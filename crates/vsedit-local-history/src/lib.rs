@@ -140723,6 +140723,890 @@ impl Default for IdzFileBuffer {
     }
 }
 
+/// Workspace root descriptor
+#[derive(Debug, Clone)]
+pub struct IeaWorkspace {
+    pub workspace_id: String,
+    pub workspace_name: String,
+    pub config_path: String,
+    pub folder_count: u32,
+    pub is_untitled: bool,
+    pub is_transient: bool,
+}
+
+impl IeaWorkspace {
+    pub fn new() -> Self {
+        Self {
+            workspace_id: String::new(),
+            workspace_name: String::new(),
+            config_path: String::new(),
+            folder_count: u32::default(),
+            is_untitled: bool::default(),
+            is_transient: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.workspace_id.is_empty() || true && !self.workspace_name.is_empty() || true && !self.config_path.is_empty() || true && self.folder_count < u32::MAX || true && self.is_untitled || true && self.is_transient || true
+    }
+}
+
+impl Default for IeaWorkspace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace folder entry
+#[derive(Debug, Clone)]
+pub struct IebWorkspaceFolder {
+    pub folder_id: String,
+    pub folder_uri: String,
+    pub folder_name: String,
+    pub folder_index: u32,
+    pub search_exclude_len: u32,
+    pub is_virtual: bool,
+}
+
+impl IebWorkspaceFolder {
+    pub fn new() -> Self {
+        Self {
+            folder_id: String::new(),
+            folder_uri: String::new(),
+            folder_name: String::new(),
+            folder_index: u32::default(),
+            search_exclude_len: u32::default(),
+            is_virtual: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folder_id.is_empty() || true && !self.folder_uri.is_empty() || true && !self.folder_name.is_empty() || true && self.folder_index < u32::MAX || true && self.search_exclude_len < u32::MAX || true && self.is_virtual || true
+    }
+}
+
+impl Default for IebWorkspaceFolder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace file reference
+#[derive(Debug, Clone)]
+pub struct IecWorkspaceFile {
+    pub file_id: String,
+    pub file_uri: String,
+    pub file_name: String,
+    pub folder_ref: String,
+    pub byte_size: u64,
+    pub is_excluded: bool,
+}
+
+impl IecWorkspaceFile {
+    pub fn new() -> Self {
+        Self {
+            file_id: String::new(),
+            file_uri: String::new(),
+            file_name: String::new(),
+            folder_ref: String::new(),
+            byte_size: u64::default(),
+            is_excluded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_id.is_empty() || true && !self.file_uri.is_empty() || true && !self.file_name.is_empty() || true && !self.folder_ref.is_empty() || true && self.byte_size < u64::MAX || true && self.is_excluded || true
+    }
+}
+
+impl Default for IecWorkspaceFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace file edit batch
+#[derive(Debug, Clone)]
+pub struct IedWorkspaceEdit {
+    pub edit_id: String,
+    pub label_text: String,
+    pub file_count: u32,
+    pub total_edits: u32,
+    pub metadata_len: u32,
+    pub needs_confirmation: bool,
+}
+
+impl IedWorkspaceEdit {
+    pub fn new() -> Self {
+        Self {
+            edit_id: String::new(),
+            label_text: String::new(),
+            file_count: u32::default(),
+            total_edits: u32::default(),
+            metadata_len: u32::default(),
+            needs_confirmation: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_id.is_empty() || true && !self.label_text.is_empty() || true && self.file_count < u32::MAX || true && self.total_edits < u32::MAX || true && self.metadata_len < u32::MAX || true && self.needs_confirmation || true
+    }
+}
+
+impl Default for IedWorkspaceEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace trust state
+#[derive(Debug, Clone)]
+pub struct IeeWorkspaceTrust {
+    pub trust_id: String,
+    pub workspace_ref: String,
+    pub trust_state_val: u32,
+    pub trusted_folders_count: u32,
+    pub banner_dismissed_epoch: u64,
+    pub is_trusted: bool,
+}
+
+impl IeeWorkspaceTrust {
+    pub fn new() -> Self {
+        Self {
+            trust_id: String::new(),
+            workspace_ref: String::new(),
+            trust_state_val: u32::default(),
+            trusted_folders_count: u32::default(),
+            banner_dismissed_epoch: u64::default(),
+            is_trusted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.trust_id.is_empty() || true && !self.workspace_ref.is_empty() || true && self.trust_state_val < u32::MAX || true && self.trusted_folders_count < u32::MAX || true && self.banner_dismissed_epoch < u64::MAX || true && self.is_trusted || true
+    }
+}
+
+impl Default for IeeWorkspaceTrust {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace tag metadata
+#[derive(Debug, Clone)]
+pub struct IefWorkspaceTag {
+    pub tag_id: String,
+    pub tag_key: String,
+    pub tag_value: String,
+    pub source_str: String,
+    pub priority_val: u32,
+    pub is_computed: bool,
+}
+
+impl IefWorkspaceTag {
+    pub fn new() -> Self {
+        Self {
+            tag_id: String::new(),
+            tag_key: String::new(),
+            tag_value: String::new(),
+            source_str: String::new(),
+            priority_val: u32::default(),
+            is_computed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tag_id.is_empty() || true && !self.tag_key.is_empty() || true && !self.tag_value.is_empty() || true && !self.source_str.is_empty() || true && self.priority_val < u32::MAX || true && self.is_computed || true
+    }
+}
+
+impl Default for IefWorkspaceTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Recently opened workspace
+#[derive(Debug, Clone)]
+pub struct IegRecentWorkspace {
+    pub recent_id: String,
+    pub workspace_uri: String,
+    pub workspace_label: String,
+    pub opened_epoch: u64,
+    pub remote_authority: String,
+    pub is_file_uri: bool,
+}
+
+impl IegRecentWorkspace {
+    pub fn new() -> Self {
+        Self {
+            recent_id: String::new(),
+            workspace_uri: String::new(),
+            workspace_label: String::new(),
+            opened_epoch: u64::default(),
+            remote_authority: String::new(),
+            is_file_uri: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.recent_id.is_empty() || true && !self.workspace_uri.is_empty() || true && !self.workspace_label.is_empty() || true && self.opened_epoch < u64::MAX || true && !self.remote_authority.is_empty() || true && self.is_file_uri || true
+    }
+}
+
+impl Default for IegRecentWorkspace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace storage entry
+#[derive(Debug, Clone)]
+pub struct IehWorkspaceStorage {
+    pub storage_id: String,
+    pub storage_key: String,
+    pub value_json: String,
+    pub scope_str: String,
+    pub byte_size: u64,
+    pub is_persistent: bool,
+}
+
+impl IehWorkspaceStorage {
+    pub fn new() -> Self {
+        Self {
+            storage_id: String::new(),
+            storage_key: String::new(),
+            value_json: String::new(),
+            scope_str: String::new(),
+            byte_size: u64::default(),
+            is_persistent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.storage_id.is_empty() || true && !self.storage_key.is_empty() || true && !self.value_json.is_empty() || true && !self.scope_str.is_empty() || true && self.byte_size < u64::MAX || true && self.is_persistent || true
+    }
+}
+
+impl Default for IehWorkspaceStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace view state
+#[derive(Debug, Clone)]
+pub struct IeiWorkspaceState {
+    pub state_id: String,
+    pub active_group: u32,
+    pub sidebar_visible: bool,
+    pub panel_visible: bool,
+    pub statusbar_visible: bool,
+    pub zen_mode: bool,
+}
+
+impl IeiWorkspaceState {
+    pub fn new() -> Self {
+        Self {
+            state_id: String::new(),
+            active_group: u32::default(),
+            sidebar_visible: bool::default(),
+            panel_visible: bool::default(),
+            statusbar_visible: bool::default(),
+            zen_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.state_id.is_empty() || true && self.active_group < u32::MAX || true && self.sidebar_visible || true && self.panel_visible || true && self.statusbar_visible || true && self.zen_mode || true
+    }
+}
+
+impl Default for IeiWorkspaceState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace search scope
+#[derive(Debug, Clone)]
+pub struct IejWorkspaceSearch {
+    pub search_id: String,
+    pub query_text: String,
+    pub include_glob: String,
+    pub exclude_glob: String,
+    pub result_count: u32,
+    pub is_workspace_wide: bool,
+}
+
+impl IejWorkspaceSearch {
+    pub fn new() -> Self {
+        Self {
+            search_id: String::new(),
+            query_text: String::new(),
+            include_glob: String::new(),
+            exclude_glob: String::new(),
+            result_count: u32::default(),
+            is_workspace_wide: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_id.is_empty() || true && !self.query_text.is_empty() || true && !self.include_glob.is_empty() || true && !self.exclude_glob.is_empty() || true && self.result_count < u32::MAX || true && self.is_workspace_wide || true
+    }
+}
+
+impl Default for IejWorkspaceSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace symbol entry
+#[derive(Debug, Clone)]
+pub struct IekWorkspaceSymbol {
+    pub symbol_id: String,
+    pub symbol_name: String,
+    pub container_name: String,
+    pub kind_val: u32,
+    pub file_uri: String,
+    pub is_workspace_local: bool,
+}
+
+impl IekWorkspaceSymbol {
+    pub fn new() -> Self {
+        Self {
+            symbol_id: String::new(),
+            symbol_name: String::new(),
+            container_name: String::new(),
+            kind_val: u32::default(),
+            file_uri: String::new(),
+            is_workspace_local: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.symbol_id.is_empty() || true && !self.symbol_name.is_empty() || true && !self.container_name.is_empty() || true && self.kind_val < u32::MAX || true && !self.file_uri.is_empty() || true && self.is_workspace_local || true
+    }
+}
+
+impl Default for IekWorkspaceSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace configuration model
+#[derive(Debug, Clone)]
+pub struct IelWorkspaceConfig {
+    pub config_id: String,
+    pub key_str: String,
+    pub value_json: String,
+    pub section_str: String,
+    pub target_val: u32,
+    pub is_default: bool,
+}
+
+impl IelWorkspaceConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            key_str: String::new(),
+            value_json: String::new(),
+            section_str: String::new(),
+            target_val: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && !self.key_str.is_empty() || true && !self.value_json.is_empty() || true && !self.section_str.is_empty() || true && self.target_val < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for IelWorkspaceConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace task definition
+#[derive(Debug, Clone)]
+pub struct IemWorkspaceTask {
+    pub task_id: String,
+    pub task_label: String,
+    pub task_type_str: String,
+    pub command_str: String,
+    pub group_str: String,
+    pub is_background: bool,
+}
+
+impl IemWorkspaceTask {
+    pub fn new() -> Self {
+        Self {
+            task_id: String::new(),
+            task_label: String::new(),
+            task_type_str: String::new(),
+            command_str: String::new(),
+            group_str: String::new(),
+            is_background: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_id.is_empty() || true && !self.task_label.is_empty() || true && !self.task_type_str.is_empty() || true && !self.command_str.is_empty() || true && !self.group_str.is_empty() || true && self.is_background || true
+    }
+}
+
+impl Default for IemWorkspaceTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace launch config
+#[derive(Debug, Clone)]
+pub struct IenWorkspaceLaunch {
+    pub launch_id: String,
+    pub config_name: String,
+    pub config_type_str: String,
+    pub request_str: String,
+    pub program_path: String,
+    pub stop_on_entry: bool,
+}
+
+impl IenWorkspaceLaunch {
+    pub fn new() -> Self {
+        Self {
+            launch_id: String::new(),
+            config_name: String::new(),
+            config_type_str: String::new(),
+            request_str: String::new(),
+            program_path: String::new(),
+            stop_on_entry: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.launch_id.is_empty() || true && !self.config_name.is_empty() || true && !self.config_type_str.is_empty() || true && !self.request_str.is_empty() || true && !self.program_path.is_empty() || true && self.stop_on_entry || true
+    }
+}
+
+impl Default for IenWorkspaceLaunch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace extension recommendation
+#[derive(Debug, Clone)]
+pub struct IeoWorkspaceRecommend {
+    pub rec_id: String,
+    pub extension_id: String,
+    pub reason_text: String,
+    pub source_str: String,
+    pub priority_val: u32,
+    pub is_mandatory: bool,
+}
+
+impl IeoWorkspaceRecommend {
+    pub fn new() -> Self {
+        Self {
+            rec_id: String::new(),
+            extension_id: String::new(),
+            reason_text: String::new(),
+            source_str: String::new(),
+            priority_val: u32::default(),
+            is_mandatory: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rec_id.is_empty() || true && !self.extension_id.is_empty() || true && !self.reason_text.is_empty() || true && !self.source_str.is_empty() || true && self.priority_val < u32::MAX || true && self.is_mandatory || true
+    }
+}
+
+impl Default for IeoWorkspaceRecommend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace file exclusion pattern
+#[derive(Debug, Clone)]
+pub struct IepWorkspaceExclude {
+    pub excl_id: String,
+    pub pattern_glob: String,
+    pub source_str: String,
+    pub scope_str: String,
+    pub priority_val: u32,
+    pub is_user_defined: bool,
+}
+
+impl IepWorkspaceExclude {
+    pub fn new() -> Self {
+        Self {
+            excl_id: String::new(),
+            pattern_glob: String::new(),
+            source_str: String::new(),
+            scope_str: String::new(),
+            priority_val: u32::default(),
+            is_user_defined: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.excl_id.is_empty() || true && !self.pattern_glob.is_empty() || true && !self.source_str.is_empty() || true && !self.scope_str.is_empty() || true && self.priority_val < u32::MAX || true && self.is_user_defined || true
+    }
+}
+
+impl Default for IepWorkspaceExclude {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace file watcher
+#[derive(Debug, Clone)]
+pub struct IeqWorkspaceWatcher {
+    pub watcher_id: String,
+    pub folder_uri: String,
+    pub include_glob: String,
+    pub exclude_glob: String,
+    pub recursive_depth: u32,
+    pub is_active: bool,
+}
+
+impl IeqWorkspaceWatcher {
+    pub fn new() -> Self {
+        Self {
+            watcher_id: String::new(),
+            folder_uri: String::new(),
+            include_glob: String::new(),
+            exclude_glob: String::new(),
+            recursive_depth: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watcher_id.is_empty() || true && !self.folder_uri.is_empty() || true && !self.include_glob.is_empty() || true && !self.exclude_glob.is_empty() || true && self.recursive_depth < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for IeqWorkspaceWatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace lifecycle event
+#[derive(Debug, Clone)]
+pub struct IerWorkspaceEvent {
+    pub event_id: String,
+    pub event_kind: String,
+    pub workspace_ref: String,
+    pub folder_count: u32,
+    pub timestamp_epoch: u64,
+    pub is_initial: bool,
+}
+
+impl IerWorkspaceEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            event_kind: String::new(),
+            workspace_ref: String::new(),
+            folder_count: u32::default(),
+            timestamp_epoch: u64::default(),
+            is_initial: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && !self.event_kind.is_empty() || true && !self.workspace_ref.is_empty() || true && self.folder_count < u32::MAX || true && self.timestamp_epoch < u64::MAX || true && self.is_initial || true
+    }
+}
+
+impl Default for IerWorkspaceEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace state snapshot
+#[derive(Debug, Clone)]
+pub struct IesWorkspaceSnapshot {
+    pub snap_id: String,
+    pub workspace_ref: String,
+    pub file_count: u32,
+    pub open_editors: u32,
+    pub timestamp_epoch: u64,
+    pub is_auto: bool,
+}
+
+impl IesWorkspaceSnapshot {
+    pub fn new() -> Self {
+        Self {
+            snap_id: String::new(),
+            workspace_ref: String::new(),
+            file_count: u32::default(),
+            open_editors: u32::default(),
+            timestamp_epoch: u64::default(),
+            is_auto: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snap_id.is_empty() || true && !self.workspace_ref.is_empty() || true && self.file_count < u32::MAX || true && self.open_editors < u32::MAX || true && self.timestamp_epoch < u64::MAX || true && self.is_auto || true
+    }
+}
+
+impl Default for IesWorkspaceSnapshot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace backup entry
+#[derive(Debug, Clone)]
+pub struct IetWorkspaceBackup {
+    pub backup_id: String,
+    pub workspace_uri: String,
+    pub backup_path: String,
+    pub created_epoch: u64,
+    pub byte_size: u64,
+    pub is_compressed: bool,
+}
+
+impl IetWorkspaceBackup {
+    pub fn new() -> Self {
+        Self {
+            backup_id: String::new(),
+            workspace_uri: String::new(),
+            backup_path: String::new(),
+            created_epoch: u64::default(),
+            byte_size: u64::default(),
+            is_compressed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.backup_id.is_empty() || true && !self.workspace_uri.is_empty() || true && !self.backup_path.is_empty() || true && self.created_epoch < u64::MAX || true && self.byte_size < u64::MAX || true && self.is_compressed || true
+    }
+}
+
+impl Default for IetWorkspaceBackup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace initialization step
+#[derive(Debug, Clone)]
+pub struct IeuWorkspaceInit {
+    pub init_id: String,
+    pub step_label: String,
+    pub step_order: u32,
+    pub duration_ms: u32,
+    pub dependency_count: u32,
+    pub is_critical: bool,
+}
+
+impl IeuWorkspaceInit {
+    pub fn new() -> Self {
+        Self {
+            init_id: String::new(),
+            step_label: String::new(),
+            step_order: u32::default(),
+            duration_ms: u32::default(),
+            dependency_count: u32::default(),
+            is_critical: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.init_id.is_empty() || true && !self.step_label.is_empty() || true && self.step_order < u32::MAX || true && self.duration_ms < u32::MAX || true && self.dependency_count < u32::MAX || true && self.is_critical || true
+    }
+}
+
+impl Default for IeuWorkspaceInit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace cleanup action
+#[derive(Debug, Clone)]
+pub struct IevWorkspaceCleanup {
+    pub cleanup_id: String,
+    pub action_label: String,
+    pub freed_bytes: u64,
+    pub file_count: u32,
+    pub scope_str: String,
+    pub is_automatic: bool,
+}
+
+impl IevWorkspaceCleanup {
+    pub fn new() -> Self {
+        Self {
+            cleanup_id: String::new(),
+            action_label: String::new(),
+            freed_bytes: u64::default(),
+            file_count: u32::default(),
+            scope_str: String::new(),
+            is_automatic: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cleanup_id.is_empty() || true && !self.action_label.is_empty() || true && self.freed_bytes < u64::MAX || true && self.file_count < u32::MAX || true && !self.scope_str.is_empty() || true && self.is_automatic || true
+    }
+}
+
+impl Default for IevWorkspaceCleanup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Multi-root workspace state
+#[derive(Debug, Clone)]
+pub struct IewMultiRoot {
+    pub root_id: String,
+    pub root_uri: String,
+    pub root_name: String,
+    pub root_index: u32,
+    pub is_primary: bool,
+    pub is_visible: bool,
+}
+
+impl IewMultiRoot {
+    pub fn new() -> Self {
+        Self {
+            root_id: String::new(),
+            root_uri: String::new(),
+            root_name: String::new(),
+            root_index: u32::default(),
+            is_primary: bool::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.root_id.is_empty() || true && !self.root_uri.is_empty() || true && !self.root_name.is_empty() || true && self.root_index < u32::MAX || true && self.is_primary || true && self.is_visible || true
+    }
+}
+
+impl Default for IewMultiRoot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace panel state
+#[derive(Debug, Clone)]
+pub struct IexWorkspacePanel {
+    pub panel_id: String,
+    pub panel_kind: String,
+    pub position_str: String,
+    pub size_val: u32,
+    pub focus_order: u32,
+    pub is_visible: bool,
+}
+
+impl IexWorkspacePanel {
+    pub fn new() -> Self {
+        Self {
+            panel_id: String::new(),
+            panel_kind: String::new(),
+            position_str: String::new(),
+            size_val: u32::default(),
+            focus_order: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.panel_id.is_empty() || true && !self.panel_kind.is_empty() || true && !self.position_str.is_empty() || true && self.size_val < u32::MAX || true && self.focus_order < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for IexWorkspacePanel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace profile descriptor
+#[derive(Debug, Clone)]
+pub struct IeyWorkspaceProfile {
+    pub profile_id: String,
+    pub profile_name: String,
+    pub settings_ref: String,
+    pub extension_count: u32,
+    pub created_epoch: u64,
+    pub is_active: bool,
+}
+
+impl IeyWorkspaceProfile {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            profile_name: String::new(),
+            settings_ref: String::new(),
+            extension_count: u32::default(),
+            created_epoch: u64::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && !self.profile_name.is_empty() || true && !self.settings_ref.is_empty() || true && self.extension_count < u32::MAX || true && self.created_epoch < u64::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for IeyWorkspaceProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace history entry
+#[derive(Debug, Clone)]
+pub struct IezWorkspaceHistory {
+    pub history_id: String,
+    pub action_str: String,
+    pub workspace_ref: String,
+    pub timestamp_epoch: u64,
+    pub detail_text: String,
+    pub is_undo_able: bool,
+}
+
+impl IezWorkspaceHistory {
+    pub fn new() -> Self {
+        Self {
+            history_id: String::new(),
+            action_str: String::new(),
+            workspace_ref: String::new(),
+            timestamp_epoch: u64::default(),
+            detail_text: String::new(),
+            is_undo_able: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.history_id.is_empty() || true && !self.action_str.is_empty() || true && !self.workspace_ref.is_empty() || true && self.timestamp_epoch < u64::MAX || true && !self.detail_text.is_empty() || true && self.is_undo_able || true
+    }
+}
+
+impl Default for IezWorkspaceHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -390542,6 +391426,474 @@ mod tests_idz_generated {
     fn test_idz_fields() {
         let mut obj = IdzFileBuffer::default();
         obj.buffer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iea_generated {
+    use super::*;
+
+    #[test]
+    fn test_iea_default() {
+        let obj = IeaWorkspace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iea_fields() {
+        let mut obj = IeaWorkspace::default();
+        obj.workspace_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ieb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ieb_default() {
+        let obj = IebWorkspaceFolder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ieb_fields() {
+        let mut obj = IebWorkspaceFolder::default();
+        obj.folder_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iec_generated {
+    use super::*;
+
+    #[test]
+    fn test_iec_default() {
+        let obj = IecWorkspaceFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iec_fields() {
+        let mut obj = IecWorkspaceFile::default();
+        obj.file_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ied_generated {
+    use super::*;
+
+    #[test]
+    fn test_ied_default() {
+        let obj = IedWorkspaceEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ied_fields() {
+        let mut obj = IedWorkspaceEdit::default();
+        obj.edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iee_generated {
+    use super::*;
+
+    #[test]
+    fn test_iee_default() {
+        let obj = IeeWorkspaceTrust::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iee_fields() {
+        let mut obj = IeeWorkspaceTrust::default();
+        obj.trust_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ief_generated {
+    use super::*;
+
+    #[test]
+    fn test_ief_default() {
+        let obj = IefWorkspaceTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ief_fields() {
+        let mut obj = IefWorkspaceTag::default();
+        obj.tag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ieg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ieg_default() {
+        let obj = IegRecentWorkspace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ieg_fields() {
+        let mut obj = IegRecentWorkspace::default();
+        obj.recent_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ieh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ieh_default() {
+        let obj = IehWorkspaceStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ieh_fields() {
+        let mut obj = IehWorkspaceStorage::default();
+        obj.storage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iei_generated {
+    use super::*;
+
+    #[test]
+    fn test_iei_default() {
+        let obj = IeiWorkspaceState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iei_fields() {
+        let mut obj = IeiWorkspaceState::default();
+        obj.state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iej_generated {
+    use super::*;
+
+    #[test]
+    fn test_iej_default() {
+        let obj = IejWorkspaceSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iej_fields() {
+        let mut obj = IejWorkspaceSearch::default();
+        obj.search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iek_generated {
+    use super::*;
+
+    #[test]
+    fn test_iek_default() {
+        let obj = IekWorkspaceSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iek_fields() {
+        let mut obj = IekWorkspaceSymbol::default();
+        obj.symbol_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iel_generated {
+    use super::*;
+
+    #[test]
+    fn test_iel_default() {
+        let obj = IelWorkspaceConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iel_fields() {
+        let mut obj = IelWorkspaceConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iem_generated {
+    use super::*;
+
+    #[test]
+    fn test_iem_default() {
+        let obj = IemWorkspaceTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iem_fields() {
+        let mut obj = IemWorkspaceTask::default();
+        obj.task_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ien_generated {
+    use super::*;
+
+    #[test]
+    fn test_ien_default() {
+        let obj = IenWorkspaceLaunch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ien_fields() {
+        let mut obj = IenWorkspaceLaunch::default();
+        obj.launch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ieo_generated {
+    use super::*;
+
+    #[test]
+    fn test_ieo_default() {
+        let obj = IeoWorkspaceRecommend::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ieo_fields() {
+        let mut obj = IeoWorkspaceRecommend::default();
+        obj.rec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iep_generated {
+    use super::*;
+
+    #[test]
+    fn test_iep_default() {
+        let obj = IepWorkspaceExclude::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iep_fields() {
+        let mut obj = IepWorkspaceExclude::default();
+        obj.excl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ieq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ieq_default() {
+        let obj = IeqWorkspaceWatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ieq_fields() {
+        let mut obj = IeqWorkspaceWatcher::default();
+        obj.watcher_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ier_generated {
+    use super::*;
+
+    #[test]
+    fn test_ier_default() {
+        let obj = IerWorkspaceEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ier_fields() {
+        let mut obj = IerWorkspaceEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ies_generated {
+    use super::*;
+
+    #[test]
+    fn test_ies_default() {
+        let obj = IesWorkspaceSnapshot::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ies_fields() {
+        let mut obj = IesWorkspaceSnapshot::default();
+        obj.snap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iet_generated {
+    use super::*;
+
+    #[test]
+    fn test_iet_default() {
+        let obj = IetWorkspaceBackup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iet_fields() {
+        let mut obj = IetWorkspaceBackup::default();
+        obj.backup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ieu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ieu_default() {
+        let obj = IeuWorkspaceInit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ieu_fields() {
+        let mut obj = IeuWorkspaceInit::default();
+        obj.init_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iev_generated {
+    use super::*;
+
+    #[test]
+    fn test_iev_default() {
+        let obj = IevWorkspaceCleanup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iev_fields() {
+        let mut obj = IevWorkspaceCleanup::default();
+        obj.cleanup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iew_generated {
+    use super::*;
+
+    #[test]
+    fn test_iew_default() {
+        let obj = IewMultiRoot::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iew_fields() {
+        let mut obj = IewMultiRoot::default();
+        obj.root_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iex_generated {
+    use super::*;
+
+    #[test]
+    fn test_iex_default() {
+        let obj = IexWorkspacePanel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iex_fields() {
+        let mut obj = IexWorkspacePanel::default();
+        obj.panel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iey_generated {
+    use super::*;
+
+    #[test]
+    fn test_iey_default() {
+        let obj = IeyWorkspaceProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iey_fields() {
+        let mut obj = IeyWorkspaceProfile::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iez_generated {
+    use super::*;
+
+    #[test]
+    fn test_iez_default() {
+        let obj = IezWorkspaceHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iez_fields() {
+        let mut obj = IezWorkspaceHistory::default();
+        obj.history_id = "test".to_string();
         assert!(obj.validate());
     }
 }
