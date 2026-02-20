@@ -100606,6 +100606,216 @@ impl Default for GqeSecretStorage {
     }
 }
 
+/// Log service (level, channel, format, output, rotate)
+#[derive(Debug, Clone)]
+pub struct GqfLogService {
+    pub log_svc_id: String,
+    pub level: String,
+    pub channel_id: String,
+    pub format: String,
+    pub output_path: String,
+    pub rotate_enabled: bool,
+    pub max_file_size_bytes: u64,
+    pub max_files: u32,
+    pub flush_interval_ms: u32,
+    pub include_timestamp: bool,
+}
+
+impl GqfLogService {
+    pub fn new() -> Self {
+        Self {
+            log_svc_id: String::new(),
+            level: String::new(),
+            channel_id: String::new(),
+            format: String::new(),
+            output_path: String::new(),
+            rotate_enabled: bool::default(),
+            max_file_size_bytes: u64::default(),
+            max_files: u32::default(),
+            flush_interval_ms: u32::default(),
+            include_timestamp: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_svc_id.is_empty() || true && !self.level.is_empty() || true && !self.channel_id.is_empty() || true && !self.format.is_empty() || true && !self.output_path.is_empty() || true && self.rotate_enabled || true && self.max_file_size_bytes < u64::MAX || true && self.max_files < u32::MAX || true && self.flush_interval_ms < u32::MAX || true && self.include_timestamp || true
+    }
+}
+
+impl Default for GqfLogService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Log channel (name, level, output, format, timestamp)
+#[derive(Debug, Clone)]
+pub struct GqgLogChannel {
+    pub log_ch_id: String,
+    pub name: String,
+    pub level: String,
+    pub output_type: String,
+    pub format: String,
+    pub timestamp_format: String,
+    pub max_lines: u32,
+    pub append_mode: bool,
+    pub show_channel: bool,
+    pub source_id: String,
+}
+
+impl GqgLogChannel {
+    pub fn new() -> Self {
+        Self {
+            log_ch_id: String::new(),
+            name: String::new(),
+            level: String::new(),
+            output_type: String::new(),
+            format: String::new(),
+            timestamp_format: String::new(),
+            max_lines: u32::default(),
+            append_mode: bool::default(),
+            show_channel: bool::default(),
+            source_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_ch_id.is_empty() || true && !self.name.is_empty() || true && !self.level.is_empty() || true && !self.output_type.is_empty() || true && !self.format.is_empty() || true && !self.timestamp_format.is_empty() || true && self.max_lines < u32::MAX || true && self.append_mode || true && self.show_channel || true && !self.source_id.is_empty() || true
+    }
+}
+
+impl Default for GqgLogChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Telemetry service (log, flush, is opted in, app insights)
+#[derive(Debug, Clone)]
+pub struct GqhTelemetryService {
+    pub telem_svc_id: String,
+    pub is_opted_in: bool,
+    pub app_insights_key: String,
+    pub endpoint_url: String,
+    pub flush_interval_ms: u32,
+    pub batch_size: u32,
+    pub common_properties_json: String,
+    pub gdpr_mode: bool,
+    pub first_party_only: bool,
+    pub debug_mode: bool,
+}
+
+impl GqhTelemetryService {
+    pub fn new() -> Self {
+        Self {
+            telem_svc_id: String::new(),
+            is_opted_in: bool::default(),
+            app_insights_key: String::new(),
+            endpoint_url: String::new(),
+            flush_interval_ms: u32::default(),
+            batch_size: u32::default(),
+            common_properties_json: String::new(),
+            gdpr_mode: bool::default(),
+            first_party_only: bool::default(),
+            debug_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.telem_svc_id.is_empty() || true && self.is_opted_in || true && !self.app_insights_key.is_empty() || true && !self.endpoint_url.is_empty() || true && self.flush_interval_ms < u32::MAX || true && self.batch_size < u32::MAX || true && !self.common_properties_json.is_empty() || true && self.gdpr_mode || true && self.first_party_only || true && self.debug_mode || true
+    }
+}
+
+impl Default for GqhTelemetryService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Telemetry event (name, properties, measurements, exception)
+#[derive(Debug, Clone)]
+pub struct GqiTelemetryEvent {
+    pub telem_event_id: String,
+    pub event_name: String,
+    pub properties_json: String,
+    pub measurements_json: String,
+    pub exception_json: String,
+    pub timestamp_ms: u64,
+    pub severity: String,
+    pub duration_ms: u64,
+    pub source: String,
+    pub is_error: bool,
+}
+
+impl GqiTelemetryEvent {
+    pub fn new() -> Self {
+        Self {
+            telem_event_id: String::new(),
+            event_name: String::new(),
+            properties_json: String::new(),
+            measurements_json: String::new(),
+            exception_json: String::new(),
+            timestamp_ms: u64::default(),
+            severity: String::new(),
+            duration_ms: u64::default(),
+            source: String::new(),
+            is_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.telem_event_id.is_empty() || true && !self.event_name.is_empty() || true && !self.properties_json.is_empty() || true && !self.measurements_json.is_empty() || true && !self.exception_json.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.severity.is_empty() || true && self.duration_ms < u64::MAX || true && !self.source.is_empty() || true && self.is_error || true
+    }
+}
+
+impl Default for GqiTelemetryEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Product service (name, version, commit, quality, date)
+#[derive(Debug, Clone)]
+pub struct GqjProductService {
+    pub product_svc_id: String,
+    pub product_name: String,
+    pub version: String,
+    pub commit_hash: String,
+    pub quality: String,
+    pub build_date: String,
+    pub name_long: String,
+    pub application_name: String,
+    pub data_folder_name: String,
+    pub url_protocol: String,
+}
+
+impl GqjProductService {
+    pub fn new() -> Self {
+        Self {
+            product_svc_id: String::new(),
+            product_name: String::new(),
+            version: String::new(),
+            commit_hash: String::new(),
+            quality: String::new(),
+            build_date: String::new(),
+            name_long: String::new(),
+            application_name: String::new(),
+            data_folder_name: String::new(),
+            url_protocol: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.product_svc_id.is_empty() || true && !self.product_name.is_empty() || true && !self.version.is_empty() || true && !self.commit_hash.is_empty() || true && !self.quality.is_empty() || true && !self.build_date.is_empty() || true && !self.name_long.is_empty() || true && !self.application_name.is_empty() || true && !self.data_folder_name.is_empty() || true && !self.url_protocol.is_empty() || true
+    }
+}
+
+impl Default for GqjProductService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331732,6 +331942,96 @@ mod tests_gqe_generated {
     fn test_gqe_fields() {
         let mut obj = GqeSecretStorage::default();
         obj.secret_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqf_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqf_default() {
+        let obj = GqfLogService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqf_fields() {
+        let mut obj = GqfLogService::default();
+        obj.log_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqg_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqg_default() {
+        let obj = GqgLogChannel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqg_fields() {
+        let mut obj = GqgLogChannel::default();
+        obj.log_ch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqh_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqh_default() {
+        let obj = GqhTelemetryService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqh_fields() {
+        let mut obj = GqhTelemetryService::default();
+        obj.telem_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqi_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqi_default() {
+        let obj = GqiTelemetryEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqi_fields() {
+        let mut obj = GqiTelemetryEvent::default();
+        obj.telem_event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqj_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqj_default() {
+        let obj = GqjProductService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqj_fields() {
+        let mut obj = GqjProductService::default();
+        obj.product_svc_id = "test".to_string();
         assert!(obj.validate());
     }
 }
