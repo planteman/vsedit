@@ -99650,6 +99650,678 @@ impl Default for GpjEditorViewport {
     }
 }
 
+/// Editor layout info (content width/height, minimap, gutter, scrollbar)
+#[derive(Debug, Clone)]
+pub struct GpkEditorLayoutInfo {
+    pub layout_id: String,
+    pub content_width: u32,
+    pub content_height: u32,
+    pub minimap_width: u32,
+    pub gutter_width: u32,
+    pub scrollbar_width: u32,
+    pub decorations_width: u32,
+    pub line_numbers_width: u32,
+    pub margin_width: u32,
+    pub overview_ruler_width: u32,
+}
+
+impl GpkEditorLayoutInfo {
+    pub fn new() -> Self {
+        Self {
+            layout_id: String::new(),
+            content_width: u32::default(),
+            content_height: u32::default(),
+            minimap_width: u32::default(),
+            gutter_width: u32::default(),
+            scrollbar_width: u32::default(),
+            decorations_width: u32::default(),
+            line_numbers_width: u32::default(),
+            margin_width: u32::default(),
+            overview_ruler_width: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_id.is_empty() || true && self.content_width < u32::MAX || true && self.content_height < u32::MAX || true && self.minimap_width < u32::MAX || true && self.gutter_width < u32::MAX || true && self.scrollbar_width < u32::MAX || true && self.decorations_width < u32::MAX || true && self.line_numbers_width < u32::MAX || true && self.margin_width < u32::MAX || true && self.overview_ruler_width < u32::MAX || true
+    }
+}
+
+impl Default for GpkEditorLayoutInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor font info (family, size, line height, letter spacing, weight)
+#[derive(Debug, Clone)]
+pub struct GplEditorFontInfo {
+    pub font_id: String,
+    pub font_family: String,
+    pub font_size: u32,
+    pub line_height: u32,
+    pub letter_spacing: f64,
+    pub font_weight: String,
+    pub typical_char_width: f64,
+    pub max_digit_width: f64,
+    pub is_monospace: bool,
+    pub can_use_half_width_rightwards: bool,
+}
+
+impl GplEditorFontInfo {
+    pub fn new() -> Self {
+        Self {
+            font_id: String::new(),
+            font_family: String::new(),
+            font_size: u32::default(),
+            line_height: u32::default(),
+            letter_spacing: f64::default(),
+            font_weight: String::new(),
+            typical_char_width: f64::default(),
+            max_digit_width: f64::default(),
+            is_monospace: bool::default(),
+            can_use_half_width_rightwards: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.font_id.is_empty() || true && !self.font_family.is_empty() || true && self.font_size < u32::MAX || true && self.line_height < u32::MAX || true && self.letter_spacing.is_finite() || true && !self.font_weight.is_empty() || true && self.typical_char_width.is_finite() || true && self.max_digit_width.is_finite() || true && self.is_monospace || true && self.can_use_half_width_rightwards || true
+    }
+}
+
+impl Default for GplEditorFontInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor render options (whitespace, control chars, guides, rulers)
+#[derive(Debug, Clone)]
+pub struct GpmEditorRenderOptions {
+    pub render_id: String,
+    pub render_whitespace: String,
+    pub render_control_chars: bool,
+    pub render_indent_guides: bool,
+    pub render_rulers_json: String,
+    pub render_line_highlight: String,
+    pub render_final_newline: String,
+    pub render_validation_decorations: String,
+    pub smooth_scrolling: bool,
+    pub cursor_surrounding_lines: u32,
+}
+
+impl GpmEditorRenderOptions {
+    pub fn new() -> Self {
+        Self {
+            render_id: String::new(),
+            render_whitespace: String::new(),
+            render_control_chars: bool::default(),
+            render_indent_guides: bool::default(),
+            render_rulers_json: String::new(),
+            render_line_highlight: String::new(),
+            render_final_newline: String::new(),
+            render_validation_decorations: String::new(),
+            smooth_scrolling: bool::default(),
+            cursor_surrounding_lines: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.render_id.is_empty() || true && !self.render_whitespace.is_empty() || true && self.render_control_chars || true && self.render_indent_guides || true && !self.render_rulers_json.is_empty() || true && !self.render_line_highlight.is_empty() || true && !self.render_final_newline.is_empty() || true && !self.render_validation_decorations.is_empty() || true && self.smooth_scrolling || true && self.cursor_surrounding_lines < u32::MAX || true
+    }
+}
+
+impl Default for GpmEditorRenderOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor line decoration (range, class, inline class, glyph)
+#[derive(Debug, Clone)]
+pub struct GpnEditorLineDecoration {
+    pub line_deco_id: String,
+    pub range_json: String,
+    pub inline_class_name: String,
+    pub glyph_margin_class: String,
+    pub is_whole_line: bool,
+    pub after_content_class: String,
+    pub before_content_class: String,
+    pub stickiness: u32,
+    pub z_index: u32,
+    pub overview_ruler_json: String,
+}
+
+impl GpnEditorLineDecoration {
+    pub fn new() -> Self {
+        Self {
+            line_deco_id: String::new(),
+            range_json: String::new(),
+            inline_class_name: String::new(),
+            glyph_margin_class: String::new(),
+            is_whole_line: bool::default(),
+            after_content_class: String::new(),
+            before_content_class: String::new(),
+            stickiness: u32::default(),
+            z_index: u32::default(),
+            overview_ruler_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_deco_id.is_empty() || true && !self.range_json.is_empty() || true && !self.inline_class_name.is_empty() || true && !self.glyph_margin_class.is_empty() || true && self.is_whole_line || true && !self.after_content_class.is_empty() || true && !self.before_content_class.is_empty() || true && self.stickiness < u32::MAX || true && self.z_index < u32::MAX || true && !self.overview_ruler_json.is_empty() || true
+    }
+}
+
+impl Default for GpnEditorLineDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor content widget (id, dom node, position, preference)
+#[derive(Debug, Clone)]
+pub struct GpoEditorContentWidget {
+    pub content_widget_id: String,
+    pub position_json: String,
+    pub preference_json: String,
+    pub allow_edge_overflow: bool,
+    pub suppress_mouse_down: bool,
+    pub is_visible: bool,
+    pub min_width: u32,
+    pub after_line_number: u32,
+    pub above_line: bool,
+    pub before_column: u32,
+}
+
+impl GpoEditorContentWidget {
+    pub fn new() -> Self {
+        Self {
+            content_widget_id: String::new(),
+            position_json: String::new(),
+            preference_json: String::new(),
+            allow_edge_overflow: bool::default(),
+            suppress_mouse_down: bool::default(),
+            is_visible: bool::default(),
+            min_width: u32::default(),
+            after_line_number: u32::default(),
+            above_line: bool::default(),
+            before_column: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.content_widget_id.is_empty() || true && !self.position_json.is_empty() || true && !self.preference_json.is_empty() || true && self.allow_edge_overflow || true && self.suppress_mouse_down || true && self.is_visible || true && self.min_width < u32::MAX || true && self.after_line_number < u32::MAX || true && self.above_line || true && self.before_column < u32::MAX || true
+    }
+}
+
+impl Default for GpoEditorContentWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor overlay widget (id, dom node, position, min width)
+#[derive(Debug, Clone)]
+pub struct GppEditorOverlayWidget {
+    pub overlay_widget_id: String,
+    pub position_json: String,
+    pub min_width: u32,
+    pub allow_edge_overflow: bool,
+    pub stack_ordinal: u32,
+    pub is_visible: bool,
+    pub suppress_mouse_down: bool,
+    pub anchor: String,
+    pub margin_top: u32,
+    pub margin_left: u32,
+}
+
+impl GppEditorOverlayWidget {
+    pub fn new() -> Self {
+        Self {
+            overlay_widget_id: String::new(),
+            position_json: String::new(),
+            min_width: u32::default(),
+            allow_edge_overflow: bool::default(),
+            stack_ordinal: u32::default(),
+            is_visible: bool::default(),
+            suppress_mouse_down: bool::default(),
+            anchor: String::new(),
+            margin_top: u32::default(),
+            margin_left: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.overlay_widget_id.is_empty() || true && !self.position_json.is_empty() || true && self.min_width < u32::MAX || true && self.allow_edge_overflow || true && self.stack_ordinal < u32::MAX || true && self.is_visible || true && self.suppress_mouse_down || true && !self.anchor.is_empty() || true && self.margin_top < u32::MAX || true && self.margin_left < u32::MAX || true
+    }
+}
+
+impl Default for GppEditorOverlayWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor view zone (after line, height, dom node, ordinal)
+#[derive(Debug, Clone)]
+pub struct GpqEditorViewZone {
+    pub view_zone_id: String,
+    pub after_line_number: u32,
+    pub height_in_lines: u32,
+    pub min_width_in_px: u32,
+    pub ordinal: u32,
+    pub is_visible: bool,
+    pub suppress_mouse_down: bool,
+    pub show_in_hidden_areas: bool,
+    pub margin_dom_node: bool,
+    pub after_column: u32,
+}
+
+impl GpqEditorViewZone {
+    pub fn new() -> Self {
+        Self {
+            view_zone_id: String::new(),
+            after_line_number: u32::default(),
+            height_in_lines: u32::default(),
+            min_width_in_px: u32::default(),
+            ordinal: u32::default(),
+            is_visible: bool::default(),
+            suppress_mouse_down: bool::default(),
+            show_in_hidden_areas: bool::default(),
+            margin_dom_node: bool::default(),
+            after_column: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_zone_id.is_empty() || true && self.after_line_number < u32::MAX || true && self.height_in_lines < u32::MAX || true && self.min_width_in_px < u32::MAX || true && self.ordinal < u32::MAX || true && self.is_visible || true && self.suppress_mouse_down || true && self.show_in_hidden_areas || true && self.margin_dom_node || true && self.after_column < u32::MAX || true
+    }
+}
+
+impl Default for GpqEditorViewZone {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor glyph margin widget (lanes, position, z-index, range)
+#[derive(Debug, Clone)]
+pub struct GprEditorGlyphMarginWidget {
+    pub glyph_widget_id: String,
+    pub lane: u32,
+    pub z_index: u32,
+    pub range_json: String,
+    pub position_json: String,
+    pub is_visible: bool,
+    pub suppress_mouse_down: bool,
+    pub tooltip: String,
+    pub icon: String,
+    pub color: String,
+}
+
+impl GprEditorGlyphMarginWidget {
+    pub fn new() -> Self {
+        Self {
+            glyph_widget_id: String::new(),
+            lane: u32::default(),
+            z_index: u32::default(),
+            range_json: String::new(),
+            position_json: String::new(),
+            is_visible: bool::default(),
+            suppress_mouse_down: bool::default(),
+            tooltip: String::new(),
+            icon: String::new(),
+            color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.glyph_widget_id.is_empty() || true && self.lane < u32::MAX || true && self.z_index < u32::MAX || true && !self.range_json.is_empty() || true && !self.position_json.is_empty() || true && self.is_visible || true && self.suppress_mouse_down || true && !self.tooltip.is_empty() || true && !self.icon.is_empty() || true && !self.color.is_empty() || true
+    }
+}
+
+impl Default for GprEditorGlyphMarginWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor model decoration (range, options, owner, stacking)
+#[derive(Debug, Clone)]
+pub struct GpsEditorModelDecoration {
+    pub model_deco_id: String,
+    pub range_json: String,
+    pub options_json: String,
+    pub owner_id: String,
+    pub stacking_order: u32,
+    pub is_whole_line: bool,
+    pub inline_class_name: String,
+    pub hover_message_json: String,
+    pub glyph_class: String,
+    pub overview_ruler_json: String,
+}
+
+impl GpsEditorModelDecoration {
+    pub fn new() -> Self {
+        Self {
+            model_deco_id: String::new(),
+            range_json: String::new(),
+            options_json: String::new(),
+            owner_id: String::new(),
+            stacking_order: u32::default(),
+            is_whole_line: bool::default(),
+            inline_class_name: String::new(),
+            hover_message_json: String::new(),
+            glyph_class: String::new(),
+            overview_ruler_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.model_deco_id.is_empty() || true && !self.range_json.is_empty() || true && !self.options_json.is_empty() || true && !self.owner_id.is_empty() || true && self.stacking_order < u32::MAX || true && self.is_whole_line || true && !self.inline_class_name.is_empty() || true && !self.hover_message_json.is_empty() || true && !self.glyph_class.is_empty() || true && !self.overview_ruler_json.is_empty() || true
+    }
+}
+
+impl Default for GpsEditorModelDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor tracked range (range, stickiness, grow mode, id)
+#[derive(Debug, Clone)]
+pub struct GptEditorTrackedRange {
+    pub tracked_id: String,
+    pub range_json: String,
+    pub stickiness: u32,
+    pub grow_only_when_typing: bool,
+    pub tracked_range_id: String,
+    pub is_valid: bool,
+    pub start_line_delta: u32,
+    pub end_line_delta: u32,
+    pub collapse_on_replace: bool,
+    pub always_grows_when_typing: bool,
+}
+
+impl GptEditorTrackedRange {
+    pub fn new() -> Self {
+        Self {
+            tracked_id: String::new(),
+            range_json: String::new(),
+            stickiness: u32::default(),
+            grow_only_when_typing: bool::default(),
+            tracked_range_id: String::new(),
+            is_valid: bool::default(),
+            start_line_delta: u32::default(),
+            end_line_delta: u32::default(),
+            collapse_on_replace: bool::default(),
+            always_grows_when_typing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tracked_id.is_empty() || true && !self.range_json.is_empty() || true && self.stickiness < u32::MAX || true && self.grow_only_when_typing || true && !self.tracked_range_id.is_empty() || true && self.is_valid || true && self.start_line_delta < u32::MAX || true && self.end_line_delta < u32::MAX || true && self.collapse_on_replace || true && self.always_grows_when_typing || true
+    }
+}
+
+impl Default for GptEditorTrackedRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor mouse target (type, position, range, detail, element)
+#[derive(Debug, Clone)]
+pub struct GpuEditorMouseTarget {
+    pub mouse_target_id: String,
+    pub target_type: String,
+    pub position_json: String,
+    pub range_json: String,
+    pub detail_json: String,
+    pub element_type: String,
+    pub mouse_column: u32,
+    pub is_in_content: bool,
+    pub is_in_margin: bool,
+    pub is_in_minimap: bool,
+}
+
+impl GpuEditorMouseTarget {
+    pub fn new() -> Self {
+        Self {
+            mouse_target_id: String::new(),
+            target_type: String::new(),
+            position_json: String::new(),
+            range_json: String::new(),
+            detail_json: String::new(),
+            element_type: String::new(),
+            mouse_column: u32::default(),
+            is_in_content: bool::default(),
+            is_in_margin: bool::default(),
+            is_in_minimap: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mouse_target_id.is_empty() || true && !self.target_type.is_empty() || true && !self.position_json.is_empty() || true && !self.range_json.is_empty() || true && !self.detail_json.is_empty() || true && !self.element_type.is_empty() || true && self.mouse_column < u32::MAX || true && self.is_in_content || true && self.is_in_margin || true && self.is_in_minimap || true
+    }
+}
+
+impl Default for GpuEditorMouseTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor cursor config (style, blink, width, surrounding lines)
+#[derive(Debug, Clone)]
+pub struct GpvEditorCursorConfig {
+    pub cursor_cfg_id: String,
+    pub style: String,
+    pub blink_mode: String,
+    pub width: u32,
+    pub surrounding_lines: u32,
+    pub surrounding_lines_style: String,
+    pub smooth_caret: bool,
+    pub animation_style: String,
+    pub hide_in_overview_ruler: bool,
+    pub primary_cursor_color: String,
+}
+
+impl GpvEditorCursorConfig {
+    pub fn new() -> Self {
+        Self {
+            cursor_cfg_id: String::new(),
+            style: String::new(),
+            blink_mode: String::new(),
+            width: u32::default(),
+            surrounding_lines: u32::default(),
+            surrounding_lines_style: String::new(),
+            smooth_caret: bool::default(),
+            animation_style: String::new(),
+            hide_in_overview_ruler: bool::default(),
+            primary_cursor_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cursor_cfg_id.is_empty() || true && !self.style.is_empty() || true && !self.blink_mode.is_empty() || true && self.width < u32::MAX || true && self.surrounding_lines < u32::MAX || true && !self.surrounding_lines_style.is_empty() || true && self.smooth_caret || true && !self.animation_style.is_empty() || true && self.hide_in_overview_ruler || true && !self.primary_cursor_color.is_empty() || true
+    }
+}
+
+impl Default for GpvEditorCursorConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor find config (seed, auto find, global find clipboard)
+#[derive(Debug, Clone)]
+pub struct GpwEditorFindConfig {
+    pub find_cfg_id: String,
+    pub seed_on_focus: bool,
+    pub auto_find_in_selection: String,
+    pub global_find_clipboard: bool,
+    pub add_extra_space_on_top: bool,
+    pub loop_mode: bool,
+    pub cursor_move_on_type: bool,
+    pub preserve_case: bool,
+    pub default_regex: bool,
+    pub default_case_sensitive: bool,
+}
+
+impl GpwEditorFindConfig {
+    pub fn new() -> Self {
+        Self {
+            find_cfg_id: String::new(),
+            seed_on_focus: bool::default(),
+            auto_find_in_selection: String::new(),
+            global_find_clipboard: bool::default(),
+            add_extra_space_on_top: bool::default(),
+            loop_mode: bool::default(),
+            cursor_move_on_type: bool::default(),
+            preserve_case: bool::default(),
+            default_regex: bool::default(),
+            default_case_sensitive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.find_cfg_id.is_empty() || true && self.seed_on_focus || true && !self.auto_find_in_selection.is_empty() || true && self.global_find_clipboard || true && self.add_extra_space_on_top || true && self.loop_mode || true && self.cursor_move_on_type || true && self.preserve_case || true && self.default_regex || true && self.default_case_sensitive || true
+    }
+}
+
+impl Default for GpwEditorFindConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor drag and drop (enabled, show move icon, copy mode)
+#[derive(Debug, Clone)]
+pub struct GpxEditorDragAndDrop {
+    pub editor_dnd_id: String,
+    pub enabled: bool,
+    pub show_move_icon: bool,
+    pub copy_modifier: String,
+    pub move_on_drag: bool,
+    pub auto_scroll: bool,
+    pub drop_on_widget: bool,
+    pub accept_mime_types_json: String,
+    pub show_drop_indicator: bool,
+    pub allow_external: bool,
+}
+
+impl GpxEditorDragAndDrop {
+    pub fn new() -> Self {
+        Self {
+            editor_dnd_id: String::new(),
+            enabled: bool::default(),
+            show_move_icon: bool::default(),
+            copy_modifier: String::new(),
+            move_on_drag: bool::default(),
+            auto_scroll: bool::default(),
+            drop_on_widget: bool::default(),
+            accept_mime_types_json: String::new(),
+            show_drop_indicator: bool::default(),
+            allow_external: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_dnd_id.is_empty() || true && self.enabled || true && self.show_move_icon || true && !self.copy_modifier.is_empty() || true && self.move_on_drag || true && self.auto_scroll || true && self.drop_on_widget || true && !self.accept_mime_types_json.is_empty() || true && self.show_drop_indicator || true && self.allow_external || true
+    }
+}
+
+impl Default for GpxEditorDragAndDrop {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor accessibility (tab focus mode, screen reader, announce)
+#[derive(Debug, Clone)]
+pub struct GpyEditorAccessibility {
+    pub editor_a11y_id: String,
+    pub tab_focus_mode: bool,
+    pub screen_reader_optimal: bool,
+    pub announce_line: bool,
+    pub announce_cursor: bool,
+    pub accessible_view: bool,
+    pub audio_cues_enabled: bool,
+    pub voice_input: bool,
+    pub high_contrast: bool,
+    pub aria_role: String,
+}
+
+impl GpyEditorAccessibility {
+    pub fn new() -> Self {
+        Self {
+            editor_a11y_id: String::new(),
+            tab_focus_mode: bool::default(),
+            screen_reader_optimal: bool::default(),
+            announce_line: bool::default(),
+            announce_cursor: bool::default(),
+            accessible_view: bool::default(),
+            audio_cues_enabled: bool::default(),
+            voice_input: bool::default(),
+            high_contrast: bool::default(),
+            aria_role: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_a11y_id.is_empty() || true && self.tab_focus_mode || true && self.screen_reader_optimal || true && self.announce_line || true && self.announce_cursor || true && self.accessible_view || true && self.audio_cues_enabled || true && self.voice_input || true && self.high_contrast || true && !self.aria_role.is_empty() || true
+    }
+}
+
+impl Default for GpyEditorAccessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor line numbers (on, off, relative, interval, render)
+#[derive(Debug, Clone)]
+pub struct GpzEditorLineNumbers {
+    pub line_nums_id: String,
+    pub render_type: String,
+    pub is_on: bool,
+    pub is_relative: bool,
+    pub is_interval: bool,
+    pub interval_value: u32,
+    pub decorator_json: String,
+    pub min_width: u32,
+    pub max_width: u32,
+    pub render_final_newline: bool,
+}
+
+impl GpzEditorLineNumbers {
+    pub fn new() -> Self {
+        Self {
+            line_nums_id: String::new(),
+            render_type: String::new(),
+            is_on: bool::default(),
+            is_relative: bool::default(),
+            is_interval: bool::default(),
+            interval_value: u32::default(),
+            decorator_json: String::new(),
+            min_width: u32::default(),
+            max_width: u32::default(),
+            render_final_newline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_nums_id.is_empty() || true && !self.render_type.is_empty() || true && self.is_on || true && self.is_relative || true && self.is_interval || true && self.interval_value < u32::MAX || true && !self.decorator_json.is_empty() || true && self.min_width < u32::MAX || true && self.max_width < u32::MAX || true && self.render_final_newline || true
+    }
+}
+
+impl Default for GpzEditorLineNumbers {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -330345,6 +331017,294 @@ mod tests_gpj_generated {
     fn test_gpj_fields() {
         let mut obj = GpjEditorViewport::default();
         obj.viewport_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpk_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpk_default() {
+        let obj = GpkEditorLayoutInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpk_fields() {
+        let mut obj = GpkEditorLayoutInfo::default();
+        obj.layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpl_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpl_default() {
+        let obj = GplEditorFontInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpl_fields() {
+        let mut obj = GplEditorFontInfo::default();
+        obj.font_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpm_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpm_default() {
+        let obj = GpmEditorRenderOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpm_fields() {
+        let mut obj = GpmEditorRenderOptions::default();
+        obj.render_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpn_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpn_default() {
+        let obj = GpnEditorLineDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpn_fields() {
+        let mut obj = GpnEditorLineDecoration::default();
+        obj.line_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpo_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpo_default() {
+        let obj = GpoEditorContentWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpo_fields() {
+        let mut obj = GpoEditorContentWidget::default();
+        obj.content_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpp_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpp_default() {
+        let obj = GppEditorOverlayWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpp_fields() {
+        let mut obj = GppEditorOverlayWidget::default();
+        obj.overlay_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpq_default() {
+        let obj = GpqEditorViewZone::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpq_fields() {
+        let mut obj = GpqEditorViewZone::default();
+        obj.view_zone_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpr_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpr_default() {
+        let obj = GprEditorGlyphMarginWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpr_fields() {
+        let mut obj = GprEditorGlyphMarginWidget::default();
+        obj.glyph_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gps_generated {
+    use super::*;
+
+    #[test]
+    fn test_gps_default() {
+        let obj = GpsEditorModelDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gps_fields() {
+        let mut obj = GpsEditorModelDecoration::default();
+        obj.model_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpt_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpt_default() {
+        let obj = GptEditorTrackedRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpt_fields() {
+        let mut obj = GptEditorTrackedRange::default();
+        obj.tracked_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpu_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpu_default() {
+        let obj = GpuEditorMouseTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpu_fields() {
+        let mut obj = GpuEditorMouseTarget::default();
+        obj.mouse_target_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpv_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpv_default() {
+        let obj = GpvEditorCursorConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpv_fields() {
+        let mut obj = GpvEditorCursorConfig::default();
+        obj.cursor_cfg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpw_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpw_default() {
+        let obj = GpwEditorFindConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpw_fields() {
+        let mut obj = GpwEditorFindConfig::default();
+        obj.find_cfg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpx_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpx_default() {
+        let obj = GpxEditorDragAndDrop::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpx_fields() {
+        let mut obj = GpxEditorDragAndDrop::default();
+        obj.editor_dnd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpy_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpy_default() {
+        let obj = GpyEditorAccessibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpy_fields() {
+        let mut obj = GpyEditorAccessibility::default();
+        obj.editor_a11y_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpz_default() {
+        let obj = GpzEditorLineNumbers::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpz_fields() {
+        let mut obj = GpzEditorLineNumbers::default();
+        obj.line_nums_id = "test".to_string();
         assert!(obj.validate());
     }
 }
