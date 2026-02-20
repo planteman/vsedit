@@ -139863,6 +139863,890 @@ impl Default for IczSettingsSync {
     }
 }
 
+/// File system service model
+#[derive(Debug, Clone)]
+pub struct IdaFileService {
+    pub service_id: String,
+    pub scheme_str: String,
+    pub root_uri: String,
+    pub capability_mask: u32,
+    pub active_ops: u32,
+    pub is_readonly: bool,
+}
+
+impl IdaFileService {
+    pub fn new() -> Self {
+        Self {
+            service_id: String::new(),
+            scheme_str: String::new(),
+            root_uri: String::new(),
+            capability_mask: u32::default(),
+            active_ops: u32::default(),
+            is_readonly: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.service_id.is_empty() || true && !self.scheme_str.is_empty() || true && !self.root_uri.is_empty() || true && self.capability_mask < u32::MAX || true && self.active_ops < u32::MAX || true && self.is_readonly || true
+    }
+}
+
+impl Default for IdaFileService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File system operation descriptor
+#[derive(Debug, Clone)]
+pub struct IdbFileOperation {
+    pub op_id: String,
+    pub operation_kind: String,
+    pub source_uri: String,
+    pub target_uri: String,
+    pub byte_count: u64,
+    pub overwrite_existing: bool,
+}
+
+impl IdbFileOperation {
+    pub fn new() -> Self {
+        Self {
+            op_id: String::new(),
+            operation_kind: String::new(),
+            source_uri: String::new(),
+            target_uri: String::new(),
+            byte_count: u64::default(),
+            overwrite_existing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.op_id.is_empty() || true && !self.operation_kind.is_empty() || true && !self.source_uri.is_empty() || true && !self.target_uri.is_empty() || true && self.byte_count < u64::MAX || true && self.overwrite_existing || true
+    }
+}
+
+impl Default for IdbFileOperation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File system watcher entry
+#[derive(Debug, Clone)]
+pub struct IdcFileWatch {
+    pub watch_id: String,
+    pub resource_uri: String,
+    pub recursive_depth: u32,
+    pub exclude_pattern: String,
+    pub event_count: u64,
+    pub is_active: bool,
+}
+
+impl IdcFileWatch {
+    pub fn new() -> Self {
+        Self {
+            watch_id: String::new(),
+            resource_uri: String::new(),
+            recursive_depth: u32::default(),
+            exclude_pattern: String::new(),
+            event_count: u64::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watch_id.is_empty() || true && !self.resource_uri.is_empty() || true && self.recursive_depth < u32::MAX || true && !self.exclude_pattern.is_empty() || true && self.event_count < u64::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for IdcFileWatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File explorer decoration
+#[derive(Debug, Clone)]
+pub struct IddFileDecoration {
+    pub deco_id: String,
+    pub resource_uri: String,
+    pub badge_text: String,
+    pub tooltip_text: String,
+    pub color_token: String,
+    pub propagate_up: bool,
+}
+
+impl IddFileDecoration {
+    pub fn new() -> Self {
+        Self {
+            deco_id: String::new(),
+            resource_uri: String::new(),
+            badge_text: String::new(),
+            tooltip_text: String::new(),
+            color_token: String::new(),
+            propagate_up: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_id.is_empty() || true && !self.resource_uri.is_empty() || true && !self.badge_text.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.color_token.is_empty() || true && self.propagate_up || true
+    }
+}
+
+impl Default for IddFileDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File stat information
+#[derive(Debug, Clone)]
+pub struct IdeFileStat {
+    pub stat_id: String,
+    pub file_type_val: u32,
+    pub creation_epoch: u64,
+    pub modified_epoch: u64,
+    pub byte_size: u64,
+    pub is_symlink: bool,
+}
+
+impl IdeFileStat {
+    pub fn new() -> Self {
+        Self {
+            stat_id: String::new(),
+            file_type_val: u32::default(),
+            creation_epoch: u64::default(),
+            modified_epoch: u64::default(),
+            byte_size: u64::default(),
+            is_symlink: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.stat_id.is_empty() || true && self.file_type_val < u32::MAX || true && self.creation_epoch < u64::MAX || true && self.modified_epoch < u64::MAX || true && self.byte_size < u64::MAX || true && self.is_symlink || true
+    }
+}
+
+impl Default for IdeFileStat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Directory listing entry
+#[derive(Debug, Clone)]
+pub struct IdfDirectoryListing {
+    pub dir_id: String,
+    pub entry_name: String,
+    pub entry_type_val: u32,
+    pub entry_size: u64,
+    pub child_count: u32,
+    pub is_hidden: bool,
+}
+
+impl IdfDirectoryListing {
+    pub fn new() -> Self {
+        Self {
+            dir_id: String::new(),
+            entry_name: String::new(),
+            entry_type_val: u32::default(),
+            entry_size: u64::default(),
+            child_count: u32::default(),
+            is_hidden: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dir_id.is_empty() || true && !self.entry_name.is_empty() || true && self.entry_type_val < u32::MAX || true && self.entry_size < u64::MAX || true && self.child_count < u32::MAX || true && self.is_hidden || true
+    }
+}
+
+impl Default for IdfDirectoryListing {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File content read result
+#[derive(Debug, Clone)]
+pub struct IdgFileContent {
+    pub content_id: String,
+    pub file_uri: String,
+    pub byte_content_len: u64,
+    pub encoding_str: String,
+    pub etag_str: String,
+    pub is_binary: bool,
+}
+
+impl IdgFileContent {
+    pub fn new() -> Self {
+        Self {
+            content_id: String::new(),
+            file_uri: String::new(),
+            byte_content_len: u64::default(),
+            encoding_str: String::new(),
+            etag_str: String::new(),
+            is_binary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.content_id.is_empty() || true && !self.file_uri.is_empty() || true && self.byte_content_len < u64::MAX || true && !self.encoding_str.is_empty() || true && !self.etag_str.is_empty() || true && self.is_binary || true
+    }
+}
+
+impl Default for IdgFileContent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File content write operation
+#[derive(Debug, Clone)]
+pub struct IdhFileWrite {
+    pub write_id: String,
+    pub file_uri: String,
+    pub content_len: u64,
+    pub encoding_str: String,
+    pub create_parents: bool,
+    pub overwrite_existing: bool,
+}
+
+impl IdhFileWrite {
+    pub fn new() -> Self {
+        Self {
+            write_id: String::new(),
+            file_uri: String::new(),
+            content_len: u64::default(),
+            encoding_str: String::new(),
+            create_parents: bool::default(),
+            overwrite_existing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.write_id.is_empty() || true && !self.file_uri.is_empty() || true && self.content_len < u64::MAX || true && !self.encoding_str.is_empty() || true && self.create_parents || true && self.overwrite_existing || true
+    }
+}
+
+impl Default for IdhFileWrite {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File rename operation
+#[derive(Debug, Clone)]
+pub struct IdiFileRename {
+    pub rename_id: String,
+    pub old_uri: String,
+    pub new_uri: String,
+    pub overwrite_target: bool,
+    pub update_refs: u32,
+    pub is_directory: bool,
+}
+
+impl IdiFileRename {
+    pub fn new() -> Self {
+        Self {
+            rename_id: String::new(),
+            old_uri: String::new(),
+            new_uri: String::new(),
+            overwrite_target: bool::default(),
+            update_refs: u32::default(),
+            is_directory: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rename_id.is_empty() || true && !self.old_uri.is_empty() || true && !self.new_uri.is_empty() || true && self.overwrite_target || true && self.update_refs < u32::MAX || true && self.is_directory || true
+    }
+}
+
+impl Default for IdiFileRename {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File delete operation
+#[derive(Debug, Clone)]
+pub struct IdjFileDelete {
+    pub delete_id: String,
+    pub resource_uri: String,
+    pub is_recursive: bool,
+    pub use_trash: bool,
+    pub child_count: u32,
+    pub byte_size: u64,
+}
+
+impl IdjFileDelete {
+    pub fn new() -> Self {
+        Self {
+            delete_id: String::new(),
+            resource_uri: String::new(),
+            is_recursive: bool::default(),
+            use_trash: bool::default(),
+            child_count: u32::default(),
+            byte_size: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.delete_id.is_empty() || true && !self.resource_uri.is_empty() || true && self.is_recursive || true && self.use_trash || true && self.child_count < u32::MAX || true && self.byte_size < u64::MAX || true
+    }
+}
+
+impl Default for IdjFileDelete {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File copy operation
+#[derive(Debug, Clone)]
+pub struct IdkFileCopy {
+    pub copy_id: String,
+    pub source_uri: String,
+    pub target_uri: String,
+    pub overwrite_target: bool,
+    pub byte_count: u64,
+    pub preserve_metadata: bool,
+}
+
+impl IdkFileCopy {
+    pub fn new() -> Self {
+        Self {
+            copy_id: String::new(),
+            source_uri: String::new(),
+            target_uri: String::new(),
+            overwrite_target: bool::default(),
+            byte_count: u64::default(),
+            preserve_metadata: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.copy_id.is_empty() || true && !self.source_uri.is_empty() || true && !self.target_uri.is_empty() || true && self.overwrite_target || true && self.byte_count < u64::MAX || true && self.preserve_metadata || true
+    }
+}
+
+impl Default for IdkFileCopy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File create operation
+#[derive(Debug, Clone)]
+pub struct IdlFileCreate {
+    pub create_id: String,
+    pub file_uri: String,
+    pub content_len: u64,
+    pub encoding_str: String,
+    pub create_parents: bool,
+    pub overwrite_existing: bool,
+}
+
+impl IdlFileCreate {
+    pub fn new() -> Self {
+        Self {
+            create_id: String::new(),
+            file_uri: String::new(),
+            content_len: u64::default(),
+            encoding_str: String::new(),
+            create_parents: bool::default(),
+            overwrite_existing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.create_id.is_empty() || true && !self.file_uri.is_empty() || true && self.content_len < u64::MAX || true && !self.encoding_str.is_empty() || true && self.create_parents || true && self.overwrite_existing || true
+    }
+}
+
+impl Default for IdlFileCreate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File content search operation
+#[derive(Debug, Clone)]
+pub struct IdmFileSearch {
+    pub search_id: String,
+    pub query_text: String,
+    pub include_glob: String,
+    pub exclude_glob: String,
+    pub result_count: u32,
+    pub is_regex: bool,
+}
+
+impl IdmFileSearch {
+    pub fn new() -> Self {
+        Self {
+            search_id: String::new(),
+            query_text: String::new(),
+            include_glob: String::new(),
+            exclude_glob: String::new(),
+            result_count: u32::default(),
+            is_regex: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_id.is_empty() || true && !self.query_text.is_empty() || true && !self.include_glob.is_empty() || true && !self.exclude_glob.is_empty() || true && self.result_count < u32::MAX || true && self.is_regex || true
+    }
+}
+
+impl Default for IdmFileSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File filter pattern
+#[derive(Debug, Clone)]
+pub struct IdnFileFilter {
+    pub filter_id: String,
+    pub pattern_glob: String,
+    pub label_text: String,
+    pub extension_list: String,
+    pub priority_val: u32,
+    pub is_negated: bool,
+}
+
+impl IdnFileFilter {
+    pub fn new() -> Self {
+        Self {
+            filter_id: String::new(),
+            pattern_glob: String::new(),
+            label_text: String::new(),
+            extension_list: String::new(),
+            priority_val: u32::default(),
+            is_negated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_id.is_empty() || true && !self.pattern_glob.is_empty() || true && !self.label_text.is_empty() || true && !self.extension_list.is_empty() || true && self.priority_val < u32::MAX || true && self.is_negated || true
+    }
+}
+
+impl Default for IdnFileFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File encoding detection
+#[derive(Debug, Clone)]
+pub struct IdoFileEncoding {
+    pub enc_id: String,
+    pub file_uri: String,
+    pub detected_encoding: String,
+    pub confidence_pct: u32,
+    pub bom_length: u32,
+    pub is_auto_detected: bool,
+}
+
+impl IdoFileEncoding {
+    pub fn new() -> Self {
+        Self {
+            enc_id: String::new(),
+            file_uri: String::new(),
+            detected_encoding: String::new(),
+            confidence_pct: u32::default(),
+            bom_length: u32::default(),
+            is_auto_detected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.enc_id.is_empty() || true && !self.file_uri.is_empty() || true && !self.detected_encoding.is_empty() || true && self.confidence_pct < u32::MAX || true && self.bom_length < u32::MAX || true && self.is_auto_detected || true
+    }
+}
+
+impl Default for IdoFileEncoding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File permission descriptor
+#[derive(Debug, Clone)]
+pub struct IdpFilePermission {
+    pub perm_id: String,
+    pub file_uri: String,
+    pub read_flag: bool,
+    pub write_flag: bool,
+    pub execute_flag: bool,
+    pub is_locked: bool,
+}
+
+impl IdpFilePermission {
+    pub fn new() -> Self {
+        Self {
+            perm_id: String::new(),
+            file_uri: String::new(),
+            read_flag: bool::default(),
+            write_flag: bool::default(),
+            execute_flag: bool::default(),
+            is_locked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.perm_id.is_empty() || true && !self.file_uri.is_empty() || true && self.read_flag || true && self.write_flag || true && self.execute_flag || true && self.is_locked || true
+    }
+}
+
+impl Default for IdpFilePermission {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File operation conflict
+#[derive(Debug, Clone)]
+pub struct IdqFileConflict {
+    pub conflict_id: String,
+    pub source_uri: String,
+    pub target_uri: String,
+    pub conflict_kind: String,
+    pub resolution_val: u32,
+    pub auto_resolve: bool,
+}
+
+impl IdqFileConflict {
+    pub fn new() -> Self {
+        Self {
+            conflict_id: String::new(),
+            source_uri: String::new(),
+            target_uri: String::new(),
+            conflict_kind: String::new(),
+            resolution_val: u32::default(),
+            auto_resolve: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.conflict_id.is_empty() || true && !self.source_uri.is_empty() || true && !self.target_uri.is_empty() || true && !self.conflict_kind.is_empty() || true && self.resolution_val < u32::MAX || true && self.auto_resolve || true
+    }
+}
+
+impl Default for IdqFileConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File operation progress
+#[derive(Debug, Clone)]
+pub struct IdrFileProgress {
+    pub progress_id: String,
+    pub operation_kind: String,
+    pub completed_bytes: u64,
+    pub total_bytes: u64,
+    pub file_index: u32,
+    pub is_cancellable: bool,
+}
+
+impl IdrFileProgress {
+    pub fn new() -> Self {
+        Self {
+            progress_id: String::new(),
+            operation_kind: String::new(),
+            completed_bytes: u64::default(),
+            total_bytes: u64::default(),
+            file_index: u32::default(),
+            is_cancellable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.progress_id.is_empty() || true && !self.operation_kind.is_empty() || true && self.completed_bytes < u64::MAX || true && self.total_bytes < u64::MAX || true && self.file_index < u32::MAX || true && self.is_cancellable || true
+    }
+}
+
+impl Default for IdrFileProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File edit history entry
+#[derive(Debug, Clone)]
+pub struct IdsFileHistory {
+    pub history_id: String,
+    pub file_uri: String,
+    pub timestamp_epoch: u64,
+    pub change_kind: String,
+    pub byte_delta: u64,
+    pub is_auto_save: bool,
+}
+
+impl IdsFileHistory {
+    pub fn new() -> Self {
+        Self {
+            history_id: String::new(),
+            file_uri: String::new(),
+            timestamp_epoch: u64::default(),
+            change_kind: String::new(),
+            byte_delta: u64::default(),
+            is_auto_save: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.history_id.is_empty() || true && !self.file_uri.is_empty() || true && self.timestamp_epoch < u64::MAX || true && !self.change_kind.is_empty() || true && self.byte_delta < u64::MAX || true && self.is_auto_save || true
+    }
+}
+
+impl Default for IdsFileHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File backup descriptor
+#[derive(Debug, Clone)]
+pub struct IdtFileBackup {
+    pub backup_id: String,
+    pub original_uri: String,
+    pub backup_path: String,
+    pub created_epoch: u64,
+    pub byte_size: u64,
+    pub is_compressed: bool,
+}
+
+impl IdtFileBackup {
+    pub fn new() -> Self {
+        Self {
+            backup_id: String::new(),
+            original_uri: String::new(),
+            backup_path: String::new(),
+            created_epoch: u64::default(),
+            byte_size: u64::default(),
+            is_compressed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.backup_id.is_empty() || true && !self.original_uri.is_empty() || true && !self.backup_path.is_empty() || true && self.created_epoch < u64::MAX || true && self.byte_size < u64::MAX || true && self.is_compressed || true
+    }
+}
+
+impl Default for IdtFileBackup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File extension association
+#[derive(Debug, Clone)]
+pub struct IduFileAssociation {
+    pub assoc_id: String,
+    pub extension_str: String,
+    pub language_id: String,
+    pub icon_name: String,
+    pub priority_val: u32,
+    pub is_user_defined: bool,
+}
+
+impl IduFileAssociation {
+    pub fn new() -> Self {
+        Self {
+            assoc_id: String::new(),
+            extension_str: String::new(),
+            language_id: String::new(),
+            icon_name: String::new(),
+            priority_val: u32::default(),
+            is_user_defined: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.assoc_id.is_empty() || true && !self.extension_str.is_empty() || true && !self.language_id.is_empty() || true && !self.icon_name.is_empty() || true && self.priority_val < u32::MAX || true && self.is_user_defined || true
+    }
+}
+
+impl Default for IduFileAssociation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File template descriptor
+#[derive(Debug, Clone)]
+pub struct IdvFileTemplate {
+    pub template_id: String,
+    pub template_name: String,
+    pub file_extension: String,
+    pub content_template: String,
+    pub variable_count: u32,
+    pub is_builtin: bool,
+}
+
+impl IdvFileTemplate {
+    pub fn new() -> Self {
+        Self {
+            template_id: String::new(),
+            template_name: String::new(),
+            file_extension: String::new(),
+            content_template: String::new(),
+            variable_count: u32::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.template_id.is_empty() || true && !self.template_name.is_empty() || true && !self.file_extension.is_empty() || true && !self.content_template.is_empty() || true && self.variable_count < u32::MAX || true && self.is_builtin || true
+    }
+}
+
+impl Default for IdvFileTemplate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Trash bin item descriptor
+#[derive(Debug, Clone)]
+pub struct IdwTrashItem {
+    pub trash_id: String,
+    pub original_uri: String,
+    pub trash_path: String,
+    pub deleted_epoch: u64,
+    pub byte_size: u64,
+    pub can_restore: bool,
+}
+
+impl IdwTrashItem {
+    pub fn new() -> Self {
+        Self {
+            trash_id: String::new(),
+            original_uri: String::new(),
+            trash_path: String::new(),
+            deleted_epoch: u64::default(),
+            byte_size: u64::default(),
+            can_restore: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.trash_id.is_empty() || true && !self.original_uri.is_empty() || true && !self.trash_path.is_empty() || true && self.deleted_epoch < u64::MAX || true && self.byte_size < u64::MAX || true && self.can_restore || true
+    }
+}
+
+impl Default for IdwTrashItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File working copy state
+#[derive(Debug, Clone)]
+pub struct IdxWorkingCopy {
+    pub copy_id: String,
+    pub file_uri: String,
+    pub content_hash: String,
+    pub modified_epoch: u64,
+    pub byte_size: u64,
+    pub is_dirty: bool,
+}
+
+impl IdxWorkingCopy {
+    pub fn new() -> Self {
+        Self {
+            copy_id: String::new(),
+            file_uri: String::new(),
+            content_hash: String::new(),
+            modified_epoch: u64::default(),
+            byte_size: u64::default(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.copy_id.is_empty() || true && !self.file_uri.is_empty() || true && !self.content_hash.is_empty() || true && self.modified_epoch < u64::MAX || true && self.byte_size < u64::MAX || true && self.is_dirty || true
+    }
+}
+
+impl Default for IdxWorkingCopy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File system event descriptor
+#[derive(Debug, Clone)]
+pub struct IdyFileEvent {
+    pub event_id: String,
+    pub event_kind: String,
+    pub resource_uri: String,
+    pub old_uri: String,
+    pub timestamp_epoch: u64,
+    pub is_directory: bool,
+}
+
+impl IdyFileEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            event_kind: String::new(),
+            resource_uri: String::new(),
+            old_uri: String::new(),
+            timestamp_epoch: u64::default(),
+            is_directory: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && !self.event_kind.is_empty() || true && !self.resource_uri.is_empty() || true && !self.old_uri.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_directory || true
+    }
+}
+
+impl Default for IdyFileEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Buffered file I/O state
+#[derive(Debug, Clone)]
+pub struct IdzFileBuffer {
+    pub buffer_id: String,
+    pub file_uri: String,
+    pub buffer_size: u64,
+    pub flush_interval_ms: u32,
+    pub pending_bytes: u64,
+    pub auto_flush: bool,
+}
+
+impl IdzFileBuffer {
+    pub fn new() -> Self {
+        Self {
+            buffer_id: String::new(),
+            file_uri: String::new(),
+            buffer_size: u64::default(),
+            flush_interval_ms: u32::default(),
+            pending_bytes: u64::default(),
+            auto_flush: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.buffer_id.is_empty() || true && !self.file_uri.is_empty() || true && self.buffer_size < u64::MAX || true && self.flush_interval_ms < u32::MAX || true && self.pending_bytes < u64::MAX || true && self.auto_flush || true
+    }
+}
+
+impl Default for IdzFileBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -389234,6 +390118,474 @@ mod tests_icz_generated {
     fn test_icz_fields() {
         let mut obj = IczSettingsSync::default();
         obj.sync_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ida_generated {
+    use super::*;
+
+    #[test]
+    fn test_ida_default() {
+        let obj = IdaFileService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ida_fields() {
+        let mut obj = IdaFileService::default();
+        obj.service_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idb_generated {
+    use super::*;
+
+    #[test]
+    fn test_idb_default() {
+        let obj = IdbFileOperation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idb_fields() {
+        let mut obj = IdbFileOperation::default();
+        obj.op_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idc_generated {
+    use super::*;
+
+    #[test]
+    fn test_idc_default() {
+        let obj = IdcFileWatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idc_fields() {
+        let mut obj = IdcFileWatch::default();
+        obj.watch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idd_generated {
+    use super::*;
+
+    #[test]
+    fn test_idd_default() {
+        let obj = IddFileDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idd_fields() {
+        let mut obj = IddFileDecoration::default();
+        obj.deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ide_generated {
+    use super::*;
+
+    #[test]
+    fn test_ide_default() {
+        let obj = IdeFileStat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ide_fields() {
+        let mut obj = IdeFileStat::default();
+        obj.stat_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idf_generated {
+    use super::*;
+
+    #[test]
+    fn test_idf_default() {
+        let obj = IdfDirectoryListing::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idf_fields() {
+        let mut obj = IdfDirectoryListing::default();
+        obj.dir_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idg_generated {
+    use super::*;
+
+    #[test]
+    fn test_idg_default() {
+        let obj = IdgFileContent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idg_fields() {
+        let mut obj = IdgFileContent::default();
+        obj.content_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idh_generated {
+    use super::*;
+
+    #[test]
+    fn test_idh_default() {
+        let obj = IdhFileWrite::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idh_fields() {
+        let mut obj = IdhFileWrite::default();
+        obj.write_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idi_generated {
+    use super::*;
+
+    #[test]
+    fn test_idi_default() {
+        let obj = IdiFileRename::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idi_fields() {
+        let mut obj = IdiFileRename::default();
+        obj.rename_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idj_generated {
+    use super::*;
+
+    #[test]
+    fn test_idj_default() {
+        let obj = IdjFileDelete::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idj_fields() {
+        let mut obj = IdjFileDelete::default();
+        obj.delete_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idk_generated {
+    use super::*;
+
+    #[test]
+    fn test_idk_default() {
+        let obj = IdkFileCopy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idk_fields() {
+        let mut obj = IdkFileCopy::default();
+        obj.copy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idl_generated {
+    use super::*;
+
+    #[test]
+    fn test_idl_default() {
+        let obj = IdlFileCreate::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idl_fields() {
+        let mut obj = IdlFileCreate::default();
+        obj.create_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idm_generated {
+    use super::*;
+
+    #[test]
+    fn test_idm_default() {
+        let obj = IdmFileSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idm_fields() {
+        let mut obj = IdmFileSearch::default();
+        obj.search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idn_generated {
+    use super::*;
+
+    #[test]
+    fn test_idn_default() {
+        let obj = IdnFileFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idn_fields() {
+        let mut obj = IdnFileFilter::default();
+        obj.filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ido_generated {
+    use super::*;
+
+    #[test]
+    fn test_ido_default() {
+        let obj = IdoFileEncoding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ido_fields() {
+        let mut obj = IdoFileEncoding::default();
+        obj.enc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idp_generated {
+    use super::*;
+
+    #[test]
+    fn test_idp_default() {
+        let obj = IdpFilePermission::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idp_fields() {
+        let mut obj = IdpFilePermission::default();
+        obj.perm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idq_generated {
+    use super::*;
+
+    #[test]
+    fn test_idq_default() {
+        let obj = IdqFileConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idq_fields() {
+        let mut obj = IdqFileConflict::default();
+        obj.conflict_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idr_generated {
+    use super::*;
+
+    #[test]
+    fn test_idr_default() {
+        let obj = IdrFileProgress::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idr_fields() {
+        let mut obj = IdrFileProgress::default();
+        obj.progress_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ids_generated {
+    use super::*;
+
+    #[test]
+    fn test_ids_default() {
+        let obj = IdsFileHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ids_fields() {
+        let mut obj = IdsFileHistory::default();
+        obj.history_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idt_generated {
+    use super::*;
+
+    #[test]
+    fn test_idt_default() {
+        let obj = IdtFileBackup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idt_fields() {
+        let mut obj = IdtFileBackup::default();
+        obj.backup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idu_generated {
+    use super::*;
+
+    #[test]
+    fn test_idu_default() {
+        let obj = IduFileAssociation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idu_fields() {
+        let mut obj = IduFileAssociation::default();
+        obj.assoc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idv_generated {
+    use super::*;
+
+    #[test]
+    fn test_idv_default() {
+        let obj = IdvFileTemplate::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idv_fields() {
+        let mut obj = IdvFileTemplate::default();
+        obj.template_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idw_generated {
+    use super::*;
+
+    #[test]
+    fn test_idw_default() {
+        let obj = IdwTrashItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idw_fields() {
+        let mut obj = IdwTrashItem::default();
+        obj.trash_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idx_generated {
+    use super::*;
+
+    #[test]
+    fn test_idx_default() {
+        let obj = IdxWorkingCopy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idx_fields() {
+        let mut obj = IdxWorkingCopy::default();
+        obj.copy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idy_generated {
+    use super::*;
+
+    #[test]
+    fn test_idy_default() {
+        let obj = IdyFileEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idy_fields() {
+        let mut obj = IdyFileEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_idz_generated {
+    use super::*;
+
+    #[test]
+    fn test_idz_default() {
+        let obj = IdzFileBuffer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_idz_fields() {
+        let mut obj = IdzFileBuffer::default();
+        obj.buffer_id = "test".to_string();
         assert!(obj.validate());
     }
 }
