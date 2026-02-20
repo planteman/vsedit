@@ -126009,6 +126009,678 @@ impl Default for HnjSettingOverride {
     }
 }
 
+/// JSON path item (segment, type, index, property, is array)
+#[derive(Debug, Clone)]
+pub struct HnkJsonPathItem {
+    pub json_path_id: String,
+    pub segment: String,
+    pub segment_type: String,
+    pub index: u32,
+    pub property_name: String,
+    pub is_array: bool,
+    pub parent_path: String,
+    pub depth: u32,
+    pub key_range_json: String,
+    pub value_range_json: String,
+}
+
+impl HnkJsonPathItem {
+    pub fn new() -> Self {
+        Self {
+            json_path_id: String::new(),
+            segment: String::new(),
+            segment_type: String::new(),
+            index: u32::default(),
+            property_name: String::new(),
+            is_array: bool::default(),
+            parent_path: String::new(),
+            depth: u32::default(),
+            key_range_json: String::new(),
+            value_range_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.json_path_id.is_empty() || true && !self.segment.is_empty() || true && !self.segment_type.is_empty() || true && self.index < u32::MAX || true && !self.property_name.is_empty() || true && self.is_array || true && !self.parent_path.is_empty() || true && self.depth < u32::MAX || true && !self.key_range_json.is_empty() || true && !self.value_range_json.is_empty() || true
+    }
+}
+
+impl Default for HnkJsonPathItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// JSON completion (label, insert text, kind, schema, path)
+#[derive(Debug, Clone)]
+pub struct HnlJsonCompletion {
+    pub json_compl_id: String,
+    pub label: String,
+    pub insert_text: String,
+    pub kind: String,
+    pub schema_path: String,
+    pub json_path: String,
+    pub detail: String,
+    pub documentation: String,
+    pub sort_text: String,
+    pub filter_text: String,
+}
+
+impl HnlJsonCompletion {
+    pub fn new() -> Self {
+        Self {
+            json_compl_id: String::new(),
+            label: String::new(),
+            insert_text: String::new(),
+            kind: String::new(),
+            schema_path: String::new(),
+            json_path: String::new(),
+            detail: String::new(),
+            documentation: String::new(),
+            sort_text: String::new(),
+            filter_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.json_compl_id.is_empty() || true && !self.label.is_empty() || true && !self.insert_text.is_empty() || true && !self.kind.is_empty() || true && !self.schema_path.is_empty() || true && !self.json_path.is_empty() || true && !self.detail.is_empty() || true && !self.documentation.is_empty() || true && !self.sort_text.is_empty() || true && !self.filter_text.is_empty() || true
+    }
+}
+
+impl Default for HnlJsonCompletion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// JSON hover (contents, range, schema, property description)
+#[derive(Debug, Clone)]
+pub struct HnmJsonHover {
+    pub json_hover_id: String,
+    pub contents: String,
+    pub range_json: String,
+    pub schema_path: String,
+    pub property_description: String,
+    pub default_value: String,
+    pub value_type: String,
+    pub enum_values_json: String,
+    pub deprecation: String,
+    pub is_property: bool,
+}
+
+impl HnmJsonHover {
+    pub fn new() -> Self {
+        Self {
+            json_hover_id: String::new(),
+            contents: String::new(),
+            range_json: String::new(),
+            schema_path: String::new(),
+            property_description: String::new(),
+            default_value: String::new(),
+            value_type: String::new(),
+            enum_values_json: String::new(),
+            deprecation: String::new(),
+            is_property: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.json_hover_id.is_empty() || true && !self.contents.is_empty() || true && !self.range_json.is_empty() || true && !self.schema_path.is_empty() || true && !self.property_description.is_empty() || true && !self.default_value.is_empty() || true && !self.value_type.is_empty() || true && !self.enum_values_json.is_empty() || true && !self.deprecation.is_empty() || true && self.is_property || true
+    }
+}
+
+impl Default for HnmJsonHover {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// JSON formatting (tab size, insert spaces, keep lines, eol)
+#[derive(Debug, Clone)]
+pub struct HnnJsonFormatting {
+    pub json_fmt_id: String,
+    pub tab_size: u32,
+    pub insert_spaces: bool,
+    pub keep_lines: bool,
+    pub eol: String,
+    pub insert_final_newline: bool,
+    pub trim_trailing_whitespace: bool,
+    pub bracket_spacing: bool,
+    pub max_preserve_newlines: u32,
+    pub wrap_line_length: u32,
+}
+
+impl HnnJsonFormatting {
+    pub fn new() -> Self {
+        Self {
+            json_fmt_id: String::new(),
+            tab_size: u32::default(),
+            insert_spaces: bool::default(),
+            keep_lines: bool::default(),
+            eol: String::new(),
+            insert_final_newline: bool::default(),
+            trim_trailing_whitespace: bool::default(),
+            bracket_spacing: bool::default(),
+            max_preserve_newlines: u32::default(),
+            wrap_line_length: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.json_fmt_id.is_empty() || true && self.tab_size < u32::MAX || true && self.insert_spaces || true && self.keep_lines || true && !self.eol.is_empty() || true && self.insert_final_newline || true && self.trim_trailing_whitespace || true && self.bracket_spacing || true && self.max_preserve_newlines < u32::MAX || true && self.wrap_line_length < u32::MAX || true
+    }
+}
+
+impl Default for HnnJsonFormatting {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// JSON folding (ranges, object folds, array folds, comments)
+#[derive(Debug, Clone)]
+pub struct HnoJsonFolding {
+    pub json_fold_id: String,
+    pub ranges_json: String,
+    pub object_fold_count: u32,
+    pub array_fold_count: u32,
+    pub comment_fold_count: u32,
+    pub total_folds: u32,
+    pub is_stale: bool,
+    pub document_uri: String,
+    pub max_depth: u32,
+    pub version: u32,
+}
+
+impl HnoJsonFolding {
+    pub fn new() -> Self {
+        Self {
+            json_fold_id: String::new(),
+            ranges_json: String::new(),
+            object_fold_count: u32::default(),
+            array_fold_count: u32::default(),
+            comment_fold_count: u32::default(),
+            total_folds: u32::default(),
+            is_stale: bool::default(),
+            document_uri: String::new(),
+            max_depth: u32::default(),
+            version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.json_fold_id.is_empty() || true && !self.ranges_json.is_empty() || true && self.object_fold_count < u32::MAX || true && self.array_fold_count < u32::MAX || true && self.comment_fold_count < u32::MAX || true && self.total_folds < u32::MAX || true && self.is_stale || true && !self.document_uri.is_empty() || true && self.max_depth < u32::MAX || true && self.version < u32::MAX || true
+    }
+}
+
+impl Default for HnoJsonFolding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// JSON color info (range, color, presentations, document)
+#[derive(Debug, Clone)]
+pub struct HnpJsonColorInfo {
+    pub json_color_id: String,
+    pub range_json: String,
+    pub color_json: String,
+    pub presentations_json: String,
+    pub document_uri: String,
+    pub property_name: String,
+    pub color_format: String,
+    pub is_editable: bool,
+    pub schema_path: String,
+    pub original_text: String,
+}
+
+impl HnpJsonColorInfo {
+    pub fn new() -> Self {
+        Self {
+            json_color_id: String::new(),
+            range_json: String::new(),
+            color_json: String::new(),
+            presentations_json: String::new(),
+            document_uri: String::new(),
+            property_name: String::new(),
+            color_format: String::new(),
+            is_editable: bool::default(),
+            schema_path: String::new(),
+            original_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.json_color_id.is_empty() || true && !self.range_json.is_empty() || true && !self.color_json.is_empty() || true && !self.presentations_json.is_empty() || true && !self.document_uri.is_empty() || true && !self.property_name.is_empty() || true && !self.color_format.is_empty() || true && self.is_editable || true && !self.schema_path.is_empty() || true && !self.original_text.is_empty() || true
+    }
+}
+
+impl Default for HnpJsonColorInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// JSON link (range, target, tooltip, is file ref)
+#[derive(Debug, Clone)]
+pub struct HnqJsonLink {
+    pub json_link_id: String,
+    pub range_json: String,
+    pub target_uri: String,
+    pub tooltip: String,
+    pub is_file_ref: bool,
+    pub property_name: String,
+    pub document_uri: String,
+    pub link_type: String,
+    pub is_resolved: bool,
+    pub schema_path: String,
+}
+
+impl HnqJsonLink {
+    pub fn new() -> Self {
+        Self {
+            json_link_id: String::new(),
+            range_json: String::new(),
+            target_uri: String::new(),
+            tooltip: String::new(),
+            is_file_ref: bool::default(),
+            property_name: String::new(),
+            document_uri: String::new(),
+            link_type: String::new(),
+            is_resolved: bool::default(),
+            schema_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.json_link_id.is_empty() || true && !self.range_json.is_empty() || true && !self.target_uri.is_empty() || true && !self.tooltip.is_empty() || true && self.is_file_ref || true && !self.property_name.is_empty() || true && !self.document_uri.is_empty() || true && !self.link_type.is_empty() || true && self.is_resolved || true && !self.schema_path.is_empty() || true
+    }
+}
+
+impl Default for HnqJsonLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// JSON diagnostic (range, message, severity, schema path)
+#[derive(Debug, Clone)]
+pub struct HnrJsonDiagnostic {
+    pub json_diag_id: String,
+    pub range_json: String,
+    pub message: String,
+    pub severity: String,
+    pub schema_path: String,
+    pub error_code: String,
+    pub property_name: String,
+    pub expected_type: String,
+    pub actual_value: String,
+    pub suggestion: String,
+}
+
+impl HnrJsonDiagnostic {
+    pub fn new() -> Self {
+        Self {
+            json_diag_id: String::new(),
+            range_json: String::new(),
+            message: String::new(),
+            severity: String::new(),
+            schema_path: String::new(),
+            error_code: String::new(),
+            property_name: String::new(),
+            expected_type: String::new(),
+            actual_value: String::new(),
+            suggestion: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.json_diag_id.is_empty() || true && !self.range_json.is_empty() || true && !self.message.is_empty() || true && !self.severity.is_empty() || true && !self.schema_path.is_empty() || true && !self.error_code.is_empty() || true && !self.property_name.is_empty() || true && !self.expected_type.is_empty() || true && !self.actual_value.is_empty() || true && !self.suggestion.is_empty() || true
+    }
+}
+
+impl Default for HnrJsonDiagnostic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// JSON outline (symbols, tree, breadcrumb, property chain)
+#[derive(Debug, Clone)]
+pub struct HnsJsonOutline {
+    pub json_outline_id: String,
+    pub symbols_json: String,
+    pub tree_json: String,
+    pub breadcrumb_json: String,
+    pub property_chain: String,
+    pub document_uri: String,
+    pub is_stale: bool,
+    pub symbol_count: u32,
+    pub depth: u32,
+    pub version: u32,
+}
+
+impl HnsJsonOutline {
+    pub fn new() -> Self {
+        Self {
+            json_outline_id: String::new(),
+            symbols_json: String::new(),
+            tree_json: String::new(),
+            breadcrumb_json: String::new(),
+            property_chain: String::new(),
+            document_uri: String::new(),
+            is_stale: bool::default(),
+            symbol_count: u32::default(),
+            depth: u32::default(),
+            version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.json_outline_id.is_empty() || true && !self.symbols_json.is_empty() || true && !self.tree_json.is_empty() || true && !self.breadcrumb_json.is_empty() || true && !self.property_chain.is_empty() || true && !self.document_uri.is_empty() || true && self.is_stale || true && self.symbol_count < u32::MAX || true && self.depth < u32::MAX || true && self.version < u32::MAX || true
+    }
+}
+
+impl Default for HnsJsonOutline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// JSON reference (ref path, resolved schema, is circular)
+#[derive(Debug, Clone)]
+pub struct HntJsonReference {
+    pub json_ref_id: String,
+    pub ref_path: String,
+    pub resolved_schema_json: String,
+    pub is_circular: bool,
+    pub source_uri: String,
+    pub target_uri: String,
+    pub depth: u32,
+    pub error_message: String,
+    pub is_external: bool,
+    pub cache_key: String,
+}
+
+impl HntJsonReference {
+    pub fn new() -> Self {
+        Self {
+            json_ref_id: String::new(),
+            ref_path: String::new(),
+            resolved_schema_json: String::new(),
+            is_circular: bool::default(),
+            source_uri: String::new(),
+            target_uri: String::new(),
+            depth: u32::default(),
+            error_message: String::new(),
+            is_external: bool::default(),
+            cache_key: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.json_ref_id.is_empty() || true && !self.ref_path.is_empty() || true && !self.resolved_schema_json.is_empty() || true && self.is_circular || true && !self.source_uri.is_empty() || true && !self.target_uri.is_empty() || true && self.depth < u32::MAX || true && !self.error_message.is_empty() || true && self.is_external || true && !self.cache_key.is_empty() || true
+    }
+}
+
+impl Default for HntJsonReference {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// settings.json (contents, overrides, comments, version)
+#[derive(Debug, Clone)]
+pub struct HnuSettingsJson {
+    pub settings_json_id: String,
+    pub contents_json: String,
+    pub overrides_json: String,
+    pub comments_json: String,
+    pub version: u32,
+    pub is_dirty: bool,
+    pub file_path: String,
+    pub scope: String,
+    pub error_count: u32,
+    pub setting_count: u32,
+}
+
+impl HnuSettingsJson {
+    pub fn new() -> Self {
+        Self {
+            settings_json_id: String::new(),
+            contents_json: String::new(),
+            overrides_json: String::new(),
+            comments_json: String::new(),
+            version: u32::default(),
+            is_dirty: bool::default(),
+            file_path: String::new(),
+            scope: String::new(),
+            error_count: u32::default(),
+            setting_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.settings_json_id.is_empty() || true && !self.contents_json.is_empty() || true && !self.overrides_json.is_empty() || true && !self.comments_json.is_empty() || true && self.version < u32::MAX || true && self.is_dirty || true && !self.file_path.is_empty() || true && !self.scope.is_empty() || true && self.error_count < u32::MAX || true && self.setting_count < u32::MAX || true
+    }
+}
+
+impl Default for HnuSettingsJson {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// keybindings.json (bindings, when clause, command, args)
+#[derive(Debug, Clone)]
+pub struct HnvKeybindingsJson {
+    pub keybind_json_id: String,
+    pub bindings_json: String,
+    pub when_clause: String,
+    pub command_id: String,
+    pub args_json: String,
+    pub key: String,
+    pub is_default: bool,
+    pub source: String,
+    pub binding_count: u32,
+    pub conflict_count: u32,
+}
+
+impl HnvKeybindingsJson {
+    pub fn new() -> Self {
+        Self {
+            keybind_json_id: String::new(),
+            bindings_json: String::new(),
+            when_clause: String::new(),
+            command_id: String::new(),
+            args_json: String::new(),
+            key: String::new(),
+            is_default: bool::default(),
+            source: String::new(),
+            binding_count: u32::default(),
+            conflict_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.keybind_json_id.is_empty() || true && !self.bindings_json.is_empty() || true && !self.when_clause.is_empty() || true && !self.command_id.is_empty() || true && !self.args_json.is_empty() || true && !self.key.is_empty() || true && self.is_default || true && !self.source.is_empty() || true && self.binding_count < u32::MAX || true && self.conflict_count < u32::MAX || true
+    }
+}
+
+impl Default for HnvKeybindingsJson {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// tasks.json (version, tasks, inputs, os specific, runner)
+#[derive(Debug, Clone)]
+pub struct HnwTasksJson {
+    pub tasks_json_id: String,
+    pub version: String,
+    pub tasks_json: String,
+    pub inputs_json: String,
+    pub os_specific_json: String,
+    pub runner: String,
+    pub is_dirty: bool,
+    pub file_path: String,
+    pub task_count: u32,
+    pub error_count: u32,
+}
+
+impl HnwTasksJson {
+    pub fn new() -> Self {
+        Self {
+            tasks_json_id: String::new(),
+            version: String::new(),
+            tasks_json: String::new(),
+            inputs_json: String::new(),
+            os_specific_json: String::new(),
+            runner: String::new(),
+            is_dirty: bool::default(),
+            file_path: String::new(),
+            task_count: u32::default(),
+            error_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tasks_json_id.is_empty() || true && !self.version.is_empty() || true && !self.tasks_json.is_empty() || true && !self.inputs_json.is_empty() || true && !self.os_specific_json.is_empty() || true && !self.runner.is_empty() || true && self.is_dirty || true && !self.file_path.is_empty() || true && self.task_count < u32::MAX || true && self.error_count < u32::MAX || true
+    }
+}
+
+impl Default for HnwTasksJson {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// launch.json (version, configurations, compounds, inputs)
+#[derive(Debug, Clone)]
+pub struct HnxLaunchJson {
+    pub launch_json_id: String,
+    pub version: String,
+    pub configurations_json: String,
+    pub compounds_json: String,
+    pub inputs_json: String,
+    pub is_dirty: bool,
+    pub file_path: String,
+    pub config_count: u32,
+    pub error_count: u32,
+    pub scope: String,
+}
+
+impl HnxLaunchJson {
+    pub fn new() -> Self {
+        Self {
+            launch_json_id: String::new(),
+            version: String::new(),
+            configurations_json: String::new(),
+            compounds_json: String::new(),
+            inputs_json: String::new(),
+            is_dirty: bool::default(),
+            file_path: String::new(),
+            config_count: u32::default(),
+            error_count: u32::default(),
+            scope: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.launch_json_id.is_empty() || true && !self.version.is_empty() || true && !self.configurations_json.is_empty() || true && !self.compounds_json.is_empty() || true && !self.inputs_json.is_empty() || true && self.is_dirty || true && !self.file_path.is_empty() || true && self.config_count < u32::MAX || true && self.error_count < u32::MAX || true && !self.scope.is_empty() || true
+    }
+}
+
+impl Default for HnxLaunchJson {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// extensions.json (recommendations, unwanted recommendations)
+#[derive(Debug, Clone)]
+pub struct HnyExtensionsJson {
+    pub ext_json_id: String,
+    pub recommendations_json: String,
+    pub unwanted_json: String,
+    pub is_dirty: bool,
+    pub file_path: String,
+    pub recommendation_count: u32,
+    pub workspace_uri: String,
+    pub version: u32,
+    pub last_updated_ms: u64,
+    pub source: String,
+}
+
+impl HnyExtensionsJson {
+    pub fn new() -> Self {
+        Self {
+            ext_json_id: String::new(),
+            recommendations_json: String::new(),
+            unwanted_json: String::new(),
+            is_dirty: bool::default(),
+            file_path: String::new(),
+            recommendation_count: u32::default(),
+            workspace_uri: String::new(),
+            version: u32::default(),
+            last_updated_ms: u64::default(),
+            source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_json_id.is_empty() || true && !self.recommendations_json.is_empty() || true && !self.unwanted_json.is_empty() || true && self.is_dirty || true && !self.file_path.is_empty() || true && self.recommendation_count < u32::MAX || true && !self.workspace_uri.is_empty() || true && self.version < u32::MAX || true && self.last_updated_ms < u64::MAX || true && !self.source.is_empty() || true
+    }
+}
+
+impl Default for HnyExtensionsJson {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// devcontainer.json (name, image, features, settings)
+#[derive(Debug, Clone)]
+pub struct HnzDevContainerJson {
+    pub devcontainer_json_id: String,
+    pub name: String,
+    pub image: String,
+    pub features_json: String,
+    pub settings_json: String,
+    pub extensions_json: String,
+    pub forward_ports_json: String,
+    pub post_create_command: String,
+    pub remote_user: String,
+    pub is_dirty: bool,
+}
+
+impl HnzDevContainerJson {
+    pub fn new() -> Self {
+        Self {
+            devcontainer_json_id: String::new(),
+            name: String::new(),
+            image: String::new(),
+            features_json: String::new(),
+            settings_json: String::new(),
+            extensions_json: String::new(),
+            forward_ports_json: String::new(),
+            post_create_command: String::new(),
+            remote_user: String::new(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.devcontainer_json_id.is_empty() || true && !self.name.is_empty() || true && !self.image.is_empty() || true && !self.features_json.is_empty() || true && !self.settings_json.is_empty() || true && !self.extensions_json.is_empty() || true && !self.forward_ports_json.is_empty() || true && !self.post_create_command.is_empty() || true && !self.remote_user.is_empty() || true && self.is_dirty || true
+    }
+}
+
+impl Default for HnzDevContainerJson {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -367872,6 +368544,294 @@ mod tests_hnj_generated {
     fn test_hnj_fields() {
         let mut obj = HnjSettingOverride::default();
         obj.setting_ovr_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnk_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnk_default() {
+        let obj = HnkJsonPathItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnk_fields() {
+        let mut obj = HnkJsonPathItem::default();
+        obj.json_path_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnl_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnl_default() {
+        let obj = HnlJsonCompletion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnl_fields() {
+        let mut obj = HnlJsonCompletion::default();
+        obj.json_compl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnm_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnm_default() {
+        let obj = HnmJsonHover::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnm_fields() {
+        let mut obj = HnmJsonHover::default();
+        obj.json_hover_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnn_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnn_default() {
+        let obj = HnnJsonFormatting::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnn_fields() {
+        let mut obj = HnnJsonFormatting::default();
+        obj.json_fmt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hno_generated {
+    use super::*;
+
+    #[test]
+    fn test_hno_default() {
+        let obj = HnoJsonFolding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hno_fields() {
+        let mut obj = HnoJsonFolding::default();
+        obj.json_fold_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnp_default() {
+        let obj = HnpJsonColorInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnp_fields() {
+        let mut obj = HnpJsonColorInfo::default();
+        obj.json_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnq_default() {
+        let obj = HnqJsonLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnq_fields() {
+        let mut obj = HnqJsonLink::default();
+        obj.json_link_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnr_default() {
+        let obj = HnrJsonDiagnostic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnr_fields() {
+        let mut obj = HnrJsonDiagnostic::default();
+        obj.json_diag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hns_generated {
+    use super::*;
+
+    #[test]
+    fn test_hns_default() {
+        let obj = HnsJsonOutline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hns_fields() {
+        let mut obj = HnsJsonOutline::default();
+        obj.json_outline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnt_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnt_default() {
+        let obj = HntJsonReference::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnt_fields() {
+        let mut obj = HntJsonReference::default();
+        obj.json_ref_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnu_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnu_default() {
+        let obj = HnuSettingsJson::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnu_fields() {
+        let mut obj = HnuSettingsJson::default();
+        obj.settings_json_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnv_default() {
+        let obj = HnvKeybindingsJson::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnv_fields() {
+        let mut obj = HnvKeybindingsJson::default();
+        obj.keybind_json_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnw_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnw_default() {
+        let obj = HnwTasksJson::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnw_fields() {
+        let mut obj = HnwTasksJson::default();
+        obj.tasks_json_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnx_default() {
+        let obj = HnxLaunchJson::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnx_fields() {
+        let mut obj = HnxLaunchJson::default();
+        obj.launch_json_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hny_generated {
+    use super::*;
+
+    #[test]
+    fn test_hny_default() {
+        let obj = HnyExtensionsJson::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hny_fields() {
+        let mut obj = HnyExtensionsJson::default();
+        obj.ext_json_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnz_default() {
+        let obj = HnzDevContainerJson::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnz_fields() {
+        let mut obj = HnzDevContainerJson::default();
+        obj.devcontainer_json_id = "test".to_string();
         assert!(obj.validate());
     }
 }
