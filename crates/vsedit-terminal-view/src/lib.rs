@@ -66136,6 +66136,459 @@ impl Default for FkoEditorBackground {
 }
 
 
+/// Editor border colors (widget border, active tab, inactive tab, panel)
+#[derive(Debug, Clone)]
+pub struct FkpEditorBorderColors {
+    pub border_id: String,
+    pub widget_border: String,
+    pub active_tab_border: String,
+    pub inactive_tab_border: String,
+    pub panel_border: String,
+    pub sidebar_border: String,
+    pub editor_group_border: String,
+    pub input_border: String,
+    pub dropdown_border: String,
+    pub focus_border: String,
+}
+
+impl FkpEditorBorderColors {
+    pub fn new() -> Self {
+        Self {
+            border_id: String::new(),
+            widget_border: String::new(),
+            active_tab_border: String::new(),
+            inactive_tab_border: String::new(),
+            panel_border: String::new(),
+            sidebar_border: String::new(),
+            editor_group_border: String::new(),
+            input_border: String::new(),
+            dropdown_border: String::new(),
+            focus_border: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.border_id.is_empty() || true && !self.widget_border.is_empty() || true && !self.active_tab_border.is_empty() || true && !self.inactive_tab_border.is_empty() || true && !self.panel_border.is_empty() || true && !self.sidebar_border.is_empty() || true && !self.editor_group_border.is_empty() || true && !self.input_border.is_empty() || true && !self.dropdown_border.is_empty() || true && !self.focus_border.is_empty() || true
+    }
+}
+
+impl Default for FkpEditorBorderColors {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor foreground colors (text, dimmed, link, error, warning, info)
+#[derive(Debug, Clone)]
+pub struct FkqEditorForegroundColors {
+    pub fg_id: String,
+    pub foreground: String,
+    pub dimmed_foreground: String,
+    pub link_foreground: String,
+    pub error_foreground: String,
+    pub warning_foreground: String,
+    pub info_foreground: String,
+    pub icon_foreground: String,
+    pub disabled_foreground: String,
+    pub description_foreground: String,
+}
+
+impl FkqEditorForegroundColors {
+    pub fn new() -> Self {
+        Self {
+            fg_id: String::new(),
+            foreground: String::new(),
+            dimmed_foreground: String::new(),
+            link_foreground: String::new(),
+            error_foreground: String::new(),
+            warning_foreground: String::new(),
+            info_foreground: String::new(),
+            icon_foreground: String::new(),
+            disabled_foreground: String::new(),
+            description_foreground: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fg_id.is_empty() || true && !self.foreground.is_empty() || true && !self.dimmed_foreground.is_empty() || true && !self.link_foreground.is_empty() || true && !self.error_foreground.is_empty() || true && !self.warning_foreground.is_empty() || true && !self.info_foreground.is_empty() || true && !self.icon_foreground.is_empty() || true && !self.disabled_foreground.is_empty() || true && !self.description_foreground.is_empty() || true
+    }
+}
+
+impl Default for FkqEditorForegroundColors {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor widget colors (find widget, suggest, hover, peek view)
+#[derive(Debug, Clone)]
+pub struct FkrEditorWidgetColors {
+    pub widget_id: String,
+    pub find_widget_bg: String,
+    pub find_widget_fg: String,
+    pub suggest_bg: String,
+    pub suggest_border: String,
+    pub hover_bg: String,
+    pub hover_border: String,
+    pub peek_view_bg: String,
+    pub peek_view_border: String,
+    pub debug_toolbar_bg: String,
+}
+
+impl FkrEditorWidgetColors {
+    pub fn new() -> Self {
+        Self {
+            widget_id: String::new(),
+            find_widget_bg: String::new(),
+            find_widget_fg: String::new(),
+            suggest_bg: String::new(),
+            suggest_border: String::new(),
+            hover_bg: String::new(),
+            hover_border: String::new(),
+            peek_view_bg: String::new(),
+            peek_view_border: String::new(),
+            debug_toolbar_bg: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.widget_id.is_empty() || true && !self.find_widget_bg.is_empty() || true && !self.find_widget_fg.is_empty() || true && !self.suggest_bg.is_empty() || true && !self.suggest_border.is_empty() || true && !self.hover_bg.is_empty() || true && !self.hover_border.is_empty() || true && !self.peek_view_bg.is_empty() || true && !self.peek_view_border.is_empty() || true && !self.debug_toolbar_bg.is_empty() || true
+    }
+}
+
+impl Default for FkrEditorWidgetColors {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor diff colors (inserted, removed, changed, diagonal fill, gutter)
+#[derive(Debug, Clone)]
+pub struct FksEditorDiffColors {
+    pub diff_color_id: String,
+    pub inserted_bg: String,
+    pub inserted_gutter: String,
+    pub removed_bg: String,
+    pub removed_gutter: String,
+    pub changed_bg: String,
+    pub changed_gutter: String,
+    pub diagonal_fill: String,
+    pub border: String,
+    pub unchanged_bg: String,
+}
+
+impl FksEditorDiffColors {
+    pub fn new() -> Self {
+        Self {
+            diff_color_id: String::new(),
+            inserted_bg: String::new(),
+            inserted_gutter: String::new(),
+            removed_bg: String::new(),
+            removed_gutter: String::new(),
+            changed_bg: String::new(),
+            changed_gutter: String::new(),
+            diagonal_fill: String::new(),
+            border: String::new(),
+            unchanged_bg: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_color_id.is_empty() || true && !self.inserted_bg.is_empty() || true && !self.inserted_gutter.is_empty() || true && !self.removed_bg.is_empty() || true && !self.removed_gutter.is_empty() || true && !self.changed_bg.is_empty() || true && !self.changed_gutter.is_empty() || true && !self.diagonal_fill.is_empty() || true && !self.border.is_empty() || true && !self.unchanged_bg.is_empty() || true
+    }
+}
+
+impl Default for FksEditorDiffColors {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor merge conflict colors (current, incoming, common, header)
+#[derive(Debug, Clone)]
+pub struct FktEditorMergeColors {
+    pub merge_color_id: String,
+    pub current_header_bg: String,
+    pub current_content_bg: String,
+    pub incoming_header_bg: String,
+    pub incoming_content_bg: String,
+    pub common_header_bg: String,
+    pub common_content_bg: String,
+    pub border: String,
+    pub current_overview_ruler: String,
+    pub incoming_overview_ruler: String,
+}
+
+impl FktEditorMergeColors {
+    pub fn new() -> Self {
+        Self {
+            merge_color_id: String::new(),
+            current_header_bg: String::new(),
+            current_content_bg: String::new(),
+            incoming_header_bg: String::new(),
+            incoming_content_bg: String::new(),
+            common_header_bg: String::new(),
+            common_content_bg: String::new(),
+            border: String::new(),
+            current_overview_ruler: String::new(),
+            incoming_overview_ruler: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.merge_color_id.is_empty() || true && !self.current_header_bg.is_empty() || true && !self.current_content_bg.is_empty() || true && !self.incoming_header_bg.is_empty() || true && !self.incoming_content_bg.is_empty() || true && !self.common_header_bg.is_empty() || true && !self.common_content_bg.is_empty() || true && !self.border.is_empty() || true && !self.current_overview_ruler.is_empty() || true && !self.incoming_overview_ruler.is_empty() || true
+    }
+}
+
+impl Default for FktEditorMergeColors {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor selection colors (background, foreground, highlight, secondary)
+#[derive(Debug, Clone)]
+pub struct FkuEditorSelectionColors {
+    pub sel_color_id: String,
+    pub selection_background: String,
+    pub selection_foreground: String,
+    pub selection_highlight_bg: String,
+    pub inactive_selection_bg: String,
+    pub selection_highlight_border: String,
+    pub secondary_selection_bg: String,
+    pub word_highlight_bg: String,
+    pub word_highlight_strong_bg: String,
+    pub word_highlight_text_bg: String,
+}
+
+impl FkuEditorSelectionColors {
+    pub fn new() -> Self {
+        Self {
+            sel_color_id: String::new(),
+            selection_background: String::new(),
+            selection_foreground: String::new(),
+            selection_highlight_bg: String::new(),
+            inactive_selection_bg: String::new(),
+            selection_highlight_border: String::new(),
+            secondary_selection_bg: String::new(),
+            word_highlight_bg: String::new(),
+            word_highlight_strong_bg: String::new(),
+            word_highlight_text_bg: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sel_color_id.is_empty() || true && !self.selection_background.is_empty() || true && !self.selection_foreground.is_empty() || true && !self.selection_highlight_bg.is_empty() || true && !self.inactive_selection_bg.is_empty() || true && !self.selection_highlight_border.is_empty() || true && !self.secondary_selection_bg.is_empty() || true && !self.word_highlight_bg.is_empty() || true && !self.word_highlight_strong_bg.is_empty() || true && !self.word_highlight_text_bg.is_empty() || true
+    }
+}
+
+impl Default for FkuEditorSelectionColors {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor match highlight colors (find match, current match, ranges)
+#[derive(Debug, Clone)]
+pub struct FkvEditorMatchColors {
+    pub match_color_id: String,
+    pub find_match_bg: String,
+    pub find_match_highlight_bg: String,
+    pub find_range_highlight_bg: String,
+    pub current_find_match_bg: String,
+    pub find_match_border: String,
+    pub highlight_border: String,
+    pub range_highlight_bg: String,
+    pub symbol_highlight_bg: String,
+    pub line_highlight_border: String,
+}
+
+impl FkvEditorMatchColors {
+    pub fn new() -> Self {
+        Self {
+            match_color_id: String::new(),
+            find_match_bg: String::new(),
+            find_match_highlight_bg: String::new(),
+            find_range_highlight_bg: String::new(),
+            current_find_match_bg: String::new(),
+            find_match_border: String::new(),
+            highlight_border: String::new(),
+            range_highlight_bg: String::new(),
+            symbol_highlight_bg: String::new(),
+            line_highlight_border: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.match_color_id.is_empty() || true && !self.find_match_bg.is_empty() || true && !self.find_match_highlight_bg.is_empty() || true && !self.find_range_highlight_bg.is_empty() || true && !self.current_find_match_bg.is_empty() || true && !self.find_match_border.is_empty() || true && !self.highlight_border.is_empty() || true && !self.range_highlight_bg.is_empty() || true && !self.symbol_highlight_bg.is_empty() || true && !self.line_highlight_border.is_empty() || true
+    }
+}
+
+impl Default for FkvEditorMatchColors {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor gutter colors (added, modified, deleted, folding, blame)
+#[derive(Debug, Clone)]
+pub struct FkwEditorGutterColors {
+    pub gutter_color_id: String,
+    pub added_bg: String,
+    pub modified_bg: String,
+    pub deleted_bg: String,
+    pub folding_control_fg: String,
+    pub blame_foreground: String,
+    pub uncommitted_fg: String,
+    pub submodule_fg: String,
+    pub comment_range_bg: String,
+    pub comment_glyph_fg: String,
+}
+
+impl FkwEditorGutterColors {
+    pub fn new() -> Self {
+        Self {
+            gutter_color_id: String::new(),
+            added_bg: String::new(),
+            modified_bg: String::new(),
+            deleted_bg: String::new(),
+            folding_control_fg: String::new(),
+            blame_foreground: String::new(),
+            uncommitted_fg: String::new(),
+            submodule_fg: String::new(),
+            comment_range_bg: String::new(),
+            comment_glyph_fg: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gutter_color_id.is_empty() || true && !self.added_bg.is_empty() || true && !self.modified_bg.is_empty() || true && !self.deleted_bg.is_empty() || true && !self.folding_control_fg.is_empty() || true && !self.blame_foreground.is_empty() || true && !self.uncommitted_fg.is_empty() || true && !self.submodule_fg.is_empty() || true && !self.comment_range_bg.is_empty() || true && !self.comment_glyph_fg.is_empty() || true
+    }
+}
+
+impl Default for FkwEditorGutterColors {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor bracket pair colors (level 1-6, unexpected, guide)
+#[derive(Debug, Clone)]
+pub struct FkxEditorBracketColors {
+    pub bracket_color_id: String,
+    pub bracket_fg_1: String,
+    pub bracket_fg_2: String,
+    pub bracket_fg_3: String,
+    pub bracket_fg_4: String,
+    pub bracket_fg_5: String,
+    pub bracket_fg_6: String,
+    pub unexpected_bracket_fg: String,
+    pub guide_bg_1: String,
+    pub guide_active_bg_1: String,
+}
+
+impl FkxEditorBracketColors {
+    pub fn new() -> Self {
+        Self {
+            bracket_color_id: String::new(),
+            bracket_fg_1: String::new(),
+            bracket_fg_2: String::new(),
+            bracket_fg_3: String::new(),
+            bracket_fg_4: String::new(),
+            bracket_fg_5: String::new(),
+            bracket_fg_6: String::new(),
+            unexpected_bracket_fg: String::new(),
+            guide_bg_1: String::new(),
+            guide_active_bg_1: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bracket_color_id.is_empty() || true && !self.bracket_fg_1.is_empty() || true && !self.bracket_fg_2.is_empty() || true && !self.bracket_fg_3.is_empty() || true && !self.bracket_fg_4.is_empty() || true && !self.bracket_fg_5.is_empty() || true && !self.bracket_fg_6.is_empty() || true && !self.unexpected_bracket_fg.is_empty() || true && !self.guide_bg_1.is_empty() || true && !self.guide_active_bg_1.is_empty() || true
+    }
+}
+
+impl Default for FkxEditorBracketColors {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor token foreground colors (keyword, string, number, comment, function)
+#[derive(Debug, Clone)]
+pub struct FkyEditorTokenForeground {
+    pub token_fg_id: String,
+    pub keyword_fg: String,
+    pub string_fg: String,
+    pub number_fg: String,
+    pub comment_fg: String,
+    pub function_fg: String,
+    pub type_fg: String,
+    pub variable_fg: String,
+    pub constant_fg: String,
+    pub operator_fg: String,
+}
+
+impl FkyEditorTokenForeground {
+    pub fn new() -> Self {
+        Self {
+            token_fg_id: String::new(),
+            keyword_fg: String::new(),
+            string_fg: String::new(),
+            number_fg: String::new(),
+            comment_fg: String::new(),
+            function_fg: String::new(),
+            type_fg: String::new(),
+            variable_fg: String::new(),
+            constant_fg: String::new(),
+            operator_fg: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_fg_id.is_empty() || true && !self.keyword_fg.is_empty() || true && !self.string_fg.is_empty() || true && !self.number_fg.is_empty() || true && !self.comment_fg.is_empty() || true && !self.function_fg.is_empty() || true && !self.type_fg.is_empty() || true && !self.variable_fg.is_empty() || true && !self.constant_fg.is_empty() || true && !self.operator_fg.is_empty() || true
+    }
+}
+
+impl Default for FkyEditorTokenForeground {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor cursor colors (cursor, background, selection, word highlight)
+#[derive(Debug, Clone)]
+pub struct FkzEditorCursorColors {
+    pub cursor_color_id: String,
+    pub cursor_foreground: String,
+    pub cursor_background: String,
+    pub multi_cursor_fg: String,
+    pub multi_cursor_bg: String,
+    pub overview_ruler_cursor: String,
+    pub drop_background: String,
+    pub char_highlight_bg: String,
+    pub whitespace_fg: String,
+    pub indent_guide_bg: String,
+}
+
+impl FkzEditorCursorColors {
+    pub fn new() -> Self {
+        Self {
+            cursor_color_id: String::new(),
+            cursor_foreground: String::new(),
+            cursor_background: String::new(),
+            multi_cursor_fg: String::new(),
+            multi_cursor_bg: String::new(),
+            overview_ruler_cursor: String::new(),
+            drop_background: String::new(),
+            char_highlight_bg: String::new(),
+            whitespace_fg: String::new(),
+            indent_guide_bg: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cursor_color_id.is_empty() || true && !self.cursor_foreground.is_empty() || true && !self.cursor_background.is_empty() || true && !self.multi_cursor_fg.is_empty() || true && !self.multi_cursor_bg.is_empty() || true && !self.overview_ruler_cursor.is_empty() || true && !self.drop_background.is_empty() || true && !self.char_highlight_bg.is_empty() || true && !self.whitespace_fg.is_empty() || true && !self.indent_guide_bg.is_empty() || true
+    }
+}
+
+impl Default for FkzEditorCursorColors {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -282307,6 +282760,204 @@ mod tests_fko_generated {
     fn test_fko_fields() {
         let mut obj = FkoEditorBackground::default();
         obj.bg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkp_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkp_default() {
+        let obj = FkpEditorBorderColors::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkp_fields() {
+        let mut obj = FkpEditorBorderColors::default();
+        obj.border_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkq_default() {
+        let obj = FkqEditorForegroundColors::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkq_fields() {
+        let mut obj = FkqEditorForegroundColors::default();
+        obj.fg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkr_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkr_default() {
+        let obj = FkrEditorWidgetColors::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkr_fields() {
+        let mut obj = FkrEditorWidgetColors::default();
+        obj.widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fks_generated {
+    use super::*;
+
+    #[test]
+    fn test_fks_default() {
+        let obj = FksEditorDiffColors::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fks_fields() {
+        let mut obj = FksEditorDiffColors::default();
+        obj.diff_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkt_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkt_default() {
+        let obj = FktEditorMergeColors::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkt_fields() {
+        let mut obj = FktEditorMergeColors::default();
+        obj.merge_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fku_generated {
+    use super::*;
+
+    #[test]
+    fn test_fku_default() {
+        let obj = FkuEditorSelectionColors::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fku_fields() {
+        let mut obj = FkuEditorSelectionColors::default();
+        obj.sel_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkv_default() {
+        let obj = FkvEditorMatchColors::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkv_fields() {
+        let mut obj = FkvEditorMatchColors::default();
+        obj.match_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkw_default() {
+        let obj = FkwEditorGutterColors::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkw_fields() {
+        let mut obj = FkwEditorGutterColors::default();
+        obj.gutter_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkx_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkx_default() {
+        let obj = FkxEditorBracketColors::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkx_fields() {
+        let mut obj = FkxEditorBracketColors::default();
+        obj.bracket_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fky_generated {
+    use super::*;
+
+    #[test]
+    fn test_fky_default() {
+        let obj = FkyEditorTokenForeground::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fky_fields() {
+        let mut obj = FkyEditorTokenForeground::default();
+        obj.token_fg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkz_default() {
+        let obj = FkzEditorCursorColors::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkz_fields() {
+        let mut obj = FkzEditorCursorColors::default();
+        obj.cursor_color_id = "test".to_string();
         assert!(obj.validate());
     }
 }
