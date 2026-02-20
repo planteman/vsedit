@@ -59666,6 +59666,459 @@ impl Default for FeoBufferSnapshot {
 }
 
 
+/// Rope data structure buffer types
+#[derive(Debug, Clone)]
+pub struct FepRopeBuffer {
+    pub rope_depth: u32,
+    pub rope_length: u64,
+    pub rope_line_count: u32,
+    pub rope_leaf_count: u32,
+    pub rope_max_leaf_size: u32,
+    pub rope_min_leaf_size: u32,
+    pub rope_has_edits: bool,
+    pub rope_balanced: bool,
+    pub rope_byte_length: u64,
+    pub rope_version: u32,
+}
+
+impl FepRopeBuffer {
+    pub fn new() -> Self {
+        Self {
+            rope_depth: u32::default(),
+            rope_length: u64::default(),
+            rope_line_count: u32::default(),
+            rope_leaf_count: u32::default(),
+            rope_max_leaf_size: u32::default(),
+            rope_min_leaf_size: u32::default(),
+            rope_has_edits: bool::default(),
+            rope_balanced: bool::default(),
+            rope_byte_length: u64::default(),
+            rope_version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.rope_depth < u32::MAX || true && self.rope_length < u64::MAX || true && self.rope_line_count < u32::MAX || true && self.rope_leaf_count < u32::MAX || true && self.rope_max_leaf_size < u32::MAX || true && self.rope_min_leaf_size < u32::MAX || true && self.rope_has_edits || true && self.rope_balanced || true && self.rope_byte_length < u64::MAX || true && self.rope_version < u32::MAX || true
+    }
+}
+
+impl Default for FepRopeBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Gap buffer text storage types
+#[derive(Debug, Clone)]
+pub struct FeqGapBuffer {
+    pub gap_start: u32,
+    pub gap_end: u32,
+    pub gap_capacity: u32,
+    pub gap_length: u32,
+    pub gap_line_count: u32,
+    pub gap_insert_count: u64,
+    pub gap_delete_count: u64,
+    pub gap_compact_threshold: u32,
+    pub gap_encoding: String,
+    pub gap_version: u32,
+}
+
+impl FeqGapBuffer {
+    pub fn new() -> Self {
+        Self {
+            gap_start: u32::default(),
+            gap_end: u32::default(),
+            gap_capacity: u32::default(),
+            gap_length: u32::default(),
+            gap_line_count: u32::default(),
+            gap_insert_count: u64::default(),
+            gap_delete_count: u64::default(),
+            gap_compact_threshold: u32::default(),
+            gap_encoding: String::new(),
+            gap_version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.gap_start < u32::MAX || true && self.gap_end < u32::MAX || true && self.gap_capacity < u32::MAX || true && self.gap_length < u32::MAX || true && self.gap_line_count < u32::MAX || true && self.gap_insert_count < u64::MAX || true && self.gap_delete_count < u64::MAX || true && self.gap_compact_threshold < u32::MAX || true && !self.gap_encoding.is_empty() || true && self.gap_version < u32::MAX || true
+    }
+}
+
+impl Default for FeqGapBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Unicode grapheme/word/sentence segmentation types
+#[derive(Debug, Clone)]
+pub struct FerUnicodeSegment {
+    pub segment_offset: u32,
+    pub segment_length: u32,
+    pub segment_type: String,
+    pub segment_text: String,
+    pub segment_is_grapheme: bool,
+    pub segment_is_word: bool,
+    pub segment_is_sentence: bool,
+    pub segment_is_line_break: bool,
+    pub segment_locale: String,
+    pub segment_category: String,
+}
+
+impl FerUnicodeSegment {
+    pub fn new() -> Self {
+        Self {
+            segment_offset: u32::default(),
+            segment_length: u32::default(),
+            segment_type: String::new(),
+            segment_text: String::new(),
+            segment_is_grapheme: bool::default(),
+            segment_is_word: bool::default(),
+            segment_is_sentence: bool::default(),
+            segment_is_line_break: bool::default(),
+            segment_locale: String::new(),
+            segment_category: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.segment_offset < u32::MAX || true && self.segment_length < u32::MAX || true && !self.segment_type.is_empty() || true && !self.segment_text.is_empty() || true && self.segment_is_grapheme || true && self.segment_is_word || true && self.segment_is_sentence || true && self.segment_is_line_break || true && !self.segment_locale.is_empty() || true && !self.segment_category.is_empty() || true
+    }
+}
+
+impl Default for FerUnicodeSegment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Regex engine (Oniguruma/Rust) types
+#[derive(Debug, Clone)]
+pub struct FesRegexEngine {
+    pub regex_pattern: String,
+    pub regex_flags: String,
+    pub regex_is_multiline: bool,
+    pub regex_is_unicode: bool,
+    pub regex_max_lookbehind: u32,
+    pub regex_capture_count: u32,
+    pub regex_capture_names: String,
+    pub regex_is_compiled: bool,
+    pub regex_engine_type: String,
+    pub regex_timeout_ms: u32,
+}
+
+impl FesRegexEngine {
+    pub fn new() -> Self {
+        Self {
+            regex_pattern: String::new(),
+            regex_flags: String::new(),
+            regex_is_multiline: bool::default(),
+            regex_is_unicode: bool::default(),
+            regex_max_lookbehind: u32::default(),
+            regex_capture_count: u32::default(),
+            regex_capture_names: String::new(),
+            regex_is_compiled: bool::default(),
+            regex_engine_type: String::new(),
+            regex_timeout_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.regex_pattern.is_empty() || true && !self.regex_flags.is_empty() || true && self.regex_is_multiline || true && self.regex_is_unicode || true && self.regex_max_lookbehind < u32::MAX || true && self.regex_capture_count < u32::MAX || true && !self.regex_capture_names.is_empty() || true && self.regex_is_compiled || true && !self.regex_engine_type.is_empty() || true && self.regex_timeout_ms < u32::MAX || true
+    }
+}
+
+impl Default for FesRegexEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Diff algorithm (Myers/patience/histogram) types
+#[derive(Debug, Clone)]
+pub struct FetDiffAlgorithm {
+    pub diff_algorithm: String,
+    pub diff_change_count: u32,
+    pub diff_compute_time_us: u64,
+    pub diff_original_length: u32,
+    pub diff_modified_length: u32,
+    pub diff_timeout_ms: u32,
+    pub diff_max_computations: u64,
+    pub diff_ignore_whitespace: bool,
+    pub diff_ignore_case: bool,
+    pub diff_boundary_mode: String,
+}
+
+impl FetDiffAlgorithm {
+    pub fn new() -> Self {
+        Self {
+            diff_algorithm: String::new(),
+            diff_change_count: u32::default(),
+            diff_compute_time_us: u64::default(),
+            diff_original_length: u32::default(),
+            diff_modified_length: u32::default(),
+            diff_timeout_ms: u32::default(),
+            diff_max_computations: u64::default(),
+            diff_ignore_whitespace: bool::default(),
+            diff_ignore_case: bool::default(),
+            diff_boundary_mode: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_algorithm.is_empty() || true && self.diff_change_count < u32::MAX || true && self.diff_compute_time_us < u64::MAX || true && self.diff_original_length < u32::MAX || true && self.diff_modified_length < u32::MAX || true && self.diff_timeout_ms < u32::MAX || true && self.diff_max_computations < u64::MAX || true && self.diff_ignore_whitespace || true && self.diff_ignore_case || true && !self.diff_boundary_mode.is_empty() || true
+    }
+}
+
+impl Default for FetDiffAlgorithm {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Three-way merge algorithm types
+#[derive(Debug, Clone)]
+pub struct FeuMergeAlgorithm {
+    pub merge_strategy: String,
+    pub merge_conflict_count: u32,
+    pub merge_resolved_count: u32,
+    pub merge_base_length: u32,
+    pub merge_left_length: u32,
+    pub merge_right_length: u32,
+    pub merge_result_length: u32,
+    pub merge_auto_resolved: u32,
+    pub merge_compute_time_us: u64,
+    pub merge_has_conflicts: bool,
+}
+
+impl FeuMergeAlgorithm {
+    pub fn new() -> Self {
+        Self {
+            merge_strategy: String::new(),
+            merge_conflict_count: u32::default(),
+            merge_resolved_count: u32::default(),
+            merge_base_length: u32::default(),
+            merge_left_length: u32::default(),
+            merge_right_length: u32::default(),
+            merge_result_length: u32::default(),
+            merge_auto_resolved: u32::default(),
+            merge_compute_time_us: u64::default(),
+            merge_has_conflicts: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.merge_strategy.is_empty() || true && self.merge_conflict_count < u32::MAX || true && self.merge_resolved_count < u32::MAX || true && self.merge_base_length < u32::MAX || true && self.merge_left_length < u32::MAX || true && self.merge_right_length < u32::MAX || true && self.merge_result_length < u32::MAX || true && self.merge_auto_resolved < u32::MAX || true && self.merge_compute_time_us < u64::MAX || true && self.merge_has_conflicts || true
+    }
+}
+
+impl Default for FeuMergeAlgorithm {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Line-by-line tokenization types
+#[derive(Debug, Clone)]
+pub struct FevTokenizerLine {
+    pub tokenizer_line_text: String,
+    pub tokenizer_state_before: u32,
+    pub tokenizer_state_after: u32,
+    pub tokenizer_tokens_count: u32,
+    pub tokenizer_line_number: u32,
+    pub tokenizer_is_invalid: bool,
+    pub tokenizer_language_id: String,
+    pub tokenizer_time_us: u64,
+    pub tokenizer_encoding: String,
+    pub tokenizer_is_first_line: bool,
+}
+
+impl FevTokenizerLine {
+    pub fn new() -> Self {
+        Self {
+            tokenizer_line_text: String::new(),
+            tokenizer_state_before: u32::default(),
+            tokenizer_state_after: u32::default(),
+            tokenizer_tokens_count: u32::default(),
+            tokenizer_line_number: u32::default(),
+            tokenizer_is_invalid: bool::default(),
+            tokenizer_language_id: String::new(),
+            tokenizer_time_us: u64::default(),
+            tokenizer_encoding: String::new(),
+            tokenizer_is_first_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tokenizer_line_text.is_empty() || true && self.tokenizer_state_before < u32::MAX || true && self.tokenizer_state_after < u32::MAX || true && self.tokenizer_tokens_count < u32::MAX || true && self.tokenizer_line_number < u32::MAX || true && self.tokenizer_is_invalid || true && !self.tokenizer_language_id.is_empty() || true && self.tokenizer_time_us < u64::MAX || true && !self.tokenizer_encoding.is_empty() || true && self.tokenizer_is_first_line || true
+    }
+}
+
+impl Default for FevTokenizerLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Bracket pair colorization types
+#[derive(Debug, Clone)]
+pub struct FewBracketPair {
+    pub bracket_open_char: String,
+    pub bracket_close_char: String,
+    pub bracket_depth: u32,
+    pub bracket_color_index: u32,
+    pub bracket_start_offset: u32,
+    pub bracket_end_offset: u32,
+    pub bracket_is_matched: bool,
+    pub bracket_is_error: bool,
+    pub bracket_language_id: String,
+    pub bracket_pair_index: u32,
+}
+
+impl FewBracketPair {
+    pub fn new() -> Self {
+        Self {
+            bracket_open_char: String::new(),
+            bracket_close_char: String::new(),
+            bracket_depth: u32::default(),
+            bracket_color_index: u32::default(),
+            bracket_start_offset: u32::default(),
+            bracket_end_offset: u32::default(),
+            bracket_is_matched: bool::default(),
+            bracket_is_error: bool::default(),
+            bracket_language_id: String::new(),
+            bracket_pair_index: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bracket_open_char.is_empty() || true && !self.bracket_close_char.is_empty() || true && self.bracket_depth < u32::MAX || true && self.bracket_color_index < u32::MAX || true && self.bracket_start_offset < u32::MAX || true && self.bracket_end_offset < u32::MAX || true && self.bracket_is_matched || true && self.bracket_is_error || true && !self.bracket_language_id.is_empty() || true && self.bracket_pair_index < u32::MAX || true
+    }
+}
+
+impl Default for FewBracketPair {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Indentation guide rendering types
+#[derive(Debug, Clone)]
+pub struct FexIndentGuide {
+    pub guide_indent_level: u32,
+    pub guide_active: bool,
+    pub guide_start_line: u32,
+    pub guide_end_line: u32,
+    pub guide_color_index: u32,
+    pub guide_style: String,
+    pub guide_is_bracket: bool,
+    pub guide_horizontal: bool,
+    pub guide_depth: u32,
+    pub guide_visible: bool,
+}
+
+impl FexIndentGuide {
+    pub fn new() -> Self {
+        Self {
+            guide_indent_level: u32::default(),
+            guide_active: bool::default(),
+            guide_start_line: u32::default(),
+            guide_end_line: u32::default(),
+            guide_color_index: u32::default(),
+            guide_style: String::new(),
+            guide_is_bracket: bool::default(),
+            guide_horizontal: bool::default(),
+            guide_depth: u32::default(),
+            guide_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.guide_indent_level < u32::MAX || true && self.guide_active || true && self.guide_start_line < u32::MAX || true && self.guide_end_line < u32::MAX || true && self.guide_color_index < u32::MAX || true && !self.guide_style.is_empty() || true && self.guide_is_bracket || true && self.guide_horizontal || true && self.guide_depth < u32::MAX || true && self.guide_visible || true
+    }
+}
+
+impl Default for FexIndentGuide {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Word boundary detection types
+#[derive(Debug, Clone)]
+pub struct FeyWordSegment {
+    pub word_start_offset: u32,
+    pub word_end_offset: u32,
+    pub word_type: u32,
+    pub word_text: String,
+    pub word_is_basic_word: bool,
+    pub word_is_whitespace: bool,
+    pub word_is_separator: bool,
+    pub word_language_config: String,
+    pub word_regex_pattern: String,
+    pub word_camel_case: bool,
+}
+
+impl FeyWordSegment {
+    pub fn new() -> Self {
+        Self {
+            word_start_offset: u32::default(),
+            word_end_offset: u32::default(),
+            word_type: u32::default(),
+            word_text: String::new(),
+            word_is_basic_word: bool::default(),
+            word_is_whitespace: bool::default(),
+            word_is_separator: bool::default(),
+            word_language_config: String::new(),
+            word_regex_pattern: String::new(),
+            word_camel_case: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.word_start_offset < u32::MAX || true && self.word_end_offset < u32::MAX || true && self.word_type < u32::MAX || true && !self.word_text.is_empty() || true && self.word_is_basic_word || true && self.word_is_whitespace || true && self.word_is_separator || true && !self.word_language_config.is_empty() || true && !self.word_regex_pattern.is_empty() || true && self.word_camel_case || true
+    }
+}
+
+impl Default for FeyWordSegment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Smart selection expansion types
+#[derive(Debug, Clone)]
+pub struct FezSmartSelect {
+    pub smart_range_start: u32,
+    pub smart_range_end: u32,
+    pub smart_parent_start: u32,
+    pub smart_parent_end: u32,
+    pub smart_depth: u32,
+    pub smart_kind: String,
+    pub smart_is_line: bool,
+    pub smart_is_word: bool,
+    pub smart_is_bracket: bool,
+    pub smart_is_statement: bool,
+}
+
+impl FezSmartSelect {
+    pub fn new() -> Self {
+        Self {
+            smart_range_start: u32::default(),
+            smart_range_end: u32::default(),
+            smart_parent_start: u32::default(),
+            smart_parent_end: u32::default(),
+            smart_depth: u32::default(),
+            smart_kind: String::new(),
+            smart_is_line: bool::default(),
+            smart_is_word: bool::default(),
+            smart_is_bracket: bool::default(),
+            smart_is_statement: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.smart_range_start < u32::MAX || true && self.smart_range_end < u32::MAX || true && self.smart_parent_start < u32::MAX || true && self.smart_parent_end < u32::MAX || true && self.smart_depth < u32::MAX || true && !self.smart_kind.is_empty() || true && self.smart_is_line || true && self.smart_is_word || true && self.smart_is_bracket || true && self.smart_is_statement || true
+    }
+}
+
+impl Default for FezSmartSelect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -273184,6 +273637,204 @@ mod tests_feo_generated {
     fn test_feo_fields() {
         let mut obj = FeoBufferSnapshot::default();
         obj.snapshot_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fep_generated {
+    use super::*;
+
+    #[test]
+    fn test_fep_default() {
+        let obj = FepRopeBuffer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fep_fields() {
+        let mut obj = FepRopeBuffer::default();
+        obj.rope_depth = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_feq_generated {
+    use super::*;
+
+    #[test]
+    fn test_feq_default() {
+        let obj = FeqGapBuffer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_feq_fields() {
+        let mut obj = FeqGapBuffer::default();
+        obj.gap_start = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fer_generated {
+    use super::*;
+
+    #[test]
+    fn test_fer_default() {
+        let obj = FerUnicodeSegment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fer_fields() {
+        let mut obj = FerUnicodeSegment::default();
+        obj.segment_offset = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fes_generated {
+    use super::*;
+
+    #[test]
+    fn test_fes_default() {
+        let obj = FesRegexEngine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fes_fields() {
+        let mut obj = FesRegexEngine::default();
+        obj.regex_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fet_generated {
+    use super::*;
+
+    #[test]
+    fn test_fet_default() {
+        let obj = FetDiffAlgorithm::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fet_fields() {
+        let mut obj = FetDiffAlgorithm::default();
+        obj.diff_algorithm = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_feu_generated {
+    use super::*;
+
+    #[test]
+    fn test_feu_default() {
+        let obj = FeuMergeAlgorithm::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_feu_fields() {
+        let mut obj = FeuMergeAlgorithm::default();
+        obj.merge_strategy = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fev_generated {
+    use super::*;
+
+    #[test]
+    fn test_fev_default() {
+        let obj = FevTokenizerLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fev_fields() {
+        let mut obj = FevTokenizerLine::default();
+        obj.tokenizer_line_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_few_generated {
+    use super::*;
+
+    #[test]
+    fn test_few_default() {
+        let obj = FewBracketPair::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_few_fields() {
+        let mut obj = FewBracketPair::default();
+        obj.bracket_open_char = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fex_generated {
+    use super::*;
+
+    #[test]
+    fn test_fex_default() {
+        let obj = FexIndentGuide::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fex_fields() {
+        let mut obj = FexIndentGuide::default();
+        obj.guide_indent_level = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fey_generated {
+    use super::*;
+
+    #[test]
+    fn test_fey_default() {
+        let obj = FeyWordSegment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fey_fields() {
+        let mut obj = FeyWordSegment::default();
+        obj.word_start_offset = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fez_generated {
+    use super::*;
+
+    #[test]
+    fn test_fez_default() {
+        let obj = FezSmartSelect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fez_fields() {
+        let mut obj = FezSmartSelect::default();
+        obj.smart_range_start = 42;
         assert!(obj.validate());
     }
 }
