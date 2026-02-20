@@ -51568,6 +51568,213 @@ impl Default for EwzGitCredential {
 }
 
 
+/// Completion item model types
+#[derive(Debug, Clone)]
+pub struct ExaCompletionItem {
+    pub completion_label: String,
+    pub completion_kind: u32,
+    pub completion_detail: String,
+    pub completion_documentation: String,
+    pub completion_sort_text: String,
+    pub completion_filter_text: String,
+    pub completion_insert_text: String,
+    pub completion_insert_text_format: u32,
+    pub completion_text_edit: String,
+    pub completion_additional_edits: String,
+}
+
+impl ExaCompletionItem {
+    pub fn new() -> Self {
+        Self {
+            completion_label: String::new(),
+            completion_kind: u32::default(),
+            completion_detail: String::new(),
+            completion_documentation: String::new(),
+            completion_sort_text: String::new(),
+            completion_filter_text: String::new(),
+            completion_insert_text: String::new(),
+            completion_insert_text_format: u32::default(),
+            completion_text_edit: String::new(),
+            completion_additional_edits: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.completion_label.is_empty() || true && self.completion_kind < u32::MAX || true && !self.completion_detail.is_empty() || true && !self.completion_documentation.is_empty() || true && !self.completion_sort_text.is_empty() || true && !self.completion_filter_text.is_empty() || true && !self.completion_insert_text.is_empty() || true && self.completion_insert_text_format < u32::MAX || true && !self.completion_text_edit.is_empty() || true && !self.completion_additional_edits.is_empty() || true
+    }
+}
+
+impl Default for ExaCompletionItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Completion list and suggestion types
+#[derive(Debug, Clone)]
+pub struct ExbCompletionList {
+    pub completion_is_incomplete: bool,
+    pub completion_default_range: String,
+    pub completion_default_commit_chars: String,
+    pub completion_default_insert_mode: u32,
+    pub completion_items_count: u32,
+    pub completion_suggestions_count: u32,
+    pub completion_dispose_timeout: u32,
+    pub completion_duration_ms: u64,
+    pub completion_trigger_kind: u32,
+    pub completion_trigger_char: String,
+}
+
+impl ExbCompletionList {
+    pub fn new() -> Self {
+        Self {
+            completion_is_incomplete: bool::default(),
+            completion_default_range: String::new(),
+            completion_default_commit_chars: String::new(),
+            completion_default_insert_mode: u32::default(),
+            completion_items_count: u32::default(),
+            completion_suggestions_count: u32::default(),
+            completion_dispose_timeout: u32::default(),
+            completion_duration_ms: u64::default(),
+            completion_trigger_kind: u32::default(),
+            completion_trigger_char: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.completion_is_incomplete || true && !self.completion_default_range.is_empty() || true && !self.completion_default_commit_chars.is_empty() || true && self.completion_default_insert_mode < u32::MAX || true && self.completion_items_count < u32::MAX || true && self.completion_suggestions_count < u32::MAX || true && self.completion_dispose_timeout < u32::MAX || true && self.completion_duration_ms < u64::MAX || true && self.completion_trigger_kind < u32::MAX || true && !self.completion_trigger_char.is_empty() || true
+    }
+}
+
+impl Default for ExbCompletionList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Signature help display types
+#[derive(Debug, Clone)]
+pub struct ExcSignatureHelp {
+    pub signature_label: String,
+    pub signature_documentation: String,
+    pub signature_parameters: String,
+    pub signature_active_parameter: u32,
+    pub signature_active_signature: u32,
+    pub signature_trigger_reason: u32,
+    pub signature_trigger_char: String,
+    pub signature_is_retrigger: bool,
+    pub signature_context_text: String,
+    pub signature_count: u32,
+}
+
+impl ExcSignatureHelp {
+    pub fn new() -> Self {
+        Self {
+            signature_label: String::new(),
+            signature_documentation: String::new(),
+            signature_parameters: String::new(),
+            signature_active_parameter: u32::default(),
+            signature_active_signature: u32::default(),
+            signature_trigger_reason: u32::default(),
+            signature_trigger_char: String::new(),
+            signature_is_retrigger: bool::default(),
+            signature_context_text: String::new(),
+            signature_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.signature_label.is_empty() || true && !self.signature_documentation.is_empty() || true && !self.signature_parameters.is_empty() || true && self.signature_active_parameter < u32::MAX || true && self.signature_active_signature < u32::MAX || true && self.signature_trigger_reason < u32::MAX || true && !self.signature_trigger_char.is_empty() || true && self.signature_is_retrigger || true && !self.signature_context_text.is_empty() || true && self.signature_count < u32::MAX || true
+    }
+}
+
+impl Default for ExcSignatureHelp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Go-to-definition result types
+#[derive(Debug, Clone)]
+pub struct ExdDefinitionResult {
+    pub definition_uri: String,
+    pub definition_range_start: u32,
+    pub definition_range_end: u32,
+    pub definition_target_range_start: u32,
+    pub definition_target_range_end: u32,
+    pub definition_target_selection_start: u32,
+    pub definition_target_selection_end: u32,
+    pub definition_origin_start: u32,
+    pub definition_origin_end: u32,
+    pub definition_kind: String,
+}
+
+impl ExdDefinitionResult {
+    pub fn new() -> Self {
+        Self {
+            definition_uri: String::new(),
+            definition_range_start: u32::default(),
+            definition_range_end: u32::default(),
+            definition_target_range_start: u32::default(),
+            definition_target_range_end: u32::default(),
+            definition_target_selection_start: u32::default(),
+            definition_target_selection_end: u32::default(),
+            definition_origin_start: u32::default(),
+            definition_origin_end: u32::default(),
+            definition_kind: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.definition_uri.is_empty() || true && self.definition_range_start < u32::MAX || true && self.definition_range_end < u32::MAX || true && self.definition_target_range_start < u32::MAX || true && self.definition_target_range_end < u32::MAX || true && self.definition_target_selection_start < u32::MAX || true && self.definition_target_selection_end < u32::MAX || true && self.definition_origin_start < u32::MAX || true && self.definition_origin_end < u32::MAX || true && !self.definition_kind.is_empty() || true
+    }
+}
+
+impl Default for ExdDefinitionResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Find references result types
+#[derive(Debug, Clone)]
+pub struct ExeReferenceResult {
+    pub reference_uri: String,
+    pub reference_range_start: u32,
+    pub reference_range_end: u32,
+    pub reference_kind: u32,
+    pub reference_context_include_declaration: bool,
+    pub reference_preview_text: String,
+    pub reference_file_name: String,
+    pub reference_line_number: u32,
+    pub reference_column: u32,
+    pub reference_is_write_access: bool,
+}
+
+impl ExeReferenceResult {
+    pub fn new() -> Self {
+        Self {
+            reference_uri: String::new(),
+            reference_range_start: u32::default(),
+            reference_range_end: u32::default(),
+            reference_kind: u32::default(),
+            reference_context_include_declaration: bool::default(),
+            reference_preview_text: String::new(),
+            reference_file_name: String::new(),
+            reference_line_number: u32::default(),
+            reference_column: u32::default(),
+            reference_is_write_access: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.reference_uri.is_empty() || true && self.reference_range_start < u32::MAX || true && self.reference_range_end < u32::MAX || true && self.reference_kind < u32::MAX || true && self.reference_context_include_declaration || true && !self.reference_preview_text.is_empty() || true && !self.reference_file_name.is_empty() || true && self.reference_line_number < u32::MAX || true && self.reference_column < u32::MAX || true && self.reference_is_write_access || true
+    }
+}
+
+impl Default for ExeReferenceResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -261367,6 +261574,96 @@ mod tests_ewz_generated {
     fn test_ewz_fields() {
         let mut obj = EwzGitCredential::default();
         obj.credential_host = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exa_generated {
+    use super::*;
+
+    #[test]
+    fn test_exa_default() {
+        let obj = ExaCompletionItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exa_fields() {
+        let mut obj = ExaCompletionItem::default();
+        obj.completion_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exb_generated {
+    use super::*;
+
+    #[test]
+    fn test_exb_default() {
+        let obj = ExbCompletionList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exb_fields() {
+        let mut obj = ExbCompletionList::default();
+        obj.completion_is_incomplete = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exc_generated {
+    use super::*;
+
+    #[test]
+    fn test_exc_default() {
+        let obj = ExcSignatureHelp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exc_fields() {
+        let mut obj = ExcSignatureHelp::default();
+        obj.signature_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exd_generated {
+    use super::*;
+
+    #[test]
+    fn test_exd_default() {
+        let obj = ExdDefinitionResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exd_fields() {
+        let mut obj = ExdDefinitionResult::default();
+        obj.definition_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exe_generated {
+    use super::*;
+
+    #[test]
+    fn test_exe_default() {
+        let obj = ExeReferenceResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exe_fields() {
+        let mut obj = ExeReferenceResult::default();
+        obj.reference_uri = "test".to_string();
         assert!(obj.validate());
     }
 }
