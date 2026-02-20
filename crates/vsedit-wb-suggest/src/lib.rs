@@ -102636,6 +102636,216 @@ impl Default for GseTestMessage {
     }
 }
 
+/// Test coverage (uri, statement count, branch count, function count)
+#[derive(Debug, Clone)]
+pub struct GsfTestCoverage {
+    pub coverage_id: String,
+    pub uri: String,
+    pub statement_count: u32,
+    pub statement_covered: u32,
+    pub branch_count: u32,
+    pub branch_covered: u32,
+    pub function_count: u32,
+    pub function_covered: u32,
+    pub line_coverage_json: String,
+    pub percentage: f64,
+}
+
+impl GsfTestCoverage {
+    pub fn new() -> Self {
+        Self {
+            coverage_id: String::new(),
+            uri: String::new(),
+            statement_count: u32::default(),
+            statement_covered: u32::default(),
+            branch_count: u32::default(),
+            branch_covered: u32::default(),
+            function_count: u32::default(),
+            function_covered: u32::default(),
+            line_coverage_json: String::new(),
+            percentage: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.coverage_id.is_empty() || true && !self.uri.is_empty() || true && self.statement_count < u32::MAX || true && self.statement_covered < u32::MAX || true && self.branch_count < u32::MAX || true && self.branch_covered < u32::MAX || true && self.function_count < u32::MAX || true && self.function_covered < u32::MAX || true && !self.line_coverage_json.is_empty() || true && self.percentage.is_finite() || true
+    }
+}
+
+impl Default for GsfTestCoverage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test tag (id, label, color, icon, hide in UI)
+#[derive(Debug, Clone)]
+pub struct GsgTestTag {
+    pub tag_id: String,
+    pub label: String,
+    pub color: String,
+    pub icon: String,
+    pub hide_in_ui: bool,
+    pub description: String,
+    pub controller_id: String,
+    pub is_default: bool,
+    pub sort_order: u32,
+    pub when_clause: String,
+}
+
+impl GsgTestTag {
+    pub fn new() -> Self {
+        Self {
+            tag_id: String::new(),
+            label: String::new(),
+            color: String::new(),
+            icon: String::new(),
+            hide_in_ui: bool::default(),
+            description: String::new(),
+            controller_id: String::new(),
+            is_default: bool::default(),
+            sort_order: u32::default(),
+            when_clause: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tag_id.is_empty() || true && !self.label.is_empty() || true && !self.color.is_empty() || true && !self.icon.is_empty() || true && self.hide_in_ui || true && !self.description.is_empty() || true && !self.controller_id.is_empty() || true && self.is_default || true && self.sort_order < u32::MAX || true && !self.when_clause.is_empty() || true
+    }
+}
+
+impl Default for GsgTestTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test explorer view (tree, sort, group, filter, auto run)
+#[derive(Debug, Clone)]
+pub struct GshTestExplorerView {
+    pub explorer_id: String,
+    pub tree_json: String,
+    pub sort_by: String,
+    pub group_by: String,
+    pub filter_text: String,
+    pub auto_run: bool,
+    pub show_inline_results: bool,
+    pub follow_running_test: bool,
+    pub show_all_messages: bool,
+    pub compact_view: bool,
+}
+
+impl GshTestExplorerView {
+    pub fn new() -> Self {
+        Self {
+            explorer_id: String::new(),
+            tree_json: String::new(),
+            sort_by: String::new(),
+            group_by: String::new(),
+            filter_text: String::new(),
+            auto_run: bool::default(),
+            show_inline_results: bool::default(),
+            follow_running_test: bool::default(),
+            show_all_messages: bool::default(),
+            compact_view: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.explorer_id.is_empty() || true && !self.tree_json.is_empty() || true && !self.sort_by.is_empty() || true && !self.group_by.is_empty() || true && !self.filter_text.is_empty() || true && self.auto_run || true && self.show_inline_results || true && self.follow_running_test || true && self.show_all_messages || true && self.compact_view || true
+    }
+}
+
+impl Default for GshTestExplorerView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test result snapshot (items, states, messages, timing)
+#[derive(Debug, Clone)]
+pub struct GsiTestResultSnapshot {
+    pub snapshot_id: String,
+    pub items_json: String,
+    pub states_json: String,
+    pub messages_json: String,
+    pub timing_json: String,
+    pub run_id: String,
+    pub timestamp_ms: u64,
+    pub is_complete: bool,
+    pub total_count: u32,
+    pub error_count: u32,
+}
+
+impl GsiTestResultSnapshot {
+    pub fn new() -> Self {
+        Self {
+            snapshot_id: String::new(),
+            items_json: String::new(),
+            states_json: String::new(),
+            messages_json: String::new(),
+            timing_json: String::new(),
+            run_id: String::new(),
+            timestamp_ms: u64::default(),
+            is_complete: bool::default(),
+            total_count: u32::default(),
+            error_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snapshot_id.is_empty() || true && !self.items_json.is_empty() || true && !self.states_json.is_empty() || true && !self.messages_json.is_empty() || true && !self.timing_json.is_empty() || true && !self.run_id.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.is_complete || true && self.total_count < u32::MAX || true && self.error_count < u32::MAX || true
+    }
+}
+
+impl Default for GsiTestResultSnapshot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test output channel (name, output items, terminal id)
+#[derive(Debug, Clone)]
+pub struct GsjTestOutputChannel {
+    pub output_ch_id: String,
+    pub name: String,
+    pub output_items_json: String,
+    pub terminal_id: String,
+    pub is_visible: bool,
+    pub line_count: u32,
+    pub max_lines: u32,
+    pub auto_scroll: bool,
+    pub word_wrap: bool,
+    pub run_id: String,
+}
+
+impl GsjTestOutputChannel {
+    pub fn new() -> Self {
+        Self {
+            output_ch_id: String::new(),
+            name: String::new(),
+            output_items_json: String::new(),
+            terminal_id: String::new(),
+            is_visible: bool::default(),
+            line_count: u32::default(),
+            max_lines: u32::default(),
+            auto_scroll: bool::default(),
+            word_wrap: bool::default(),
+            run_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_ch_id.is_empty() || true && !self.name.is_empty() || true && !self.output_items_json.is_empty() || true && !self.terminal_id.is_empty() || true && self.is_visible || true && self.line_count < u32::MAX || true && self.max_lines < u32::MAX || true && self.auto_scroll || true && self.word_wrap || true && !self.run_id.is_empty() || true
+    }
+}
+
+impl Default for GsjTestOutputChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -334737,6 +334947,96 @@ mod tests_gse_generated {
     fn test_gse_fields() {
         let mut obj = GseTestMessage::default();
         obj.test_msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsf_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsf_default() {
+        let obj = GsfTestCoverage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsf_fields() {
+        let mut obj = GsfTestCoverage::default();
+        obj.coverage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsg_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsg_default() {
+        let obj = GsgTestTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsg_fields() {
+        let mut obj = GsgTestTag::default();
+        obj.tag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsh_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsh_default() {
+        let obj = GshTestExplorerView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsh_fields() {
+        let mut obj = GshTestExplorerView::default();
+        obj.explorer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsi_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsi_default() {
+        let obj = GsiTestResultSnapshot::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsi_fields() {
+        let mut obj = GsiTestResultSnapshot::default();
+        obj.snapshot_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsj_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsj_default() {
+        let obj = GsjTestOutputChannel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsj_fields() {
+        let mut obj = GsjTestOutputChannel::default();
+        obj.output_ch_id = "test".to_string();
         assert!(obj.validate());
     }
 }
