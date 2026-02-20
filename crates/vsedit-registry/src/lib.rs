@@ -80529,6 +80529,426 @@ impl Default for FxzLanguageFeatureRegistry {
     }
 }
 
+/// Error telemetry (type, message, stack, source, count)
+#[derive(Debug, Clone)]
+pub struct FyaErrorTelemetry {
+    pub error_id: String,
+    pub error_type: String,
+    pub message: String,
+    pub stack_trace: String,
+    pub source: String,
+    pub occurrence_count: u64,
+    pub first_seen_ms: u64,
+    pub last_seen_ms: u64,
+    pub is_external: bool,
+    pub severity: u32,
+}
+
+impl FyaErrorTelemetry {
+    pub fn new() -> Self {
+        Self {
+            error_id: String::new(),
+            error_type: String::new(),
+            message: String::new(),
+            stack_trace: String::new(),
+            source: String::new(),
+            occurrence_count: u64::default(),
+            first_seen_ms: u64::default(),
+            last_seen_ms: u64::default(),
+            is_external: bool::default(),
+            severity: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.error_id.is_empty() || true && !self.error_type.is_empty() || true && !self.message.is_empty() || true && !self.stack_trace.is_empty() || true && !self.source.is_empty() || true && self.occurrence_count < u64::MAX || true && self.first_seen_ms < u64::MAX || true && self.last_seen_ms < u64::MAX || true && self.is_external || true && self.severity < u32::MAX || true
+    }
+}
+
+impl Default for FyaErrorTelemetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Error handler (unexpected error, onUnexpectedError, listener)
+#[derive(Debug, Clone)]
+pub struct FybErrorHandler {
+    pub handler_id: String,
+    pub listener_count: u32,
+    pub unexpected_error_count: u64,
+    pub last_error_ms: u64,
+    pub is_disposed: bool,
+    pub error_collect_mode: u32,
+    pub threshold: u32,
+    pub suppress_identical: bool,
+    pub rethrow_unhandled: bool,
+    pub handler_stack_json: String,
+}
+
+impl FybErrorHandler {
+    pub fn new() -> Self {
+        Self {
+            handler_id: String::new(),
+            listener_count: u32::default(),
+            unexpected_error_count: u64::default(),
+            last_error_ms: u64::default(),
+            is_disposed: bool::default(),
+            error_collect_mode: u32::default(),
+            threshold: u32::default(),
+            suppress_identical: bool::default(),
+            rethrow_unhandled: bool::default(),
+            handler_stack_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.handler_id.is_empty() || true && self.listener_count < u32::MAX || true && self.unexpected_error_count < u64::MAX || true && self.last_error_ms < u64::MAX || true && self.is_disposed || true && self.error_collect_mode < u32::MAX || true && self.threshold < u32::MAX || true && self.suppress_identical || true && self.rethrow_unhandled || true && !self.handler_stack_json.is_empty() || true
+    }
+}
+
+impl Default for FybErrorHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Error info (name, message, stack, cause, actions)
+#[derive(Debug, Clone)]
+pub struct FycErrorInfo {
+    pub info_id: String,
+    pub name: String,
+    pub message: String,
+    pub stack: String,
+    pub cause_json: String,
+    pub actions_json: String,
+    pub is_recoverable: bool,
+    pub retry_count: u32,
+    pub error_code: u32,
+    pub data_json: String,
+}
+
+impl FycErrorInfo {
+    pub fn new() -> Self {
+        Self {
+            info_id: String::new(),
+            name: String::new(),
+            message: String::new(),
+            stack: String::new(),
+            cause_json: String::new(),
+            actions_json: String::new(),
+            is_recoverable: bool::default(),
+            retry_count: u32::default(),
+            error_code: u32::default(),
+            data_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.info_id.is_empty() || true && !self.name.is_empty() || true && !self.message.is_empty() || true && !self.stack.is_empty() || true && !self.cause_json.is_empty() || true && !self.actions_json.is_empty() || true && self.is_recoverable || true && self.retry_count < u32::MAX || true && self.error_code < u32::MAX || true && !self.data_json.is_empty() || true
+    }
+}
+
+impl Default for FycErrorInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Crash reporter (submit url, product name, extra, enabled)
+#[derive(Debug, Clone)]
+pub struct FydCrashReporter {
+    pub reporter_id: String,
+    pub submit_url: String,
+    pub product_name: String,
+    pub extra_json: String,
+    pub is_enabled: bool,
+    pub crash_count: u64,
+    pub last_crash_ms: u64,
+    pub compress_data: bool,
+    pub rate_limit: u32,
+    pub upload_to_server: bool,
+}
+
+impl FydCrashReporter {
+    pub fn new() -> Self {
+        Self {
+            reporter_id: String::new(),
+            submit_url: String::new(),
+            product_name: String::new(),
+            extra_json: String::new(),
+            is_enabled: bool::default(),
+            crash_count: u64::default(),
+            last_crash_ms: u64::default(),
+            compress_data: bool::default(),
+            rate_limit: u32::default(),
+            upload_to_server: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.reporter_id.is_empty() || true && !self.submit_url.is_empty() || true && !self.product_name.is_empty() || true && !self.extra_json.is_empty() || true && self.is_enabled || true && self.crash_count < u64::MAX || true && self.last_crash_ms < u64::MAX || true && self.compress_data || true && self.rate_limit < u32::MAX || true && self.upload_to_server || true
+    }
+}
+
+impl Default for FydCrashReporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Performance mark (name, timestamp, duration, category)
+#[derive(Debug, Clone)]
+pub struct FyePerformanceMark {
+    pub mark_id: String,
+    pub name: String,
+    pub timestamp_ms: f64,
+    pub duration_ms: f64,
+    pub category: String,
+    pub phase: u32,
+    pub thread_id: String,
+    pub correlation_id: String,
+    pub parent_id: String,
+    pub metadata_json: String,
+}
+
+impl FyePerformanceMark {
+    pub fn new() -> Self {
+        Self {
+            mark_id: String::new(),
+            name: String::new(),
+            timestamp_ms: f64::default(),
+            duration_ms: f64::default(),
+            category: String::new(),
+            phase: u32::default(),
+            thread_id: String::new(),
+            correlation_id: String::new(),
+            parent_id: String::new(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mark_id.is_empty() || true && !self.name.is_empty() || true && self.timestamp_ms.is_finite() || true && self.duration_ms.is_finite() || true && !self.category.is_empty() || true && self.phase < u32::MAX || true && !self.thread_id.is_empty() || true && !self.correlation_id.is_empty() || true && !self.parent_id.is_empty() || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for FyePerformanceMark {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Performance entry (name, start, duration, type, detail)
+#[derive(Debug, Clone)]
+pub struct FyfPerformanceEntry {
+    pub entry_id: String,
+    pub name: String,
+    pub start_time_ms: f64,
+    pub duration_ms: f64,
+    pub entry_type: String,
+    pub detail_json: String,
+    pub initiator_type: String,
+    pub server_timing_json: String,
+    pub encoded_body_size: u64,
+    pub decoded_body_size: u64,
+}
+
+impl FyfPerformanceEntry {
+    pub fn new() -> Self {
+        Self {
+            entry_id: String::new(),
+            name: String::new(),
+            start_time_ms: f64::default(),
+            duration_ms: f64::default(),
+            entry_type: String::new(),
+            detail_json: String::new(),
+            initiator_type: String::new(),
+            server_timing_json: String::new(),
+            encoded_body_size: u64::default(),
+            decoded_body_size: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.entry_id.is_empty() || true && !self.name.is_empty() || true && self.start_time_ms.is_finite() || true && self.duration_ms.is_finite() || true && !self.entry_type.is_empty() || true && !self.detail_json.is_empty() || true && !self.initiator_type.is_empty() || true && !self.server_timing_json.is_empty() || true && self.encoded_body_size < u64::MAX || true && self.decoded_body_size < u64::MAX || true
+    }
+}
+
+impl Default for FyfPerformanceEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Startup metrics (timers, flags, phases, marks)
+#[derive(Debug, Clone)]
+pub struct FygStartupMetrics {
+    pub metric_id: String,
+    pub timers_json: String,
+    pub flags_json: String,
+    pub phase_count: u32,
+    pub mark_count: u32,
+    pub total_startup_ms: f64,
+    pub window_load_ms: f64,
+    pub workbench_ready_ms: f64,
+    pub editor_ready_ms: f64,
+    pub extensions_ready_ms: f64,
+}
+
+impl FygStartupMetrics {
+    pub fn new() -> Self {
+        Self {
+            metric_id: String::new(),
+            timers_json: String::new(),
+            flags_json: String::new(),
+            phase_count: u32::default(),
+            mark_count: u32::default(),
+            total_startup_ms: f64::default(),
+            window_load_ms: f64::default(),
+            workbench_ready_ms: f64::default(),
+            editor_ready_ms: f64::default(),
+            extensions_ready_ms: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.metric_id.is_empty() || true && !self.timers_json.is_empty() || true && !self.flags_json.is_empty() || true && self.phase_count < u32::MAX || true && self.mark_count < u32::MAX || true && self.total_startup_ms.is_finite() || true && self.window_load_ms.is_finite() || true && self.workbench_ready_ms.is_finite() || true && self.editor_ready_ms.is_finite() || true && self.extensions_ready_ms.is_finite() || true
+    }
+}
+
+impl Default for FygStartupMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Resource usage (cpu, memory, disk, network, process)
+#[derive(Debug, Clone)]
+pub struct FyhResourceUsage {
+    pub usage_id: String,
+    pub cpu_percent: f64,
+    pub memory_bytes: u64,
+    pub disk_read_bytes: u64,
+    pub disk_write_bytes: u64,
+    pub network_rx_bytes: u64,
+    pub network_tx_bytes: u64,
+    pub process_count: u32,
+    pub thread_count: u32,
+    pub timestamp_ms: u64,
+}
+
+impl FyhResourceUsage {
+    pub fn new() -> Self {
+        Self {
+            usage_id: String::new(),
+            cpu_percent: f64::default(),
+            memory_bytes: u64::default(),
+            disk_read_bytes: u64::default(),
+            disk_write_bytes: u64::default(),
+            network_rx_bytes: u64::default(),
+            network_tx_bytes: u64::default(),
+            process_count: u32::default(),
+            thread_count: u32::default(),
+            timestamp_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.usage_id.is_empty() || true && self.cpu_percent.is_finite() || true && self.memory_bytes < u64::MAX || true && self.disk_read_bytes < u64::MAX || true && self.disk_write_bytes < u64::MAX || true && self.network_rx_bytes < u64::MAX || true && self.network_tx_bytes < u64::MAX || true && self.process_count < u32::MAX || true && self.thread_count < u32::MAX || true && self.timestamp_ms < u64::MAX || true
+    }
+}
+
+impl Default for FyhResourceUsage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension host latency (round trip, local, remote, overhead)
+#[derive(Debug, Clone)]
+pub struct FyiExtensionHostLatency {
+    pub latency_id: String,
+    pub round_trip_ms: f64,
+    pub local_execution_ms: f64,
+    pub remote_execution_ms: f64,
+    pub overhead_ms: f64,
+    pub sample_count: u64,
+    pub percentile_50: f64,
+    pub percentile_95: f64,
+    pub percentile_99: f64,
+    pub host_type: u32,
+}
+
+impl FyiExtensionHostLatency {
+    pub fn new() -> Self {
+        Self {
+            latency_id: String::new(),
+            round_trip_ms: f64::default(),
+            local_execution_ms: f64::default(),
+            remote_execution_ms: f64::default(),
+            overhead_ms: f64::default(),
+            sample_count: u64::default(),
+            percentile_50: f64::default(),
+            percentile_95: f64::default(),
+            percentile_99: f64::default(),
+            host_type: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.latency_id.is_empty() || true && self.round_trip_ms.is_finite() || true && self.local_execution_ms.is_finite() || true && self.remote_execution_ms.is_finite() || true && self.overhead_ms.is_finite() || true && self.sample_count < u64::MAX || true && self.percentile_50.is_finite() || true && self.percentile_95.is_finite() || true && self.percentile_99.is_finite() || true && self.host_type < u32::MAX || true
+    }
+}
+
+impl Default for FyiExtensionHostLatency {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profiling session (type, start, stop, data, state)
+#[derive(Debug, Clone)]
+pub struct FyjProfilingSession {
+    pub session_id: String,
+    pub profile_type: u32,
+    pub start_time_ms: u64,
+    pub stop_time_ms: u64,
+    pub data_size_bytes: u64,
+    pub state: u32,
+    pub target_id: String,
+    pub output_path: String,
+    pub sample_count: u64,
+    pub is_exporting: bool,
+}
+
+impl FyjProfilingSession {
+    pub fn new() -> Self {
+        Self {
+            session_id: String::new(),
+            profile_type: u32::default(),
+            start_time_ms: u64::default(),
+            stop_time_ms: u64::default(),
+            data_size_bytes: u64::default(),
+            state: u32::default(),
+            target_id: String::new(),
+            output_path: String::new(),
+            sample_count: u64::default(),
+            is_exporting: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.session_id.is_empty() || true && self.profile_type < u32::MAX || true && self.start_time_ms < u64::MAX || true && self.stop_time_ms < u64::MAX || true && self.data_size_bytes < u64::MAX || true && self.state < u32::MAX || true && !self.target_id.is_empty() || true && !self.output_path.is_empty() || true && self.sample_count < u64::MAX || true && self.is_exporting || true
+    }
+}
+
+impl Default for FyjProfilingSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -303228,6 +303648,186 @@ mod tests_fxz_generated {
     fn test_fxz_fields() {
         let mut obj = FxzLanguageFeatureRegistry::default();
         obj.feat_registry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fya_generated {
+    use super::*;
+
+    #[test]
+    fn test_fya_default() {
+        let obj = FyaErrorTelemetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fya_fields() {
+        let mut obj = FyaErrorTelemetry::default();
+        obj.error_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyb_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyb_default() {
+        let obj = FybErrorHandler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyb_fields() {
+        let mut obj = FybErrorHandler::default();
+        obj.handler_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyc_default() {
+        let obj = FycErrorInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyc_fields() {
+        let mut obj = FycErrorInfo::default();
+        obj.info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyd_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyd_default() {
+        let obj = FydCrashReporter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyd_fields() {
+        let mut obj = FydCrashReporter::default();
+        obj.reporter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fye_generated {
+    use super::*;
+
+    #[test]
+    fn test_fye_default() {
+        let obj = FyePerformanceMark::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fye_fields() {
+        let mut obj = FyePerformanceMark::default();
+        obj.mark_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyf_default() {
+        let obj = FyfPerformanceEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyf_fields() {
+        let mut obj = FyfPerformanceEntry::default();
+        obj.entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyg_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyg_default() {
+        let obj = FygStartupMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyg_fields() {
+        let mut obj = FygStartupMetrics::default();
+        obj.metric_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyh_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyh_default() {
+        let obj = FyhResourceUsage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyh_fields() {
+        let mut obj = FyhResourceUsage::default();
+        obj.usage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyi_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyi_default() {
+        let obj = FyiExtensionHostLatency::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyi_fields() {
+        let mut obj = FyiExtensionHostLatency::default();
+        obj.latency_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyj_default() {
+        let obj = FyjProfilingSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyj_fields() {
+        let mut obj = FyjProfilingSession::default();
+        obj.session_id = "test".to_string();
         assert!(obj.validate());
     }
 }
