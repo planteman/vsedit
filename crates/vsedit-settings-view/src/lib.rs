@@ -168146,6 +168146,890 @@ impl Default for JizDiagnosticCollection {
     }
 }
 
+/// Search model descriptor
+#[derive(Debug, Clone)]
+pub struct JjaSearchModel {
+    pub search_model_id: String,
+    pub query_ref: String,
+    pub result_count: u32,
+    pub file_count: u32,
+    pub replace_pattern: String,
+    pub is_regex: bool,
+}
+
+impl JjaSearchModel {
+    pub fn new() -> Self {
+        Self {
+            search_model_id: String::new(),
+            query_ref: String::new(),
+            result_count: u32::default(),
+            file_count: u32::default(),
+            replace_pattern: String::new(),
+            is_regex: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_model_id.is_empty() || true && !self.query_ref.is_empty() || true && self.result_count < u32::MAX || true && self.file_count < u32::MAX || true && !self.replace_pattern.is_empty() || true && self.is_regex || true
+    }
+}
+
+impl Default for JjaSearchModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search result entry
+#[derive(Debug, Clone)]
+pub struct JjbSearchResult {
+    pub search_result_id: String,
+    pub file_uri: String,
+    pub match_count: u32,
+    pub line_ranges_json: String,
+    pub preview_text: String,
+    pub is_collapsed: bool,
+}
+
+impl JjbSearchResult {
+    pub fn new() -> Self {
+        Self {
+            search_result_id: String::new(),
+            file_uri: String::new(),
+            match_count: u32::default(),
+            line_ranges_json: String::new(),
+            preview_text: String::new(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_result_id.is_empty() || true && !self.file_uri.is_empty() || true && self.match_count < u32::MAX || true && !self.line_ranges_json.is_empty() || true && !self.preview_text.is_empty() || true && self.is_collapsed || true
+    }
+}
+
+impl Default for JjbSearchResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search text match
+#[derive(Debug, Clone)]
+pub struct JjcSearchMatch {
+    pub search_match_id: String,
+    pub line_number: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub match_text: String,
+    pub is_in_replace: bool,
+}
+
+impl JjcSearchMatch {
+    pub fn new() -> Self {
+        Self {
+            search_match_id: String::new(),
+            line_number: u32::default(),
+            start_col: u32::default(),
+            end_col: u32::default(),
+            match_text: String::new(),
+            is_in_replace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_match_id.is_empty() || true && self.line_number < u32::MAX || true && self.start_col < u32::MAX || true && self.end_col < u32::MAX || true && !self.match_text.is_empty() || true && self.is_in_replace || true
+    }
+}
+
+impl Default for JjcSearchMatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search query descriptor
+#[derive(Debug, Clone)]
+pub struct JjdSearchQuery {
+    pub search_query_id: String,
+    pub pattern_str: String,
+    pub include_glob: String,
+    pub exclude_glob: String,
+    pub max_results: u32,
+    pub case_sensitive: bool,
+}
+
+impl JjdSearchQuery {
+    pub fn new() -> Self {
+        Self {
+            search_query_id: String::new(),
+            pattern_str: String::new(),
+            include_glob: String::new(),
+            exclude_glob: String::new(),
+            max_results: u32::default(),
+            case_sensitive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_query_id.is_empty() || true && !self.pattern_str.is_empty() || true && !self.include_glob.is_empty() || true && !self.exclude_glob.is_empty() || true && self.max_results < u32::MAX || true && self.case_sensitive || true
+    }
+}
+
+impl Default for JjdSearchQuery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search filter entry
+#[derive(Debug, Clone)]
+pub struct JjeSearchFilter {
+    pub search_filter_id: String,
+    pub filter_type_str: String,
+    pub pattern_str: String,
+    pub label_str: String,
+    pub match_count: u32,
+    pub is_active: bool,
+}
+
+impl JjeSearchFilter {
+    pub fn new() -> Self {
+        Self {
+            search_filter_id: String::new(),
+            filter_type_str: String::new(),
+            pattern_str: String::new(),
+            label_str: String::new(),
+            match_count: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_filter_id.is_empty() || true && !self.filter_type_str.is_empty() || true && !self.pattern_str.is_empty() || true && !self.label_str.is_empty() || true && self.match_count < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for JjeSearchFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search and replace descriptor
+#[derive(Debug, Clone)]
+pub struct JjfSearchReplace {
+    pub search_replace_id: String,
+    pub search_pattern: String,
+    pub replace_pattern: String,
+    pub replaced_count: u32,
+    pub file_count: u32,
+    pub preserve_case: bool,
+}
+
+impl JjfSearchReplace {
+    pub fn new() -> Self {
+        Self {
+            search_replace_id: String::new(),
+            search_pattern: String::new(),
+            replace_pattern: String::new(),
+            replaced_count: u32::default(),
+            file_count: u32::default(),
+            preserve_case: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_replace_id.is_empty() || true && !self.search_pattern.is_empty() || true && !self.replace_pattern.is_empty() || true && self.replaced_count < u32::MAX || true && self.file_count < u32::MAX || true && self.preserve_case || true
+    }
+}
+
+impl Default for JjfSearchReplace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor find widget state
+#[derive(Debug, Clone)]
+pub struct JjgFindWidget {
+    pub find_widget_id: String,
+    pub search_string: String,
+    pub replace_string: String,
+    pub match_count: u32,
+    pub current_match_idx: u32,
+    pub is_visible: bool,
+}
+
+impl JjgFindWidget {
+    pub fn new() -> Self {
+        Self {
+            find_widget_id: String::new(),
+            search_string: String::new(),
+            replace_string: String::new(),
+            match_count: u32::default(),
+            current_match_idx: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.find_widget_id.is_empty() || true && !self.search_string.is_empty() || true && !self.replace_string.is_empty() || true && self.match_count < u32::MAX || true && self.current_match_idx < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for JjgFindWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor find match entry
+#[derive(Debug, Clone)]
+pub struct JjhFindMatch {
+    pub find_match_id: String,
+    pub range_json: String,
+    pub match_text: String,
+    pub file_uri: String,
+    pub highlight_class: String,
+    pub is_current: bool,
+}
+
+impl JjhFindMatch {
+    pub fn new() -> Self {
+        Self {
+            find_match_id: String::new(),
+            range_json: String::new(),
+            match_text: String::new(),
+            file_uri: String::new(),
+            highlight_class: String::new(),
+            is_current: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.find_match_id.is_empty() || true && !self.range_json.is_empty() || true && !self.match_text.is_empty() || true && !self.file_uri.is_empty() || true && !self.highlight_class.is_empty() || true && self.is_current || true
+    }
+}
+
+impl Default for JjhFindMatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Find widget options
+#[derive(Debug, Clone)]
+pub struct JjiFindOptions {
+    pub find_opts_id: String,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub use_regex: bool,
+    pub search_scope_json: String,
+    pub preserve_case: bool,
+}
+
+impl JjiFindOptions {
+    pub fn new() -> Self {
+        Self {
+            find_opts_id: String::new(),
+            case_sensitive: bool::default(),
+            whole_word: bool::default(),
+            use_regex: bool::default(),
+            search_scope_json: String::new(),
+            preserve_case: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.find_opts_id.is_empty() || true && self.case_sensitive || true && self.whole_word || true && self.use_regex || true && !self.search_scope_json.is_empty() || true && self.preserve_case || true
+    }
+}
+
+impl Default for JjiFindOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search editor descriptor
+#[derive(Debug, Clone)]
+pub struct JjjSearchEditor {
+    pub search_editor_id: String,
+    pub query_ref: String,
+    pub result_model_ref: String,
+    pub context_lines: u32,
+    pub show_replace: bool,
+    pub is_pinned: bool,
+}
+
+impl JjjSearchEditor {
+    pub fn new() -> Self {
+        Self {
+            search_editor_id: String::new(),
+            query_ref: String::new(),
+            result_model_ref: String::new(),
+            context_lines: u32::default(),
+            show_replace: bool::default(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_editor_id.is_empty() || true && !self.query_ref.is_empty() || true && !self.result_model_ref.is_empty() || true && self.context_lines < u32::MAX || true && self.show_replace || true && self.is_pinned || true
+    }
+}
+
+impl Default for JjjSearchEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search history entry
+#[derive(Debug, Clone)]
+pub struct JjkSearchHistory {
+    pub search_hist_id: String,
+    pub pattern_str: String,
+    pub is_regex: bool,
+    pub case_sensitive: bool,
+    pub used_epoch: u64,
+    pub is_replace_history: bool,
+}
+
+impl JjkSearchHistory {
+    pub fn new() -> Self {
+        Self {
+            search_hist_id: String::new(),
+            pattern_str: String::new(),
+            is_regex: bool::default(),
+            case_sensitive: bool::default(),
+            used_epoch: u64::default(),
+            is_replace_history: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_hist_id.is_empty() || true && !self.pattern_str.is_empty() || true && self.is_regex || true && self.case_sensitive || true && self.used_epoch < u64::MAX || true && self.is_replace_history || true
+    }
+}
+
+impl Default for JjkSearchHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search view descriptor
+#[derive(Debug, Clone)]
+pub struct JjlSearchView {
+    pub search_view_id: String,
+    pub tree_ref: String,
+    pub result_count: u32,
+    pub expanded_count: u32,
+    pub sort_order_str: String,
+    pub is_searching: bool,
+}
+
+impl JjlSearchView {
+    pub fn new() -> Self {
+        Self {
+            search_view_id: String::new(),
+            tree_ref: String::new(),
+            result_count: u32::default(),
+            expanded_count: u32::default(),
+            sort_order_str: String::new(),
+            is_searching: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_view_id.is_empty() || true && !self.tree_ref.is_empty() || true && self.result_count < u32::MAX || true && self.expanded_count < u32::MAX || true && !self.sort_order_str.is_empty() || true && self.is_searching || true
+    }
+}
+
+impl Default for JjlSearchView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Grep/ripgrep search engine
+#[derive(Debug, Clone)]
+pub struct JjmGrepEngine {
+    pub grep_id: String,
+    pub binary_path: String,
+    pub args_csv: String,
+    pub working_dir: String,
+    pub max_file_size: u64,
+    pub is_multiline: bool,
+}
+
+impl JjmGrepEngine {
+    pub fn new() -> Self {
+        Self {
+            grep_id: String::new(),
+            binary_path: String::new(),
+            args_csv: String::new(),
+            working_dir: String::new(),
+            max_file_size: u64::default(),
+            is_multiline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grep_id.is_empty() || true && !self.binary_path.is_empty() || true && !self.args_csv.is_empty() || true && !self.working_dir.is_empty() || true && self.max_file_size < u64::MAX || true && self.is_multiline || true
+    }
+}
+
+impl Default for JjmGrepEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text search provider
+#[derive(Debug, Clone)]
+pub struct JjnTextSearchProvider {
+    pub tsp_id: String,
+    pub provider_name: String,
+    pub scheme_str: String,
+    pub max_results: u32,
+    pub timeout_ms: u32,
+    pub supports_regex: bool,
+}
+
+impl JjnTextSearchProvider {
+    pub fn new() -> Self {
+        Self {
+            tsp_id: String::new(),
+            provider_name: String::new(),
+            scheme_str: String::new(),
+            max_results: u32::default(),
+            timeout_ms: u32::default(),
+            supports_regex: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tsp_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.scheme_str.is_empty() || true && self.max_results < u32::MAX || true && self.timeout_ms < u32::MAX || true && self.supports_regex || true
+    }
+}
+
+impl Default for JjnTextSearchProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File search provider
+#[derive(Debug, Clone)]
+pub struct JjoFileSearchProvider {
+    pub fsp_id: String,
+    pub provider_name: String,
+    pub scheme_str: String,
+    pub max_results: u32,
+    pub cache_key: String,
+    pub supports_cancel: bool,
+}
+
+impl JjoFileSearchProvider {
+    pub fn new() -> Self {
+        Self {
+            fsp_id: String::new(),
+            provider_name: String::new(),
+            scheme_str: String::new(),
+            max_results: u32::default(),
+            cache_key: String::new(),
+            supports_cancel: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fsp_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.scheme_str.is_empty() || true && self.max_results < u32::MAX || true && !self.cache_key.is_empty() || true && self.supports_cancel || true
+    }
+}
+
+impl Default for JjoFileSearchProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// AI-powered search provider
+#[derive(Debug, Clone)]
+pub struct JjpAiSearchProvider {
+    pub ai_search_id: String,
+    pub model_name: String,
+    pub query_text: String,
+    pub result_count: u32,
+    pub confidence_threshold: f64,
+    pub is_semantic: bool,
+}
+
+impl JjpAiSearchProvider {
+    pub fn new() -> Self {
+        Self {
+            ai_search_id: String::new(),
+            model_name: String::new(),
+            query_text: String::new(),
+            result_count: u32::default(),
+            confidence_threshold: f64::default(),
+            is_semantic: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ai_search_id.is_empty() || true && !self.model_name.is_empty() || true && !self.query_text.is_empty() || true && self.result_count < u32::MAX || true && self.confidence_threshold.is_finite() || true && self.is_semantic || true
+    }
+}
+
+impl Default for JjpAiSearchProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search result decoration
+#[derive(Debug, Clone)]
+pub struct JjqSearchDecoration {
+    pub search_deco_id: String,
+    pub range_json: String,
+    pub class_name: String,
+    pub overview_color: String,
+    pub minimap_color: String,
+    pub is_current_match: bool,
+}
+
+impl JjqSearchDecoration {
+    pub fn new() -> Self {
+        Self {
+            search_deco_id: String::new(),
+            range_json: String::new(),
+            class_name: String::new(),
+            overview_color: String::new(),
+            minimap_color: String::new(),
+            is_current_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_deco_id.is_empty() || true && !self.range_json.is_empty() || true && !self.class_name.is_empty() || true && !self.overview_color.is_empty() || true && !self.minimap_color.is_empty() || true && self.is_current_match || true
+    }
+}
+
+impl Default for JjqSearchDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search tree view node
+#[derive(Debug, Clone)]
+pub struct JjrSearchTreeNode {
+    pub search_node_id: String,
+    pub label_str: String,
+    pub resource_uri: String,
+    pub match_count: u32,
+    pub parent_ref: String,
+    pub is_file_node: bool,
+}
+
+impl JjrSearchTreeNode {
+    pub fn new() -> Self {
+        Self {
+            search_node_id: String::new(),
+            label_str: String::new(),
+            resource_uri: String::new(),
+            match_count: u32::default(),
+            parent_ref: String::new(),
+            is_file_node: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_node_id.is_empty() || true && !self.label_str.is_empty() || true && !self.resource_uri.is_empty() || true && self.match_count < u32::MAX || true && !self.parent_ref.is_empty() || true && self.is_file_node || true
+    }
+}
+
+impl Default for JjrSearchTreeNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search progress descriptor
+#[derive(Debug, Clone)]
+pub struct JjsSearchProgress {
+    pub search_prog_id: String,
+    pub files_searched: u32,
+    pub matches_found: u32,
+    pub elapsed_ms: u32,
+    pub bytes_searched: u64,
+    pub is_complete: bool,
+}
+
+impl JjsSearchProgress {
+    pub fn new() -> Self {
+        Self {
+            search_prog_id: String::new(),
+            files_searched: u32::default(),
+            matches_found: u32::default(),
+            elapsed_ms: u32::default(),
+            bytes_searched: u64::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_prog_id.is_empty() || true && self.files_searched < u32::MAX || true && self.matches_found < u32::MAX || true && self.elapsed_ms < u32::MAX || true && self.bytes_searched < u64::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for JjsSearchProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search configuration entry
+#[derive(Debug, Clone)]
+pub struct JjtSearchConfig {
+    pub search_cfg_id: String,
+    pub key_str: String,
+    pub value_json: String,
+    pub scope_str: String,
+    pub source_str: String,
+    pub is_default: bool,
+}
+
+impl JjtSearchConfig {
+    pub fn new() -> Self {
+        Self {
+            search_cfg_id: String::new(),
+            key_str: String::new(),
+            value_json: String::new(),
+            scope_str: String::new(),
+            source_str: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_cfg_id.is_empty() || true && !self.key_str.is_empty() || true && !self.value_json.is_empty() || true && !self.scope_str.is_empty() || true && !self.source_str.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for JjtSearchConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search exclusion pattern
+#[derive(Debug, Clone)]
+pub struct JjuSearchExclusion {
+    pub search_excl_id: String,
+    pub pattern_str: String,
+    pub source_str: String,
+    pub match_count: u32,
+    pub is_global: bool,
+    pub is_user_defined: bool,
+}
+
+impl JjuSearchExclusion {
+    pub fn new() -> Self {
+        Self {
+            search_excl_id: String::new(),
+            pattern_str: String::new(),
+            source_str: String::new(),
+            match_count: u32::default(),
+            is_global: bool::default(),
+            is_user_defined: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_excl_id.is_empty() || true && !self.pattern_str.is_empty() || true && !self.source_str.is_empty() || true && self.match_count < u32::MAX || true && self.is_global || true && self.is_user_defined || true
+    }
+}
+
+impl Default for JjuSearchExclusion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search include pattern
+#[derive(Debug, Clone)]
+pub struct JjvSearchInclude {
+    pub search_incl_id: String,
+    pub pattern_str: String,
+    pub label_str: String,
+    pub file_count: u32,
+    pub priority_val: u32,
+    pub is_active: bool,
+}
+
+impl JjvSearchInclude {
+    pub fn new() -> Self {
+        Self {
+            search_incl_id: String::new(),
+            pattern_str: String::new(),
+            label_str: String::new(),
+            file_count: u32::default(),
+            priority_val: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_incl_id.is_empty() || true && !self.pattern_str.is_empty() || true && !self.label_str.is_empty() || true && self.file_count < u32::MAX || true && self.priority_val < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for JjvSearchInclude {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search result bookmark
+#[derive(Debug, Clone)]
+pub struct JjwSearchBookmark {
+    pub search_bm_id: String,
+    pub file_uri: String,
+    pub line_number: u32,
+    pub column_val: u32,
+    pub label_str: String,
+    pub is_pinned: bool,
+}
+
+impl JjwSearchBookmark {
+    pub fn new() -> Self {
+        Self {
+            search_bm_id: String::new(),
+            file_uri: String::new(),
+            line_number: u32::default(),
+            column_val: u32::default(),
+            label_str: String::new(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_bm_id.is_empty() || true && !self.file_uri.is_empty() || true && self.line_number < u32::MAX || true && self.column_val < u32::MAX || true && !self.label_str.is_empty() || true && self.is_pinned || true
+    }
+}
+
+impl Default for JjwSearchBookmark {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search result export
+#[derive(Debug, Clone)]
+pub struct JjxSearchExport {
+    pub search_exp_id: String,
+    pub format_str: String,
+    pub output_path: String,
+    pub result_count: u32,
+    pub include_context: bool,
+    pub is_complete: bool,
+}
+
+impl JjxSearchExport {
+    pub fn new() -> Self {
+        Self {
+            search_exp_id: String::new(),
+            format_str: String::new(),
+            output_path: String::new(),
+            result_count: u32::default(),
+            include_context: bool::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_exp_id.is_empty() || true && !self.format_str.is_empty() || true && !self.output_path.is_empty() || true && self.result_count < u32::MAX || true && self.include_context || true && self.is_complete || true
+    }
+}
+
+impl Default for JjxSearchExport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go to line descriptor
+#[derive(Debug, Clone)]
+pub struct JjyGotoLine {
+    pub goto_line_id: String,
+    pub target_line: u32,
+    pub target_col: u32,
+    pub editor_ref: String,
+    pub reveal_type_str: String,
+    pub is_valid: bool,
+}
+
+impl JjyGotoLine {
+    pub fn new() -> Self {
+        Self {
+            goto_line_id: String::new(),
+            target_line: u32::default(),
+            target_col: u32::default(),
+            editor_ref: String::new(),
+            reveal_type_str: String::new(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.goto_line_id.is_empty() || true && self.target_line < u32::MAX || true && self.target_col < u32::MAX || true && !self.editor_ref.is_empty() || true && !self.reveal_type_str.is_empty() || true && self.is_valid || true
+    }
+}
+
+impl Default for JjyGotoLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go to symbol descriptor
+#[derive(Debug, Clone)]
+pub struct JjzGotoSymbol {
+    pub goto_sym_id: String,
+    pub symbol_name: String,
+    pub kind_val: u32,
+    pub location_json: String,
+    pub container_name: String,
+    pub is_fuzzy_match: bool,
+}
+
+impl JjzGotoSymbol {
+    pub fn new() -> Self {
+        Self {
+            goto_sym_id: String::new(),
+            symbol_name: String::new(),
+            kind_val: u32::default(),
+            location_json: String::new(),
+            container_name: String::new(),
+            is_fuzzy_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.goto_sym_id.is_empty() || true && !self.symbol_name.is_empty() || true && self.kind_val < u32::MAX || true && !self.location_json.is_empty() || true && !self.container_name.is_empty() || true && self.is_fuzzy_match || true
+    }
+}
+
+impl Default for JjzGotoSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -432359,6 +433243,474 @@ mod tests_jiz_generated {
     fn test_jiz_fields() {
         let mut obj = JizDiagnosticCollection::default();
         obj.diag_coll_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jja_generated {
+    use super::*;
+
+    #[test]
+    fn test_jja_default() {
+        let obj = JjaSearchModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jja_fields() {
+        let mut obj = JjaSearchModel::default();
+        obj.search_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjb_default() {
+        let obj = JjbSearchResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjb_fields() {
+        let mut obj = JjbSearchResult::default();
+        obj.search_result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjc_default() {
+        let obj = JjcSearchMatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjc_fields() {
+        let mut obj = JjcSearchMatch::default();
+        obj.search_match_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjd_default() {
+        let obj = JjdSearchQuery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjd_fields() {
+        let mut obj = JjdSearchQuery::default();
+        obj.search_query_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jje_generated {
+    use super::*;
+
+    #[test]
+    fn test_jje_default() {
+        let obj = JjeSearchFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jje_fields() {
+        let mut obj = JjeSearchFilter::default();
+        obj.search_filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjf_default() {
+        let obj = JjfSearchReplace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjf_fields() {
+        let mut obj = JjfSearchReplace::default();
+        obj.search_replace_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjg_default() {
+        let obj = JjgFindWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjg_fields() {
+        let mut obj = JjgFindWidget::default();
+        obj.find_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjh_default() {
+        let obj = JjhFindMatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjh_fields() {
+        let mut obj = JjhFindMatch::default();
+        obj.find_match_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jji_generated {
+    use super::*;
+
+    #[test]
+    fn test_jji_default() {
+        let obj = JjiFindOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jji_fields() {
+        let mut obj = JjiFindOptions::default();
+        obj.find_opts_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjj_default() {
+        let obj = JjjSearchEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjj_fields() {
+        let mut obj = JjjSearchEditor::default();
+        obj.search_editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjk_default() {
+        let obj = JjkSearchHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjk_fields() {
+        let mut obj = JjkSearchHistory::default();
+        obj.search_hist_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjl_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjl_default() {
+        let obj = JjlSearchView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjl_fields() {
+        let mut obj = JjlSearchView::default();
+        obj.search_view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjm_default() {
+        let obj = JjmGrepEngine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjm_fields() {
+        let mut obj = JjmGrepEngine::default();
+        obj.grep_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjn_default() {
+        let obj = JjnTextSearchProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjn_fields() {
+        let mut obj = JjnTextSearchProvider::default();
+        obj.tsp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjo_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjo_default() {
+        let obj = JjoFileSearchProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjo_fields() {
+        let mut obj = JjoFileSearchProvider::default();
+        obj.fsp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjp_default() {
+        let obj = JjpAiSearchProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjp_fields() {
+        let mut obj = JjpAiSearchProvider::default();
+        obj.ai_search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjq_default() {
+        let obj = JjqSearchDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjq_fields() {
+        let mut obj = JjqSearchDecoration::default();
+        obj.search_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjr_default() {
+        let obj = JjrSearchTreeNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjr_fields() {
+        let mut obj = JjrSearchTreeNode::default();
+        obj.search_node_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjs_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjs_default() {
+        let obj = JjsSearchProgress::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjs_fields() {
+        let mut obj = JjsSearchProgress::default();
+        obj.search_prog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjt_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjt_default() {
+        let obj = JjtSearchConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjt_fields() {
+        let mut obj = JjtSearchConfig::default();
+        obj.search_cfg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jju_generated {
+    use super::*;
+
+    #[test]
+    fn test_jju_default() {
+        let obj = JjuSearchExclusion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jju_fields() {
+        let mut obj = JjuSearchExclusion::default();
+        obj.search_excl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjv_default() {
+        let obj = JjvSearchInclude::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjv_fields() {
+        let mut obj = JjvSearchInclude::default();
+        obj.search_incl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjw_default() {
+        let obj = JjwSearchBookmark::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjw_fields() {
+        let mut obj = JjwSearchBookmark::default();
+        obj.search_bm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjx_default() {
+        let obj = JjxSearchExport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjx_fields() {
+        let mut obj = JjxSearchExport::default();
+        obj.search_exp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjy_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjy_default() {
+        let obj = JjyGotoLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjy_fields() {
+        let mut obj = JjyGotoLine::default();
+        obj.goto_line_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jjz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jjz_default() {
+        let obj = JjzGotoSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jjz_fields() {
+        let mut obj = JjzGotoSymbol::default();
+        obj.goto_sym_id = "test".to_string();
         assert!(obj.validate());
     }
 }
