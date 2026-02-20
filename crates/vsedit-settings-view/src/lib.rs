@@ -53584,6 +53584,213 @@ impl Default for EyzHoverWidget {
 }
 
 
+/// Dependency injection service collection types
+#[derive(Debug, Clone)]
+pub struct EzaServiceCollection {
+    pub service_count: u32,
+    pub service_is_disposed: bool,
+    pub service_parent_id: String,
+    pub service_trace_enabled: bool,
+    pub service_strict_mode: bool,
+    pub service_allow_overrides: bool,
+    pub service_creation_order: String,
+    pub service_scope_id: String,
+    pub service_label: String,
+    pub service_max_depth: u32,
+}
+
+impl EzaServiceCollection {
+    pub fn new() -> Self {
+        Self {
+            service_count: u32::default(),
+            service_is_disposed: bool::default(),
+            service_parent_id: String::new(),
+            service_trace_enabled: bool::default(),
+            service_strict_mode: bool::default(),
+            service_allow_overrides: bool::default(),
+            service_creation_order: String::new(),
+            service_scope_id: String::new(),
+            service_label: String::new(),
+            service_max_depth: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.service_count < u32::MAX || true && self.service_is_disposed || true && !self.service_parent_id.is_empty() || true && self.service_trace_enabled || true && self.service_strict_mode || true && self.service_allow_overrides || true && !self.service_creation_order.is_empty() || true && !self.service_scope_id.is_empty() || true && !self.service_label.is_empty() || true && self.service_max_depth < u32::MAX || true
+    }
+}
+
+impl Default for EzaServiceCollection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Service identifier/decorator types
+#[derive(Debug, Clone)]
+pub struct EzbServiceIdentifier {
+    pub service_id: String,
+    pub service_type_name: String,
+    pub service_optional: bool,
+    pub service_multiple: bool,
+    pub service_decorator_id: String,
+    pub service_super_type: String,
+    pub service_creation_policy: String,
+    pub service_supports_delayed: bool,
+    pub service_scope: String,
+    pub service_tag: String,
+}
+
+impl EzbServiceIdentifier {
+    pub fn new() -> Self {
+        Self {
+            service_id: String::new(),
+            service_type_name: String::new(),
+            service_optional: bool::default(),
+            service_multiple: bool::default(),
+            service_decorator_id: String::new(),
+            service_super_type: String::new(),
+            service_creation_policy: String::new(),
+            service_supports_delayed: bool::default(),
+            service_scope: String::new(),
+            service_tag: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.service_id.is_empty() || true && !self.service_type_name.is_empty() || true && self.service_optional || true && self.service_multiple || true && !self.service_decorator_id.is_empty() || true && !self.service_super_type.is_empty() || true && !self.service_creation_policy.is_empty() || true && self.service_supports_delayed || true && !self.service_scope.is_empty() || true && !self.service_tag.is_empty() || true
+    }
+}
+
+impl Default for EzbServiceIdentifier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Instantiation service (DI container) types
+#[derive(Debug, Clone)]
+pub struct EzcInstantiationService {
+    pub inst_trace_depth: u32,
+    pub inst_strict_service_deps: bool,
+    pub inst_active_instantiations: u32,
+    pub inst_total_created: u64,
+    pub inst_total_disposed: u64,
+    pub inst_max_recursion: u32,
+    pub inst_parent_id: String,
+    pub inst_scope_id: String,
+    pub inst_log_level: String,
+    pub inst_creation_trace: String,
+}
+
+impl EzcInstantiationService {
+    pub fn new() -> Self {
+        Self {
+            inst_trace_depth: u32::default(),
+            inst_strict_service_deps: bool::default(),
+            inst_active_instantiations: u32::default(),
+            inst_total_created: u64::default(),
+            inst_total_disposed: u64::default(),
+            inst_max_recursion: u32::default(),
+            inst_parent_id: String::new(),
+            inst_scope_id: String::new(),
+            inst_log_level: String::new(),
+            inst_creation_trace: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.inst_trace_depth < u32::MAX || true && self.inst_strict_service_deps || true && self.inst_active_instantiations < u32::MAX || true && self.inst_total_created < u64::MAX || true && self.inst_total_disposed < u64::MAX || true && self.inst_max_recursion < u32::MAX || true && !self.inst_parent_id.is_empty() || true && !self.inst_scope_id.is_empty() || true && !self.inst_log_level.is_empty() || true && !self.inst_creation_trace.is_empty() || true
+    }
+}
+
+impl Default for EzcInstantiationService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Service descriptor (singleton/transient) types
+#[derive(Debug, Clone)]
+pub struct EzdServiceDescriptor {
+    pub descriptor_ctor_id: String,
+    pub descriptor_static_args: String,
+    pub descriptor_supports_delayed: bool,
+    pub descriptor_creation_policy: String,
+    pub descriptor_super_ctor_id: String,
+    pub descriptor_dependencies: String,
+    pub descriptor_optional_deps: String,
+    pub descriptor_label: String,
+    pub descriptor_scope: String,
+    pub descriptor_is_disposed: bool,
+}
+
+impl EzdServiceDescriptor {
+    pub fn new() -> Self {
+        Self {
+            descriptor_ctor_id: String::new(),
+            descriptor_static_args: String::new(),
+            descriptor_supports_delayed: bool::default(),
+            descriptor_creation_policy: String::new(),
+            descriptor_super_ctor_id: String::new(),
+            descriptor_dependencies: String::new(),
+            descriptor_optional_deps: String::new(),
+            descriptor_label: String::new(),
+            descriptor_scope: String::new(),
+            descriptor_is_disposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.descriptor_ctor_id.is_empty() || true && !self.descriptor_static_args.is_empty() || true && self.descriptor_supports_delayed || true && !self.descriptor_creation_policy.is_empty() || true && !self.descriptor_super_ctor_id.is_empty() || true && !self.descriptor_dependencies.is_empty() || true && !self.descriptor_optional_deps.is_empty() || true && !self.descriptor_label.is_empty() || true && !self.descriptor_scope.is_empty() || true && self.descriptor_is_disposed || true
+    }
+}
+
+impl Default for EzdServiceDescriptor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Service dependency graph types
+#[derive(Debug, Clone)]
+pub struct EzeServiceGraph {
+    pub graph_node_count: u32,
+    pub graph_edge_count: u32,
+    pub graph_root_count: u32,
+    pub graph_cycle_count: u32,
+    pub graph_max_depth: u32,
+    pub graph_topological_order: String,
+    pub graph_has_cycles: bool,
+    pub graph_strongly_connected: String,
+    pub graph_validation_errors: String,
+    pub graph_build_time_ms: u64,
+}
+
+impl EzeServiceGraph {
+    pub fn new() -> Self {
+        Self {
+            graph_node_count: u32::default(),
+            graph_edge_count: u32::default(),
+            graph_root_count: u32::default(),
+            graph_cycle_count: u32::default(),
+            graph_max_depth: u32::default(),
+            graph_topological_order: String::new(),
+            graph_has_cycles: bool::default(),
+            graph_strongly_connected: String::new(),
+            graph_validation_errors: String::new(),
+            graph_build_time_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.graph_node_count < u32::MAX || true && self.graph_edge_count < u32::MAX || true && self.graph_root_count < u32::MAX || true && self.graph_cycle_count < u32::MAX || true && self.graph_max_depth < u32::MAX || true && !self.graph_topological_order.is_empty() || true && self.graph_has_cycles || true && !self.graph_strongly_connected.is_empty() || true && !self.graph_validation_errors.is_empty() || true && self.graph_build_time_ms < u64::MAX || true
+    }
+}
+
+impl Default for EzeServiceGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -264445,6 +264652,96 @@ mod tests_eyz_generated {
     fn test_eyz_fields() {
         let mut obj = EyzHoverWidget::default();
         obj.hover_content = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eza_generated {
+    use super::*;
+
+    #[test]
+    fn test_eza_default() {
+        let obj = EzaServiceCollection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eza_fields() {
+        let mut obj = EzaServiceCollection::default();
+        obj.service_count = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezb_default() {
+        let obj = EzbServiceIdentifier::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezb_fields() {
+        let mut obj = EzbServiceIdentifier::default();
+        obj.service_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezc_default() {
+        let obj = EzcInstantiationService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezc_fields() {
+        let mut obj = EzcInstantiationService::default();
+        obj.inst_trace_depth = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezd_default() {
+        let obj = EzdServiceDescriptor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezd_fields() {
+        let mut obj = EzdServiceDescriptor::default();
+        obj.descriptor_ctor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eze_generated {
+    use super::*;
+
+    #[test]
+    fn test_eze_default() {
+        let obj = EzeServiceGraph::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eze_fields() {
+        let mut obj = EzeServiceGraph::default();
+        obj.graph_node_count = 42;
         assert!(obj.validate());
     }
 }
