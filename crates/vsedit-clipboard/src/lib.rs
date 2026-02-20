@@ -53971,6 +53971,213 @@ impl Default for EzeServiceGraph {
 }
 
 
+/// Application lifecycle service types
+#[derive(Debug, Clone)]
+pub struct EzfLifecycleService {
+    pub lifecycle_phase: u32,
+    pub lifecycle_startup_kind: u32,
+    pub lifecycle_shutdown_reason: String,
+    pub lifecycle_will_shutdown: bool,
+    pub lifecycle_startup_complete: bool,
+    pub lifecycle_startup_time_ms: u64,
+    pub lifecycle_before_shutdown_veto: bool,
+    pub lifecycle_join_count: u32,
+    pub lifecycle_error_count: u32,
+    pub lifecycle_trace_enabled: bool,
+}
+
+impl EzfLifecycleService {
+    pub fn new() -> Self {
+        Self {
+            lifecycle_phase: u32::default(),
+            lifecycle_startup_kind: u32::default(),
+            lifecycle_shutdown_reason: String::new(),
+            lifecycle_will_shutdown: bool::default(),
+            lifecycle_startup_complete: bool::default(),
+            lifecycle_startup_time_ms: u64::default(),
+            lifecycle_before_shutdown_veto: bool::default(),
+            lifecycle_join_count: u32::default(),
+            lifecycle_error_count: u32::default(),
+            lifecycle_trace_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lifecycle_phase < u32::MAX || true && self.lifecycle_startup_kind < u32::MAX || true && !self.lifecycle_shutdown_reason.is_empty() || true && self.lifecycle_will_shutdown || true && self.lifecycle_startup_complete || true && self.lifecycle_startup_time_ms < u64::MAX || true && self.lifecycle_before_shutdown_veto || true && self.lifecycle_join_count < u32::MAX || true && self.lifecycle_error_count < u32::MAX || true && self.lifecycle_trace_enabled || true
+    }
+}
+
+impl Default for EzfLifecycleService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Window management service types
+#[derive(Debug, Clone)]
+pub struct EzgWindowService {
+    pub window_id: u32,
+    pub window_title: String,
+    pub window_state: String,
+    pub window_focused: bool,
+    pub window_visible: bool,
+    pub window_maximized: bool,
+    pub window_fullscreen: bool,
+    pub window_width: u32,
+    pub window_height: u32,
+    pub window_background_color: String,
+}
+
+impl EzgWindowService {
+    pub fn new() -> Self {
+        Self {
+            window_id: u32::default(),
+            window_title: String::new(),
+            window_state: String::new(),
+            window_focused: bool::default(),
+            window_visible: bool::default(),
+            window_maximized: bool::default(),
+            window_fullscreen: bool::default(),
+            window_width: u32::default(),
+            window_height: u32::default(),
+            window_background_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.window_id < u32::MAX || true && !self.window_title.is_empty() || true && !self.window_state.is_empty() || true && self.window_focused || true && self.window_visible || true && self.window_maximized || true && self.window_fullscreen || true && self.window_width < u32::MAX || true && self.window_height < u32::MAX || true && !self.window_background_color.is_empty() || true
+    }
+}
+
+impl Default for EzgWindowService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Environment service (paths/OS/args) types
+#[derive(Debug, Clone)]
+pub struct EzhEnvironmentService {
+    pub env_app_root: String,
+    pub env_user_home: String,
+    pub env_user_data_path: String,
+    pub env_extensions_path: String,
+    pub env_log_path: String,
+    pub env_os: String,
+    pub env_arch: String,
+    pub env_remote_authority: String,
+    pub env_is_built: bool,
+    pub env_verbose: bool,
+}
+
+impl EzhEnvironmentService {
+    pub fn new() -> Self {
+        Self {
+            env_app_root: String::new(),
+            env_user_home: String::new(),
+            env_user_data_path: String::new(),
+            env_extensions_path: String::new(),
+            env_log_path: String::new(),
+            env_os: String::new(),
+            env_arch: String::new(),
+            env_remote_authority: String::new(),
+            env_is_built: bool::default(),
+            env_verbose: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.env_app_root.is_empty() || true && !self.env_user_home.is_empty() || true && !self.env_user_data_path.is_empty() || true && !self.env_extensions_path.is_empty() || true && !self.env_log_path.is_empty() || true && !self.env_os.is_empty() || true && !self.env_arch.is_empty() || true && !self.env_remote_authority.is_empty() || true && self.env_is_built || true && self.env_verbose || true
+    }
+}
+
+impl Default for EzhEnvironmentService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Product/branding service types
+#[derive(Debug, Clone)]
+pub struct EziProductService {
+    pub product_name_short: String,
+    pub product_name_long: String,
+    pub product_application_name: String,
+    pub product_data_folder_name: String,
+    pub product_url_protocol: String,
+    pub product_quality: String,
+    pub product_commit: String,
+    pub product_version: String,
+    pub product_date: String,
+    pub product_settings_search_url: String,
+}
+
+impl EziProductService {
+    pub fn new() -> Self {
+        Self {
+            product_name_short: String::new(),
+            product_name_long: String::new(),
+            product_application_name: String::new(),
+            product_data_folder_name: String::new(),
+            product_url_protocol: String::new(),
+            product_quality: String::new(),
+            product_commit: String::new(),
+            product_version: String::new(),
+            product_date: String::new(),
+            product_settings_search_url: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.product_name_short.is_empty() || true && !self.product_name_long.is_empty() || true && !self.product_application_name.is_empty() || true && !self.product_data_folder_name.is_empty() || true && !self.product_url_protocol.is_empty() || true && !self.product_quality.is_empty() || true && !self.product_commit.is_empty() || true && !self.product_version.is_empty() || true && !self.product_date.is_empty() || true && !self.product_settings_search_url.is_empty() || true
+    }
+}
+
+impl Default for EziProductService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Application update service types
+#[derive(Debug, Clone)]
+pub struct EzjUpdateService {
+    pub update_state: u32,
+    pub update_available_version: String,
+    pub update_product_version: String,
+    pub update_url: String,
+    pub update_hash: String,
+    pub update_timestamp: u64,
+    pub update_auto_download: bool,
+    pub update_is_background: bool,
+    pub update_release_notes: String,
+    pub update_supports_hot_exit: bool,
+}
+
+impl EzjUpdateService {
+    pub fn new() -> Self {
+        Self {
+            update_state: u32::default(),
+            update_available_version: String::new(),
+            update_product_version: String::new(),
+            update_url: String::new(),
+            update_hash: String::new(),
+            update_timestamp: u64::default(),
+            update_auto_download: bool::default(),
+            update_is_background: bool::default(),
+            update_release_notes: String::new(),
+            update_supports_hot_exit: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.update_state < u32::MAX || true && !self.update_available_version.is_empty() || true && !self.update_product_version.is_empty() || true && !self.update_url.is_empty() || true && !self.update_hash.is_empty() || true && self.update_timestamp < u64::MAX || true && self.update_auto_download || true && self.update_is_background || true && !self.update_release_notes.is_empty() || true && self.update_supports_hot_exit || true
+    }
+}
+
+impl Default for EzjUpdateService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -264904,6 +265111,96 @@ mod tests_eze_generated {
     fn test_eze_fields() {
         let mut obj = EzeServiceGraph::default();
         obj.graph_node_count = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezf_default() {
+        let obj = EzfLifecycleService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezf_fields() {
+        let mut obj = EzfLifecycleService::default();
+        obj.lifecycle_phase = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezg_default() {
+        let obj = EzgWindowService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezg_fields() {
+        let mut obj = EzgWindowService::default();
+        obj.window_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezh_default() {
+        let obj = EzhEnvironmentService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezh_fields() {
+        let mut obj = EzhEnvironmentService::default();
+        obj.env_app_root = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezi_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezi_default() {
+        let obj = EziProductService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezi_fields() {
+        let mut obj = EziProductService::default();
+        obj.product_name_short = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezj_default() {
+        let obj = EzjUpdateService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezj_fields() {
+        let mut obj = EzjUpdateService::default();
+        obj.update_state = 42;
         assert!(obj.validate());
     }
 }
