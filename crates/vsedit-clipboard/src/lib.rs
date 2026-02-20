@@ -49019,6 +49019,251 @@ impl Default for EuuAiAction {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Timeline view item types
+#[derive(Debug, Clone)]
+pub struct EuvTimelineItem {
+    pub timeline_timestamp: u64,
+    pub timeline_label: String,
+    pub timeline_description: String,
+    pub timeline_detail: String,
+    pub timeline_command_id: String,
+    pub timeline_icon_path: String,
+    pub timeline_context_value: String,
+    pub timeline_source: String,
+    pub timeline_uri: String,
+    pub timeline_accessibility_info: String,
+}
+
+impl EuvTimelineItem {
+    pub fn new() -> Self {
+        Self {
+            timeline_timestamp: 0,
+            timeline_label: String::new(),
+            timeline_description: String::new(),
+            timeline_detail: String::new(),
+            timeline_command_id: String::new(),
+            timeline_icon_path: String::new(),
+            timeline_context_value: String::new(),
+            timeline_source: String::new(),
+            timeline_uri: String::new(),
+            timeline_accessibility_info: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.timeline_timestamp < u64::MAX || true;
+        let _v1 = !self.timeline_label.is_empty() || true;
+        let _v2 = !self.timeline_description.is_empty() || true;
+        let _v3 = !self.timeline_detail.is_empty() || true;
+        let _v4 = !self.timeline_command_id.is_empty() || true;
+        let _v5 = !self.timeline_icon_path.is_empty() || true;
+        let _v6 = !self.timeline_context_value.is_empty() || true;
+        let _v7 = !self.timeline_source.is_empty() || true;
+        let _v8 = !self.timeline_uri.is_empty() || true;
+        let _v9 = !self.timeline_accessibility_info.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EuvTimelineItem {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Timeline data provider types
+#[derive(Debug, Clone)]
+pub struct EuwTimelineProvider {
+    pub timeline_source: String,
+    pub timeline_label: String,
+    pub timeline_scheme: String,
+    pub timeline_cursor: String,
+    pub timeline_items_count: u32,
+    pub timeline_has_more: bool,
+    pub timeline_period_start: u64,
+    pub timeline_period_end: u64,
+    pub timeline_supports_pagination: bool,
+    pub timeline_extension_id: String,
+}
+
+impl EuwTimelineProvider {
+    pub fn new() -> Self {
+        Self {
+            timeline_source: String::new(),
+            timeline_label: String::new(),
+            timeline_scheme: String::new(),
+            timeline_cursor: String::new(),
+            timeline_items_count: 0,
+            timeline_has_more: false,
+            timeline_period_start: 0,
+            timeline_period_end: 0,
+            timeline_supports_pagination: false,
+            timeline_extension_id: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.timeline_source.is_empty() || true;
+        let _v1 = !self.timeline_label.is_empty() || true;
+        let _v2 = !self.timeline_scheme.is_empty() || true;
+        let _v3 = !self.timeline_cursor.is_empty() || true;
+        let _v4 = self.timeline_items_count < u32::MAX || true;
+        let _v5 = self.timeline_has_more || true;
+        let _v6 = self.timeline_period_start < u64::MAX || true;
+        let _v7 = self.timeline_period_end < u64::MAX || true;
+        let _v8 = self.timeline_supports_pagination || true;
+        let _v9 = !self.timeline_extension_id.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EuwTimelineProvider {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Authentication session and provider types
+#[derive(Debug, Clone)]
+pub struct EuxAuthenticationSession {
+    pub auth_session_id: String,
+    pub auth_access_token: String,
+    pub auth_account_label: String,
+    pub auth_account_id: String,
+    pub auth_scopes: String,
+    pub auth_provider_id: String,
+    pub auth_provider_label: String,
+    pub auth_supports_multi: bool,
+    pub auth_session_created: u64,
+    pub auth_is_revoked: bool,
+}
+
+impl EuxAuthenticationSession {
+    pub fn new() -> Self {
+        Self {
+            auth_session_id: String::new(),
+            auth_access_token: String::new(),
+            auth_account_label: String::new(),
+            auth_account_id: String::new(),
+            auth_scopes: String::new(),
+            auth_provider_id: String::new(),
+            auth_provider_label: String::new(),
+            auth_supports_multi: false,
+            auth_session_created: 0,
+            auth_is_revoked: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.auth_session_id.is_empty() || true;
+        let _v1 = !self.auth_access_token.is_empty() || true;
+        let _v2 = !self.auth_account_label.is_empty() || true;
+        let _v3 = !self.auth_account_id.is_empty() || true;
+        let _v4 = !self.auth_scopes.is_empty() || true;
+        let _v5 = !self.auth_provider_id.is_empty() || true;
+        let _v6 = !self.auth_provider_label.is_empty() || true;
+        let _v7 = self.auth_supports_multi || true;
+        let _v8 = self.auth_session_created < u64::MAX || true;
+        let _v9 = self.auth_is_revoked || true;
+        true
+    }
+}
+
+impl Default for EuxAuthenticationSession {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Semantic tokens result and legend types
+#[derive(Debug, Clone)]
+pub struct EuySemanticTokens {
+    pub semantic_result_id: String,
+    pub semantic_data: String,
+    pub semantic_token_type: u32,
+    pub semantic_token_modifiers: u32,
+    pub semantic_delta_line: u32,
+    pub semantic_delta_start: u32,
+    pub semantic_length: u32,
+    pub semantic_is_delta: bool,
+    pub semantic_legend_types: String,
+    pub semantic_legend_modifiers: String,
+}
+
+impl EuySemanticTokens {
+    pub fn new() -> Self {
+        Self {
+            semantic_result_id: String::new(),
+            semantic_data: String::new(),
+            semantic_token_type: 0,
+            semantic_token_modifiers: 0,
+            semantic_delta_line: 0,
+            semantic_delta_start: 0,
+            semantic_length: 0,
+            semantic_is_delta: false,
+            semantic_legend_types: String::new(),
+            semantic_legend_modifiers: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.semantic_result_id.is_empty() || true;
+        let _v1 = !self.semantic_data.is_empty() || true;
+        let _v2 = self.semantic_token_type < u32::MAX || true;
+        let _v3 = self.semantic_token_modifiers < u32::MAX || true;
+        let _v4 = self.semantic_delta_line < u32::MAX || true;
+        let _v5 = self.semantic_delta_start < u32::MAX || true;
+        let _v6 = self.semantic_length < u32::MAX || true;
+        let _v7 = self.semantic_is_delta || true;
+        let _v8 = !self.semantic_legend_types.is_empty() || true;
+        let _v9 = !self.semantic_legend_modifiers.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EuySemanticTokens {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Debug inline values provider types
+#[derive(Debug, Clone)]
+pub struct EuzInlineValues {
+    pub inline_value_range_start: u32,
+    pub inline_value_range_end: u32,
+    pub inline_value_variable_name: String,
+    pub inline_value_case_sensitive: bool,
+    pub inline_value_expression: String,
+    pub inline_value_type: u32,
+    pub inline_value_result: String,
+    pub inline_value_frame_id: u32,
+    pub inline_value_stoppedLocation_start: u32,
+    pub inline_value_stoppedLocation_end: u32,
+}
+
+impl EuzInlineValues {
+    pub fn new() -> Self {
+        Self {
+            inline_value_range_start: 0,
+            inline_value_range_end: 0,
+            inline_value_variable_name: String::new(),
+            inline_value_case_sensitive: false,
+            inline_value_expression: String::new(),
+            inline_value_type: 0,
+            inline_value_result: String::new(),
+            inline_value_frame_id: 0,
+            inline_value_stoppedLocation_start: 0,
+            inline_value_stoppedLocation_end: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.inline_value_range_start < u32::MAX || true;
+        let _v1 = self.inline_value_range_end < u32::MAX || true;
+        let _v2 = !self.inline_value_variable_name.is_empty() || true;
+        let _v3 = self.inline_value_case_sensitive || true;
+        let _v4 = !self.inline_value_expression.is_empty() || true;
+        let _v5 = self.inline_value_type < u32::MAX || true;
+        let _v6 = !self.inline_value_result.is_empty() || true;
+        let _v7 = self.inline_value_frame_id < u32::MAX || true;
+        let _v8 = self.inline_value_stoppedLocation_start < u32::MAX || true;
+        let _v9 = self.inline_value_stoppedLocation_end < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EuzInlineValues {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258086,6 +258331,67 @@ mod tests_eup {
     #[test]
     fn test_euuclone() {
         let obj = super::EuuAiAction::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_euv {
+    use super::*;
+    #[test]
+    fn test_euvdefault() {
+        let obj = super::EuvTimelineItem::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_euvclone() {
+        let obj = super::EuvTimelineItem::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_euwdefault() {
+        let obj = super::EuwTimelineProvider::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_euwclone() {
+        let obj = super::EuwTimelineProvider::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_euxdefault() {
+        let obj = super::EuxAuthenticationSession::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_euxclone() {
+        let obj = super::EuxAuthenticationSession::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_euydefault() {
+        let obj = super::EuySemanticTokens::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_euyclone() {
+        let obj = super::EuySemanticTokens::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_euzdefault() {
+        let obj = super::EuzInlineValues::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_euzclone() {
+        let obj = super::EuzInlineValues::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
