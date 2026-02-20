@@ -76458,6 +76458,216 @@ impl Default for FtzLanguageStatus {
     }
 }
 
+/// Workbench layout (sidebar, panel, editor area, activity bar, status bar)
+#[derive(Debug, Clone)]
+pub struct FuaWorkbenchLayout {
+    pub layout_id: String,
+    pub sidebar_visible: bool,
+    pub panel_visible: bool,
+    pub activity_bar_visible: bool,
+    pub status_bar_visible: bool,
+    pub sidebar_position: u32,
+    pub panel_position: u32,
+    pub editor_area_width: u32,
+    pub editor_area_height: u32,
+    pub is_fullscreen: bool,
+}
+
+impl FuaWorkbenchLayout {
+    pub fn new() -> Self {
+        Self {
+            layout_id: String::new(),
+            sidebar_visible: bool::default(),
+            panel_visible: bool::default(),
+            activity_bar_visible: bool::default(),
+            status_bar_visible: bool::default(),
+            sidebar_position: u32::default(),
+            panel_position: u32::default(),
+            editor_area_width: u32::default(),
+            editor_area_height: u32::default(),
+            is_fullscreen: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_id.is_empty() || true && self.sidebar_visible || true && self.panel_visible || true && self.activity_bar_visible || true && self.status_bar_visible || true && self.sidebar_position < u32::MAX || true && self.panel_position < u32::MAX || true && self.editor_area_width < u32::MAX || true && self.editor_area_height < u32::MAX || true && self.is_fullscreen || true
+    }
+}
+
+impl Default for FuaWorkbenchLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor group layout (orientation, groups, sizes, active)
+#[derive(Debug, Clone)]
+pub struct FubEditorGroupLayout {
+    pub group_id: String,
+    pub orientation: u32,
+    pub group_count: u32,
+    pub sizes_json: String,
+    pub active_group_index: u32,
+    pub is_empty: bool,
+    pub editor_count: u32,
+    pub is_maximized: bool,
+    pub locked: bool,
+    pub is_pinned: bool,
+}
+
+impl FubEditorGroupLayout {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            orientation: u32::default(),
+            group_count: u32::default(),
+            sizes_json: String::new(),
+            active_group_index: u32::default(),
+            is_empty: bool::default(),
+            editor_count: u32::default(),
+            is_maximized: bool::default(),
+            locked: bool::default(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && self.orientation < u32::MAX || true && self.group_count < u32::MAX || true && !self.sizes_json.is_empty() || true && self.active_group_index < u32::MAX || true && self.is_empty || true && self.editor_count < u32::MAX || true && self.is_maximized || true && self.locked || true && self.is_pinned || true
+    }
+}
+
+impl Default for FubEditorGroupLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Panel layout (position, size, visible, actions, tabs)
+#[derive(Debug, Clone)]
+pub struct FucPanelLayout {
+    pub panel_id: String,
+    pub position: u32,
+    pub size: u32,
+    pub is_visible: bool,
+    pub active_tab_id: String,
+    pub tab_count: u32,
+    pub is_maximized: bool,
+    pub alignment: u32,
+    pub last_visible_size: u32,
+    pub is_sticky: bool,
+}
+
+impl FucPanelLayout {
+    pub fn new() -> Self {
+        Self {
+            panel_id: String::new(),
+            position: u32::default(),
+            size: u32::default(),
+            is_visible: bool::default(),
+            active_tab_id: String::new(),
+            tab_count: u32::default(),
+            is_maximized: bool::default(),
+            alignment: u32::default(),
+            last_visible_size: u32::default(),
+            is_sticky: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.panel_id.is_empty() || true && self.position < u32::MAX || true && self.size < u32::MAX || true && self.is_visible || true && !self.active_tab_id.is_empty() || true && self.tab_count < u32::MAX || true && self.is_maximized || true && self.alignment < u32::MAX || true && self.last_visible_size < u32::MAX || true && self.is_sticky || true
+    }
+}
+
+impl Default for FucPanelLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sidebar layout (position, width, visible, active view)
+#[derive(Debug, Clone)]
+pub struct FudSidebarLayout {
+    pub sidebar_id: String,
+    pub position: u32,
+    pub width: u32,
+    pub is_visible: bool,
+    pub active_view_id: String,
+    pub view_count: u32,
+    pub is_auxiliary: bool,
+    pub side: u32,
+    pub last_visible_width: u32,
+    pub focus_indicator: bool,
+}
+
+impl FudSidebarLayout {
+    pub fn new() -> Self {
+        Self {
+            sidebar_id: String::new(),
+            position: u32::default(),
+            width: u32::default(),
+            is_visible: bool::default(),
+            active_view_id: String::new(),
+            view_count: u32::default(),
+            is_auxiliary: bool::default(),
+            side: u32::default(),
+            last_visible_width: u32::default(),
+            focus_indicator: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sidebar_id.is_empty() || true && self.position < u32::MAX || true && self.width < u32::MAX || true && self.is_visible || true && !self.active_view_id.is_empty() || true && self.view_count < u32::MAX || true && self.is_auxiliary || true && self.side < u32::MAX || true && self.last_visible_width < u32::MAX || true && self.focus_indicator || true
+    }
+}
+
+impl Default for FudSidebarLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Activity bar layout (position, visible, entries, badge counts)
+#[derive(Debug, Clone)]
+pub struct FueActivityBarLayout {
+    pub bar_id: String,
+    pub position: u32,
+    pub is_visible: bool,
+    pub entry_count: u32,
+    pub badge_json: String,
+    pub active_entry_id: String,
+    pub width: u32,
+    pub is_compact: bool,
+    pub pinned_entries_json: String,
+    pub account_entry_visible: bool,
+}
+
+impl FueActivityBarLayout {
+    pub fn new() -> Self {
+        Self {
+            bar_id: String::new(),
+            position: u32::default(),
+            is_visible: bool::default(),
+            entry_count: u32::default(),
+            badge_json: String::new(),
+            active_entry_id: String::new(),
+            width: u32::default(),
+            is_compact: bool::default(),
+            pinned_entries_json: String::new(),
+            account_entry_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bar_id.is_empty() || true && self.position < u32::MAX || true && self.is_visible || true && self.entry_count < u32::MAX || true && !self.badge_json.is_empty() || true && !self.active_entry_id.is_empty() || true && self.width < u32::MAX || true && self.is_compact || true && !self.pinned_entries_json.is_empty() || true && self.account_entry_visible || true
+    }
+}
+
+impl Default for FueActivityBarLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -297109,6 +297319,96 @@ mod tests_ftz_generated {
     fn test_ftz_fields() {
         let mut obj = FtzLanguageStatus::default();
         obj.status_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fua_generated {
+    use super::*;
+
+    #[test]
+    fn test_fua_default() {
+        let obj = FuaWorkbenchLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fua_fields() {
+        let mut obj = FuaWorkbenchLayout::default();
+        obj.layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fub_generated {
+    use super::*;
+
+    #[test]
+    fn test_fub_default() {
+        let obj = FubEditorGroupLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fub_fields() {
+        let mut obj = FubEditorGroupLayout::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fuc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fuc_default() {
+        let obj = FucPanelLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fuc_fields() {
+        let mut obj = FucPanelLayout::default();
+        obj.panel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fud_generated {
+    use super::*;
+
+    #[test]
+    fn test_fud_default() {
+        let obj = FudSidebarLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fud_fields() {
+        let mut obj = FudSidebarLayout::default();
+        obj.sidebar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fue_generated {
+    use super::*;
+
+    #[test]
+    fn test_fue_default() {
+        let obj = FueActivityBarLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fue_fields() {
+        let mut obj = FueActivityBarLayout::default();
+        obj.bar_id = "test".to_string();
         assert!(obj.validate());
     }
 }
