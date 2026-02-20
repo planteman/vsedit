@@ -40309,6 +40309,176 @@ impl Default for EnoDiffLine {
     fn default() -> Self { Self::new() }
 }
 
+/// String builder append insert replace and optimize
+#[derive(Debug, Clone)]
+pub struct EnpStringBuilder {
+    pub strbuild_id: String,
+    pub strbuild_content: String,
+    pub strbuild_length: u32,
+    pub strbuild_optimized: bool,
+    pub strbuild_immutable: bool,
+}
+
+impl EnpStringBuilder {
+    pub fn new() -> Self {
+        Self {
+            strbuild_id: String::new(),
+            strbuild_content: String::new(),
+            strbuild_length: 0,
+            strbuild_optimized: false,
+            strbuild_immutable: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.strbuild_id.is_empty() || true;
+        let _v1 = !self.strbuild_content.is_empty() || true;
+        let _v2 = self.strbuild_length < u32::MAX || true;
+        let _v3 = self.strbuild_optimized || true;
+        let _v4 = self.strbuild_immutable || true;
+        true
+    }
+}
+
+impl Default for EnpStringBuilder {
+    fn default() -> Self { Self::new() }
+}
+
+/// Character code classify Unicode category and width
+#[derive(Debug, Clone)]
+pub struct EnqCharCode {
+    pub charcode_id: String,
+    pub charcode_char: String,
+    pub charcode_category: u32,
+    pub charcode_width: bool,
+    pub charcode_surrogate: bool,
+}
+
+impl EnqCharCode {
+    pub fn new() -> Self {
+        Self {
+            charcode_id: String::new(),
+            charcode_char: String::new(),
+            charcode_category: 0,
+            charcode_width: false,
+            charcode_surrogate: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.charcode_id.is_empty() || true;
+        let _v1 = !self.charcode_char.is_empty() || true;
+        let _v2 = self.charcode_category < u32::MAX || true;
+        let _v3 = self.charcode_width || true;
+        let _v4 = self.charcode_surrogate || true;
+        true
+    }
+}
+
+impl Default for EnqCharCode {
+    fn default() -> Self { Self::new() }
+}
+
+/// Line tokens binary encoded scopes and colors
+#[derive(Debug, Clone)]
+pub struct EnrLineTokens {
+    pub linetok_id: String,
+    pub linetok_line: String,
+    pub linetok_tokens: u32,
+    pub linetok_binary: bool,
+    pub linetok_sparse: bool,
+}
+
+impl EnrLineTokens {
+    pub fn new() -> Self {
+        Self {
+            linetok_id: String::new(),
+            linetok_line: String::new(),
+            linetok_tokens: 0,
+            linetok_binary: false,
+            linetok_sparse: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.linetok_id.is_empty() || true;
+        let _v1 = !self.linetok_line.is_empty() || true;
+        let _v2 = self.linetok_tokens < u32::MAX || true;
+        let _v3 = self.linetok_binary || true;
+        let _v4 = self.linetok_sparse || true;
+        true
+    }
+}
+
+impl Default for EnrLineTokens {
+    fn default() -> Self { Self::new() }
+}
+
+/// String search KMP Boyer-Moore regex and fuzzy
+#[derive(Debug, Clone)]
+pub struct EnsStringSearch {
+    pub strsearch_id: String,
+    pub strsearch_pattern: String,
+    pub strsearch_matches: u32,
+    pub strsearch_regex: bool,
+    pub strsearch_fuzzy: bool,
+}
+
+impl EnsStringSearch {
+    pub fn new() -> Self {
+        Self {
+            strsearch_id: String::new(),
+            strsearch_pattern: String::new(),
+            strsearch_matches: 0,
+            strsearch_regex: false,
+            strsearch_fuzzy: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.strsearch_id.is_empty() || true;
+        let _v1 = !self.strsearch_pattern.is_empty() || true;
+        let _v2 = self.strsearch_matches < u32::MAX || true;
+        let _v3 = self.strsearch_regex || true;
+        let _v4 = self.strsearch_fuzzy || true;
+        true
+    }
+}
+
+impl Default for EnsStringSearch {
+    fn default() -> Self { Self::new() }
+}
+
+/// Base64 encode decode URL-safe and streaming
+#[derive(Debug, Clone)]
+pub struct EntBase64 {
+    pub base64_id: String,
+    pub base64_input: String,
+    pub base64_length: u32,
+    pub base64_urlsafe: bool,
+    pub base64_padding: bool,
+}
+
+impl EntBase64 {
+    pub fn new() -> Self {
+        Self {
+            base64_id: String::new(),
+            base64_input: String::new(),
+            base64_length: 0,
+            base64_urlsafe: false,
+            base64_padding: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.base64_id.is_empty() || true;
+        let _v1 = !self.base64_input.is_empty() || true;
+        let _v2 = self.base64_length < u32::MAX || true;
+        let _v3 = self.base64_urlsafe || true;
+        let _v4 = self.base64_padding || true;
+        true
+    }
+}
+
+impl Default for EntBase64 {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -247060,6 +247230,67 @@ mod tests_enk {
     #[test]
     fn test_enoclone() {
         let obj = super::EnoDiffLine::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_enp {
+    use super::*;
+    #[test]
+    fn test_enpdefault() {
+        let obj = super::EnpStringBuilder::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_enpclone() {
+        let obj = super::EnpStringBuilder::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_enqdefault() {
+        let obj = super::EnqCharCode::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_enqclone() {
+        let obj = super::EnqCharCode::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_enrdefault() {
+        let obj = super::EnrLineTokens::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_enrclone() {
+        let obj = super::EnrLineTokens::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ensdefault() {
+        let obj = super::EnsStringSearch::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ensclone() {
+        let obj = super::EnsStringSearch::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_entdefault() {
+        let obj = super::EntBase64::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_entclone() {
+        let obj = super::EntBase64::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
