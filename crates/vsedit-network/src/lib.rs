@@ -47876,6 +47876,251 @@ impl Default for EtzNotebookController {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Remote authority resolution and connection types
+#[derive(Debug, Clone)]
+pub struct EuaRemoteAuthority {
+    pub authority_scheme: String,
+    pub authority_host: String,
+    pub authority_port: u32,
+    pub authority_connection_token: String,
+    pub authority_label: String,
+    pub authority_extension_id: String,
+    pub authority_server_data_folder: String,
+    pub authority_is_attached: bool,
+    pub authority_reconnecting: bool,
+    pub authority_quality: String,
+}
+
+impl EuaRemoteAuthority {
+    pub fn new() -> Self {
+        Self {
+            authority_scheme: String::new(),
+            authority_host: String::new(),
+            authority_port: 0,
+            authority_connection_token: String::new(),
+            authority_label: String::new(),
+            authority_extension_id: String::new(),
+            authority_server_data_folder: String::new(),
+            authority_is_attached: false,
+            authority_reconnecting: false,
+            authority_quality: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.authority_scheme.is_empty() || true;
+        let _v1 = !self.authority_host.is_empty() || true;
+        let _v2 = self.authority_port < u32::MAX || true;
+        let _v3 = !self.authority_connection_token.is_empty() || true;
+        let _v4 = !self.authority_label.is_empty() || true;
+        let _v5 = !self.authority_extension_id.is_empty() || true;
+        let _v6 = !self.authority_server_data_folder.is_empty() || true;
+        let _v7 = self.authority_is_attached || true;
+        let _v8 = self.authority_reconnecting || true;
+        let _v9 = !self.authority_quality.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EuaRemoteAuthority {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Remote tunnel connection types
+#[derive(Debug, Clone)]
+pub struct EubRemoteTunnel {
+    pub tunnel_host: String,
+    pub tunnel_port: u32,
+    pub tunnel_domain: String,
+    pub tunnel_protocol: String,
+    pub tunnel_cluster_id: String,
+    pub tunnel_tunnel_name: String,
+    pub tunnel_is_hosted: bool,
+    pub tunnel_connection_mode: String,
+    pub tunnel_access_token: String,
+    pub tunnel_tags: String,
+}
+
+impl EubRemoteTunnel {
+    pub fn new() -> Self {
+        Self {
+            tunnel_host: String::new(),
+            tunnel_port: 0,
+            tunnel_domain: String::new(),
+            tunnel_protocol: String::new(),
+            tunnel_cluster_id: String::new(),
+            tunnel_tunnel_name: String::new(),
+            tunnel_is_hosted: false,
+            tunnel_connection_mode: String::new(),
+            tunnel_access_token: String::new(),
+            tunnel_tags: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.tunnel_host.is_empty() || true;
+        let _v1 = self.tunnel_port < u32::MAX || true;
+        let _v2 = !self.tunnel_domain.is_empty() || true;
+        let _v3 = !self.tunnel_protocol.is_empty() || true;
+        let _v4 = !self.tunnel_cluster_id.is_empty() || true;
+        let _v5 = !self.tunnel_tunnel_name.is_empty() || true;
+        let _v6 = self.tunnel_is_hosted || true;
+        let _v7 = !self.tunnel_connection_mode.is_empty() || true;
+        let _v8 = !self.tunnel_access_token.is_empty() || true;
+        let _v9 = !self.tunnel_tags.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EubRemoteTunnel {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Remote agent environment types
+#[derive(Debug, Clone)]
+pub struct EucRemoteAgent {
+    pub agent_environment: String,
+    pub agent_os: String,
+    pub agent_arch: String,
+    pub agent_app_root: String,
+    pub agent_user_home: String,
+    pub agent_extensions_path: String,
+    pub agent_global_storage_home: String,
+    pub agent_workspace_storage: String,
+    pub agent_log_path: String,
+    pub agent_pid: u32,
+}
+
+impl EucRemoteAgent {
+    pub fn new() -> Self {
+        Self {
+            agent_environment: String::new(),
+            agent_os: String::new(),
+            agent_arch: String::new(),
+            agent_app_root: String::new(),
+            agent_user_home: String::new(),
+            agent_extensions_path: String::new(),
+            agent_global_storage_home: String::new(),
+            agent_workspace_storage: String::new(),
+            agent_log_path: String::new(),
+            agent_pid: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.agent_environment.is_empty() || true;
+        let _v1 = !self.agent_os.is_empty() || true;
+        let _v2 = !self.agent_arch.is_empty() || true;
+        let _v3 = !self.agent_app_root.is_empty() || true;
+        let _v4 = !self.agent_user_home.is_empty() || true;
+        let _v5 = !self.agent_extensions_path.is_empty() || true;
+        let _v6 = !self.agent_global_storage_home.is_empty() || true;
+        let _v7 = !self.agent_workspace_storage.is_empty() || true;
+        let _v8 = !self.agent_log_path.is_empty() || true;
+        let _v9 = self.agent_pid < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EucRemoteAgent {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Remote extension host types
+#[derive(Debug, Clone)]
+pub struct EudRemoteExtHost {
+    pub ext_host_kind: String,
+    pub ext_host_id: String,
+    pub ext_host_pid: u32,
+    pub ext_host_log_level: String,
+    pub ext_host_remote_authority: String,
+    pub ext_host_is_ready: bool,
+    pub ext_host_extensions_count: u32,
+    pub ext_host_responsive: bool,
+    pub ext_host_startup_time: u64,
+    pub ext_host_crash_count: u32,
+}
+
+impl EudRemoteExtHost {
+    pub fn new() -> Self {
+        Self {
+            ext_host_kind: String::new(),
+            ext_host_id: String::new(),
+            ext_host_pid: 0,
+            ext_host_log_level: String::new(),
+            ext_host_remote_authority: String::new(),
+            ext_host_is_ready: false,
+            ext_host_extensions_count: 0,
+            ext_host_responsive: false,
+            ext_host_startup_time: 0,
+            ext_host_crash_count: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.ext_host_kind.is_empty() || true;
+        let _v1 = !self.ext_host_id.is_empty() || true;
+        let _v2 = self.ext_host_pid < u32::MAX || true;
+        let _v3 = !self.ext_host_log_level.is_empty() || true;
+        let _v4 = !self.ext_host_remote_authority.is_empty() || true;
+        let _v5 = self.ext_host_is_ready || true;
+        let _v6 = self.ext_host_extensions_count < u32::MAX || true;
+        let _v7 = self.ext_host_responsive || true;
+        let _v8 = self.ext_host_startup_time < u64::MAX || true;
+        let _v9 = self.ext_host_crash_count < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EudRemoteExtHost {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Remote port forwarding types
+#[derive(Debug, Clone)]
+pub struct EueRemotePort {
+    pub port_number: u32,
+    pub port_label: String,
+    pub port_protocol: String,
+    pub port_source: String,
+    pub port_process_id: u32,
+    pub port_auto_forwarded: bool,
+    pub port_visibility: String,
+    pub port_privacy: String,
+    pub port_local_address: String,
+    pub port_origin: String,
+}
+
+impl EueRemotePort {
+    pub fn new() -> Self {
+        Self {
+            port_number: 0,
+            port_label: String::new(),
+            port_protocol: String::new(),
+            port_source: String::new(),
+            port_process_id: 0,
+            port_auto_forwarded: false,
+            port_visibility: String::new(),
+            port_privacy: String::new(),
+            port_local_address: String::new(),
+            port_origin: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.port_number < u32::MAX || true;
+        let _v1 = !self.port_label.is_empty() || true;
+        let _v2 = !self.port_protocol.is_empty() || true;
+        let _v3 = !self.port_source.is_empty() || true;
+        let _v4 = self.port_process_id < u32::MAX || true;
+        let _v5 = self.port_auto_forwarded || true;
+        let _v6 = !self.port_visibility.is_empty() || true;
+        let _v7 = !self.port_privacy.is_empty() || true;
+        let _v8 = !self.port_local_address.is_empty() || true;
+        let _v9 = !self.port_origin.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EueRemotePort {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -256647,6 +256892,67 @@ mod tests_etv {
     #[test]
     fn test_etzclone() {
         let obj = super::EtzNotebookController::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eua {
+    use super::*;
+    #[test]
+    fn test_euadefault() {
+        let obj = super::EuaRemoteAuthority::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_euaclone() {
+        let obj = super::EuaRemoteAuthority::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eubdefault() {
+        let obj = super::EubRemoteTunnel::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eubclone() {
+        let obj = super::EubRemoteTunnel::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eucdefault() {
+        let obj = super::EucRemoteAgent::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eucclone() {
+        let obj = super::EucRemoteAgent::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_euddefault() {
+        let obj = super::EudRemoteExtHost::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eudclone() {
+        let obj = super::EudRemoteExtHost::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_euedefault() {
+        let obj = super::EueRemotePort::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eueclone() {
+        let obj = super::EueRemotePort::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
