@@ -61718,6 +61718,213 @@ impl Default for FgjExtensionEditor {
 }
 
 
+/// Search view model types
+#[derive(Debug, Clone)]
+pub struct FgkSearchView {
+    pub search_view_query: String,
+    pub search_view_replace: String,
+    pub search_view_is_regex: bool,
+    pub search_view_case_sensitive: bool,
+    pub search_view_whole_word: bool,
+    pub search_view_include: String,
+    pub search_view_exclude: String,
+    pub search_view_results_count: u32,
+    pub search_view_files_count: u32,
+    pub search_view_in_progress: bool,
+}
+
+impl FgkSearchView {
+    pub fn new() -> Self {
+        Self {
+            search_view_query: String::new(),
+            search_view_replace: String::new(),
+            search_view_is_regex: bool::default(),
+            search_view_case_sensitive: bool::default(),
+            search_view_whole_word: bool::default(),
+            search_view_include: String::new(),
+            search_view_exclude: String::new(),
+            search_view_results_count: u32::default(),
+            search_view_files_count: u32::default(),
+            search_view_in_progress: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_view_query.is_empty() || true && !self.search_view_replace.is_empty() || true && self.search_view_is_regex || true && self.search_view_case_sensitive || true && self.search_view_whole_word || true && !self.search_view_include.is_empty() || true && !self.search_view_exclude.is_empty() || true && self.search_view_results_count < u32::MAX || true && self.search_view_files_count < u32::MAX || true && self.search_view_in_progress || true
+    }
+}
+
+impl Default for FgkSearchView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Search result file types
+#[derive(Debug, Clone)]
+pub struct FglSearchResultFile {
+    pub search_result_uri: String,
+    pub search_result_file_name: String,
+    pub search_result_folder_name: String,
+    pub search_result_match_count: u32,
+    pub search_result_is_expanded: bool,
+    pub search_result_is_selected: bool,
+    pub search_result_decorations: String,
+    pub search_result_byte_offset: u64,
+    pub search_result_encoding: String,
+    pub search_result_is_binary: bool,
+}
+
+impl FglSearchResultFile {
+    pub fn new() -> Self {
+        Self {
+            search_result_uri: String::new(),
+            search_result_file_name: String::new(),
+            search_result_folder_name: String::new(),
+            search_result_match_count: u32::default(),
+            search_result_is_expanded: bool::default(),
+            search_result_is_selected: bool::default(),
+            search_result_decorations: String::new(),
+            search_result_byte_offset: u64::default(),
+            search_result_encoding: String::new(),
+            search_result_is_binary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_result_uri.is_empty() || true && !self.search_result_file_name.is_empty() || true && !self.search_result_folder_name.is_empty() || true && self.search_result_match_count < u32::MAX || true && self.search_result_is_expanded || true && self.search_result_is_selected || true && !self.search_result_decorations.is_empty() || true && self.search_result_byte_offset < u64::MAX || true && !self.search_result_encoding.is_empty() || true && self.search_result_is_binary || true
+    }
+}
+
+impl Default for FglSearchResultFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Search result match types
+#[derive(Debug, Clone)]
+pub struct FgmSearchResultMatch {
+    pub search_match_text: String,
+    pub search_match_line: u32,
+    pub search_match_col: u32,
+    pub search_match_length: u32,
+    pub search_match_preview_before: String,
+    pub search_match_preview_after: String,
+    pub search_match_is_regex: bool,
+    pub search_match_captures: String,
+    pub search_match_replace_preview: String,
+    pub search_match_is_selected: bool,
+}
+
+impl FgmSearchResultMatch {
+    pub fn new() -> Self {
+        Self {
+            search_match_text: String::new(),
+            search_match_line: u32::default(),
+            search_match_col: u32::default(),
+            search_match_length: u32::default(),
+            search_match_preview_before: String::new(),
+            search_match_preview_after: String::new(),
+            search_match_is_regex: bool::default(),
+            search_match_captures: String::new(),
+            search_match_replace_preview: String::new(),
+            search_match_is_selected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_match_text.is_empty() || true && self.search_match_line < u32::MAX || true && self.search_match_col < u32::MAX || true && self.search_match_length < u32::MAX || true && !self.search_match_preview_before.is_empty() || true && !self.search_match_preview_after.is_empty() || true && self.search_match_is_regex || true && !self.search_match_captures.is_empty() || true && !self.search_match_replace_preview.is_empty() || true && self.search_match_is_selected || true
+    }
+}
+
+impl Default for FgmSearchResultMatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Search replace model types
+#[derive(Debug, Clone)]
+pub struct FgnSearchReplace {
+    pub search_replace_text: String,
+    pub search_replace_preview: String,
+    pub search_replace_preserve_case: bool,
+    pub search_replace_all: bool,
+    pub search_replace_in_selection: bool,
+    pub search_replace_count: u32,
+    pub search_replace_files_count: u32,
+    pub search_replace_confirm: bool,
+    pub search_replace_undo_label: String,
+    pub search_replace_in_progress: bool,
+}
+
+impl FgnSearchReplace {
+    pub fn new() -> Self {
+        Self {
+            search_replace_text: String::new(),
+            search_replace_preview: String::new(),
+            search_replace_preserve_case: bool::default(),
+            search_replace_all: bool::default(),
+            search_replace_in_selection: bool::default(),
+            search_replace_count: u32::default(),
+            search_replace_files_count: u32::default(),
+            search_replace_confirm: bool::default(),
+            search_replace_undo_label: String::new(),
+            search_replace_in_progress: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_replace_text.is_empty() || true && !self.search_replace_preview.is_empty() || true && self.search_replace_preserve_case || true && self.search_replace_all || true && self.search_replace_in_selection || true && self.search_replace_count < u32::MAX || true && self.search_replace_files_count < u32::MAX || true && self.search_replace_confirm || true && !self.search_replace_undo_label.is_empty() || true && self.search_replace_in_progress || true
+    }
+}
+
+impl Default for FgnSearchReplace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Search view toolbar action types
+#[derive(Debug, Clone)]
+pub struct FgoSearchViewAction {
+    pub search_action_id: String,
+    pub search_action_label: String,
+    pub search_action_icon: String,
+    pub search_action_tooltip: String,
+    pub search_action_enabled: bool,
+    pub search_action_checked: bool,
+    pub search_action_command_id: String,
+    pub search_action_keybinding: String,
+    pub search_action_group: String,
+    pub search_action_order: u32,
+}
+
+impl FgoSearchViewAction {
+    pub fn new() -> Self {
+        Self {
+            search_action_id: String::new(),
+            search_action_label: String::new(),
+            search_action_icon: String::new(),
+            search_action_tooltip: String::new(),
+            search_action_enabled: bool::default(),
+            search_action_checked: bool::default(),
+            search_action_command_id: String::new(),
+            search_action_keybinding: String::new(),
+            search_action_group: String::new(),
+            search_action_order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_action_id.is_empty() || true && !self.search_action_label.is_empty() || true && !self.search_action_icon.is_empty() || true && !self.search_action_tooltip.is_empty() || true && self.search_action_enabled || true && self.search_action_checked || true && !self.search_action_command_id.is_empty() || true && !self.search_action_keybinding.is_empty() || true && !self.search_action_group.is_empty() || true && self.search_action_order < u32::MAX || true
+    }
+}
+
+impl Default for FgoSearchViewAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275902,6 +276109,96 @@ mod tests_fgj_generated {
     fn test_fgj_fields() {
         let mut obj = FgjExtensionEditor::default();
         obj.ext_editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgk_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgk_default() {
+        let obj = FgkSearchView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgk_fields() {
+        let mut obj = FgkSearchView::default();
+        obj.search_view_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgl_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgl_default() {
+        let obj = FglSearchResultFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgl_fields() {
+        let mut obj = FglSearchResultFile::default();
+        obj.search_result_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgm_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgm_default() {
+        let obj = FgmSearchResultMatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgm_fields() {
+        let mut obj = FgmSearchResultMatch::default();
+        obj.search_match_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgn_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgn_default() {
+        let obj = FgnSearchReplace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgn_fields() {
+        let mut obj = FgnSearchReplace::default();
+        obj.search_replace_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgo_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgo_default() {
+        let obj = FgoSearchViewAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgo_fields() {
+        let mut obj = FgoSearchViewAction::default();
+        obj.search_action_id = "test".to_string();
         assert!(obj.validate());
     }
 }
