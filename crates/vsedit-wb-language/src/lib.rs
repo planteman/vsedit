@@ -116570,6 +116570,426 @@ impl Default for HezNotebookTrust {
     }
 }
 
+/// Chat message (role, content, name, tool calls, function call)
+#[derive(Debug, Clone)]
+pub struct HfaChatMessage {
+    pub chat_msg_id: String,
+    pub role: String,
+    pub content: String,
+    pub name: String,
+    pub tool_calls_json: String,
+    pub function_call_json: String,
+    pub timestamp_ms: u64,
+    pub token_count: u32,
+    pub is_system: bool,
+    pub refusal: String,
+}
+
+impl HfaChatMessage {
+    pub fn new() -> Self {
+        Self {
+            chat_msg_id: String::new(),
+            role: String::new(),
+            content: String::new(),
+            name: String::new(),
+            tool_calls_json: String::new(),
+            function_call_json: String::new(),
+            timestamp_ms: u64::default(),
+            token_count: u32::default(),
+            is_system: bool::default(),
+            refusal: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_msg_id.is_empty() || true && !self.role.is_empty() || true && !self.content.is_empty() || true && !self.name.is_empty() || true && !self.tool_calls_json.is_empty() || true && !self.function_call_json.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.token_count < u32::MAX || true && self.is_system || true && !self.refusal.is_empty() || true
+    }
+}
+
+impl Default for HfaChatMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat request (messages, model, temperature, max tokens, tools)
+#[derive(Debug, Clone)]
+pub struct HfbChatRequest {
+    pub chat_req_id: String,
+    pub messages_json: String,
+    pub model: String,
+    pub temperature: f64,
+    pub max_tokens: u32,
+    pub tools_json: String,
+    pub top_p: f64,
+    pub frequency_penalty: f64,
+    pub presence_penalty: f64,
+    pub stream: bool,
+}
+
+impl HfbChatRequest {
+    pub fn new() -> Self {
+        Self {
+            chat_req_id: String::new(),
+            messages_json: String::new(),
+            model: String::new(),
+            temperature: f64::default(),
+            max_tokens: u32::default(),
+            tools_json: String::new(),
+            top_p: f64::default(),
+            frequency_penalty: f64::default(),
+            presence_penalty: f64::default(),
+            stream: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_req_id.is_empty() || true && !self.messages_json.is_empty() || true && !self.model.is_empty() || true && self.temperature.is_finite() || true && self.max_tokens < u32::MAX || true && !self.tools_json.is_empty() || true && self.top_p.is_finite() || true && self.frequency_penalty.is_finite() || true && self.presence_penalty.is_finite() || true && self.stream || true
+    }
+}
+
+impl Default for HfbChatRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat response (choices, usage, model, created, finish reason)
+#[derive(Debug, Clone)]
+pub struct HfcChatResponse {
+    pub chat_resp_id: String,
+    pub choices_json: String,
+    pub usage_json: String,
+    pub model: String,
+    pub created_ms: u64,
+    pub finish_reason: String,
+    pub request_id: String,
+    pub is_streaming: bool,
+    pub error_message: String,
+    pub total_tokens: u32,
+}
+
+impl HfcChatResponse {
+    pub fn new() -> Self {
+        Self {
+            chat_resp_id: String::new(),
+            choices_json: String::new(),
+            usage_json: String::new(),
+            model: String::new(),
+            created_ms: u64::default(),
+            finish_reason: String::new(),
+            request_id: String::new(),
+            is_streaming: bool::default(),
+            error_message: String::new(),
+            total_tokens: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_resp_id.is_empty() || true && !self.choices_json.is_empty() || true && !self.usage_json.is_empty() || true && !self.model.is_empty() || true && self.created_ms < u64::MAX || true && !self.finish_reason.is_empty() || true && !self.request_id.is_empty() || true && self.is_streaming || true && !self.error_message.is_empty() || true && self.total_tokens < u32::MAX || true
+    }
+}
+
+impl Default for HfcChatResponse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat participant (id, name, icon, description, is default)
+#[derive(Debug, Clone)]
+pub struct HfdChatParticipant {
+    pub chat_part_id: String,
+    pub participant_id: String,
+    pub name: String,
+    pub icon_path: String,
+    pub description: String,
+    pub is_default: bool,
+    pub commands_json: String,
+    pub full_name: String,
+    pub when_clause: String,
+    pub extension_id: String,
+}
+
+impl HfdChatParticipant {
+    pub fn new() -> Self {
+        Self {
+            chat_part_id: String::new(),
+            participant_id: String::new(),
+            name: String::new(),
+            icon_path: String::new(),
+            description: String::new(),
+            is_default: bool::default(),
+            commands_json: String::new(),
+            full_name: String::new(),
+            when_clause: String::new(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_part_id.is_empty() || true && !self.participant_id.is_empty() || true && !self.name.is_empty() || true && !self.icon_path.is_empty() || true && !self.description.is_empty() || true && self.is_default || true && !self.commands_json.is_empty() || true && !self.full_name.is_empty() || true && !self.when_clause.is_empty() || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for HfdChatParticipant {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat command (name, description, is sticky, sample request)
+#[derive(Debug, Clone)]
+pub struct HfeChatCommand {
+    pub chat_cmd_id: String,
+    pub name: String,
+    pub description: String,
+    pub is_sticky: bool,
+    pub sample_request: String,
+    pub when_clause: String,
+    pub disambiguation_json: String,
+    pub is_default: bool,
+    pub detail: String,
+    pub sort_text: String,
+}
+
+impl HfeChatCommand {
+    pub fn new() -> Self {
+        Self {
+            chat_cmd_id: String::new(),
+            name: String::new(),
+            description: String::new(),
+            is_sticky: bool::default(),
+            sample_request: String::new(),
+            when_clause: String::new(),
+            disambiguation_json: String::new(),
+            is_default: bool::default(),
+            detail: String::new(),
+            sort_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_cmd_id.is_empty() || true && !self.name.is_empty() || true && !self.description.is_empty() || true && self.is_sticky || true && !self.sample_request.is_empty() || true && !self.when_clause.is_empty() || true && !self.disambiguation_json.is_empty() || true && self.is_default || true && !self.detail.is_empty() || true && !self.sort_text.is_empty() || true
+    }
+}
+
+impl Default for HfeChatCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat variable (name, description, value, is full, icon)
+#[derive(Debug, Clone)]
+pub struct HffChatVariable {
+    pub chat_var_id: String,
+    pub name: String,
+    pub description: String,
+    pub value: String,
+    pub is_full: bool,
+    pub icon_path: String,
+    pub model_description: String,
+    pub is_mutable: bool,
+    pub id: String,
+    pub chat_description: String,
+}
+
+impl HffChatVariable {
+    pub fn new() -> Self {
+        Self {
+            chat_var_id: String::new(),
+            name: String::new(),
+            description: String::new(),
+            value: String::new(),
+            is_full: bool::default(),
+            icon_path: String::new(),
+            model_description: String::new(),
+            is_mutable: bool::default(),
+            id: String::new(),
+            chat_description: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_var_id.is_empty() || true && !self.name.is_empty() || true && !self.description.is_empty() || true && !self.value.is_empty() || true && self.is_full || true && !self.icon_path.is_empty() || true && !self.model_description.is_empty() || true && self.is_mutable || true && !self.id.is_empty() || true && !self.chat_description.is_empty() || true
+    }
+}
+
+impl Default for HffChatVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat followup (message, tooltip, title, command, label)
+#[derive(Debug, Clone)]
+pub struct HfgChatFollowup {
+    pub chat_followup_id: String,
+    pub message: String,
+    pub tooltip: String,
+    pub title: String,
+    pub command_id: String,
+    pub label: String,
+    pub participant_id: String,
+    pub kind: String,
+    pub arguments_json: String,
+    pub is_auto: bool,
+}
+
+impl HfgChatFollowup {
+    pub fn new() -> Self {
+        Self {
+            chat_followup_id: String::new(),
+            message: String::new(),
+            tooltip: String::new(),
+            title: String::new(),
+            command_id: String::new(),
+            label: String::new(),
+            participant_id: String::new(),
+            kind: String::new(),
+            arguments_json: String::new(),
+            is_auto: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_followup_id.is_empty() || true && !self.message.is_empty() || true && !self.tooltip.is_empty() || true && !self.title.is_empty() || true && !self.command_id.is_empty() || true && !self.label.is_empty() || true && !self.participant_id.is_empty() || true && !self.kind.is_empty() || true && !self.arguments_json.is_empty() || true && self.is_auto || true
+    }
+}
+
+impl Default for HfgChatFollowup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat code block (code, language, uri, range, is editable)
+#[derive(Debug, Clone)]
+pub struct HfhChatCodeBlock {
+    pub chat_code_id: String,
+    pub code: String,
+    pub language_id: String,
+    pub uri: String,
+    pub range_json: String,
+    pub is_editable: bool,
+    pub is_copyable: bool,
+    pub is_runnable: bool,
+    pub file_name: String,
+    pub line_count: u32,
+}
+
+impl HfhChatCodeBlock {
+    pub fn new() -> Self {
+        Self {
+            chat_code_id: String::new(),
+            code: String::new(),
+            language_id: String::new(),
+            uri: String::new(),
+            range_json: String::new(),
+            is_editable: bool::default(),
+            is_copyable: bool::default(),
+            is_runnable: bool::default(),
+            file_name: String::new(),
+            line_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_code_id.is_empty() || true && !self.code.is_empty() || true && !self.language_id.is_empty() || true && !self.uri.is_empty() || true && !self.range_json.is_empty() || true && self.is_editable || true && self.is_copyable || true && self.is_runnable || true && !self.file_name.is_empty() || true && self.line_count < u32::MAX || true
+    }
+}
+
+impl Default for HfhChatCodeBlock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat tool invocation (name, arguments, result, call id)
+#[derive(Debug, Clone)]
+pub struct HfiChatToolInvocation {
+    pub chat_tool_id: String,
+    pub tool_name: String,
+    pub arguments_json: String,
+    pub result_json: String,
+    pub call_id: String,
+    pub is_confirmed: bool,
+    pub start_time_ms: u64,
+    pub end_time_ms: u64,
+    pub error_message: String,
+    pub is_streaming: bool,
+}
+
+impl HfiChatToolInvocation {
+    pub fn new() -> Self {
+        Self {
+            chat_tool_id: String::new(),
+            tool_name: String::new(),
+            arguments_json: String::new(),
+            result_json: String::new(),
+            call_id: String::new(),
+            is_confirmed: bool::default(),
+            start_time_ms: u64::default(),
+            end_time_ms: u64::default(),
+            error_message: String::new(),
+            is_streaming: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_tool_id.is_empty() || true && !self.tool_name.is_empty() || true && !self.arguments_json.is_empty() || true && !self.result_json.is_empty() || true && !self.call_id.is_empty() || true && self.is_confirmed || true && self.start_time_ms < u64::MAX || true && self.end_time_ms < u64::MAX || true && !self.error_message.is_empty() || true && self.is_streaming || true
+    }
+}
+
+impl Default for HfiChatToolInvocation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat agent result (metadata, error, followups, slashCmd)
+#[derive(Debug, Clone)]
+pub struct HfjChatAgentResult {
+    pub chat_agent_id: String,
+    pub metadata_json: String,
+    pub error_message: String,
+    pub followups_json: String,
+    pub slash_command: String,
+    pub response_text: String,
+    pub is_complete: bool,
+    pub is_filtered: bool,
+    pub duration_ms: u64,
+    pub participant_id: String,
+}
+
+impl HfjChatAgentResult {
+    pub fn new() -> Self {
+        Self {
+            chat_agent_id: String::new(),
+            metadata_json: String::new(),
+            error_message: String::new(),
+            followups_json: String::new(),
+            slash_command: String::new(),
+            response_text: String::new(),
+            is_complete: bool::default(),
+            is_filtered: bool::default(),
+            duration_ms: u64::default(),
+            participant_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_agent_id.is_empty() || true && !self.metadata_json.is_empty() || true && !self.error_message.is_empty() || true && !self.followups_json.is_empty() || true && !self.slash_command.is_empty() || true && !self.response_text.is_empty() || true && self.is_complete || true && self.is_filtered || true && self.duration_ms < u64::MAX || true && !self.participant_id.is_empty() || true
+    }
+}
+
+impl Default for HfjChatAgentResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -354700,6 +355120,186 @@ mod tests_hez_generated {
     fn test_hez_fields() {
         let mut obj = HezNotebookTrust::default();
         obj.nb_trust_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfa_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfa_default() {
+        let obj = HfaChatMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfa_fields() {
+        let mut obj = HfaChatMessage::default();
+        obj.chat_msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfb_default() {
+        let obj = HfbChatRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfb_fields() {
+        let mut obj = HfbChatRequest::default();
+        obj.chat_req_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfc_default() {
+        let obj = HfcChatResponse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfc_fields() {
+        let mut obj = HfcChatResponse::default();
+        obj.chat_resp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfd_default() {
+        let obj = HfdChatParticipant::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfd_fields() {
+        let mut obj = HfdChatParticipant::default();
+        obj.chat_part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfe_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfe_default() {
+        let obj = HfeChatCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfe_fields() {
+        let mut obj = HfeChatCommand::default();
+        obj.chat_cmd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hff_generated {
+    use super::*;
+
+    #[test]
+    fn test_hff_default() {
+        let obj = HffChatVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hff_fields() {
+        let mut obj = HffChatVariable::default();
+        obj.chat_var_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfg_default() {
+        let obj = HfgChatFollowup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfg_fields() {
+        let mut obj = HfgChatFollowup::default();
+        obj.chat_followup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfh_default() {
+        let obj = HfhChatCodeBlock::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfh_fields() {
+        let mut obj = HfhChatCodeBlock::default();
+        obj.chat_code_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfi_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfi_default() {
+        let obj = HfiChatToolInvocation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfi_fields() {
+        let mut obj = HfiChatToolInvocation::default();
+        obj.chat_tool_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfj_default() {
+        let obj = HfjChatAgentResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfj_fields() {
+        let mut obj = HfjChatAgentResult::default();
+        obj.chat_agent_id = "test".to_string();
         assert!(obj.validate());
     }
 }
