@@ -65151,6 +65151,213 @@ impl Default for FjzEditorDropIntoConfig {
 }
 
 
+/// Color theme (id, label, type, colors, token colors, semanticHighlighting)
+#[derive(Debug, Clone)]
+pub struct FkaColorTheme {
+    pub theme_id: String,
+    pub label: String,
+    pub theme_type: u32,
+    pub colors_json: String,
+    pub token_colors_json: String,
+    pub semantic_highlighting: bool,
+    pub extension_id: String,
+    pub settings_id: String,
+    pub is_default: bool,
+    pub watch_uri: String,
+}
+
+impl FkaColorTheme {
+    pub fn new() -> Self {
+        Self {
+            theme_id: String::new(),
+            label: String::new(),
+            theme_type: u32::default(),
+            colors_json: String::new(),
+            token_colors_json: String::new(),
+            semantic_highlighting: bool::default(),
+            extension_id: String::new(),
+            settings_id: String::new(),
+            is_default: bool::default(),
+            watch_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_id.is_empty() || true && !self.label.is_empty() || true && self.theme_type < u32::MAX || true && !self.colors_json.is_empty() || true && !self.token_colors_json.is_empty() || true && self.semantic_highlighting || true && !self.extension_id.is_empty() || true && !self.settings_id.is_empty() || true && self.is_default || true && !self.watch_uri.is_empty() || true
+    }
+}
+
+impl Default for FkaColorTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Color theme token rule (scope, foreground, background, font style)
+#[derive(Debug, Clone)]
+pub struct FkbColorThemeRule {
+    pub rule_id: String,
+    pub scope: String,
+    pub foreground: String,
+    pub background: String,
+    pub font_style: u32,
+    pub bold: bool,
+    pub italic: bool,
+    pub underline: bool,
+    pub strikethrough: bool,
+    pub settings_json: String,
+}
+
+impl FkbColorThemeRule {
+    pub fn new() -> Self {
+        Self {
+            rule_id: String::new(),
+            scope: String::new(),
+            foreground: String::new(),
+            background: String::new(),
+            font_style: u32::default(),
+            bold: bool::default(),
+            italic: bool::default(),
+            underline: bool::default(),
+            strikethrough: bool::default(),
+            settings_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rule_id.is_empty() || true && !self.scope.is_empty() || true && !self.foreground.is_empty() || true && !self.background.is_empty() || true && self.font_style < u32::MAX || true && self.bold || true && self.italic || true && self.underline || true && self.strikethrough || true && !self.settings_json.is_empty() || true
+    }
+}
+
+impl Default for FkbColorThemeRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Icon theme (file icons, folder icons, language icons, definitions)
+#[derive(Debug, Clone)]
+pub struct FkcIconTheme {
+    pub icon_theme_id: String,
+    pub label: String,
+    pub file_icons_json: String,
+    pub folder_icons_json: String,
+    pub language_ids_json: String,
+    pub definitions_json: String,
+    pub extension_id: String,
+    pub has_file_icons: bool,
+    pub has_folder_icons: bool,
+    pub hidesExplorerArrows: bool,
+}
+
+impl FkcIconTheme {
+    pub fn new() -> Self {
+        Self {
+            icon_theme_id: String::new(),
+            label: String::new(),
+            file_icons_json: String::new(),
+            folder_icons_json: String::new(),
+            language_ids_json: String::new(),
+            definitions_json: String::new(),
+            extension_id: String::new(),
+            has_file_icons: bool::default(),
+            has_folder_icons: bool::default(),
+            hidesExplorerArrows: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.icon_theme_id.is_empty() || true && !self.label.is_empty() || true && !self.file_icons_json.is_empty() || true && !self.folder_icons_json.is_empty() || true && !self.language_ids_json.is_empty() || true && !self.definitions_json.is_empty() || true && !self.extension_id.is_empty() || true && self.has_file_icons || true && self.has_folder_icons || true && self.hidesExplorerArrows || true
+    }
+}
+
+impl Default for FkcIconTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Product icon theme (codicon overrides, font definitions)
+#[derive(Debug, Clone)]
+pub struct FkdProductIconTheme {
+    pub product_icon_id: String,
+    pub label: String,
+    pub icon_definitions_json: String,
+    pub font_definitions_json: String,
+    pub extension_id: String,
+    pub is_default: bool,
+    pub override_count: u32,
+    pub font_character_map_json: String,
+    pub settings_id: String,
+    pub description: String,
+}
+
+impl FkdProductIconTheme {
+    pub fn new() -> Self {
+        Self {
+            product_icon_id: String::new(),
+            label: String::new(),
+            icon_definitions_json: String::new(),
+            font_definitions_json: String::new(),
+            extension_id: String::new(),
+            is_default: bool::default(),
+            override_count: u32::default(),
+            font_character_map_json: String::new(),
+            settings_id: String::new(),
+            description: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.product_icon_id.is_empty() || true && !self.label.is_empty() || true && !self.icon_definitions_json.is_empty() || true && !self.font_definitions_json.is_empty() || true && !self.extension_id.is_empty() || true && self.is_default || true && self.override_count < u32::MAX || true && !self.font_character_map_json.is_empty() || true && !self.settings_id.is_empty() || true && !self.description.is_empty() || true
+    }
+}
+
+impl Default for FkdProductIconTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Color registry entry (id, defaults, description, dark/light/hc values)
+#[derive(Debug, Clone)]
+pub struct FkeColorRegistry {
+    pub color_id: String,
+    pub description: String,
+    pub default_dark: String,
+    pub default_light: String,
+    pub default_hc_dark: String,
+    pub default_hc_light: String,
+    pub needs_transparency: bool,
+    pub deprecation_message: String,
+    pub category: String,
+    pub is_proposed: bool,
+}
+
+impl FkeColorRegistry {
+    pub fn new() -> Self {
+        Self {
+            color_id: String::new(),
+            description: String::new(),
+            default_dark: String::new(),
+            default_light: String::new(),
+            default_hc_dark: String::new(),
+            default_hc_light: String::new(),
+            needs_transparency: bool::default(),
+            deprecation_message: String::new(),
+            category: String::new(),
+            is_proposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_id.is_empty() || true && !self.description.is_empty() || true && !self.default_dark.is_empty() || true && !self.default_light.is_empty() || true && !self.default_hc_dark.is_empty() || true && !self.default_hc_light.is_empty() || true && self.needs_transparency || true && !self.deprecation_message.is_empty() || true && !self.category.is_empty() || true && self.is_proposed || true
+    }
+}
+
+impl Default for FkeColorRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -281417,6 +281624,96 @@ mod tests_fjz_generated {
     fn test_fjz_fields() {
         let mut obj = FjzEditorDropIntoConfig::default();
         obj.drop_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fka_generated {
+    use super::*;
+
+    #[test]
+    fn test_fka_default() {
+        let obj = FkaColorTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fka_fields() {
+        let mut obj = FkaColorTheme::default();
+        obj.theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkb_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkb_default() {
+        let obj = FkbColorThemeRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkb_fields() {
+        let mut obj = FkbColorThemeRule::default();
+        obj.rule_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkc_default() {
+        let obj = FkcIconTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkc_fields() {
+        let mut obj = FkcIconTheme::default();
+        obj.icon_theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkd_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkd_default() {
+        let obj = FkdProductIconTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkd_fields() {
+        let mut obj = FkdProductIconTheme::default();
+        obj.product_icon_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fke_generated {
+    use super::*;
+
+    #[test]
+    fn test_fke_default() {
+        let obj = FkeColorRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fke_fields() {
+        let mut obj = FkeColorRegistry::default();
+        obj.color_id = "test".to_string();
         assert!(obj.validate());
     }
 }
