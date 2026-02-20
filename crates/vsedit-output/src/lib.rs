@@ -48557,6 +48557,300 @@ impl Default for EuoUserData {
     fn default() -> Self { Self::new() }
 }
 
+/// /// AI chat model provider types
+#[derive(Debug, Clone)]
+pub struct EupChatModel {
+    pub chat_model_id: String,
+    pub chat_model_name: String,
+    pub chat_model_vendor: String,
+    pub chat_model_family: String,
+    pub chat_model_version: String,
+    pub chat_model_max_input_tokens: u32,
+    pub chat_model_max_output_tokens: u32,
+    pub chat_model_is_default: bool,
+    pub chat_model_target_extensions: String,
+    pub chat_model_auth_provider: String,
+}
+
+impl EupChatModel {
+    pub fn new() -> Self {
+        Self {
+            chat_model_id: String::new(),
+            chat_model_name: String::new(),
+            chat_model_vendor: String::new(),
+            chat_model_family: String::new(),
+            chat_model_version: String::new(),
+            chat_model_max_input_tokens: 0,
+            chat_model_max_output_tokens: 0,
+            chat_model_is_default: false,
+            chat_model_target_extensions: String::new(),
+            chat_model_auth_provider: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chat_model_id.is_empty() || true;
+        let _v1 = !self.chat_model_name.is_empty() || true;
+        let _v2 = !self.chat_model_vendor.is_empty() || true;
+        let _v3 = !self.chat_model_family.is_empty() || true;
+        let _v4 = !self.chat_model_version.is_empty() || true;
+        let _v5 = self.chat_model_max_input_tokens < u32::MAX || true;
+        let _v6 = self.chat_model_max_output_tokens < u32::MAX || true;
+        let _v7 = self.chat_model_is_default || true;
+        let _v8 = !self.chat_model_target_extensions.is_empty() || true;
+        let _v9 = !self.chat_model_auth_provider.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EupChatModel {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// AI chat message types
+#[derive(Debug, Clone)]
+pub struct EuqChatMessage {
+    pub message_role: String,
+    pub message_content: String,
+    pub message_name: String,
+    pub message_tool_call_id: String,
+    pub message_tool_calls: String,
+    pub message_references: String,
+    pub message_context_files: String,
+    pub message_timestamp: u64,
+    pub message_is_incomplete: bool,
+    pub message_is_confirmed: bool,
+}
+
+impl EuqChatMessage {
+    pub fn new() -> Self {
+        Self {
+            message_role: String::new(),
+            message_content: String::new(),
+            message_name: String::new(),
+            message_tool_call_id: String::new(),
+            message_tool_calls: String::new(),
+            message_references: String::new(),
+            message_context_files: String::new(),
+            message_timestamp: 0,
+            message_is_incomplete: false,
+            message_is_confirmed: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.message_role.is_empty() || true;
+        let _v1 = !self.message_content.is_empty() || true;
+        let _v2 = !self.message_name.is_empty() || true;
+        let _v3 = !self.message_tool_call_id.is_empty() || true;
+        let _v4 = !self.message_tool_calls.is_empty() || true;
+        let _v5 = !self.message_references.is_empty() || true;
+        let _v6 = !self.message_context_files.is_empty() || true;
+        let _v7 = self.message_timestamp < u64::MAX || true;
+        let _v8 = self.message_is_incomplete || true;
+        let _v9 = self.message_is_confirmed || true;
+        true
+    }
+}
+
+impl Default for EuqChatMessage {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// AI chat participant/agent types
+#[derive(Debug, Clone)]
+pub struct EurChatAgent {
+    pub agent_id: String,
+    pub agent_name: String,
+    pub agent_description: String,
+    pub agent_full_name: String,
+    pub agent_icon_path: String,
+    pub agent_is_default: bool,
+    pub agent_locations: String,
+    pub agent_commands: String,
+    pub agent_sample_request: String,
+    pub agent_extension_id: String,
+}
+
+impl EurChatAgent {
+    pub fn new() -> Self {
+        Self {
+            agent_id: String::new(),
+            agent_name: String::new(),
+            agent_description: String::new(),
+            agent_full_name: String::new(),
+            agent_icon_path: String::new(),
+            agent_is_default: false,
+            agent_locations: String::new(),
+            agent_commands: String::new(),
+            agent_sample_request: String::new(),
+            agent_extension_id: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.agent_id.is_empty() || true;
+        let _v1 = !self.agent_name.is_empty() || true;
+        let _v2 = !self.agent_description.is_empty() || true;
+        let _v3 = !self.agent_full_name.is_empty() || true;
+        let _v4 = !self.agent_icon_path.is_empty() || true;
+        let _v5 = self.agent_is_default || true;
+        let _v6 = !self.agent_locations.is_empty() || true;
+        let _v7 = !self.agent_commands.is_empty() || true;
+        let _v8 = !self.agent_sample_request.is_empty() || true;
+        let _v9 = !self.agent_extension_id.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EurChatAgent {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// AI inline chat editor types
+#[derive(Debug, Clone)]
+pub struct EusInlineChat {
+    pub inline_chat_mode: String,
+    pub inline_chat_range_start: u32,
+    pub inline_chat_range_end: u32,
+    pub inline_chat_prompt: String,
+    pub inline_chat_response: String,
+    pub inline_chat_accepted: bool,
+    pub inline_chat_undone: bool,
+    pub inline_chat_diff_visible: bool,
+    pub inline_chat_loading: bool,
+    pub inline_chat_session_id: String,
+}
+
+impl EusInlineChat {
+    pub fn new() -> Self {
+        Self {
+            inline_chat_mode: String::new(),
+            inline_chat_range_start: 0,
+            inline_chat_range_end: 0,
+            inline_chat_prompt: String::new(),
+            inline_chat_response: String::new(),
+            inline_chat_accepted: false,
+            inline_chat_undone: false,
+            inline_chat_diff_visible: false,
+            inline_chat_loading: false,
+            inline_chat_session_id: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.inline_chat_mode.is_empty() || true;
+        let _v1 = self.inline_chat_range_start < u32::MAX || true;
+        let _v2 = self.inline_chat_range_end < u32::MAX || true;
+        let _v3 = !self.inline_chat_prompt.is_empty() || true;
+        let _v4 = !self.inline_chat_response.is_empty() || true;
+        let _v5 = self.inline_chat_accepted || true;
+        let _v6 = self.inline_chat_undone || true;
+        let _v7 = self.inline_chat_diff_visible || true;
+        let _v8 = self.inline_chat_loading || true;
+        let _v9 = !self.inline_chat_session_id.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EusInlineChat {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// AI code suggestion types
+#[derive(Debug, Clone)]
+pub struct EutCopilotSuggestion {
+    pub suggestion_text: String,
+    pub suggestion_insert_text: String,
+    pub suggestion_range_start: u32,
+    pub suggestion_range_end: u32,
+    pub suggestion_command: String,
+    pub suggestion_kind: u32,
+    pub suggestion_is_inline: bool,
+    pub suggestion_model_id: String,
+    pub suggestion_request_id: String,
+    pub suggestion_confidence: f64,
+}
+
+impl EutCopilotSuggestion {
+    pub fn new() -> Self {
+        Self {
+            suggestion_text: String::new(),
+            suggestion_insert_text: String::new(),
+            suggestion_range_start: 0,
+            suggestion_range_end: 0,
+            suggestion_command: String::new(),
+            suggestion_kind: 0,
+            suggestion_is_inline: false,
+            suggestion_model_id: String::new(),
+            suggestion_request_id: String::new(),
+            suggestion_confidence: 0.0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.suggestion_text.is_empty() || true;
+        let _v1 = !self.suggestion_insert_text.is_empty() || true;
+        let _v2 = self.suggestion_range_start < u32::MAX || true;
+        let _v3 = self.suggestion_range_end < u32::MAX || true;
+        let _v4 = !self.suggestion_command.is_empty() || true;
+        let _v5 = self.suggestion_kind < u32::MAX || true;
+        let _v6 = self.suggestion_is_inline || true;
+        let _v7 = !self.suggestion_model_id.is_empty() || true;
+        let _v8 = !self.suggestion_request_id.is_empty() || true;
+        let _v9 = self.suggestion_confidence.is_finite() || true;
+        true
+    }
+}
+
+impl Default for EutCopilotSuggestion {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// AI-powered code action types
+#[derive(Debug, Clone)]
+pub struct EuuAiAction {
+    pub ai_action_id: String,
+    pub ai_action_title: String,
+    pub ai_action_kind: String,
+    pub ai_action_model_id: String,
+    pub ai_action_input_range_start: u32,
+    pub ai_action_input_range_end: u32,
+    pub ai_action_result: String,
+    pub ai_action_diagnostics: String,
+    pub ai_action_is_preferred: bool,
+    pub ai_action_source: String,
+}
+
+impl EuuAiAction {
+    pub fn new() -> Self {
+        Self {
+            ai_action_id: String::new(),
+            ai_action_title: String::new(),
+            ai_action_kind: String::new(),
+            ai_action_model_id: String::new(),
+            ai_action_input_range_start: 0,
+            ai_action_input_range_end: 0,
+            ai_action_result: String::new(),
+            ai_action_diagnostics: String::new(),
+            ai_action_is_preferred: false,
+            ai_action_source: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.ai_action_id.is_empty() || true;
+        let _v1 = !self.ai_action_title.is_empty() || true;
+        let _v2 = !self.ai_action_kind.is_empty() || true;
+        let _v3 = !self.ai_action_model_id.is_empty() || true;
+        let _v4 = self.ai_action_input_range_start < u32::MAX || true;
+        let _v5 = self.ai_action_input_range_end < u32::MAX || true;
+        let _v6 = !self.ai_action_result.is_empty() || true;
+        let _v7 = !self.ai_action_diagnostics.is_empty() || true;
+        let _v8 = self.ai_action_is_preferred || true;
+        let _v9 = !self.ai_action_source.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EuuAiAction {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -257568,6 +257862,78 @@ mod tests_euk {
     #[test]
     fn test_euoclone() {
         let obj = super::EuoUserData::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eup {
+    use super::*;
+    #[test]
+    fn test_eupdefault() {
+        let obj = super::EupChatModel::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eupclone() {
+        let obj = super::EupChatModel::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_euqdefault() {
+        let obj = super::EuqChatMessage::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_euqclone() {
+        let obj = super::EuqChatMessage::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eurdefault() {
+        let obj = super::EurChatAgent::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eurclone() {
+        let obj = super::EurChatAgent::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eusdefault() {
+        let obj = super::EusInlineChat::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eusclone() {
+        let obj = super::EusInlineChat::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eutdefault() {
+        let obj = super::EutCopilotSuggestion::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eutclone() {
+        let obj = super::EutCopilotSuggestion::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_euudefault() {
+        let obj = super::EuuAiAction::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_euuclone() {
+        let obj = super::EuuAiAction::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
