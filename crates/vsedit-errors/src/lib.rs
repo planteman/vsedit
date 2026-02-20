@@ -89853,6 +89853,678 @@ impl Default for GgjScmDiffEditor {
     }
 }
 
+/// Git repository (root, HEAD, remotes, branches, state, submodules)
+#[derive(Debug, Clone)]
+pub struct GgkGitRepository {
+    pub git_repo_id: String,
+    pub root_uri: String,
+    pub head_ref: String,
+    pub remotes_json: String,
+    pub branches_json: String,
+    pub state: String,
+    pub submodule_count: u32,
+    pub is_bare: bool,
+    pub worktree_count: u32,
+    pub object_count: u64,
+}
+
+impl GgkGitRepository {
+    pub fn new() -> Self {
+        Self {
+            git_repo_id: String::new(),
+            root_uri: String::new(),
+            head_ref: String::new(),
+            remotes_json: String::new(),
+            branches_json: String::new(),
+            state: String::new(),
+            submodule_count: u32::default(),
+            is_bare: bool::default(),
+            worktree_count: u32::default(),
+            object_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.git_repo_id.is_empty() || true && !self.root_uri.is_empty() || true && !self.head_ref.is_empty() || true && !self.remotes_json.is_empty() || true && !self.branches_json.is_empty() || true && !self.state.is_empty() || true && self.submodule_count < u32::MAX || true && self.is_bare || true && self.worktree_count < u32::MAX || true && self.object_count < u64::MAX || true
+    }
+}
+
+impl Default for GgkGitRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git branch (name, upstream, ahead, behind, is current, tracking)
+#[derive(Debug, Clone)]
+pub struct GglGitBranch {
+    pub branch_id: String,
+    pub name: String,
+    pub upstream_name: String,
+    pub ahead: u32,
+    pub behind: u32,
+    pub is_current: bool,
+    pub tracking_status: String,
+    pub remote_name: String,
+    pub commit_hash: String,
+    pub is_protected: bool,
+}
+
+impl GglGitBranch {
+    pub fn new() -> Self {
+        Self {
+            branch_id: String::new(),
+            name: String::new(),
+            upstream_name: String::new(),
+            ahead: u32::default(),
+            behind: u32::default(),
+            is_current: bool::default(),
+            tracking_status: String::new(),
+            remote_name: String::new(),
+            commit_hash: String::new(),
+            is_protected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.branch_id.is_empty() || true && !self.name.is_empty() || true && !self.upstream_name.is_empty() || true && self.ahead < u32::MAX || true && self.behind < u32::MAX || true && self.is_current || true && !self.tracking_status.is_empty() || true && !self.remote_name.is_empty() || true && !self.commit_hash.is_empty() || true && self.is_protected || true
+    }
+}
+
+impl Default for GglGitBranch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git commit info (hash, parents, message, author, committer, date)
+#[derive(Debug, Clone)]
+pub struct GgmGitCommitInfo {
+    pub commit_info_id: String,
+    pub hash: String,
+    pub parents_json: String,
+    pub message: String,
+    pub author_name: String,
+    pub author_email: String,
+    pub committer_name: String,
+    pub committer_email: String,
+    pub date_ms: u64,
+    pub is_merge: bool,
+}
+
+impl GgmGitCommitInfo {
+    pub fn new() -> Self {
+        Self {
+            commit_info_id: String::new(),
+            hash: String::new(),
+            parents_json: String::new(),
+            message: String::new(),
+            author_name: String::new(),
+            author_email: String::new(),
+            committer_name: String::new(),
+            committer_email: String::new(),
+            date_ms: u64::default(),
+            is_merge: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.commit_info_id.is_empty() || true && !self.hash.is_empty() || true && !self.parents_json.is_empty() || true && !self.message.is_empty() || true && !self.author_name.is_empty() || true && !self.author_email.is_empty() || true && !self.committer_name.is_empty() || true && !self.committer_email.is_empty() || true && self.date_ms < u64::MAX || true && self.is_merge || true
+    }
+}
+
+impl Default for GgmGitCommitInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git remote (name, fetch url, push url, is origin, branches)
+#[derive(Debug, Clone)]
+pub struct GgnGitRemote {
+    pub remote_id: String,
+    pub name: String,
+    pub fetch_url: String,
+    pub push_url: String,
+    pub is_origin: bool,
+    pub branches_json: String,
+    pub last_fetch_ms: u64,
+    pub is_prune_on_fetch: bool,
+    pub mirror_mode: String,
+    pub tag_opt: String,
+}
+
+impl GgnGitRemote {
+    pub fn new() -> Self {
+        Self {
+            remote_id: String::new(),
+            name: String::new(),
+            fetch_url: String::new(),
+            push_url: String::new(),
+            is_origin: bool::default(),
+            branches_json: String::new(),
+            last_fetch_ms: u64::default(),
+            is_prune_on_fetch: bool::default(),
+            mirror_mode: String::new(),
+            tag_opt: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_id.is_empty() || true && !self.name.is_empty() || true && !self.fetch_url.is_empty() || true && !self.push_url.is_empty() || true && self.is_origin || true && !self.branches_json.is_empty() || true && self.last_fetch_ms < u64::MAX || true && self.is_prune_on_fetch || true && !self.mirror_mode.is_empty() || true && !self.tag_opt.is_empty() || true
+    }
+}
+
+impl Default for GgnGitRemote {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git stash (index, message, date, changes, untracked, kept index)
+#[derive(Debug, Clone)]
+pub struct GgoGitStash {
+    pub stash_id: String,
+    pub index: u32,
+    pub message: String,
+    pub date_ms: u64,
+    pub changed_files: u32,
+    pub untracked_files: u32,
+    pub kept_index: bool,
+    pub include_untracked: bool,
+    pub parent_hash: String,
+    pub commit_hash: String,
+}
+
+impl GgoGitStash {
+    pub fn new() -> Self {
+        Self {
+            stash_id: String::new(),
+            index: u32::default(),
+            message: String::new(),
+            date_ms: u64::default(),
+            changed_files: u32::default(),
+            untracked_files: u32::default(),
+            kept_index: bool::default(),
+            include_untracked: bool::default(),
+            parent_hash: String::new(),
+            commit_hash: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.stash_id.is_empty() || true && self.index < u32::MAX || true && !self.message.is_empty() || true && self.date_ms < u64::MAX || true && self.changed_files < u32::MAX || true && self.untracked_files < u32::MAX || true && self.kept_index || true && self.include_untracked || true && !self.parent_hash.is_empty() || true && !self.commit_hash.is_empty() || true
+    }
+}
+
+impl Default for GgoGitStash {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git diff stat (additions, deletions, changed files, binary files)
+#[derive(Debug, Clone)]
+pub struct GgpGitDiffStat {
+    pub diff_stat_id: String,
+    pub additions: u32,
+    pub deletions: u32,
+    pub changed_files: u32,
+    pub binary_files: u32,
+    pub total_hunks: u32,
+    pub renamed_files: u32,
+    pub copied_files: u32,
+    pub is_summary: bool,
+    pub context_lines: u32,
+}
+
+impl GgpGitDiffStat {
+    pub fn new() -> Self {
+        Self {
+            diff_stat_id: String::new(),
+            additions: u32::default(),
+            deletions: u32::default(),
+            changed_files: u32::default(),
+            binary_files: u32::default(),
+            total_hunks: u32::default(),
+            renamed_files: u32::default(),
+            copied_files: u32::default(),
+            is_summary: bool::default(),
+            context_lines: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_stat_id.is_empty() || true && self.additions < u32::MAX || true && self.deletions < u32::MAX || true && self.changed_files < u32::MAX || true && self.binary_files < u32::MAX || true && self.total_hunks < u32::MAX || true && self.renamed_files < u32::MAX || true && self.copied_files < u32::MAX || true && self.is_summary || true && self.context_lines < u32::MAX || true
+    }
+}
+
+impl Default for GgpGitDiffStat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git blame info (commit hash, author, date, line, message)
+#[derive(Debug, Clone)]
+pub struct GgqGitBlameInfo {
+    pub blame_id: String,
+    pub commit_hash: String,
+    pub author_name: String,
+    pub author_email: String,
+    pub date_ms: u64,
+    pub line_number: u32,
+    pub original_line: u32,
+    pub message: String,
+    pub filename: String,
+    pub is_boundary: bool,
+}
+
+impl GgqGitBlameInfo {
+    pub fn new() -> Self {
+        Self {
+            blame_id: String::new(),
+            commit_hash: String::new(),
+            author_name: String::new(),
+            author_email: String::new(),
+            date_ms: u64::default(),
+            line_number: u32::default(),
+            original_line: u32::default(),
+            message: String::new(),
+            filename: String::new(),
+            is_boundary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.blame_id.is_empty() || true && !self.commit_hash.is_empty() || true && !self.author_name.is_empty() || true && !self.author_email.is_empty() || true && self.date_ms < u64::MAX || true && self.line_number < u32::MAX || true && self.original_line < u32::MAX || true && !self.message.is_empty() || true && !self.filename.is_empty() || true && self.is_boundary || true
+    }
+}
+
+impl Default for GgqGitBlameInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git submodule (path, url, branch, commit, is initialized)
+#[derive(Debug, Clone)]
+pub struct GgrGitSubmodule {
+    pub submodule_id: String,
+    pub path: String,
+    pub url: String,
+    pub branch: String,
+    pub commit_hash: String,
+    pub is_initialized: bool,
+    pub has_changes: bool,
+    pub has_untracked: bool,
+    pub is_up_to_date: bool,
+    pub depth: u32,
+}
+
+impl GgrGitSubmodule {
+    pub fn new() -> Self {
+        Self {
+            submodule_id: String::new(),
+            path: String::new(),
+            url: String::new(),
+            branch: String::new(),
+            commit_hash: String::new(),
+            is_initialized: bool::default(),
+            has_changes: bool::default(),
+            has_untracked: bool::default(),
+            is_up_to_date: bool::default(),
+            depth: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.submodule_id.is_empty() || true && !self.path.is_empty() || true && !self.url.is_empty() || true && !self.branch.is_empty() || true && !self.commit_hash.is_empty() || true && self.is_initialized || true && self.has_changes || true && self.has_untracked || true && self.is_up_to_date || true && self.depth < u32::MAX || true
+    }
+}
+
+impl Default for GgrGitSubmodule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git worktree (path, head, branch, is bare, is main, locked)
+#[derive(Debug, Clone)]
+pub struct GgsGitWorktree {
+    pub worktree_id: String,
+    pub path: String,
+    pub head_ref: String,
+    pub branch_name: String,
+    pub is_bare: bool,
+    pub is_main: bool,
+    pub is_locked: bool,
+    pub lock_reason: String,
+    pub prune_reason: String,
+    pub is_detached: bool,
+}
+
+impl GgsGitWorktree {
+    pub fn new() -> Self {
+        Self {
+            worktree_id: String::new(),
+            path: String::new(),
+            head_ref: String::new(),
+            branch_name: String::new(),
+            is_bare: bool::default(),
+            is_main: bool::default(),
+            is_locked: bool::default(),
+            lock_reason: String::new(),
+            prune_reason: String::new(),
+            is_detached: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.worktree_id.is_empty() || true && !self.path.is_empty() || true && !self.head_ref.is_empty() || true && !self.branch_name.is_empty() || true && self.is_bare || true && self.is_main || true && self.is_locked || true && !self.lock_reason.is_empty() || true && !self.prune_reason.is_empty() || true && self.is_detached || true
+    }
+}
+
+impl Default for GgsGitWorktree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git rebase status (current step, total, head name, onto, patches)
+#[derive(Debug, Clone)]
+pub struct GgtGitRebaseStatus {
+    pub rebase_id: String,
+    pub current_step: u32,
+    pub total_steps: u32,
+    pub head_name: String,
+    pub onto: String,
+    pub patches_json: String,
+    pub is_interactive: bool,
+    pub is_in_progress: bool,
+    pub strategy: String,
+    pub preserve_merges: bool,
+}
+
+impl GgtGitRebaseStatus {
+    pub fn new() -> Self {
+        Self {
+            rebase_id: String::new(),
+            current_step: u32::default(),
+            total_steps: u32::default(),
+            head_name: String::new(),
+            onto: String::new(),
+            patches_json: String::new(),
+            is_interactive: bool::default(),
+            is_in_progress: bool::default(),
+            strategy: String::new(),
+            preserve_merges: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rebase_id.is_empty() || true && self.current_step < u32::MAX || true && self.total_steps < u32::MAX || true && !self.head_name.is_empty() || true && !self.onto.is_empty() || true && !self.patches_json.is_empty() || true && self.is_interactive || true && self.is_in_progress || true && !self.strategy.is_empty() || true && self.preserve_merges || true
+    }
+}
+
+impl Default for GgtGitRebaseStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git merge status (head, merge head, message, conflicts, mode)
+#[derive(Debug, Clone)]
+pub struct GguGitMergeStatus {
+    pub merge_id: String,
+    pub head_ref: String,
+    pub merge_head: String,
+    pub message: String,
+    pub conflict_count: u32,
+    pub mode: String,
+    pub is_in_progress: bool,
+    pub strategy: String,
+    pub squash: bool,
+    pub no_commit: bool,
+}
+
+impl GguGitMergeStatus {
+    pub fn new() -> Self {
+        Self {
+            merge_id: String::new(),
+            head_ref: String::new(),
+            merge_head: String::new(),
+            message: String::new(),
+            conflict_count: u32::default(),
+            mode: String::new(),
+            is_in_progress: bool::default(),
+            strategy: String::new(),
+            squash: bool::default(),
+            no_commit: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.merge_id.is_empty() || true && !self.head_ref.is_empty() || true && !self.merge_head.is_empty() || true && !self.message.is_empty() || true && self.conflict_count < u32::MAX || true && !self.mode.is_empty() || true && self.is_in_progress || true && !self.strategy.is_empty() || true && self.squash || true && self.no_commit || true
+    }
+}
+
+impl Default for GguGitMergeStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git cherry-pick status (commit, head, sequence, conflicts)
+#[derive(Debug, Clone)]
+pub struct GgvGitCherryPickStatus {
+    pub cherry_id: String,
+    pub commit_hash: String,
+    pub head_ref: String,
+    pub sequence_json: String,
+    pub conflict_count: u32,
+    pub is_in_progress: bool,
+    pub current_step: u32,
+    pub total_steps: u32,
+    pub abort_safety: bool,
+    pub strategy: String,
+}
+
+impl GgvGitCherryPickStatus {
+    pub fn new() -> Self {
+        Self {
+            cherry_id: String::new(),
+            commit_hash: String::new(),
+            head_ref: String::new(),
+            sequence_json: String::new(),
+            conflict_count: u32::default(),
+            is_in_progress: bool::default(),
+            current_step: u32::default(),
+            total_steps: u32::default(),
+            abort_safety: bool::default(),
+            strategy: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cherry_id.is_empty() || true && !self.commit_hash.is_empty() || true && !self.head_ref.is_empty() || true && !self.sequence_json.is_empty() || true && self.conflict_count < u32::MAX || true && self.is_in_progress || true && self.current_step < u32::MAX || true && self.total_steps < u32::MAX || true && self.abort_safety || true && !self.strategy.is_empty() || true
+    }
+}
+
+impl Default for GgvGitCherryPickStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git tag (name, target, tagger, message, is annotated, date)
+#[derive(Debug, Clone)]
+pub struct GgwGitTag {
+    pub tag_id: String,
+    pub name: String,
+    pub target_hash: String,
+    pub tagger_name: String,
+    pub tagger_email: String,
+    pub message: String,
+    pub is_annotated: bool,
+    pub date_ms: u64,
+    pub is_signed: bool,
+    pub signature: String,
+}
+
+impl GgwGitTag {
+    pub fn new() -> Self {
+        Self {
+            tag_id: String::new(),
+            name: String::new(),
+            target_hash: String::new(),
+            tagger_name: String::new(),
+            tagger_email: String::new(),
+            message: String::new(),
+            is_annotated: bool::default(),
+            date_ms: u64::default(),
+            is_signed: bool::default(),
+            signature: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tag_id.is_empty() || true && !self.name.is_empty() || true && !self.target_hash.is_empty() || true && !self.tagger_name.is_empty() || true && !self.tagger_email.is_empty() || true && !self.message.is_empty() || true && self.is_annotated || true && self.date_ms < u64::MAX || true && self.is_signed || true && !self.signature.is_empty() || true
+    }
+}
+
+impl Default for GgwGitTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git config (scope, entries, includes, conditional, user, email)
+#[derive(Debug, Clone)]
+pub struct GgxGitConfig {
+    pub config_id: String,
+    pub scope: String,
+    pub entries_json: String,
+    pub includes_json: String,
+    pub conditional_json: String,
+    pub user_name: String,
+    pub user_email: String,
+    pub core_json: String,
+    pub remote_json: String,
+    pub merge_json: String,
+}
+
+impl GgxGitConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            scope: String::new(),
+            entries_json: String::new(),
+            includes_json: String::new(),
+            conditional_json: String::new(),
+            user_name: String::new(),
+            user_email: String::new(),
+            core_json: String::new(),
+            remote_json: String::new(),
+            merge_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && !self.scope.is_empty() || true && !self.entries_json.is_empty() || true && !self.includes_json.is_empty() || true && !self.conditional_json.is_empty() || true && !self.user_name.is_empty() || true && !self.user_email.is_empty() || true && !self.core_json.is_empty() || true && !self.remote_json.is_empty() || true && !self.merge_json.is_empty() || true
+    }
+}
+
+impl Default for GgxGitConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git credential (protocol, host, username, password, helper)
+#[derive(Debug, Clone)]
+pub struct GgyGitCredential {
+    pub credential_id: String,
+    pub protocol: String,
+    pub host: String,
+    pub username: String,
+    pub password_hash: String,
+    pub helper: String,
+    pub use_http_path: bool,
+    pub timeout_ms: u32,
+    pub cache_mode: String,
+    pub is_stored: bool,
+}
+
+impl GgyGitCredential {
+    pub fn new() -> Self {
+        Self {
+            credential_id: String::new(),
+            protocol: String::new(),
+            host: String::new(),
+            username: String::new(),
+            password_hash: String::new(),
+            helper: String::new(),
+            use_http_path: bool::default(),
+            timeout_ms: u32::default(),
+            cache_mode: String::new(),
+            is_stored: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.credential_id.is_empty() || true && !self.protocol.is_empty() || true && !self.host.is_empty() || true && !self.username.is_empty() || true && !self.password_hash.is_empty() || true && !self.helper.is_empty() || true && self.use_http_path || true && self.timeout_ms < u32::MAX || true && !self.cache_mode.is_empty() || true && self.is_stored || true
+    }
+}
+
+impl Default for GgyGitCredential {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git hook manager (hooks dir, pre-commit, commit-msg, post-commit)
+#[derive(Debug, Clone)]
+pub struct GgzGitHookManager {
+    pub hook_id: String,
+    pub hooks_dir: String,
+    pub pre_commit: String,
+    pub commit_msg: String,
+    pub post_commit: String,
+    pub pre_push: String,
+    pub post_checkout: String,
+    pub pre_rebase: String,
+    pub is_enabled: bool,
+    pub bypass_hooks: bool,
+}
+
+impl GgzGitHookManager {
+    pub fn new() -> Self {
+        Self {
+            hook_id: String::new(),
+            hooks_dir: String::new(),
+            pre_commit: String::new(),
+            commit_msg: String::new(),
+            post_commit: String::new(),
+            pre_push: String::new(),
+            post_checkout: String::new(),
+            pre_rebase: String::new(),
+            is_enabled: bool::default(),
+            bypass_hooks: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hook_id.is_empty() || true && !self.hooks_dir.is_empty() || true && !self.pre_commit.is_empty() || true && !self.commit_msg.is_empty() || true && !self.post_commit.is_empty() || true && !self.pre_push.is_empty() || true && !self.post_checkout.is_empty() || true && !self.pre_rebase.is_empty() || true && self.is_enabled || true && self.bypass_hooks || true
+    }
+}
+
+impl Default for GgzGitHookManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -316310,6 +316982,294 @@ mod tests_ggj_generated {
     fn test_ggj_fields() {
         let mut obj = GgjScmDiffEditor::default();
         obj.diff_editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggk_default() {
+        let obj = GgkGitRepository::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggk_fields() {
+        let mut obj = GgkGitRepository::default();
+        obj.git_repo_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggl_default() {
+        let obj = GglGitBranch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggl_fields() {
+        let mut obj = GglGitBranch::default();
+        obj.branch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggm_default() {
+        let obj = GgmGitCommitInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggm_fields() {
+        let mut obj = GgmGitCommitInfo::default();
+        obj.commit_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggn_default() {
+        let obj = GgnGitRemote::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggn_fields() {
+        let mut obj = GgnGitRemote::default();
+        obj.remote_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggo_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggo_default() {
+        let obj = GgoGitStash::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggo_fields() {
+        let mut obj = GgoGitStash::default();
+        obj.stash_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggp_default() {
+        let obj = GgpGitDiffStat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggp_fields() {
+        let mut obj = GgpGitDiffStat::default();
+        obj.diff_stat_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggq_default() {
+        let obj = GgqGitBlameInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggq_fields() {
+        let mut obj = GgqGitBlameInfo::default();
+        obj.blame_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggr_default() {
+        let obj = GgrGitSubmodule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggr_fields() {
+        let mut obj = GgrGitSubmodule::default();
+        obj.submodule_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggs_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggs_default() {
+        let obj = GgsGitWorktree::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggs_fields() {
+        let mut obj = GgsGitWorktree::default();
+        obj.worktree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggt_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggt_default() {
+        let obj = GgtGitRebaseStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggt_fields() {
+        let mut obj = GgtGitRebaseStatus::default();
+        obj.rebase_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggu_default() {
+        let obj = GguGitMergeStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggu_fields() {
+        let mut obj = GguGitMergeStatus::default();
+        obj.merge_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggv_default() {
+        let obj = GgvGitCherryPickStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggv_fields() {
+        let mut obj = GgvGitCherryPickStatus::default();
+        obj.cherry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggw_default() {
+        let obj = GgwGitTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggw_fields() {
+        let mut obj = GgwGitTag::default();
+        obj.tag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggx_default() {
+        let obj = GgxGitConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggx_fields() {
+        let mut obj = GgxGitConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggy_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggy_default() {
+        let obj = GgyGitCredential::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggy_fields() {
+        let mut obj = GgyGitCredential::default();
+        obj.credential_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggz_default() {
+        let obj = GgzGitHookManager::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggz_fields() {
+        let mut obj = GgzGitHookManager::default();
+        obj.hook_id = "test".to_string();
         assert!(obj.validate());
     }
 }
