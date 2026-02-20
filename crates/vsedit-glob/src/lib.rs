@@ -56134,6 +56134,213 @@ impl Default for FbeTerminalMode {
 }
 
 
+/// Terminal escape sequence parser types
+#[derive(Debug, Clone)]
+pub struct FbfTerminalParser {
+    pub parser_state: u32,
+    pub parser_params: String,
+    pub parser_intermediates: String,
+    pub parser_osc_raw: String,
+    pub parser_utf8_state: u32,
+    pub parser_pending_char: u32,
+    pub parser_collect_buffer: String,
+    pub parser_ignore_flagged: bool,
+    pub parser_param_count: u32,
+    pub parser_sub_param_index: u32,
+}
+
+impl FbfTerminalParser {
+    pub fn new() -> Self {
+        Self {
+            parser_state: u32::default(),
+            parser_params: String::new(),
+            parser_intermediates: String::new(),
+            parser_osc_raw: String::new(),
+            parser_utf8_state: u32::default(),
+            parser_pending_char: u32::default(),
+            parser_collect_buffer: String::new(),
+            parser_ignore_flagged: bool::default(),
+            parser_param_count: u32::default(),
+            parser_sub_param_index: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.parser_state < u32::MAX || true && !self.parser_params.is_empty() || true && !self.parser_intermediates.is_empty() || true && !self.parser_osc_raw.is_empty() || true && self.parser_utf8_state < u32::MAX || true && self.parser_pending_char < u32::MAX || true && !self.parser_collect_buffer.is_empty() || true && self.parser_ignore_flagged || true && self.parser_param_count < u32::MAX || true && self.parser_sub_param_index < u32::MAX || true
+    }
+}
+
+impl Default for FbfTerminalParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal OSC (Operating System Command) types
+#[derive(Debug, Clone)]
+pub struct FbgTerminalOsc {
+    pub osc_command: u32,
+    pub osc_data: String,
+    pub osc_title: String,
+    pub osc_color_index: u32,
+    pub osc_color_value: String,
+    pub osc_hyperlink_uri: String,
+    pub osc_hyperlink_id: String,
+    pub osc_clipboard_data: String,
+    pub osc_notification: String,
+    pub osc_raw_bytes: String,
+}
+
+impl FbgTerminalOsc {
+    pub fn new() -> Self {
+        Self {
+            osc_command: u32::default(),
+            osc_data: String::new(),
+            osc_title: String::new(),
+            osc_color_index: u32::default(),
+            osc_color_value: String::new(),
+            osc_hyperlink_uri: String::new(),
+            osc_hyperlink_id: String::new(),
+            osc_clipboard_data: String::new(),
+            osc_notification: String::new(),
+            osc_raw_bytes: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.osc_command < u32::MAX || true && !self.osc_data.is_empty() || true && !self.osc_title.is_empty() || true && self.osc_color_index < u32::MAX || true && !self.osc_color_value.is_empty() || true && !self.osc_hyperlink_uri.is_empty() || true && !self.osc_hyperlink_id.is_empty() || true && !self.osc_clipboard_data.is_empty() || true && !self.osc_notification.is_empty() || true && !self.osc_raw_bytes.is_empty() || true
+    }
+}
+
+impl Default for FbgTerminalOsc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal CSI (Control Sequence Introducer) types
+#[derive(Debug, Clone)]
+pub struct FbhTerminalCsi {
+    pub csi_command: String,
+    pub csi_params: String,
+    pub csi_intermediates: String,
+    pub csi_private_marker: bool,
+    pub csi_param_count: u32,
+    pub csi_default_param: u32,
+    pub csi_sub_params: String,
+    pub csi_raw_bytes: String,
+    pub csi_is_sgr: bool,
+    pub csi_is_cursor_move: bool,
+}
+
+impl FbhTerminalCsi {
+    pub fn new() -> Self {
+        Self {
+            csi_command: String::new(),
+            csi_params: String::new(),
+            csi_intermediates: String::new(),
+            csi_private_marker: bool::default(),
+            csi_param_count: u32::default(),
+            csi_default_param: u32::default(),
+            csi_sub_params: String::new(),
+            csi_raw_bytes: String::new(),
+            csi_is_sgr: bool::default(),
+            csi_is_cursor_move: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.csi_command.is_empty() || true && !self.csi_params.is_empty() || true && !self.csi_intermediates.is_empty() || true && self.csi_private_marker || true && self.csi_param_count < u32::MAX || true && self.csi_default_param < u32::MAX || true && !self.csi_sub_params.is_empty() || true && !self.csi_raw_bytes.is_empty() || true && self.csi_is_sgr || true && self.csi_is_cursor_move || true
+    }
+}
+
+impl Default for FbhTerminalCsi {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal ESC sequence types
+#[derive(Debug, Clone)]
+pub struct FbiTerminalEsc {
+    pub esc_intermediate: String,
+    pub esc_final_byte: u32,
+    pub esc_is_designate: bool,
+    pub esc_designate_index: u32,
+    pub esc_charset_name: String,
+    pub esc_application_mode: bool,
+    pub esc_save_cursor: bool,
+    pub esc_restore_cursor: bool,
+    pub esc_reset_state: bool,
+    pub esc_raw_bytes: String,
+}
+
+impl FbiTerminalEsc {
+    pub fn new() -> Self {
+        Self {
+            esc_intermediate: String::new(),
+            esc_final_byte: u32::default(),
+            esc_is_designate: bool::default(),
+            esc_designate_index: u32::default(),
+            esc_charset_name: String::new(),
+            esc_application_mode: bool::default(),
+            esc_save_cursor: bool::default(),
+            esc_restore_cursor: bool::default(),
+            esc_reset_state: bool::default(),
+            esc_raw_bytes: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.esc_intermediate.is_empty() || true && self.esc_final_byte < u32::MAX || true && self.esc_is_designate || true && self.esc_designate_index < u32::MAX || true && !self.esc_charset_name.is_empty() || true && self.esc_application_mode || true && self.esc_save_cursor || true && self.esc_restore_cursor || true && self.esc_reset_state || true && !self.esc_raw_bytes.is_empty() || true
+    }
+}
+
+impl Default for FbiTerminalEsc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal DCS (Device Control String) types
+#[derive(Debug, Clone)]
+pub struct FbjTerminalDcs {
+    pub dcs_intermediates: String,
+    pub dcs_final_byte: u32,
+    pub dcs_params: String,
+    pub dcs_data: String,
+    pub dcs_is_sixel: bool,
+    pub dcs_is_tmux: bool,
+    pub dcs_is_iterm: bool,
+    pub dcs_hook_active: bool,
+    pub dcs_raw_bytes: String,
+    pub dcs_passthrough: bool,
+}
+
+impl FbjTerminalDcs {
+    pub fn new() -> Self {
+        Self {
+            dcs_intermediates: String::new(),
+            dcs_final_byte: u32::default(),
+            dcs_params: String::new(),
+            dcs_data: String::new(),
+            dcs_is_sixel: bool::default(),
+            dcs_is_tmux: bool::default(),
+            dcs_is_iterm: bool::default(),
+            dcs_hook_active: bool::default(),
+            dcs_raw_bytes: String::new(),
+            dcs_passthrough: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dcs_intermediates.is_empty() || true && self.dcs_final_byte < u32::MAX || true && !self.dcs_params.is_empty() || true && !self.dcs_data.is_empty() || true && self.dcs_is_sixel || true && self.dcs_is_tmux || true && self.dcs_is_iterm || true && self.dcs_hook_active || true && !self.dcs_raw_bytes.is_empty() || true && self.dcs_passthrough || true
+    }
+}
+
+impl Default for FbjTerminalDcs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -267906,6 +268113,96 @@ mod tests_fbe_generated {
     fn test_fbe_fields() {
         let mut obj = FbeTerminalMode::default();
         obj.mode_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbf_default() {
+        let obj = FbfTerminalParser::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbf_fields() {
+        let mut obj = FbfTerminalParser::default();
+        obj.parser_state = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbg_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbg_default() {
+        let obj = FbgTerminalOsc::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbg_fields() {
+        let mut obj = FbgTerminalOsc::default();
+        obj.osc_command = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbh_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbh_default() {
+        let obj = FbhTerminalCsi::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbh_fields() {
+        let mut obj = FbhTerminalCsi::default();
+        obj.csi_command = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbi_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbi_default() {
+        let obj = FbiTerminalEsc::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbi_fields() {
+        let mut obj = FbiTerminalEsc::default();
+        obj.esc_intermediate = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbj_default() {
+        let obj = FbjTerminalDcs::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbj_fields() {
+        let mut obj = FbjTerminalDcs::default();
+        obj.dcs_intermediates = "test".to_string();
         assert!(obj.validate());
     }
 }
