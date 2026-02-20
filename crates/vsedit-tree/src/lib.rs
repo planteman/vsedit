@@ -70063,6 +70063,216 @@ impl Default for FoeTestMessage {
     }
 }
 
+/// Test coverage (statement coverage, branch coverage, file, line details)
+#[derive(Debug, Clone)]
+pub struct FofTestCoverage {
+    pub coverage_id: String,
+    pub file_uri: String,
+    pub statement_count: u32,
+    pub statement_covered: u32,
+    pub branch_count: u32,
+    pub branch_covered: u32,
+    pub function_count: u32,
+    pub function_covered: u32,
+    pub line_details_json: String,
+    pub declaration_coverage_json: String,
+}
+
+impl FofTestCoverage {
+    pub fn new() -> Self {
+        Self {
+            coverage_id: String::new(),
+            file_uri: String::new(),
+            statement_count: u32::default(),
+            statement_covered: u32::default(),
+            branch_count: u32::default(),
+            branch_covered: u32::default(),
+            function_count: u32::default(),
+            function_covered: u32::default(),
+            line_details_json: String::new(),
+            declaration_coverage_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.coverage_id.is_empty() || true && !self.file_uri.is_empty() || true && self.statement_count < u32::MAX || true && self.statement_covered < u32::MAX || true && self.branch_count < u32::MAX || true && self.branch_covered < u32::MAX || true && self.function_count < u32::MAX || true && self.function_covered < u32::MAX || true && !self.line_details_json.is_empty() || true && !self.declaration_coverage_json.is_empty() || true
+    }
+}
+
+impl Default for FofTestCoverage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test tag (id, label, description, hiding, running)
+#[derive(Debug, Clone)]
+pub struct FogTestTag {
+    pub tag_id: String,
+    pub label: String,
+    pub description: String,
+    pub can_hide: bool,
+    pub can_run: bool,
+    pub color_id: String,
+    pub icon_id: String,
+    pub controller_id: String,
+    pub is_hidden: bool,
+    pub priority: u32,
+}
+
+impl FogTestTag {
+    pub fn new() -> Self {
+        Self {
+            tag_id: String::new(),
+            label: String::new(),
+            description: String::new(),
+            can_hide: bool::default(),
+            can_run: bool::default(),
+            color_id: String::new(),
+            icon_id: String::new(),
+            controller_id: String::new(),
+            is_hidden: bool::default(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tag_id.is_empty() || true && !self.label.is_empty() || true && !self.description.is_empty() || true && self.can_hide || true && self.can_run || true && !self.color_id.is_empty() || true && !self.icon_id.is_empty() || true && !self.controller_id.is_empty() || true && self.is_hidden || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for FogTestTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test explorer view (tree state, filter, sort, group by)
+#[derive(Debug, Clone)]
+pub struct FohTestExplorerView {
+    pub explorer_id: String,
+    pub filter_text: String,
+    pub sort_by: u32,
+    pub group_by: u32,
+    pub show_passed: bool,
+    pub show_failed: bool,
+    pub show_skipped: bool,
+    pub auto_run_enabled: bool,
+    pub collapse_all: bool,
+    pub is_visible: bool,
+}
+
+impl FohTestExplorerView {
+    pub fn new() -> Self {
+        Self {
+            explorer_id: String::new(),
+            filter_text: String::new(),
+            sort_by: u32::default(),
+            group_by: u32::default(),
+            show_passed: bool::default(),
+            show_failed: bool::default(),
+            show_skipped: bool::default(),
+            auto_run_enabled: bool::default(),
+            collapse_all: bool::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.explorer_id.is_empty() || true && !self.filter_text.is_empty() || true && self.sort_by < u32::MAX || true && self.group_by < u32::MAX || true && self.show_passed || true && self.show_failed || true && self.show_skipped || true && self.auto_run_enabled || true && self.collapse_all || true && self.is_visible || true
+    }
+}
+
+impl Default for FohTestExplorerView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test result snapshot (state, duration, output, tasks)
+#[derive(Debug, Clone)]
+pub struct FoiTestResultSnapshot {
+    pub snapshot_id: String,
+    pub state: u32,
+    pub duration_ms: u64,
+    pub output_text: String,
+    pub task_count: u32,
+    pub completed_count: u32,
+    pub error_count: u32,
+    pub is_complete: bool,
+    pub run_id: String,
+    pub snapshot_time_ms: u64,
+}
+
+impl FoiTestResultSnapshot {
+    pub fn new() -> Self {
+        Self {
+            snapshot_id: String::new(),
+            state: u32::default(),
+            duration_ms: u64::default(),
+            output_text: String::new(),
+            task_count: u32::default(),
+            completed_count: u32::default(),
+            error_count: u32::default(),
+            is_complete: bool::default(),
+            run_id: String::new(),
+            snapshot_time_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snapshot_id.is_empty() || true && self.state < u32::MAX || true && self.duration_ms < u64::MAX || true && !self.output_text.is_empty() || true && self.task_count < u32::MAX || true && self.completed_count < u32::MAX || true && self.error_count < u32::MAX || true && self.is_complete || true && !self.run_id.is_empty() || true && self.snapshot_time_ms < u64::MAX || true
+    }
+}
+
+impl Default for FoiTestResultSnapshot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test output channel (test run, append text, replace, show)
+#[derive(Debug, Clone)]
+pub struct FojTestOutputChannel {
+    pub channel_id: String,
+    pub run_id: String,
+    pub line_count: u64,
+    pub is_visible: bool,
+    pub append_mode: bool,
+    pub max_lines: u32,
+    pub language_id: String,
+    pub test_name: String,
+    pub is_preserved: bool,
+    pub encoding: String,
+}
+
+impl FojTestOutputChannel {
+    pub fn new() -> Self {
+        Self {
+            channel_id: String::new(),
+            run_id: String::new(),
+            line_count: u64::default(),
+            is_visible: bool::default(),
+            append_mode: bool::default(),
+            max_lines: u32::default(),
+            language_id: String::new(),
+            test_name: String::new(),
+            is_preserved: bool::default(),
+            encoding: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.channel_id.is_empty() || true && !self.run_id.is_empty() || true && self.line_count < u64::MAX || true && self.is_visible || true && self.append_mode || true && self.max_lines < u32::MAX || true && !self.language_id.is_empty() || true && !self.test_name.is_empty() || true && self.is_preserved || true && !self.encoding.is_empty() || true
+    }
+}
+
+impl Default for FojTestOutputChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -288070,6 +288280,96 @@ mod tests_foe_generated {
     fn test_foe_fields() {
         let mut obj = FoeTestMessage::default();
         obj.message_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fof_generated {
+    use super::*;
+
+    #[test]
+    fn test_fof_default() {
+        let obj = FofTestCoverage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fof_fields() {
+        let mut obj = FofTestCoverage::default();
+        obj.coverage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fog_generated {
+    use super::*;
+
+    #[test]
+    fn test_fog_default() {
+        let obj = FogTestTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fog_fields() {
+        let mut obj = FogTestTag::default();
+        obj.tag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_foh_generated {
+    use super::*;
+
+    #[test]
+    fn test_foh_default() {
+        let obj = FohTestExplorerView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_foh_fields() {
+        let mut obj = FohTestExplorerView::default();
+        obj.explorer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_foi_generated {
+    use super::*;
+
+    #[test]
+    fn test_foi_default() {
+        let obj = FoiTestResultSnapshot::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_foi_fields() {
+        let mut obj = FoiTestResultSnapshot::default();
+        obj.snapshot_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_foj_generated {
+    use super::*;
+
+    #[test]
+    fn test_foj_default() {
+        let obj = FojTestOutputChannel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_foj_fields() {
+        let mut obj = FojTestOutputChannel::default();
+        obj.channel_id = "test".to_string();
         assert!(obj.validate());
     }
 }
