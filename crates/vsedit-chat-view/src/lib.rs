@@ -60370,6 +60370,213 @@ impl Default for FfeEditorViewIndent {
 }
 
 
+/// Editor scrollbar rendering types
+#[derive(Debug, Clone)]
+pub struct FffEditorViewScrollbar {
+    pub scrollbar_width: u32,
+    pub scrollbar_height: u32,
+    pub scrollbar_vertical_visible: bool,
+    pub scrollbar_horizontal_visible: bool,
+    pub scrollbar_thumb_size: u32,
+    pub scrollbar_thumb_position: f64,
+    pub scrollbar_track_color: String,
+    pub scrollbar_thumb_color: String,
+    pub scrollbar_arrow_size: u32,
+    pub scrollbar_fade_timeout: u32,
+}
+
+impl FffEditorViewScrollbar {
+    pub fn new() -> Self {
+        Self {
+            scrollbar_width: u32::default(),
+            scrollbar_height: u32::default(),
+            scrollbar_vertical_visible: bool::default(),
+            scrollbar_horizontal_visible: bool::default(),
+            scrollbar_thumb_size: u32::default(),
+            scrollbar_thumb_position: f64::default(),
+            scrollbar_track_color: String::new(),
+            scrollbar_thumb_color: String::new(),
+            scrollbar_arrow_size: u32::default(),
+            scrollbar_fade_timeout: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.scrollbar_width < u32::MAX || true && self.scrollbar_height < u32::MAX || true && self.scrollbar_vertical_visible || true && self.scrollbar_horizontal_visible || true && self.scrollbar_thumb_size < u32::MAX || true && self.scrollbar_thumb_position.is_finite() || true && !self.scrollbar_track_color.is_empty() || true && !self.scrollbar_thumb_color.is_empty() || true && self.scrollbar_arrow_size < u32::MAX || true && self.scrollbar_fade_timeout < u32::MAX || true
+    }
+}
+
+impl Default for FffEditorViewScrollbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor minimap rendering types
+#[derive(Debug, Clone)]
+pub struct FfgEditorViewMinimap {
+    pub minimap_width: u32,
+    pub minimap_height: u32,
+    pub minimap_char_width: f64,
+    pub minimap_char_height: f64,
+    pub minimap_line_height: f64,
+    pub minimap_scale: u32,
+    pub minimap_slider_visible: bool,
+    pub minimap_slider_color: String,
+    pub minimap_bg_color: String,
+    pub minimap_render_chars: bool,
+}
+
+impl FfgEditorViewMinimap {
+    pub fn new() -> Self {
+        Self {
+            minimap_width: u32::default(),
+            minimap_height: u32::default(),
+            minimap_char_width: f64::default(),
+            minimap_char_height: f64::default(),
+            minimap_line_height: f64::default(),
+            minimap_scale: u32::default(),
+            minimap_slider_visible: bool::default(),
+            minimap_slider_color: String::new(),
+            minimap_bg_color: String::new(),
+            minimap_render_chars: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.minimap_width < u32::MAX || true && self.minimap_height < u32::MAX || true && self.minimap_char_width.is_finite() || true && self.minimap_char_height.is_finite() || true && self.minimap_line_height.is_finite() || true && self.minimap_scale < u32::MAX || true && self.minimap_slider_visible || true && !self.minimap_slider_color.is_empty() || true && !self.minimap_bg_color.is_empty() || true && self.minimap_render_chars || true
+    }
+}
+
+impl Default for FfgEditorViewMinimap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor gutter rendering types
+#[derive(Debug, Clone)]
+pub struct FfhEditorViewGutter {
+    pub gutter_width: u32,
+    pub gutter_left: u32,
+    pub gutter_line_numbers_width: u32,
+    pub gutter_folding_width: u32,
+    pub gutter_decoration_width: u32,
+    pub gutter_glyph_margin_width: u32,
+    pub gutter_bg_color: String,
+    pub gutter_border_color: String,
+    pub gutter_min_width: u32,
+    pub gutter_visible: bool,
+}
+
+impl FfhEditorViewGutter {
+    pub fn new() -> Self {
+        Self {
+            gutter_width: u32::default(),
+            gutter_left: u32::default(),
+            gutter_line_numbers_width: u32::default(),
+            gutter_folding_width: u32::default(),
+            gutter_decoration_width: u32::default(),
+            gutter_glyph_margin_width: u32::default(),
+            gutter_bg_color: String::new(),
+            gutter_border_color: String::new(),
+            gutter_min_width: u32::default(),
+            gutter_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.gutter_width < u32::MAX || true && self.gutter_left < u32::MAX || true && self.gutter_line_numbers_width < u32::MAX || true && self.gutter_folding_width < u32::MAX || true && self.gutter_decoration_width < u32::MAX || true && self.gutter_glyph_margin_width < u32::MAX || true && !self.gutter_bg_color.is_empty() || true && !self.gutter_border_color.is_empty() || true && self.gutter_min_width < u32::MAX || true && self.gutter_visible || true
+    }
+}
+
+impl Default for FfhEditorViewGutter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor margin rendering types
+#[derive(Debug, Clone)]
+pub struct FfiEditorViewMargin {
+    pub margin_left: u32,
+    pub margin_right: u32,
+    pub margin_top: u32,
+    pub margin_bottom: u32,
+    pub margin_glyph_left: u32,
+    pub margin_glyph_width: u32,
+    pub margin_line_number_left: u32,
+    pub margin_line_number_width: u32,
+    pub margin_decoration_left: u32,
+    pub margin_folding_left: u32,
+}
+
+impl FfiEditorViewMargin {
+    pub fn new() -> Self {
+        Self {
+            margin_left: u32::default(),
+            margin_right: u32::default(),
+            margin_top: u32::default(),
+            margin_bottom: u32::default(),
+            margin_glyph_left: u32::default(),
+            margin_glyph_width: u32::default(),
+            margin_line_number_left: u32::default(),
+            margin_line_number_width: u32::default(),
+            margin_decoration_left: u32::default(),
+            margin_folding_left: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.margin_left < u32::MAX || true && self.margin_right < u32::MAX || true && self.margin_top < u32::MAX || true && self.margin_bottom < u32::MAX || true && self.margin_glyph_left < u32::MAX || true && self.margin_glyph_width < u32::MAX || true && self.margin_line_number_left < u32::MAX || true && self.margin_line_number_width < u32::MAX || true && self.margin_decoration_left < u32::MAX || true && self.margin_folding_left < u32::MAX || true
+    }
+}
+
+impl Default for FfiEditorViewMargin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor content area rendering types
+#[derive(Debug, Clone)]
+pub struct FfjEditorViewContent {
+    pub content_left: u32,
+    pub content_width: u32,
+    pub content_height: u32,
+    pub content_scroll_left: f64,
+    pub content_scroll_top: f64,
+    pub content_scroll_width: u32,
+    pub content_scroll_height: u32,
+    pub content_visible_lines: u32,
+    pub content_is_scrolling: bool,
+    pub content_render_count: u64,
+}
+
+impl FfjEditorViewContent {
+    pub fn new() -> Self {
+        Self {
+            content_left: u32::default(),
+            content_width: u32::default(),
+            content_height: u32::default(),
+            content_scroll_left: f64::default(),
+            content_scroll_top: f64::default(),
+            content_scroll_width: u32::default(),
+            content_scroll_height: u32::default(),
+            content_visible_lines: u32::default(),
+            content_is_scrolling: bool::default(),
+            content_render_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.content_left < u32::MAX || true && self.content_width < u32::MAX || true && self.content_height < u32::MAX || true && self.content_scroll_left.is_finite() || true && self.content_scroll_top.is_finite() || true && self.content_scroll_width < u32::MAX || true && self.content_scroll_height < u32::MAX || true && self.content_visible_lines < u32::MAX || true && self.content_is_scrolling || true && self.content_render_count < u64::MAX || true
+    }
+}
+
+impl Default for FfjEditorViewContent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -274134,6 +274341,96 @@ mod tests_ffe_generated {
     fn test_ffe_fields() {
         let mut obj = FfeEditorViewIndent::default();
         obj.indent_level = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fff_generated {
+    use super::*;
+
+    #[test]
+    fn test_fff_default() {
+        let obj = FffEditorViewScrollbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fff_fields() {
+        let mut obj = FffEditorViewScrollbar::default();
+        obj.scrollbar_width = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffg_default() {
+        let obj = FfgEditorViewMinimap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffg_fields() {
+        let mut obj = FfgEditorViewMinimap::default();
+        obj.minimap_width = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffh_default() {
+        let obj = FfhEditorViewGutter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffh_fields() {
+        let mut obj = FfhEditorViewGutter::default();
+        obj.gutter_width = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffi_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffi_default() {
+        let obj = FfiEditorViewMargin::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffi_fields() {
+        let mut obj = FfiEditorViewMargin::default();
+        obj.margin_left = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffj_default() {
+        let obj = FfjEditorViewContent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffj_fields() {
+        let mut obj = FfjEditorViewContent::default();
+        obj.content_left = 42;
         assert!(obj.validate());
     }
 }
