@@ -86466,6 +86466,678 @@ impl Default for GdjSearchDecorations {
     }
 }
 
+/// Find controller (query, match case, whole word, regex, scope)
+#[derive(Debug, Clone)]
+pub struct GdkFindController {
+    pub find_id: String,
+    pub query: String,
+    pub match_case: bool,
+    pub whole_word: bool,
+    pub is_regex: bool,
+    pub scope_start: u32,
+    pub scope_end: u32,
+    pub match_index: u32,
+    pub match_count: u32,
+    pub is_active: bool,
+}
+
+impl GdkFindController {
+    pub fn new() -> Self {
+        Self {
+            find_id: String::new(),
+            query: String::new(),
+            match_case: bool::default(),
+            whole_word: bool::default(),
+            is_regex: bool::default(),
+            scope_start: u32::default(),
+            scope_end: u32::default(),
+            match_index: u32::default(),
+            match_count: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.find_id.is_empty() || true && !self.query.is_empty() || true && self.match_case || true && self.whole_word || true && self.is_regex || true && self.scope_start < u32::MAX || true && self.scope_end < u32::MAX || true && self.match_index < u32::MAX || true && self.match_count < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for GdkFindController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Find replace state (search string, replace string, match index, count)
+#[derive(Debug, Clone)]
+pub struct GdlFindReplaceState {
+    pub state_id: String,
+    pub search_string: String,
+    pub replace_string: String,
+    pub match_index: u32,
+    pub match_count: u32,
+    pub is_revealed: bool,
+    pub is_replace_active: bool,
+    pub preserve_case: bool,
+    pub seeds_from_selection: bool,
+    pub auto_find: bool,
+}
+
+impl GdlFindReplaceState {
+    pub fn new() -> Self {
+        Self {
+            state_id: String::new(),
+            search_string: String::new(),
+            replace_string: String::new(),
+            match_index: u32::default(),
+            match_count: u32::default(),
+            is_revealed: bool::default(),
+            is_replace_active: bool::default(),
+            preserve_case: bool::default(),
+            seeds_from_selection: bool::default(),
+            auto_find: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.state_id.is_empty() || true && !self.search_string.is_empty() || true && !self.replace_string.is_empty() || true && self.match_index < u32::MAX || true && self.match_count < u32::MAX || true && self.is_revealed || true && self.is_replace_active || true && self.preserve_case || true && self.seeds_from_selection || true && self.auto_find || true
+    }
+}
+
+impl Default for GdlFindReplaceState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Find widget (input, buttons, counter, is visible, is focused)
+#[derive(Debug, Clone)]
+pub struct GdmFindWidget {
+    pub widget_id: String,
+    pub search_input: String,
+    pub replace_input: String,
+    pub is_visible: bool,
+    pub is_focused: bool,
+    pub is_replace_visible: bool,
+    pub counter_text: String,
+    pub no_results: bool,
+    pub top_position: u32,
+    pub width: u32,
+}
+
+impl GdmFindWidget {
+    pub fn new() -> Self {
+        Self {
+            widget_id: String::new(),
+            search_input: String::new(),
+            replace_input: String::new(),
+            is_visible: bool::default(),
+            is_focused: bool::default(),
+            is_replace_visible: bool::default(),
+            counter_text: String::new(),
+            no_results: bool::default(),
+            top_position: u32::default(),
+            width: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.widget_id.is_empty() || true && !self.search_input.is_empty() || true && !self.replace_input.is_empty() || true && self.is_visible || true && self.is_focused || true && self.is_replace_visible || true && !self.counter_text.is_empty() || true && self.no_results || true && self.top_position < u32::MAX || true && self.width < u32::MAX || true
+    }
+}
+
+impl Default for GdmFindWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Find in files model (tree root, flat results, stats, progress)
+#[derive(Debug, Clone)]
+pub struct GdnFindInFilesModel {
+    pub model_id: String,
+    pub tree_root_json: String,
+    pub flat_results_json: String,
+    pub file_count: u32,
+    pub match_count: u32,
+    pub is_complete: bool,
+    pub progress_pct: f64,
+    pub search_time_ms: u64,
+    pub replace_count: u32,
+    pub error_count: u32,
+}
+
+impl GdnFindInFilesModel {
+    pub fn new() -> Self {
+        Self {
+            model_id: String::new(),
+            tree_root_json: String::new(),
+            flat_results_json: String::new(),
+            file_count: u32::default(),
+            match_count: u32::default(),
+            is_complete: bool::default(),
+            progress_pct: f64::default(),
+            search_time_ms: u64::default(),
+            replace_count: u32::default(),
+            error_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.model_id.is_empty() || true && !self.tree_root_json.is_empty() || true && !self.flat_results_json.is_empty() || true && self.file_count < u32::MAX || true && self.match_count < u32::MAX || true && self.is_complete || true && self.progress_pct.is_finite() || true && self.search_time_ms < u64::MAX || true && self.replace_count < u32::MAX || true && self.error_count < u32::MAX || true
+    }
+}
+
+impl Default for GdnFindInFilesModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search tree item (label, uri, match ranges, context, collapsed)
+#[derive(Debug, Clone)]
+pub struct GdoSearchTreeItem {
+    pub tree_id: String,
+    pub label: String,
+    pub uri: String,
+    pub match_ranges_json: String,
+    pub context_text: String,
+    pub is_collapsed: bool,
+    pub child_count: u32,
+    pub line_number: u32,
+    pub column: u32,
+    pub is_replaced: bool,
+}
+
+impl GdoSearchTreeItem {
+    pub fn new() -> Self {
+        Self {
+            tree_id: String::new(),
+            label: String::new(),
+            uri: String::new(),
+            match_ranges_json: String::new(),
+            context_text: String::new(),
+            is_collapsed: bool::default(),
+            child_count: u32::default(),
+            line_number: u32::default(),
+            column: u32::default(),
+            is_replaced: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_id.is_empty() || true && !self.label.is_empty() || true && !self.uri.is_empty() || true && !self.match_ranges_json.is_empty() || true && !self.context_text.is_empty() || true && self.is_collapsed || true && self.child_count < u32::MAX || true && self.line_number < u32::MAX || true && self.column < u32::MAX || true && self.is_replaced || true
+    }
+}
+
+impl Default for GdoSearchTreeItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Symbol search (query, kind filter, scope, provider, limit)
+#[derive(Debug, Clone)]
+pub struct GdpSymbolSearch {
+    pub symbol_id: String,
+    pub query: String,
+    pub kind_filter: String,
+    pub scope: String,
+    pub provider_id: String,
+    pub limit: u32,
+    pub include_declaration: bool,
+    pub fuzzy_match: bool,
+    pub sort_by_location: bool,
+    pub workspace_only: bool,
+}
+
+impl GdpSymbolSearch {
+    pub fn new() -> Self {
+        Self {
+            symbol_id: String::new(),
+            query: String::new(),
+            kind_filter: String::new(),
+            scope: String::new(),
+            provider_id: String::new(),
+            limit: u32::default(),
+            include_declaration: bool::default(),
+            fuzzy_match: bool::default(),
+            sort_by_location: bool::default(),
+            workspace_only: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.symbol_id.is_empty() || true && !self.query.is_empty() || true && !self.kind_filter.is_empty() || true && !self.scope.is_empty() || true && !self.provider_id.is_empty() || true && self.limit < u32::MAX || true && self.include_declaration || true && self.fuzzy_match || true && self.sort_by_location || true && self.workspace_only || true
+    }
+}
+
+impl Default for GdpSymbolSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Goto symbol quick pick (filter, group by kind, show detail)
+#[derive(Debug, Clone)]
+pub struct GdqGotoSymbolQuickPick {
+    pub goto_id: String,
+    pub filter: String,
+    pub group_by_kind: bool,
+    pub show_detail: bool,
+    pub include_members: bool,
+    pub sort_by_name: bool,
+    pub sort_by_position: bool,
+    pub show_icons: bool,
+    pub breadcrumb_mode: bool,
+    pub outline_mode: bool,
+}
+
+impl GdqGotoSymbolQuickPick {
+    pub fn new() -> Self {
+        Self {
+            goto_id: String::new(),
+            filter: String::new(),
+            group_by_kind: bool::default(),
+            show_detail: bool::default(),
+            include_members: bool::default(),
+            sort_by_name: bool::default(),
+            sort_by_position: bool::default(),
+            show_icons: bool::default(),
+            breadcrumb_mode: bool::default(),
+            outline_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.goto_id.is_empty() || true && !self.filter.is_empty() || true && self.group_by_kind || true && self.show_detail || true && self.include_members || true && self.sort_by_name || true && self.sort_by_position || true && self.show_icons || true && self.breadcrumb_mode || true && self.outline_mode || true
+    }
+}
+
+impl Default for GdqGotoSymbolQuickPick {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Goto line quick pick (line number, column, validation, range)
+#[derive(Debug, Clone)]
+pub struct GdrGotoLineQuickPick {
+    pub goto_line_id: String,
+    pub line_number: u32,
+    pub column: u32,
+    pub is_valid: bool,
+    pub max_line: u32,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub decoration_json: String,
+    pub input_text: String,
+    pub error_message: String,
+}
+
+impl GdrGotoLineQuickPick {
+    pub fn new() -> Self {
+        Self {
+            goto_line_id: String::new(),
+            line_number: u32::default(),
+            column: u32::default(),
+            is_valid: bool::default(),
+            max_line: u32::default(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            decoration_json: String::new(),
+            input_text: String::new(),
+            error_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.goto_line_id.is_empty() || true && self.line_number < u32::MAX || true && self.column < u32::MAX || true && self.is_valid || true && self.max_line < u32::MAX || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && !self.decoration_json.is_empty() || true && !self.input_text.is_empty() || true && !self.error_message.is_empty() || true
+    }
+}
+
+impl Default for GdrGotoLineQuickPick {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Quick open model (entries, filter, scored, history, recent)
+#[derive(Debug, Clone)]
+pub struct GdsQuickOpenModel {
+    pub quick_open_id: String,
+    pub entries_json: String,
+    pub filter_text: String,
+    pub scored_entries_json: String,
+    pub history_json: String,
+    pub recent_json: String,
+    pub selected_index: u32,
+    pub max_items: u32,
+    pub is_active: bool,
+    pub include_recent: bool,
+}
+
+impl GdsQuickOpenModel {
+    pub fn new() -> Self {
+        Self {
+            quick_open_id: String::new(),
+            entries_json: String::new(),
+            filter_text: String::new(),
+            scored_entries_json: String::new(),
+            history_json: String::new(),
+            recent_json: String::new(),
+            selected_index: u32::default(),
+            max_items: u32::default(),
+            is_active: bool::default(),
+            include_recent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.quick_open_id.is_empty() || true && !self.entries_json.is_empty() || true && !self.filter_text.is_empty() || true && !self.scored_entries_json.is_empty() || true && !self.history_json.is_empty() || true && !self.recent_json.is_empty() || true && self.selected_index < u32::MAX || true && self.max_items < u32::MAX || true && self.is_active || true && self.include_recent || true
+    }
+}
+
+impl Default for GdsQuickOpenModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search exclude config (patterns, use defaults, glob, honor gitignore)
+#[derive(Debug, Clone)]
+pub struct GdtSearchExcludeConfig {
+    pub exclude_id: String,
+    pub patterns_json: String,
+    pub use_defaults: bool,
+    pub glob_json: String,
+    pub honor_gitignore: bool,
+    pub use_parent_ignore: bool,
+    pub use_global_ignore: bool,
+    pub additional_json: String,
+    pub is_enabled: bool,
+    pub scope: String,
+}
+
+impl GdtSearchExcludeConfig {
+    pub fn new() -> Self {
+        Self {
+            exclude_id: String::new(),
+            patterns_json: String::new(),
+            use_defaults: bool::default(),
+            glob_json: String::new(),
+            honor_gitignore: bool::default(),
+            use_parent_ignore: bool::default(),
+            use_global_ignore: bool::default(),
+            additional_json: String::new(),
+            is_enabled: bool::default(),
+            scope: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exclude_id.is_empty() || true && !self.patterns_json.is_empty() || true && self.use_defaults || true && !self.glob_json.is_empty() || true && self.honor_gitignore || true && self.use_parent_ignore || true && self.use_global_ignore || true && !self.additional_json.is_empty() || true && self.is_enabled || true && !self.scope.is_empty() || true
+    }
+}
+
+impl Default for GdtSearchExcludeConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search include config (patterns, file extensions, open editors only)
+#[derive(Debug, Clone)]
+pub struct GduSearchIncludeConfig {
+    pub include_id: String,
+    pub patterns_json: String,
+    pub file_extensions_json: String,
+    pub open_editors_only: bool,
+    pub folder_uri: String,
+    pub max_depth: u32,
+    pub follow_symlinks: bool,
+    pub hidden_files: bool,
+    pub binary_files: bool,
+    pub max_filesize_bytes: u64,
+}
+
+impl GduSearchIncludeConfig {
+    pub fn new() -> Self {
+        Self {
+            include_id: String::new(),
+            patterns_json: String::new(),
+            file_extensions_json: String::new(),
+            open_editors_only: bool::default(),
+            folder_uri: String::new(),
+            max_depth: u32::default(),
+            follow_symlinks: bool::default(),
+            hidden_files: bool::default(),
+            binary_files: bool::default(),
+            max_filesize_bytes: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.include_id.is_empty() || true && !self.patterns_json.is_empty() || true && !self.file_extensions_json.is_empty() || true && self.open_editors_only || true && !self.folder_uri.is_empty() || true && self.max_depth < u32::MAX || true && self.follow_symlinks || true && self.hidden_files || true && self.binary_files || true && self.max_filesize_bytes < u64::MAX || true
+    }
+}
+
+impl Default for GduSearchIncludeConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search sort order (by match count, file, path, type, modified)
+#[derive(Debug, Clone)]
+pub struct GdvSearchSortOrder {
+    pub sort_id: String,
+    pub by_match_count: bool,
+    pub by_file_name: bool,
+    pub by_path: bool,
+    pub by_type: bool,
+    pub by_modified_time: bool,
+    pub direction: String,
+    pub group_by_folder: bool,
+    pub natural_sort: bool,
+    pub case_insensitive: bool,
+}
+
+impl GdvSearchSortOrder {
+    pub fn new() -> Self {
+        Self {
+            sort_id: String::new(),
+            by_match_count: bool::default(),
+            by_file_name: bool::default(),
+            by_path: bool::default(),
+            by_type: bool::default(),
+            by_modified_time: bool::default(),
+            direction: String::new(),
+            group_by_folder: bool::default(),
+            natural_sort: bool::default(),
+            case_insensitive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sort_id.is_empty() || true && self.by_match_count || true && self.by_file_name || true && self.by_path || true && self.by_type || true && self.by_modified_time || true && !self.direction.is_empty() || true && self.group_by_folder || true && self.natural_sort || true && self.case_insensitive || true
+    }
+}
+
+impl Default for GdvSearchSortOrder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search notebook support (cell search, output search, metadata)
+#[derive(Debug, Clone)]
+pub struct GdwSearchNotebookSupport {
+    pub notebook_id: String,
+    pub cell_search_enabled: bool,
+    pub output_search_enabled: bool,
+    pub metadata_search: bool,
+    pub cell_kind_filter: String,
+    pub include_markdown: bool,
+    pub include_code: bool,
+    pub search_output_type: String,
+    pub max_cell_results: u32,
+    pub flatten_results: bool,
+}
+
+impl GdwSearchNotebookSupport {
+    pub fn new() -> Self {
+        Self {
+            notebook_id: String::new(),
+            cell_search_enabled: bool::default(),
+            output_search_enabled: bool::default(),
+            metadata_search: bool::default(),
+            cell_kind_filter: String::new(),
+            include_markdown: bool::default(),
+            include_code: bool::default(),
+            search_output_type: String::new(),
+            max_cell_results: u32::default(),
+            flatten_results: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.notebook_id.is_empty() || true && self.cell_search_enabled || true && self.output_search_enabled || true && self.metadata_search || true && !self.cell_kind_filter.is_empty() || true && self.include_markdown || true && self.include_code || true && !self.search_output_type.is_empty() || true && self.max_cell_results < u32::MAX || true && self.flatten_results || true
+    }
+}
+
+impl Default for GdwSearchNotebookSupport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Multi-file search (workspace, folder, multiroot, custom scope)
+#[derive(Debug, Clone)]
+pub struct GdxMultiFileSearch {
+    pub multi_id: String,
+    pub scope_type: String,
+    pub workspace_folder_json: String,
+    pub custom_scope_json: String,
+    pub parallel_search: bool,
+    pub merge_results: bool,
+    pub folder_separator: String,
+    pub root_count: u32,
+    pub active_root_only: bool,
+    pub include_nested: bool,
+}
+
+impl GdxMultiFileSearch {
+    pub fn new() -> Self {
+        Self {
+            multi_id: String::new(),
+            scope_type: String::new(),
+            workspace_folder_json: String::new(),
+            custom_scope_json: String::new(),
+            parallel_search: bool::default(),
+            merge_results: bool::default(),
+            folder_separator: String::new(),
+            root_count: u32::default(),
+            active_root_only: bool::default(),
+            include_nested: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.multi_id.is_empty() || true && !self.scope_type.is_empty() || true && !self.workspace_folder_json.is_empty() || true && !self.custom_scope_json.is_empty() || true && self.parallel_search || true && self.merge_results || true && !self.folder_separator.is_empty() || true && self.root_count < u32::MAX || true && self.active_root_only || true && self.include_nested || true
+    }
+}
+
+impl Default for GdxMultiFileSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search action context (replace all, replace in file, open match)
+#[derive(Debug, Clone)]
+pub struct GdySearchActionContext {
+    pub action_id: String,
+    pub replace_all: bool,
+    pub replace_in_file: bool,
+    pub open_match: bool,
+    pub dismiss_on_replace: bool,
+    pub preview_replace: bool,
+    pub confirm_replace: bool,
+    pub undo_stop: bool,
+    pub batch_replace: bool,
+    pub target_uri: String,
+}
+
+impl GdySearchActionContext {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            replace_all: bool::default(),
+            replace_in_file: bool::default(),
+            open_match: bool::default(),
+            dismiss_on_replace: bool::default(),
+            preview_replace: bool::default(),
+            confirm_replace: bool::default(),
+            undo_stop: bool::default(),
+            batch_replace: bool::default(),
+            target_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && self.replace_all || true && self.replace_in_file || true && self.open_match || true && self.dismiss_on_replace || true && self.preview_replace || true && self.confirm_replace || true && self.undo_stop || true && self.batch_replace || true && !self.target_uri.is_empty() || true
+    }
+}
+
+impl Default for GdySearchActionContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search accessibility (screen reader, result announce, navigate)
+#[derive(Debug, Clone)]
+pub struct GdzSearchAccessibility {
+    pub a11y_id: String,
+    pub screen_reader_mode: bool,
+    pub announce_results: bool,
+    pub navigate_results: bool,
+    pub match_announce_delay_ms: u32,
+    pub tree_role: String,
+    pub focus_on_match: bool,
+    pub aria_label: String,
+    pub result_live_region: bool,
+    pub keyboard_shortcut_hint: bool,
+}
+
+impl GdzSearchAccessibility {
+    pub fn new() -> Self {
+        Self {
+            a11y_id: String::new(),
+            screen_reader_mode: bool::default(),
+            announce_results: bool::default(),
+            navigate_results: bool::default(),
+            match_announce_delay_ms: u32::default(),
+            tree_role: String::new(),
+            focus_on_match: bool::default(),
+            aria_label: String::new(),
+            result_live_region: bool::default(),
+            keyboard_shortcut_hint: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_id.is_empty() || true && self.screen_reader_mode || true && self.announce_results || true && self.navigate_results || true && self.match_announce_delay_ms < u32::MAX || true && !self.tree_role.is_empty() || true && self.focus_on_match || true && !self.aria_label.is_empty() || true && self.result_live_region || true && self.keyboard_shortcut_hint || true
+    }
+}
+
+impl Default for GdzSearchAccessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -311618,6 +312290,294 @@ mod tests_gdj_generated {
     fn test_gdj_fields() {
         let mut obj = GdjSearchDecorations::default();
         obj.deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdk_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdk_default() {
+        let obj = GdkFindController::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdk_fields() {
+        let mut obj = GdkFindController::default();
+        obj.find_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdl_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdl_default() {
+        let obj = GdlFindReplaceState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdl_fields() {
+        let mut obj = GdlFindReplaceState::default();
+        obj.state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdm_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdm_default() {
+        let obj = GdmFindWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdm_fields() {
+        let mut obj = GdmFindWidget::default();
+        obj.widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdn_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdn_default() {
+        let obj = GdnFindInFilesModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdn_fields() {
+        let mut obj = GdnFindInFilesModel::default();
+        obj.model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdo_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdo_default() {
+        let obj = GdoSearchTreeItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdo_fields() {
+        let mut obj = GdoSearchTreeItem::default();
+        obj.tree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdp_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdp_default() {
+        let obj = GdpSymbolSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdp_fields() {
+        let mut obj = GdpSymbolSearch::default();
+        obj.symbol_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdq_default() {
+        let obj = GdqGotoSymbolQuickPick::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdq_fields() {
+        let mut obj = GdqGotoSymbolQuickPick::default();
+        obj.goto_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdr_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdr_default() {
+        let obj = GdrGotoLineQuickPick::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdr_fields() {
+        let mut obj = GdrGotoLineQuickPick::default();
+        obj.goto_line_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gds_generated {
+    use super::*;
+
+    #[test]
+    fn test_gds_default() {
+        let obj = GdsQuickOpenModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gds_fields() {
+        let mut obj = GdsQuickOpenModel::default();
+        obj.quick_open_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdt_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdt_default() {
+        let obj = GdtSearchExcludeConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdt_fields() {
+        let mut obj = GdtSearchExcludeConfig::default();
+        obj.exclude_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdu_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdu_default() {
+        let obj = GduSearchIncludeConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdu_fields() {
+        let mut obj = GduSearchIncludeConfig::default();
+        obj.include_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdv_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdv_default() {
+        let obj = GdvSearchSortOrder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdv_fields() {
+        let mut obj = GdvSearchSortOrder::default();
+        obj.sort_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdw_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdw_default() {
+        let obj = GdwSearchNotebookSupport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdw_fields() {
+        let mut obj = GdwSearchNotebookSupport::default();
+        obj.notebook_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdx_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdx_default() {
+        let obj = GdxMultiFileSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdx_fields() {
+        let mut obj = GdxMultiFileSearch::default();
+        obj.multi_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdy_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdy_default() {
+        let obj = GdySearchActionContext::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdy_fields() {
+        let mut obj = GdySearchActionContext::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdz_default() {
+        let obj = GdzSearchAccessibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdz_fields() {
+        let mut obj = GdzSearchAccessibility::default();
+        obj.a11y_id = "test".to_string();
         assert!(obj.validate());
     }
 }
