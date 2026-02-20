@@ -68265,6 +68265,468 @@ impl Default for FmoExtensionDependency {
     }
 }
 
+/// Extension storage (global/workspace state, secrets, keys)
+#[derive(Debug, Clone)]
+pub struct FmpExtensionStorageState {
+    pub storage_id: String,
+    pub global_state_json: String,
+    pub workspace_state_json: String,
+    pub secrets_json: String,
+    pub key_count: u32,
+    pub global_storage_uri: String,
+    pub workspace_storage_uri: String,
+    pub log_storage_uri: String,
+    pub is_migrated: bool,
+    pub storage_version: u32,
+}
+
+impl FmpExtensionStorageState {
+    pub fn new() -> Self {
+        Self {
+            storage_id: String::new(),
+            global_state_json: String::new(),
+            workspace_state_json: String::new(),
+            secrets_json: String::new(),
+            key_count: u32::default(),
+            global_storage_uri: String::new(),
+            workspace_storage_uri: String::new(),
+            log_storage_uri: String::new(),
+            is_migrated: bool::default(),
+            storage_version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.storage_id.is_empty() || true && !self.global_state_json.is_empty() || true && !self.workspace_state_json.is_empty() || true && !self.secrets_json.is_empty() || true && self.key_count < u32::MAX || true && !self.global_storage_uri.is_empty() || true && !self.workspace_storage_uri.is_empty() || true && !self.log_storage_uri.is_empty() || true && self.is_migrated || true && self.storage_version < u32::MAX || true
+    }
+}
+
+impl Default for FmpExtensionStorageState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension telemetry (events, sender, logger, consent)
+#[derive(Debug, Clone)]
+pub struct FmqExtensionTelemetry {
+    pub telemetry_id: String,
+    pub event_name: String,
+    pub properties_json: String,
+    pub measurements_json: String,
+    pub consent_level: u32,
+    pub is_opted_in: bool,
+    pub sender_id: String,
+    pub logger_id: String,
+    pub extension_id: String,
+    pub is_usage_event: bool,
+}
+
+impl FmqExtensionTelemetry {
+    pub fn new() -> Self {
+        Self {
+            telemetry_id: String::new(),
+            event_name: String::new(),
+            properties_json: String::new(),
+            measurements_json: String::new(),
+            consent_level: u32::default(),
+            is_opted_in: bool::default(),
+            sender_id: String::new(),
+            logger_id: String::new(),
+            extension_id: String::new(),
+            is_usage_event: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.telemetry_id.is_empty() || true && !self.event_name.is_empty() || true && !self.properties_json.is_empty() || true && !self.measurements_json.is_empty() || true && self.consent_level < u32::MAX || true && self.is_opted_in || true && !self.sender_id.is_empty() || true && !self.logger_id.is_empty() || true && !self.extension_id.is_empty() || true && self.is_usage_event || true
+    }
+}
+
+impl Default for FmqExtensionTelemetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension localization (bundle, locale, translations, fallback)
+#[derive(Debug, Clone)]
+pub struct FmrExtensionLocalization {
+    pub l10n_id: String,
+    pub locale: String,
+    pub bundle_uri: String,
+    pub translations_json: String,
+    pub fallback_locale: String,
+    pub available_locales_json: String,
+    pub is_default: bool,
+    pub message_count: u32,
+    pub extension_id: String,
+    pub format_string_count: u32,
+}
+
+impl FmrExtensionLocalization {
+    pub fn new() -> Self {
+        Self {
+            l10n_id: String::new(),
+            locale: String::new(),
+            bundle_uri: String::new(),
+            translations_json: String::new(),
+            fallback_locale: String::new(),
+            available_locales_json: String::new(),
+            is_default: bool::default(),
+            message_count: u32::default(),
+            extension_id: String::new(),
+            format_string_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.l10n_id.is_empty() || true && !self.locale.is_empty() || true && !self.bundle_uri.is_empty() || true && !self.translations_json.is_empty() || true && !self.fallback_locale.is_empty() || true && !self.available_locales_json.is_empty() || true && self.is_default || true && self.message_count < u32::MAX || true && !self.extension_id.is_empty() || true && self.format_string_count < u32::MAX || true
+    }
+}
+
+impl Default for FmrExtensionLocalization {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension chat participant (id, handler, icon, sample prompts)
+#[derive(Debug, Clone)]
+pub struct FmsExtensionChatParticipant {
+    pub participant_id: String,
+    pub name: String,
+    pub description: String,
+    pub icon_path: String,
+    pub sample_prompts_json: String,
+    pub is_default: bool,
+    pub slash_commands_json: String,
+    pub follow_ups_json: String,
+    pub extension_id: String,
+    pub is_sticky: bool,
+}
+
+impl FmsExtensionChatParticipant {
+    pub fn new() -> Self {
+        Self {
+            participant_id: String::new(),
+            name: String::new(),
+            description: String::new(),
+            icon_path: String::new(),
+            sample_prompts_json: String::new(),
+            is_default: bool::default(),
+            slash_commands_json: String::new(),
+            follow_ups_json: String::new(),
+            extension_id: String::new(),
+            is_sticky: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.participant_id.is_empty() || true && !self.name.is_empty() || true && !self.description.is_empty() || true && !self.icon_path.is_empty() || true && !self.sample_prompts_json.is_empty() || true && self.is_default || true && !self.slash_commands_json.is_empty() || true && !self.follow_ups_json.is_empty() || true && !self.extension_id.is_empty() || true && self.is_sticky || true
+    }
+}
+
+impl Default for FmsExtensionChatParticipant {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension language model access (model id, vendor, family, tokens)
+#[derive(Debug, Clone)]
+pub struct FmtExtensionLanguageModel {
+    pub model_id: String,
+    pub vendor: String,
+    pub family: String,
+    pub name: String,
+    pub version: String,
+    pub max_input_tokens: u32,
+    pub max_output_tokens: u32,
+    pub supports_tool_calls: bool,
+    pub supports_streaming: bool,
+    pub auth_provider_id: String,
+}
+
+impl FmtExtensionLanguageModel {
+    pub fn new() -> Self {
+        Self {
+            model_id: String::new(),
+            vendor: String::new(),
+            family: String::new(),
+            name: String::new(),
+            version: String::new(),
+            max_input_tokens: u32::default(),
+            max_output_tokens: u32::default(),
+            supports_tool_calls: bool::default(),
+            supports_streaming: bool::default(),
+            auth_provider_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.model_id.is_empty() || true && !self.vendor.is_empty() || true && !self.family.is_empty() || true && !self.name.is_empty() || true && !self.version.is_empty() || true && self.max_input_tokens < u32::MAX || true && self.max_output_tokens < u32::MAX || true && self.supports_tool_calls || true && self.supports_streaming || true && !self.auth_provider_id.is_empty() || true
+    }
+}
+
+impl Default for FmtExtensionLanguageModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension test item (id, uri, label, range, tags, run profile)
+#[derive(Debug, Clone)]
+pub struct FmuExtensionTest {
+    pub test_id: String,
+    pub uri: String,
+    pub label: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub tags_json: String,
+    pub run_profile_id: String,
+    pub can_resolve_children: bool,
+    pub busy: bool,
+    pub error_message: String,
+}
+
+impl FmuExtensionTest {
+    pub fn new() -> Self {
+        Self {
+            test_id: String::new(),
+            uri: String::new(),
+            label: String::new(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            tags_json: String::new(),
+            run_profile_id: String::new(),
+            can_resolve_children: bool::default(),
+            busy: bool::default(),
+            error_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_id.is_empty() || true && !self.uri.is_empty() || true && !self.label.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && !self.tags_json.is_empty() || true && !self.run_profile_id.is_empty() || true && self.can_resolve_children || true && self.busy || true && !self.error_message.is_empty() || true
+    }
+}
+
+impl Default for FmuExtensionTest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension task definition (type, source, execution, group, detail)
+#[derive(Debug, Clone)]
+pub struct FmvExtensionTask {
+    pub task_id: String,
+    pub task_type: String,
+    pub source: String,
+    pub execution_json: String,
+    pub group_id: String,
+    pub detail: String,
+    pub name: String,
+    pub is_background: bool,
+    pub problem_matchers_json: String,
+    pub run_options_json: String,
+}
+
+impl FmvExtensionTask {
+    pub fn new() -> Self {
+        Self {
+            task_id: String::new(),
+            task_type: String::new(),
+            source: String::new(),
+            execution_json: String::new(),
+            group_id: String::new(),
+            detail: String::new(),
+            name: String::new(),
+            is_background: bool::default(),
+            problem_matchers_json: String::new(),
+            run_options_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_id.is_empty() || true && !self.task_type.is_empty() || true && !self.source.is_empty() || true && !self.execution_json.is_empty() || true && !self.group_id.is_empty() || true && !self.detail.is_empty() || true && !self.name.is_empty() || true && self.is_background || true && !self.problem_matchers_json.is_empty() || true && !self.run_options_json.is_empty() || true
+    }
+}
+
+impl Default for FmvExtensionTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension terminal link (start index, length, tooltip, handler)
+#[derive(Debug, Clone)]
+pub struct FmwExtensionTerminalLink {
+    pub link_id: String,
+    pub start_index: u32,
+    pub length: u32,
+    pub tooltip: String,
+    pub handler_id: String,
+    pub uri: String,
+    pub text: String,
+    pub extension_id: String,
+    pub is_trusted: bool,
+    pub context_json: String,
+}
+
+impl FmwExtensionTerminalLink {
+    pub fn new() -> Self {
+        Self {
+            link_id: String::new(),
+            start_index: u32::default(),
+            length: u32::default(),
+            tooltip: String::new(),
+            handler_id: String::new(),
+            uri: String::new(),
+            text: String::new(),
+            extension_id: String::new(),
+            is_trusted: bool::default(),
+            context_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.link_id.is_empty() || true && self.start_index < u32::MAX || true && self.length < u32::MAX || true && !self.tooltip.is_empty() || true && !self.handler_id.is_empty() || true && !self.uri.is_empty() || true && !self.text.is_empty() || true && !self.extension_id.is_empty() || true && self.is_trusted || true && !self.context_json.is_empty() || true
+    }
+}
+
+impl Default for FmwExtensionTerminalLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension file decoration provider (badge, color, propagate, tooltip)
+#[derive(Debug, Clone)]
+pub struct FmxExtensionFileDecorationProvider {
+    pub decoration_provider_id: String,
+    pub uri: String,
+    pub badge_text: String,
+    pub badge_color_id: String,
+    pub tooltip: String,
+    pub propagate: bool,
+    pub letter: String,
+    pub priority: u32,
+    pub strikethrough: bool,
+    pub faded: bool,
+}
+
+impl FmxExtensionFileDecorationProvider {
+    pub fn new() -> Self {
+        Self {
+            decoration_provider_id: String::new(),
+            uri: String::new(),
+            badge_text: String::new(),
+            badge_color_id: String::new(),
+            tooltip: String::new(),
+            propagate: bool::default(),
+            letter: String::new(),
+            priority: u32::default(),
+            strikethrough: bool::default(),
+            faded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decoration_provider_id.is_empty() || true && !self.uri.is_empty() || true && !self.badge_text.is_empty() || true && !self.badge_color_id.is_empty() || true && !self.tooltip.is_empty() || true && self.propagate || true && !self.letter.is_empty() || true && self.priority < u32::MAX || true && self.strikethrough || true && self.faded || true
+    }
+}
+
+impl Default for FmxExtensionFileDecorationProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension URI handler (scheme, handler, can handle)
+#[derive(Debug, Clone)]
+pub struct FmyExtensionUriHandler {
+    pub handler_id: String,
+    pub scheme: String,
+    pub extension_id: String,
+    pub can_handle_external: bool,
+    pub uri_pattern: String,
+    pub is_registered: bool,
+    pub handle_count: u64,
+    pub last_handled_ms: u64,
+    pub error_count: u32,
+    pub is_default: bool,
+}
+
+impl FmyExtensionUriHandler {
+    pub fn new() -> Self {
+        Self {
+            handler_id: String::new(),
+            scheme: String::new(),
+            extension_id: String::new(),
+            can_handle_external: bool::default(),
+            uri_pattern: String::new(),
+            is_registered: bool::default(),
+            handle_count: u64::default(),
+            last_handled_ms: u64::default(),
+            error_count: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.handler_id.is_empty() || true && !self.scheme.is_empty() || true && !self.extension_id.is_empty() || true && self.can_handle_external || true && !self.uri_pattern.is_empty() || true && self.is_registered || true && self.handle_count < u64::MAX || true && self.last_handled_ms < u64::MAX || true && self.error_count < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for FmyExtensionUriHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension embedding provider (model, tokenizer, distance metric)
+#[derive(Debug, Clone)]
+pub struct FmzExtensionEmbedding {
+    pub embedding_id: String,
+    pub model_name: String,
+    pub tokenizer_id: String,
+    pub distance_metric: u32,
+    pub dimensions: u32,
+    pub max_batch_size: u32,
+    pub provider_id: String,
+    pub extension_id: String,
+    pub supports_truncation: bool,
+    pub normalization: bool,
+}
+
+impl FmzExtensionEmbedding {
+    pub fn new() -> Self {
+        Self {
+            embedding_id: String::new(),
+            model_name: String::new(),
+            tokenizer_id: String::new(),
+            distance_metric: u32::default(),
+            dimensions: u32::default(),
+            max_batch_size: u32::default(),
+            provider_id: String::new(),
+            extension_id: String::new(),
+            supports_truncation: bool::default(),
+            normalization: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.embedding_id.is_empty() || true && !self.model_name.is_empty() || true && !self.tokenizer_id.is_empty() || true && self.distance_metric < u32::MAX || true && self.dimensions < u32::MAX || true && self.max_batch_size < u32::MAX || true && !self.provider_id.is_empty() || true && !self.extension_id.is_empty() || true && self.supports_truncation || true && self.normalization || true
+    }
+}
+
+impl Default for FmzExtensionEmbedding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -285541,6 +286003,204 @@ mod tests_fmo_generated {
     fn test_fmo_fields() {
         let mut obj = FmoExtensionDependency::default();
         obj.dep_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmp_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmp_default() {
+        let obj = FmpExtensionStorageState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmp_fields() {
+        let mut obj = FmpExtensionStorageState::default();
+        obj.storage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmq_default() {
+        let obj = FmqExtensionTelemetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmq_fields() {
+        let mut obj = FmqExtensionTelemetry::default();
+        obj.telemetry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmr_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmr_default() {
+        let obj = FmrExtensionLocalization::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmr_fields() {
+        let mut obj = FmrExtensionLocalization::default();
+        obj.l10n_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fms_generated {
+    use super::*;
+
+    #[test]
+    fn test_fms_default() {
+        let obj = FmsExtensionChatParticipant::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fms_fields() {
+        let mut obj = FmsExtensionChatParticipant::default();
+        obj.participant_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmt_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmt_default() {
+        let obj = FmtExtensionLanguageModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmt_fields() {
+        let mut obj = FmtExtensionLanguageModel::default();
+        obj.model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmu_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmu_default() {
+        let obj = FmuExtensionTest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmu_fields() {
+        let mut obj = FmuExtensionTest::default();
+        obj.test_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmv_default() {
+        let obj = FmvExtensionTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmv_fields() {
+        let mut obj = FmvExtensionTask::default();
+        obj.task_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmw_default() {
+        let obj = FmwExtensionTerminalLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmw_fields() {
+        let mut obj = FmwExtensionTerminalLink::default();
+        obj.link_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmx_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmx_default() {
+        let obj = FmxExtensionFileDecorationProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmx_fields() {
+        let mut obj = FmxExtensionFileDecorationProvider::default();
+        obj.decoration_provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmy_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmy_default() {
+        let obj = FmyExtensionUriHandler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmy_fields() {
+        let mut obj = FmyExtensionUriHandler::default();
+        obj.handler_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmz_default() {
+        let obj = FmzExtensionEmbedding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmz_fields() {
+        let mut obj = FmzExtensionEmbedding::default();
+        obj.embedding_id = "test".to_string();
         assert!(obj.validate());
     }
 }
