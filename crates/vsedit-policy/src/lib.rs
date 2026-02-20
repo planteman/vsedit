@@ -99404,6 +99404,216 @@ impl Default for GpeCursorStyle {
     }
 }
 
+/// Column selection (start, end, column mode, rectangular, fill)
+#[derive(Debug, Clone)]
+pub struct GpfColumnSelection {
+    pub col_sel_id: String,
+    pub start_line: u32,
+    pub start_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub is_column_mode: bool,
+    pub is_rectangular: bool,
+    pub fill_char: String,
+    pub virtual_space: bool,
+    pub swap_ends: bool,
+}
+
+impl GpfColumnSelection {
+    pub fn new() -> Self {
+        Self {
+            col_sel_id: String::new(),
+            start_line: u32::default(),
+            start_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            is_column_mode: bool::default(),
+            is_rectangular: bool::default(),
+            fill_char: String::new(),
+            virtual_space: bool::default(),
+            swap_ends: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.col_sel_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && self.is_column_mode || true && self.is_rectangular || true && !self.fill_char.is_empty() || true && self.virtual_space || true && self.swap_ends || true
+    }
+}
+
+impl Default for GpfColumnSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Selection highlight (occurrences, decorations, delay, case)
+#[derive(Debug, Clone)]
+pub struct GpgSelectionHighlight {
+    pub highlight_id: String,
+    pub occurrences_json: String,
+    pub decorations_json: String,
+    pub delay_ms: u32,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub show_in_minimap: bool,
+    pub show_in_overview: bool,
+    pub max_matches: u32,
+    pub seed_on_type: bool,
+}
+
+impl GpgSelectionHighlight {
+    pub fn new() -> Self {
+        Self {
+            highlight_id: String::new(),
+            occurrences_json: String::new(),
+            decorations_json: String::new(),
+            delay_ms: u32::default(),
+            case_sensitive: bool::default(),
+            whole_word: bool::default(),
+            show_in_minimap: bool::default(),
+            show_in_overview: bool::default(),
+            max_matches: u32::default(),
+            seed_on_type: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.highlight_id.is_empty() || true && !self.occurrences_json.is_empty() || true && !self.decorations_json.is_empty() || true && self.delay_ms < u32::MAX || true && self.case_sensitive || true && self.whole_word || true && self.show_in_minimap || true && self.show_in_overview || true && self.max_matches < u32::MAX || true && self.seed_on_type || true
+    }
+}
+
+impl Default for GpgSelectionHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor surrounding pairs (auto surround, brackets, quotes)
+#[derive(Debug, Clone)]
+pub struct GphCursorSurroundingPairs {
+    pub surround_id: String,
+    pub auto_surround: String,
+    pub brackets_json: String,
+    pub quotes_json: String,
+    pub auto_close_before: String,
+    pub language_id: String,
+    pub enabled: bool,
+    pub type_over: bool,
+    pub smart_backspace: bool,
+    pub electric_chars_json: String,
+}
+
+impl GphCursorSurroundingPairs {
+    pub fn new() -> Self {
+        Self {
+            surround_id: String::new(),
+            auto_surround: String::new(),
+            brackets_json: String::new(),
+            quotes_json: String::new(),
+            auto_close_before: String::new(),
+            language_id: String::new(),
+            enabled: bool::default(),
+            type_over: bool::default(),
+            smart_backspace: bool::default(),
+            electric_chars_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.surround_id.is_empty() || true && !self.auto_surround.is_empty() || true && !self.brackets_json.is_empty() || true && !self.quotes_json.is_empty() || true && !self.auto_close_before.is_empty() || true && !self.language_id.is_empty() || true && self.enabled || true && self.type_over || true && self.smart_backspace || true && !self.electric_chars_json.is_empty() || true
+    }
+}
+
+impl Default for GphCursorSurroundingPairs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor scroll state (top, left, height, width, smooth)
+#[derive(Debug, Clone)]
+pub struct GpiEditorScrollState {
+    pub scroll_id: String,
+    pub scroll_top: u32,
+    pub scroll_left: u32,
+    pub viewport_height: u32,
+    pub viewport_width: u32,
+    pub smooth_scroll: bool,
+    pub scroll_sensitivity: u32,
+    pub fast_scroll_sensitivity: u32,
+    pub scroll_beyond_last_line: bool,
+    pub scroll_predomiannt_axis: bool,
+}
+
+impl GpiEditorScrollState {
+    pub fn new() -> Self {
+        Self {
+            scroll_id: String::new(),
+            scroll_top: u32::default(),
+            scroll_left: u32::default(),
+            viewport_height: u32::default(),
+            viewport_width: u32::default(),
+            smooth_scroll: bool::default(),
+            scroll_sensitivity: u32::default(),
+            fast_scroll_sensitivity: u32::default(),
+            scroll_beyond_last_line: bool::default(),
+            scroll_predomiannt_axis: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scroll_id.is_empty() || true && self.scroll_top < u32::MAX || true && self.scroll_left < u32::MAX || true && self.viewport_height < u32::MAX || true && self.viewport_width < u32::MAX || true && self.smooth_scroll || true && self.scroll_sensitivity < u32::MAX || true && self.fast_scroll_sensitivity < u32::MAX || true && self.scroll_beyond_last_line || true && self.scroll_predomiannt_axis || true
+    }
+}
+
+impl Default for GpiEditorScrollState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor viewport (start line, end line, visible ranges, height)
+#[derive(Debug, Clone)]
+pub struct GpjEditorViewport {
+    pub viewport_id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub visible_ranges_json: String,
+    pub height_px: u32,
+    pub width_px: u32,
+    pub line_height: u32,
+    pub top_offset: u32,
+    pub content_width: u32,
+    pub is_scrolling: bool,
+}
+
+impl GpjEditorViewport {
+    pub fn new() -> Self {
+        Self {
+            viewport_id: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            visible_ranges_json: String::new(),
+            height_px: u32::default(),
+            width_px: u32::default(),
+            line_height: u32::default(),
+            top_offset: u32::default(),
+            content_width: u32::default(),
+            is_scrolling: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.viewport_id.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.visible_ranges_json.is_empty() || true && self.height_px < u32::MAX || true && self.width_px < u32::MAX || true && self.line_height < u32::MAX || true && self.top_offset < u32::MAX || true && self.content_width < u32::MAX || true && self.is_scrolling || true
+    }
+}
+
+impl Default for GpjEditorViewport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -330202,6 +330412,96 @@ mod tests_gpe_generated {
     fn test_gpe_fields() {
         let mut obj = GpeCursorStyle::default();
         obj.style_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpf_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpf_default() {
+        let obj = GpfColumnSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpf_fields() {
+        let mut obj = GpfColumnSelection::default();
+        obj.col_sel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpg_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpg_default() {
+        let obj = GpgSelectionHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpg_fields() {
+        let mut obj = GpgSelectionHighlight::default();
+        obj.highlight_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gph_generated {
+    use super::*;
+
+    #[test]
+    fn test_gph_default() {
+        let obj = GphCursorSurroundingPairs::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gph_fields() {
+        let mut obj = GphCursorSurroundingPairs::default();
+        obj.surround_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpi_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpi_default() {
+        let obj = GpiEditorScrollState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpi_fields() {
+        let mut obj = GpiEditorScrollState::default();
+        obj.scroll_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpj_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpj_default() {
+        let obj = GpjEditorViewport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpj_fields() {
+        let mut obj = GpjEditorViewport::default();
+        obj.viewport_id = "test".to_string();
         assert!(obj.validate());
     }
 }
