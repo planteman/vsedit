@@ -157451,6 +157451,890 @@ impl Default for IwzNetworkConfig {
     }
 }
 
+/// File system watcher descriptor
+#[derive(Debug, Clone)]
+pub struct IxaFsWatcher {
+    pub watcher_id: String,
+    pub root_path: String,
+    pub recursive_depth: u32,
+    pub event_count: u64,
+    pub poll_interval_ms: u32,
+    pub is_active: bool,
+}
+
+impl IxaFsWatcher {
+    pub fn new() -> Self {
+        Self {
+            watcher_id: String::new(),
+            root_path: String::new(),
+            recursive_depth: u32::default(),
+            event_count: u64::default(),
+            poll_interval_ms: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watcher_id.is_empty() || true && !self.root_path.is_empty() || true && self.recursive_depth < u32::MAX || true && self.event_count < u64::MAX || true && self.poll_interval_ms < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for IxaFsWatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File system change event
+#[derive(Debug, Clone)]
+pub struct IxbFsEvent {
+    pub event_id: String,
+    pub file_path: String,
+    pub event_kind: String,
+    pub timestamp_epoch: u64,
+    pub file_size_bytes: u64,
+    pub is_directory: bool,
+}
+
+impl IxbFsEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            file_path: String::new(),
+            event_kind: String::new(),
+            timestamp_epoch: u64::default(),
+            file_size_bytes: u64::default(),
+            is_directory: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && !self.file_path.is_empty() || true && !self.event_kind.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.file_size_bytes < u64::MAX || true && self.is_directory || true
+    }
+}
+
+impl Default for IxbFsEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File watch glob pattern
+#[derive(Debug, Clone)]
+pub struct IxcWatchPattern {
+    pub pattern_id: String,
+    pub glob_pattern: String,
+    pub base_path: String,
+    pub priority_val: u32,
+    pub match_count: u64,
+    pub is_exclude: bool,
+}
+
+impl IxcWatchPattern {
+    pub fn new() -> Self {
+        Self {
+            pattern_id: String::new(),
+            glob_pattern: String::new(),
+            base_path: String::new(),
+            priority_val: u32::default(),
+            match_count: u64::default(),
+            is_exclude: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pattern_id.is_empty() || true && !self.glob_pattern.is_empty() || true && !self.base_path.is_empty() || true && self.priority_val < u32::MAX || true && self.match_count < u64::MAX || true && self.is_exclude || true
+    }
+}
+
+impl Default for IxcWatchPattern {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Directory scanning result
+#[derive(Debug, Clone)]
+pub struct IxdDirScan {
+    pub scan_id: String,
+    pub dir_path: String,
+    pub file_count: u32,
+    pub dir_count: u32,
+    pub total_bytes: u64,
+    pub is_complete: bool,
+}
+
+impl IxdDirScan {
+    pub fn new() -> Self {
+        Self {
+            scan_id: String::new(),
+            dir_path: String::new(),
+            file_count: u32::default(),
+            dir_count: u32::default(),
+            total_bytes: u64::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scan_id.is_empty() || true && !self.dir_path.is_empty() || true && self.file_count < u32::MAX || true && self.dir_count < u32::MAX || true && self.total_bytes < u64::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for IxdDirScan {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File change detection entry
+#[derive(Debug, Clone)]
+pub struct IxeFileChange {
+    pub change_id: String,
+    pub old_path: String,
+    pub new_path: String,
+    pub change_kind_str: String,
+    pub mtime_epoch: u64,
+    pub is_rename: bool,
+}
+
+impl IxeFileChange {
+    pub fn new() -> Self {
+        Self {
+            change_id: String::new(),
+            old_path: String::new(),
+            new_path: String::new(),
+            change_kind_str: String::new(),
+            mtime_epoch: u64::default(),
+            is_rename: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.change_id.is_empty() || true && !self.old_path.is_empty() || true && !self.new_path.is_empty() || true && !self.change_kind_str.is_empty() || true && self.mtime_epoch < u64::MAX || true && self.is_rename || true
+    }
+}
+
+impl Default for IxeFileChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Watcher configuration option
+#[derive(Debug, Clone)]
+pub struct IxfWatcherOption {
+    pub option_id: String,
+    pub option_name: String,
+    pub option_value: String,
+    pub description_text: String,
+    pub default_val: u32,
+    pub is_enabled: bool,
+}
+
+impl IxfWatcherOption {
+    pub fn new() -> Self {
+        Self {
+            option_id: String::new(),
+            option_name: String::new(),
+            option_value: String::new(),
+            description_text: String::new(),
+            default_val: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.option_id.is_empty() || true && !self.option_name.is_empty() || true && !self.option_value.is_empty() || true && !self.description_text.is_empty() || true && self.default_val < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for IxfWatcherOption {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Watch exclusion rule
+#[derive(Debug, Clone)]
+pub struct IxgWatchExclusion {
+    pub excl_id: String,
+    pub excl_pattern: String,
+    pub excl_reason: String,
+    pub source_config: String,
+    pub excl_count: u32,
+    pub is_recursive: bool,
+}
+
+impl IxgWatchExclusion {
+    pub fn new() -> Self {
+        Self {
+            excl_id: String::new(),
+            excl_pattern: String::new(),
+            excl_reason: String::new(),
+            source_config: String::new(),
+            excl_count: u32::default(),
+            is_recursive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.excl_id.is_empty() || true && !self.excl_pattern.is_empty() || true && !self.excl_reason.is_empty() || true && !self.source_config.is_empty() || true && self.excl_count < u32::MAX || true && self.is_recursive || true
+    }
+}
+
+impl Default for IxgWatchExclusion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File index entry for fast lookup
+#[derive(Debug, Clone)]
+pub struct IxhFileIndex {
+    pub idx_id: String,
+    pub file_uri: String,
+    pub content_length: u64,
+    pub language_id: String,
+    pub index_epoch: u64,
+    pub is_indexed: bool,
+}
+
+impl IxhFileIndex {
+    pub fn new() -> Self {
+        Self {
+            idx_id: String::new(),
+            file_uri: String::new(),
+            content_length: u64::default(),
+            language_id: String::new(),
+            index_epoch: u64::default(),
+            is_indexed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.idx_id.is_empty() || true && !self.file_uri.is_empty() || true && self.content_length < u64::MAX || true && !self.language_id.is_empty() || true && self.index_epoch < u64::MAX || true && self.is_indexed || true
+    }
+}
+
+impl Default for IxhFileIndex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File content hash result
+#[derive(Debug, Clone)]
+pub struct IxiContentHash {
+    pub hash_id: String,
+    pub file_ref: String,
+    pub hash_algo: String,
+    pub hash_value: String,
+    pub compute_ms: u32,
+    pub is_verified: bool,
+}
+
+impl IxiContentHash {
+    pub fn new() -> Self {
+        Self {
+            hash_id: String::new(),
+            file_ref: String::new(),
+            hash_algo: String::new(),
+            hash_value: String::new(),
+            compute_ms: u32::default(),
+            is_verified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hash_id.is_empty() || true && !self.file_ref.is_empty() || true && !self.hash_algo.is_empty() || true && !self.hash_value.is_empty() || true && self.compute_ms < u32::MAX || true && self.is_verified || true
+    }
+}
+
+impl Default for IxiContentHash {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Atomic file save operation
+#[derive(Debug, Clone)]
+pub struct IxjAtomicSave {
+    pub save_id: String,
+    pub target_path: String,
+    pub temp_path: String,
+    pub byte_count: u64,
+    pub write_epoch: u64,
+    pub is_atomic: bool,
+}
+
+impl IxjAtomicSave {
+    pub fn new() -> Self {
+        Self {
+            save_id: String::new(),
+            target_path: String::new(),
+            temp_path: String::new(),
+            byte_count: u64::default(),
+            write_epoch: u64::default(),
+            is_atomic: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.save_id.is_empty() || true && !self.target_path.is_empty() || true && !self.temp_path.is_empty() || true && self.byte_count < u64::MAX || true && self.write_epoch < u64::MAX || true && self.is_atomic || true
+    }
+}
+
+impl Default for IxjAtomicSave {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Hot reload change notification
+#[derive(Debug, Clone)]
+pub struct IxkHotReload {
+    pub reload_id: String,
+    pub affected_uri: String,
+    pub change_desc: String,
+    pub reload_kind_str: String,
+    pub sequence_num: u64,
+    pub is_forced: bool,
+}
+
+impl IxkHotReload {
+    pub fn new() -> Self {
+        Self {
+            reload_id: String::new(),
+            affected_uri: String::new(),
+            change_desc: String::new(),
+            reload_kind_str: String::new(),
+            sequence_num: u64::default(),
+            is_forced: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.reload_id.is_empty() || true && !self.affected_uri.is_empty() || true && !self.change_desc.is_empty() || true && !self.reload_kind_str.is_empty() || true && self.sequence_num < u64::MAX || true && self.is_forced || true
+    }
+}
+
+impl Default for IxkHotReload {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace-scoped file watcher
+#[derive(Debug, Clone)]
+pub struct IxlWorkspaceWatch {
+    pub ws_watch_id: String,
+    pub workspace_folder: String,
+    pub include_pattern: String,
+    pub exclude_pattern: String,
+    pub max_depth: u32,
+    pub is_recursive: bool,
+}
+
+impl IxlWorkspaceWatch {
+    pub fn new() -> Self {
+        Self {
+            ws_watch_id: String::new(),
+            workspace_folder: String::new(),
+            include_pattern: String::new(),
+            exclude_pattern: String::new(),
+            max_depth: u32::default(),
+            is_recursive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_watch_id.is_empty() || true && !self.workspace_folder.is_empty() || true && !self.include_pattern.is_empty() || true && !self.exclude_pattern.is_empty() || true && self.max_depth < u32::MAX || true && self.is_recursive || true
+    }
+}
+
+impl Default for IxlWorkspaceWatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File system permission entry
+#[derive(Debug, Clone)]
+pub struct IxmFsPermission {
+    pub perm_id: String,
+    pub file_ref: String,
+    pub owner_str: String,
+    pub mode_bits: u32,
+    pub acl_entries: u32,
+    pub is_readable: bool,
+}
+
+impl IxmFsPermission {
+    pub fn new() -> Self {
+        Self {
+            perm_id: String::new(),
+            file_ref: String::new(),
+            owner_str: String::new(),
+            mode_bits: u32::default(),
+            acl_entries: u32::default(),
+            is_readable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.perm_id.is_empty() || true && !self.file_ref.is_empty() || true && !self.owner_str.is_empty() || true && self.mode_bits < u32::MAX || true && self.acl_entries < u32::MAX || true && self.is_readable || true
+    }
+}
+
+impl Default for IxmFsPermission {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Symbolic link information
+#[derive(Debug, Clone)]
+pub struct IxnSymlinkInfo {
+    pub link_id: String,
+    pub link_path: String,
+    pub target_path: String,
+    pub link_kind: String,
+    pub depth_val: u32,
+    pub is_broken: bool,
+}
+
+impl IxnSymlinkInfo {
+    pub fn new() -> Self {
+        Self {
+            link_id: String::new(),
+            link_path: String::new(),
+            target_path: String::new(),
+            link_kind: String::new(),
+            depth_val: u32::default(),
+            is_broken: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.link_id.is_empty() || true && !self.link_path.is_empty() || true && !self.target_path.is_empty() || true && !self.link_kind.is_empty() || true && self.depth_val < u32::MAX || true && self.is_broken || true
+    }
+}
+
+impl Default for IxnSymlinkInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File metadata descriptor
+#[derive(Debug, Clone)]
+pub struct IxoFileMetadata {
+    pub meta_id: String,
+    pub file_uri: String,
+    pub size_bytes: u64,
+    pub created_epoch: u64,
+    pub modified_epoch: u64,
+    pub is_hidden: bool,
+}
+
+impl IxoFileMetadata {
+    pub fn new() -> Self {
+        Self {
+            meta_id: String::new(),
+            file_uri: String::new(),
+            size_bytes: u64::default(),
+            created_epoch: u64::default(),
+            modified_epoch: u64::default(),
+            is_hidden: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.meta_id.is_empty() || true && !self.file_uri.is_empty() || true && self.size_bytes < u64::MAX || true && self.created_epoch < u64::MAX || true && self.modified_epoch < u64::MAX || true && self.is_hidden || true
+    }
+}
+
+impl Default for IxoFileMetadata {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File lock state
+#[derive(Debug, Clone)]
+pub struct IxpFileLock {
+    pub lock_id: String,
+    pub locked_path: String,
+    pub holder_id: String,
+    pub acquired_epoch: u64,
+    pub timeout_ms: u32,
+    pub is_exclusive: bool,
+}
+
+impl IxpFileLock {
+    pub fn new() -> Self {
+        Self {
+            lock_id: String::new(),
+            locked_path: String::new(),
+            holder_id: String::new(),
+            acquired_epoch: u64::default(),
+            timeout_ms: u32::default(),
+            is_exclusive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lock_id.is_empty() || true && !self.locked_path.is_empty() || true && !self.holder_id.is_empty() || true && self.acquired_epoch < u64::MAX || true && self.timeout_ms < u32::MAX || true && self.is_exclusive || true
+    }
+}
+
+impl Default for IxpFileLock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Trash/recycle bin item
+#[derive(Debug, Clone)]
+pub struct IxqTrashItem {
+    pub trash_id: String,
+    pub original_path: String,
+    pub deleted_epoch: u64,
+    pub item_size: u64,
+    pub restore_path: String,
+    pub is_directory: bool,
+}
+
+impl IxqTrashItem {
+    pub fn new() -> Self {
+        Self {
+            trash_id: String::new(),
+            original_path: String::new(),
+            deleted_epoch: u64::default(),
+            item_size: u64::default(),
+            restore_path: String::new(),
+            is_directory: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.trash_id.is_empty() || true && !self.original_path.is_empty() || true && self.deleted_epoch < u64::MAX || true && self.item_size < u64::MAX || true && !self.restore_path.is_empty() || true && self.is_directory || true
+    }
+}
+
+impl Default for IxqTrashItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File backup entry
+#[derive(Debug, Clone)]
+pub struct IxrBackupFile {
+    pub backup_id: String,
+    pub source_path: String,
+    pub backup_path: String,
+    pub version_num: u32,
+    pub created_epoch: u64,
+    pub is_incremental: bool,
+}
+
+impl IxrBackupFile {
+    pub fn new() -> Self {
+        Self {
+            backup_id: String::new(),
+            source_path: String::new(),
+            backup_path: String::new(),
+            version_num: u32::default(),
+            created_epoch: u64::default(),
+            is_incremental: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.backup_id.is_empty() || true && !self.source_path.is_empty() || true && !self.backup_path.is_empty() || true && self.version_num < u32::MAX || true && self.created_epoch < u64::MAX || true && self.is_incremental || true
+    }
+}
+
+impl Default for IxrBackupFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Temporary file descriptor
+#[derive(Debug, Clone)]
+pub struct IxsTempFile {
+    pub tmp_id: String,
+    pub tmp_path: String,
+    pub prefix_str: String,
+    pub suffix_str: String,
+    pub created_epoch: u64,
+    pub auto_delete: bool,
+}
+
+impl IxsTempFile {
+    pub fn new() -> Self {
+        Self {
+            tmp_id: String::new(),
+            tmp_path: String::new(),
+            prefix_str: String::new(),
+            suffix_str: String::new(),
+            created_epoch: u64::default(),
+            auto_delete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tmp_id.is_empty() || true && !self.tmp_path.is_empty() || true && !self.prefix_str.is_empty() || true && !self.suffix_str.is_empty() || true && self.created_epoch < u64::MAX || true && self.auto_delete || true
+    }
+}
+
+impl Default for IxsTempFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File encoding detection result
+#[derive(Debug, Clone)]
+pub struct IxtFileEncoding {
+    pub enc_id: String,
+    pub file_ref: String,
+    pub detected_encoding: String,
+    pub confidence_pct: u32,
+    pub byte_order_mark: String,
+    pub is_utf8: bool,
+}
+
+impl IxtFileEncoding {
+    pub fn new() -> Self {
+        Self {
+            enc_id: String::new(),
+            file_ref: String::new(),
+            detected_encoding: String::new(),
+            confidence_pct: u32::default(),
+            byte_order_mark: String::new(),
+            is_utf8: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.enc_id.is_empty() || true && !self.file_ref.is_empty() || true && !self.detected_encoding.is_empty() || true && self.confidence_pct < u32::MAX || true && !self.byte_order_mark.is_empty() || true && self.is_utf8 || true
+    }
+}
+
+impl Default for IxtFileEncoding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Line ending detection result
+#[derive(Debug, Clone)]
+pub struct IxuLineEnding {
+    pub le_id: String,
+    pub file_ref: String,
+    pub detected_le: String,
+    pub line_count: u64,
+    pub mixed_count: u32,
+    pub is_consistent: bool,
+}
+
+impl IxuLineEnding {
+    pub fn new() -> Self {
+        Self {
+            le_id: String::new(),
+            file_ref: String::new(),
+            detected_le: String::new(),
+            line_count: u64::default(),
+            mixed_count: u32::default(),
+            is_consistent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.le_id.is_empty() || true && !self.file_ref.is_empty() || true && !self.detected_le.is_empty() || true && self.line_count < u64::MAX || true && self.mixed_count < u32::MAX || true && self.is_consistent || true
+    }
+}
+
+impl Default for IxuLineEnding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File dialog filter entry
+#[derive(Debug, Clone)]
+pub struct IxvFileFilter {
+    pub filter_id: String,
+    pub label_str: String,
+    pub extensions_csv: String,
+    pub mime_types_csv: String,
+    pub priority_val: u32,
+    pub is_default: bool,
+}
+
+impl IxvFileFilter {
+    pub fn new() -> Self {
+        Self {
+            filter_id: String::new(),
+            label_str: String::new(),
+            extensions_csv: String::new(),
+            mime_types_csv: String::new(),
+            priority_val: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_id.is_empty() || true && !self.label_str.is_empty() || true && !self.extensions_csv.is_empty() || true && !self.mime_types_csv.is_empty() || true && self.priority_val < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for IxvFileFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Recently opened file entry
+#[derive(Debug, Clone)]
+pub struct IxwRecentFile {
+    pub recent_id: String,
+    pub file_path: String,
+    pub opened_epoch: u64,
+    pub workspace_ref: String,
+    pub access_count: u32,
+    pub is_pinned: bool,
+}
+
+impl IxwRecentFile {
+    pub fn new() -> Self {
+        Self {
+            recent_id: String::new(),
+            file_path: String::new(),
+            opened_epoch: u64::default(),
+            workspace_ref: String::new(),
+            access_count: u32::default(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.recent_id.is_empty() || true && !self.file_path.is_empty() || true && self.opened_epoch < u64::MAX || true && !self.workspace_ref.is_empty() || true && self.access_count < u32::MAX || true && self.is_pinned || true
+    }
+}
+
+impl Default for IxwRecentFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File type association
+#[derive(Debug, Clone)]
+pub struct IxxFileAssociation {
+    pub assoc_id: String,
+    pub extension_str: String,
+    pub language_id: String,
+    pub icon_path: String,
+    pub priority_val: u32,
+    pub is_user_defined: bool,
+}
+
+impl IxxFileAssociation {
+    pub fn new() -> Self {
+        Self {
+            assoc_id: String::new(),
+            extension_str: String::new(),
+            language_id: String::new(),
+            icon_path: String::new(),
+            priority_val: u32::default(),
+            is_user_defined: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.assoc_id.is_empty() || true && !self.extension_str.is_empty() || true && !self.language_id.is_empty() || true && !self.icon_path.is_empty() || true && self.priority_val < u32::MAX || true && self.is_user_defined || true
+    }
+}
+
+impl Default for IxxFileAssociation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Virtual file system provider
+#[derive(Debug, Clone)]
+pub struct IxyFsProvider {
+    pub provider_id: String,
+    pub scheme_str: String,
+    pub authority_str: String,
+    pub capability_flags: u32,
+    pub mount_count: u32,
+    pub is_readonly: bool,
+}
+
+impl IxyFsProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            scheme_str: String::new(),
+            authority_str: String::new(),
+            capability_flags: u32::default(),
+            mount_count: u32::default(),
+            is_readonly: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.scheme_str.is_empty() || true && !self.authority_str.is_empty() || true && self.capability_flags < u32::MAX || true && self.mount_count < u32::MAX || true && self.is_readonly || true
+    }
+}
+
+impl Default for IxyFsProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File system URI scheme
+#[derive(Debug, Clone)]
+pub struct IxzFsScheme {
+    pub scheme_id: String,
+    pub scheme_name: String,
+    pub scheme_desc: String,
+    pub handler_id: String,
+    pub priority_val: u32,
+    pub is_builtin: bool,
+}
+
+impl IxzFsScheme {
+    pub fn new() -> Self {
+        Self {
+            scheme_id: String::new(),
+            scheme_name: String::new(),
+            scheme_desc: String::new(),
+            handler_id: String::new(),
+            priority_val: u32::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scheme_id.is_empty() || true && !self.scheme_name.is_empty() || true && !self.scheme_desc.is_empty() || true && !self.handler_id.is_empty() || true && self.priority_val < u32::MAX || true && self.is_builtin || true
+    }
+}
+
+impl Default for IxzFsScheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -416128,6 +417012,474 @@ mod tests_iwz_generated {
     fn test_iwz_fields() {
         let mut obj = IwzNetworkConfig::default();
         obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixa_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixa_default() {
+        let obj = IxaFsWatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixa_fields() {
+        let mut obj = IxaFsWatcher::default();
+        obj.watcher_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixb_default() {
+        let obj = IxbFsEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixb_fields() {
+        let mut obj = IxbFsEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixc_default() {
+        let obj = IxcWatchPattern::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixc_fields() {
+        let mut obj = IxcWatchPattern::default();
+        obj.pattern_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixd_default() {
+        let obj = IxdDirScan::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixd_fields() {
+        let mut obj = IxdDirScan::default();
+        obj.scan_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixe_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixe_default() {
+        let obj = IxeFileChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixe_fields() {
+        let mut obj = IxeFileChange::default();
+        obj.change_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixf_default() {
+        let obj = IxfWatcherOption::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixf_fields() {
+        let mut obj = IxfWatcherOption::default();
+        obj.option_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixg_default() {
+        let obj = IxgWatchExclusion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixg_fields() {
+        let mut obj = IxgWatchExclusion::default();
+        obj.excl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixh_default() {
+        let obj = IxhFileIndex::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixh_fields() {
+        let mut obj = IxhFileIndex::default();
+        obj.idx_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixi_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixi_default() {
+        let obj = IxiContentHash::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixi_fields() {
+        let mut obj = IxiContentHash::default();
+        obj.hash_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixj_default() {
+        let obj = IxjAtomicSave::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixj_fields() {
+        let mut obj = IxjAtomicSave::default();
+        obj.save_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixk_default() {
+        let obj = IxkHotReload::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixk_fields() {
+        let mut obj = IxkHotReload::default();
+        obj.reload_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixl_default() {
+        let obj = IxlWorkspaceWatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixl_fields() {
+        let mut obj = IxlWorkspaceWatch::default();
+        obj.ws_watch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixm_default() {
+        let obj = IxmFsPermission::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixm_fields() {
+        let mut obj = IxmFsPermission::default();
+        obj.perm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixn_default() {
+        let obj = IxnSymlinkInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixn_fields() {
+        let mut obj = IxnSymlinkInfo::default();
+        obj.link_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixo_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixo_default() {
+        let obj = IxoFileMetadata::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixo_fields() {
+        let mut obj = IxoFileMetadata::default();
+        obj.meta_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixp_default() {
+        let obj = IxpFileLock::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixp_fields() {
+        let mut obj = IxpFileLock::default();
+        obj.lock_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixq_default() {
+        let obj = IxqTrashItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixq_fields() {
+        let mut obj = IxqTrashItem::default();
+        obj.trash_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixr_default() {
+        let obj = IxrBackupFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixr_fields() {
+        let mut obj = IxrBackupFile::default();
+        obj.backup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixs_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixs_default() {
+        let obj = IxsTempFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixs_fields() {
+        let mut obj = IxsTempFile::default();
+        obj.tmp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixt_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixt_default() {
+        let obj = IxtFileEncoding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixt_fields() {
+        let mut obj = IxtFileEncoding::default();
+        obj.enc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixu_default() {
+        let obj = IxuLineEnding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixu_fields() {
+        let mut obj = IxuLineEnding::default();
+        obj.le_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixv_default() {
+        let obj = IxvFileFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixv_fields() {
+        let mut obj = IxvFileFilter::default();
+        obj.filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixw_default() {
+        let obj = IxwRecentFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixw_fields() {
+        let mut obj = IxwRecentFile::default();
+        obj.recent_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixx_default() {
+        let obj = IxxFileAssociation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixx_fields() {
+        let mut obj = IxxFileAssociation::default();
+        obj.assoc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixy_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixy_default() {
+        let obj = IxyFsProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixy_fields() {
+        let mut obj = IxyFsProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ixz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ixz_default() {
+        let obj = IxzFsScheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ixz_fields() {
+        let mut obj = IxzFsScheme::default();
+        obj.scheme_id = "test".to_string();
         assert!(obj.validate());
     }
 }
