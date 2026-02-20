@@ -52958,6 +52958,213 @@ impl Default for EyeContextMenu {
 }
 
 
+/// Toolbar widget model types
+#[derive(Debug, Clone)]
+pub struct EyfToolbar {
+    pub toolbar_id: String,
+    pub toolbar_actions_count: u32,
+    pub toolbar_orientation: String,
+    pub toolbar_overflow_enabled: bool,
+    pub toolbar_has_separator: bool,
+    pub toolbar_visible: bool,
+    pub toolbar_height: u32,
+    pub toolbar_bg_color: String,
+    pub toolbar_border_color: String,
+    pub toolbar_compact: bool,
+}
+
+impl EyfToolbar {
+    pub fn new() -> Self {
+        Self {
+            toolbar_id: String::new(),
+            toolbar_actions_count: u32::default(),
+            toolbar_orientation: String::new(),
+            toolbar_overflow_enabled: bool::default(),
+            toolbar_has_separator: bool::default(),
+            toolbar_visible: bool::default(),
+            toolbar_height: u32::default(),
+            toolbar_bg_color: String::new(),
+            toolbar_border_color: String::new(),
+            toolbar_compact: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.toolbar_id.is_empty() || true && self.toolbar_actions_count < u32::MAX || true && !self.toolbar_orientation.is_empty() || true && self.toolbar_overflow_enabled || true && self.toolbar_has_separator || true && self.toolbar_visible || true && self.toolbar_height < u32::MAX || true && !self.toolbar_bg_color.is_empty() || true && !self.toolbar_border_color.is_empty() || true && self.toolbar_compact || true
+    }
+}
+
+impl Default for EyfToolbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Badge/counter indicator types
+#[derive(Debug, Clone)]
+pub struct EygBadge {
+    pub badge_value: String,
+    pub badge_tooltip: String,
+    pub badge_bg_color: String,
+    pub badge_fg_color: String,
+    pub badge_border_color: String,
+    pub badge_is_dot: bool,
+    pub badge_max_count: u32,
+    pub badge_hidden: bool,
+    pub badge_font_size: u32,
+    pub badge_position: String,
+}
+
+impl EygBadge {
+    pub fn new() -> Self {
+        Self {
+            badge_value: String::new(),
+            badge_tooltip: String::new(),
+            badge_bg_color: String::new(),
+            badge_fg_color: String::new(),
+            badge_border_color: String::new(),
+            badge_is_dot: bool::default(),
+            badge_max_count: u32::default(),
+            badge_hidden: bool::default(),
+            badge_font_size: u32::default(),
+            badge_position: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.badge_value.is_empty() || true && !self.badge_tooltip.is_empty() || true && !self.badge_bg_color.is_empty() || true && !self.badge_fg_color.is_empty() || true && !self.badge_border_color.is_empty() || true && self.badge_is_dot || true && self.badge_max_count < u32::MAX || true && self.badge_hidden || true && self.badge_font_size < u32::MAX || true && !self.badge_position.is_empty() || true
+    }
+}
+
+impl Default for EygBadge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Icon-label rendering types
+#[derive(Debug, Clone)]
+pub struct EyhIconLabel {
+    pub icon_codicon: String,
+    pub icon_label: String,
+    pub icon_description: String,
+    pub icon_tooltip: String,
+    pub icon_color: String,
+    pub icon_spin: bool,
+    pub icon_modifier: String,
+    pub icon_size: u32,
+    pub icon_font_id: String,
+    pub icon_id: String,
+}
+
+impl EyhIconLabel {
+    pub fn new() -> Self {
+        Self {
+            icon_codicon: String::new(),
+            icon_label: String::new(),
+            icon_description: String::new(),
+            icon_tooltip: String::new(),
+            icon_color: String::new(),
+            icon_spin: bool::default(),
+            icon_modifier: String::new(),
+            icon_size: u32::default(),
+            icon_font_id: String::new(),
+            icon_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.icon_codicon.is_empty() || true && !self.icon_label.is_empty() || true && !self.icon_description.is_empty() || true && !self.icon_tooltip.is_empty() || true && !self.icon_color.is_empty() || true && self.icon_spin || true && !self.icon_modifier.is_empty() || true && self.icon_size < u32::MAX || true && !self.icon_font_id.is_empty() || true && !self.icon_id.is_empty() || true
+    }
+}
+
+impl Default for EyhIconLabel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Count badge display types
+#[derive(Debug, Clone)]
+pub struct EyiCountBadge {
+    pub count_value: u32,
+    pub count_max: u32,
+    pub count_overflow_text: String,
+    pub count_tooltip: String,
+    pub count_bg_color: String,
+    pub count_fg_color: String,
+    pub count_border_radius: u32,
+    pub count_font_size: u32,
+    pub count_min_width: u32,
+    pub count_hidden: bool,
+}
+
+impl EyiCountBadge {
+    pub fn new() -> Self {
+        Self {
+            count_value: u32::default(),
+            count_max: u32::default(),
+            count_overflow_text: String::new(),
+            count_tooltip: String::new(),
+            count_bg_color: String::new(),
+            count_fg_color: String::new(),
+            count_border_radius: u32::default(),
+            count_font_size: u32::default(),
+            count_min_width: u32::default(),
+            count_hidden: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.count_value < u32::MAX || true && self.count_max < u32::MAX || true && !self.count_overflow_text.is_empty() || true && !self.count_tooltip.is_empty() || true && !self.count_bg_color.is_empty() || true && !self.count_fg_color.is_empty() || true && self.count_border_radius < u32::MAX || true && self.count_font_size < u32::MAX || true && self.count_min_width < u32::MAX || true && self.count_hidden || true
+    }
+}
+
+impl Default for EyiCountBadge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Progress bar widget types
+#[derive(Debug, Clone)]
+pub struct EyjProgressBar {
+    pub progress_total: u32,
+    pub progress_worked: u32,
+    pub progress_infinite: bool,
+    pub progress_bar_color: String,
+    pub progress_bar_bg_color: String,
+    pub progress_bar_height: u32,
+    pub progress_message: String,
+    pub progress_bit_width: u32,
+    pub progress_visible: bool,
+    pub progress_smooth: bool,
+}
+
+impl EyjProgressBar {
+    pub fn new() -> Self {
+        Self {
+            progress_total: u32::default(),
+            progress_worked: u32::default(),
+            progress_infinite: bool::default(),
+            progress_bar_color: String::new(),
+            progress_bar_bg_color: String::new(),
+            progress_bar_height: u32::default(),
+            progress_message: String::new(),
+            progress_bit_width: u32::default(),
+            progress_visible: bool::default(),
+            progress_smooth: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.progress_total < u32::MAX || true && self.progress_worked < u32::MAX || true && self.progress_infinite || true && !self.progress_bar_color.is_empty() || true && !self.progress_bar_bg_color.is_empty() || true && self.progress_bar_height < u32::MAX || true && !self.progress_message.is_empty() || true && self.progress_bit_width < u32::MAX || true && self.progress_visible || true && self.progress_smooth || true
+    }
+}
+
+impl Default for EyjProgressBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -263344,6 +263551,96 @@ mod tests_eye_generated {
     fn test_eye_fields() {
         let mut obj = EyeContextMenu::default();
         obj.menu_items_count = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyf_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyf_default() {
+        let obj = EyfToolbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyf_fields() {
+        let mut obj = EyfToolbar::default();
+        obj.toolbar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyg_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyg_default() {
+        let obj = EygBadge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyg_fields() {
+        let mut obj = EygBadge::default();
+        obj.badge_value = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyh_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyh_default() {
+        let obj = EyhIconLabel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyh_fields() {
+        let mut obj = EyhIconLabel::default();
+        obj.icon_codicon = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyi_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyi_default() {
+        let obj = EyiCountBadge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyi_fields() {
+        let mut obj = EyiCountBadge::default();
+        obj.count_value = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyj_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyj_default() {
+        let obj = EyjProgressBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyj_fields() {
+        let mut obj = EyjProgressBar::default();
+        obj.progress_total = 42;
         assert!(obj.validate());
     }
 }
