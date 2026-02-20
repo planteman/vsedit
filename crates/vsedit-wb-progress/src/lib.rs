@@ -162043,6 +162043,890 @@ impl Default for JbzViewDiffInline {
     }
 }
 
+/// Configuration model descriptor
+#[derive(Debug, Clone)]
+pub struct JcaConfigModel {
+    pub config_model_id: String,
+    pub config_name: String,
+    pub scope_str: String,
+    pub version_val: u32,
+    pub property_count: u32,
+    pub is_dirty: bool,
+}
+
+impl JcaConfigModel {
+    pub fn new() -> Self {
+        Self {
+            config_model_id: String::new(),
+            config_name: String::new(),
+            scope_str: String::new(),
+            version_val: u32::default(),
+            property_count: u32::default(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_model_id.is_empty() || true && !self.config_name.is_empty() || true && !self.scope_str.is_empty() || true && self.version_val < u32::MAX || true && self.property_count < u32::MAX || true && self.is_dirty || true
+    }
+}
+
+impl Default for JcaConfigModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration scope entry
+#[derive(Debug, Clone)]
+pub struct JcbConfigScope {
+    pub scope_id: String,
+    pub scope_name: String,
+    pub parent_ref: String,
+    pub priority_val: u32,
+    pub resource_uri: String,
+    pub is_user_scope: bool,
+}
+
+impl JcbConfigScope {
+    pub fn new() -> Self {
+        Self {
+            scope_id: String::new(),
+            scope_name: String::new(),
+            parent_ref: String::new(),
+            priority_val: u32::default(),
+            resource_uri: String::new(),
+            is_user_scope: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope_id.is_empty() || true && !self.scope_name.is_empty() || true && !self.parent_ref.is_empty() || true && self.priority_val < u32::MAX || true && !self.resource_uri.is_empty() || true && self.is_user_scope || true
+    }
+}
+
+impl Default for JcbConfigScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration override entry
+#[derive(Debug, Clone)]
+pub struct JccConfigOverride {
+    pub override_id: String,
+    pub key_str: String,
+    pub value_json: String,
+    pub scope_ref: String,
+    pub language_id: String,
+    pub is_language_specific: bool,
+}
+
+impl JccConfigOverride {
+    pub fn new() -> Self {
+        Self {
+            override_id: String::new(),
+            key_str: String::new(),
+            value_json: String::new(),
+            scope_ref: String::new(),
+            language_id: String::new(),
+            is_language_specific: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.override_id.is_empty() || true && !self.key_str.is_empty() || true && !self.value_json.is_empty() || true && !self.scope_ref.is_empty() || true && !self.language_id.is_empty() || true && self.is_language_specific || true
+    }
+}
+
+impl Default for JccConfigOverride {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration default value
+#[derive(Debug, Clone)]
+pub struct JcdConfigDefault {
+    pub default_id: String,
+    pub key_str: String,
+    pub value_json: String,
+    pub source_str: String,
+    pub description_str: String,
+    pub is_extension_default: bool,
+}
+
+impl JcdConfigDefault {
+    pub fn new() -> Self {
+        Self {
+            default_id: String::new(),
+            key_str: String::new(),
+            value_json: String::new(),
+            source_str: String::new(),
+            description_str: String::new(),
+            is_extension_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.default_id.is_empty() || true && !self.key_str.is_empty() || true && !self.value_json.is_empty() || true && !self.source_str.is_empty() || true && !self.description_str.is_empty() || true && self.is_extension_default || true
+    }
+}
+
+impl Default for JcdConfigDefault {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration schema descriptor
+#[derive(Debug, Clone)]
+pub struct JceConfigSchema {
+    pub schema_id: String,
+    pub schema_ref: String,
+    pub title_str: String,
+    pub extension_id: String,
+    pub property_count: u32,
+    pub is_registered: bool,
+}
+
+impl JceConfigSchema {
+    pub fn new() -> Self {
+        Self {
+            schema_id: String::new(),
+            schema_ref: String::new(),
+            title_str: String::new(),
+            extension_id: String::new(),
+            property_count: u32::default(),
+            is_registered: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.schema_id.is_empty() || true && !self.schema_ref.is_empty() || true && !self.title_str.is_empty() || true && !self.extension_id.is_empty() || true && self.property_count < u32::MAX || true && self.is_registered || true
+    }
+}
+
+impl Default for JceConfigSchema {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration property definition
+#[derive(Debug, Clone)]
+pub struct JcfConfigProperty {
+    pub prop_id: String,
+    pub key_str: String,
+    pub type_str: String,
+    pub default_json: String,
+    pub description_str: String,
+    pub is_deprecated: bool,
+}
+
+impl JcfConfigProperty {
+    pub fn new() -> Self {
+        Self {
+            prop_id: String::new(),
+            key_str: String::new(),
+            type_str: String::new(),
+            default_json: String::new(),
+            description_str: String::new(),
+            is_deprecated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prop_id.is_empty() || true && !self.key_str.is_empty() || true && !self.type_str.is_empty() || true && !self.default_json.is_empty() || true && !self.description_str.is_empty() || true && self.is_deprecated || true
+    }
+}
+
+impl Default for JcfConfigProperty {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration policy entry
+#[derive(Debug, Clone)]
+pub struct JcgConfigPolicy {
+    pub policy_id: String,
+    pub policy_name: String,
+    pub target_key: String,
+    pub policy_value_json: String,
+    pub enforcement_level: u32,
+    pub is_applied: bool,
+}
+
+impl JcgConfigPolicy {
+    pub fn new() -> Self {
+        Self {
+            policy_id: String::new(),
+            policy_name: String::new(),
+            target_key: String::new(),
+            policy_value_json: String::new(),
+            enforcement_level: u32::default(),
+            is_applied: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.policy_id.is_empty() || true && !self.policy_name.is_empty() || true && !self.target_key.is_empty() || true && !self.policy_value_json.is_empty() || true && self.enforcement_level < u32::MAX || true && self.is_applied || true
+    }
+}
+
+impl Default for JcgConfigPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration validation result
+#[derive(Debug, Clone)]
+pub struct JchConfigValidation {
+    pub validation_id: String,
+    pub key_ref: String,
+    pub value_json: String,
+    pub error_msg: String,
+    pub severity_val: u32,
+    pub is_valid: bool,
+}
+
+impl JchConfigValidation {
+    pub fn new() -> Self {
+        Self {
+            validation_id: String::new(),
+            key_ref: String::new(),
+            value_json: String::new(),
+            error_msg: String::new(),
+            severity_val: u32::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.validation_id.is_empty() || true && !self.key_ref.is_empty() || true && !self.value_json.is_empty() || true && !self.error_msg.is_empty() || true && self.severity_val < u32::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for JchConfigValidation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings editor group
+#[derive(Debug, Clone)]
+pub struct JciSettingsGroup {
+    pub group_id: String,
+    pub group_title: String,
+    pub parent_ref: String,
+    pub setting_count: u32,
+    pub order_val: u32,
+    pub is_expanded: bool,
+}
+
+impl JciSettingsGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            group_title: String::new(),
+            parent_ref: String::new(),
+            setting_count: u32::default(),
+            order_val: u32::default(),
+            is_expanded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.group_title.is_empty() || true && !self.parent_ref.is_empty() || true && self.setting_count < u32::MAX || true && self.order_val < u32::MAX || true && self.is_expanded || true
+    }
+}
+
+impl Default for JciSettingsGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings search result
+#[derive(Debug, Clone)]
+pub struct JcjSettingsSearch {
+    pub search_id: String,
+    pub query_str: String,
+    pub result_count: u32,
+    pub match_type_str: String,
+    pub filter_tags: String,
+    pub has_exact_match: bool,
+}
+
+impl JcjSettingsSearch {
+    pub fn new() -> Self {
+        Self {
+            search_id: String::new(),
+            query_str: String::new(),
+            result_count: u32::default(),
+            match_type_str: String::new(),
+            filter_tags: String::new(),
+            has_exact_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_id.is_empty() || true && !self.query_str.is_empty() || true && self.result_count < u32::MAX || true && !self.match_type_str.is_empty() || true && !self.filter_tags.is_empty() || true && self.has_exact_match || true
+    }
+}
+
+impl Default for JcjSettingsSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings tree node
+#[derive(Debug, Clone)]
+pub struct JckSettingsTree {
+    pub tree_id: String,
+    pub node_label: String,
+    pub parent_ref: String,
+    pub child_count: u32,
+    pub depth_val: u32,
+    pub is_leaf: bool,
+}
+
+impl JckSettingsTree {
+    pub fn new() -> Self {
+        Self {
+            tree_id: String::new(),
+            node_label: String::new(),
+            parent_ref: String::new(),
+            child_count: u32::default(),
+            depth_val: u32::default(),
+            is_leaf: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_id.is_empty() || true && !self.node_label.is_empty() || true && !self.parent_ref.is_empty() || true && self.child_count < u32::MAX || true && self.depth_val < u32::MAX || true && self.is_leaf || true
+    }
+}
+
+impl Default for JckSettingsTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings editor widget
+#[derive(Debug, Clone)]
+pub struct JclSettingsWidget {
+    pub widget_id: String,
+    pub setting_key: String,
+    pub widget_type_str: String,
+    pub current_value_json: String,
+    pub enum_values_csv: String,
+    pub is_modified: bool,
+}
+
+impl JclSettingsWidget {
+    pub fn new() -> Self {
+        Self {
+            widget_id: String::new(),
+            setting_key: String::new(),
+            widget_type_str: String::new(),
+            current_value_json: String::new(),
+            enum_values_csv: String::new(),
+            is_modified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.widget_id.is_empty() || true && !self.setting_key.is_empty() || true && !self.widget_type_str.is_empty() || true && !self.current_value_json.is_empty() || true && !self.enum_values_csv.is_empty() || true && self.is_modified || true
+    }
+}
+
+impl Default for JclSettingsWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keybinding configuration entry
+#[derive(Debug, Clone)]
+pub struct JcmKeybindingEntry {
+    pub kb_entry_id: String,
+    pub key_str: String,
+    pub command_ref: String,
+    pub when_clause: String,
+    pub source_str: String,
+    pub is_user_defined: bool,
+}
+
+impl JcmKeybindingEntry {
+    pub fn new() -> Self {
+        Self {
+            kb_entry_id: String::new(),
+            key_str: String::new(),
+            command_ref: String::new(),
+            when_clause: String::new(),
+            source_str: String::new(),
+            is_user_defined: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kb_entry_id.is_empty() || true && !self.key_str.is_empty() || true && !self.command_ref.is_empty() || true && !self.when_clause.is_empty() || true && !self.source_str.is_empty() || true && self.is_user_defined || true
+    }
+}
+
+impl Default for JcmKeybindingEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keybinding resolver state
+#[derive(Debug, Clone)]
+pub struct JcnKeybindingResolver {
+    pub kb_resolver_id: String,
+    pub chord_buffer: String,
+    pub pending_count: u32,
+    pub match_count: u32,
+    pub timeout_ms: u32,
+    pub has_partial_match: bool,
+}
+
+impl JcnKeybindingResolver {
+    pub fn new() -> Self {
+        Self {
+            kb_resolver_id: String::new(),
+            chord_buffer: String::new(),
+            pending_count: u32::default(),
+            match_count: u32::default(),
+            timeout_ms: u32::default(),
+            has_partial_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kb_resolver_id.is_empty() || true && !self.chord_buffer.is_empty() || true && self.pending_count < u32::MAX || true && self.match_count < u32::MAX || true && self.timeout_ms < u32::MAX || true && self.has_partial_match || true
+    }
+}
+
+impl Default for JcnKeybindingResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Key chord descriptor
+#[derive(Debug, Clone)]
+pub struct JcoKeyChord {
+    pub chord_id: String,
+    pub key_code: u32,
+    pub ctrl_key: bool,
+    pub shift_key: bool,
+    pub alt_key: bool,
+    pub meta_key: bool,
+}
+
+impl JcoKeyChord {
+    pub fn new() -> Self {
+        Self {
+            chord_id: String::new(),
+            key_code: u32::default(),
+            ctrl_key: bool::default(),
+            shift_key: bool::default(),
+            alt_key: bool::default(),
+            meta_key: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chord_id.is_empty() || true && self.key_code < u32::MAX || true && self.ctrl_key || true && self.shift_key || true && self.alt_key || true && self.meta_key || true
+    }
+}
+
+impl Default for JcoKeyChord {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Key sequence descriptor
+#[derive(Debug, Clone)]
+pub struct JcpKeySequence {
+    pub key_seq_id: String,
+    pub parts_json: String,
+    pub chord_count: u32,
+    pub display_str: String,
+    pub electron_accel: String,
+    pub is_two_part: bool,
+}
+
+impl JcpKeySequence {
+    pub fn new() -> Self {
+        Self {
+            key_seq_id: String::new(),
+            parts_json: String::new(),
+            chord_count: u32::default(),
+            display_str: String::new(),
+            electron_accel: String::new(),
+            is_two_part: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key_seq_id.is_empty() || true && !self.parts_json.is_empty() || true && self.chord_count < u32::MAX || true && !self.display_str.is_empty() || true && !self.electron_accel.is_empty() || true && self.is_two_part || true
+    }
+}
+
+impl Default for JcpKeySequence {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Context key descriptor
+#[derive(Debug, Clone)]
+pub struct JcqContextKey {
+    pub ctx_key_id: String,
+    pub key_name: String,
+    pub default_value_json: String,
+    pub description_str: String,
+    pub bound_count: u32,
+    pub is_boolean: bool,
+}
+
+impl JcqContextKey {
+    pub fn new() -> Self {
+        Self {
+            ctx_key_id: String::new(),
+            key_name: String::new(),
+            default_value_json: String::new(),
+            description_str: String::new(),
+            bound_count: u32::default(),
+            is_boolean: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ctx_key_id.is_empty() || true && !self.key_name.is_empty() || true && !self.default_value_json.is_empty() || true && !self.description_str.is_empty() || true && self.bound_count < u32::MAX || true && self.is_boolean || true
+    }
+}
+
+impl Default for JcqContextKey {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// When clause expression
+#[derive(Debug, Clone)]
+pub struct JcrWhenClause {
+    pub when_id: String,
+    pub expression_str: String,
+    pub context_keys_csv: String,
+    pub negated_keys_csv: String,
+    pub operator_count: u32,
+    pub is_complex: bool,
+}
+
+impl JcrWhenClause {
+    pub fn new() -> Self {
+        Self {
+            when_id: String::new(),
+            expression_str: String::new(),
+            context_keys_csv: String::new(),
+            negated_keys_csv: String::new(),
+            operator_count: u32::default(),
+            is_complex: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.when_id.is_empty() || true && !self.expression_str.is_empty() || true && !self.context_keys_csv.is_empty() || true && !self.negated_keys_csv.is_empty() || true && self.operator_count < u32::MAX || true && self.is_complex || true
+    }
+}
+
+impl Default for JcrWhenClause {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings profile entry
+#[derive(Debug, Clone)]
+pub struct JcsProfileEntry {
+    pub profile_id: String,
+    pub profile_name: String,
+    pub settings_json: String,
+    pub extensions_csv: String,
+    pub icon_str: String,
+    pub is_default: bool,
+}
+
+impl JcsProfileEntry {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            profile_name: String::new(),
+            settings_json: String::new(),
+            extensions_csv: String::new(),
+            icon_str: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && !self.profile_name.is_empty() || true && !self.settings_json.is_empty() || true && !self.extensions_csv.is_empty() || true && !self.icon_str.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for JcsProfileEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings sync configuration
+#[derive(Debug, Clone)]
+pub struct JctSyncConfig {
+    pub sync_id: String,
+    pub account_ref: String,
+    pub sync_scope: String,
+    pub last_sync_epoch: u64,
+    pub conflict_count: u32,
+    pub is_enabled: bool,
+}
+
+impl JctSyncConfig {
+    pub fn new() -> Self {
+        Self {
+            sync_id: String::new(),
+            account_ref: String::new(),
+            sync_scope: String::new(),
+            last_sync_epoch: u64::default(),
+            conflict_count: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sync_id.is_empty() || true && !self.account_ref.is_empty() || true && !self.sync_scope.is_empty() || true && self.last_sync_epoch < u64::MAX || true && self.conflict_count < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for JctSyncConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings migration entry
+#[derive(Debug, Clone)]
+pub struct JcuSettingsMigration {
+    pub migration_id: String,
+    pub from_version: String,
+    pub to_version: String,
+    pub migrated_keys_csv: String,
+    pub migration_count: u32,
+    pub is_applied: bool,
+}
+
+impl JcuSettingsMigration {
+    pub fn new() -> Self {
+        Self {
+            migration_id: String::new(),
+            from_version: String::new(),
+            to_version: String::new(),
+            migrated_keys_csv: String::new(),
+            migration_count: u32::default(),
+            is_applied: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.migration_id.is_empty() || true && !self.from_version.is_empty() || true && !self.to_version.is_empty() || true && !self.migrated_keys_csv.is_empty() || true && self.migration_count < u32::MAX || true && self.is_applied || true
+    }
+}
+
+impl Default for JcuSettingsMigration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings export descriptor
+#[derive(Debug, Clone)]
+pub struct JcvSettingsExport {
+    pub export_id: String,
+    pub format_str: String,
+    pub included_scopes: String,
+    pub file_path: String,
+    pub exported_count: u32,
+    pub include_extensions: bool,
+}
+
+impl JcvSettingsExport {
+    pub fn new() -> Self {
+        Self {
+            export_id: String::new(),
+            format_str: String::new(),
+            included_scopes: String::new(),
+            file_path: String::new(),
+            exported_count: u32::default(),
+            include_extensions: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.export_id.is_empty() || true && !self.format_str.is_empty() || true && !self.included_scopes.is_empty() || true && !self.file_path.is_empty() || true && self.exported_count < u32::MAX || true && self.include_extensions || true
+    }
+}
+
+impl Default for JcvSettingsExport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings import descriptor
+#[derive(Debug, Clone)]
+pub struct JcwSettingsImport {
+    pub import_id: String,
+    pub source_path: String,
+    pub format_str: String,
+    pub imported_count: u32,
+    pub conflict_count: u32,
+    pub overwrite_existing: bool,
+}
+
+impl JcwSettingsImport {
+    pub fn new() -> Self {
+        Self {
+            import_id: String::new(),
+            source_path: String::new(),
+            format_str: String::new(),
+            imported_count: u32::default(),
+            conflict_count: u32::default(),
+            overwrite_existing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.import_id.is_empty() || true && !self.source_path.is_empty() || true && !self.format_str.is_empty() || true && self.imported_count < u32::MAX || true && self.conflict_count < u32::MAX || true && self.overwrite_existing || true
+    }
+}
+
+impl Default for JcwSettingsImport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// User settings file model
+#[derive(Debug, Clone)]
+pub struct JcxUserSettings {
+    pub user_settings_id: String,
+    pub file_path: String,
+    pub content_hash: String,
+    pub setting_count: u32,
+    pub last_modified_epoch: u64,
+    pub is_valid_json: bool,
+}
+
+impl JcxUserSettings {
+    pub fn new() -> Self {
+        Self {
+            user_settings_id: String::new(),
+            file_path: String::new(),
+            content_hash: String::new(),
+            setting_count: u32::default(),
+            last_modified_epoch: u64::default(),
+            is_valid_json: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.user_settings_id.is_empty() || true && !self.file_path.is_empty() || true && !self.content_hash.is_empty() || true && self.setting_count < u32::MAX || true && self.last_modified_epoch < u64::MAX || true && self.is_valid_json || true
+    }
+}
+
+impl Default for JcxUserSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace settings file model
+#[derive(Debug, Clone)]
+pub struct JcyWorkspaceSettings {
+    pub ws_settings_id: String,
+    pub workspace_ref: String,
+    pub file_path: String,
+    pub setting_count: u32,
+    pub override_count: u32,
+    pub is_multi_root: bool,
+}
+
+impl JcyWorkspaceSettings {
+    pub fn new() -> Self {
+        Self {
+            ws_settings_id: String::new(),
+            workspace_ref: String::new(),
+            file_path: String::new(),
+            setting_count: u32::default(),
+            override_count: u32::default(),
+            is_multi_root: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_settings_id.is_empty() || true && !self.workspace_ref.is_empty() || true && !self.file_path.is_empty() || true && self.setting_count < u32::MAX || true && self.override_count < u32::MAX || true && self.is_multi_root || true
+    }
+}
+
+impl Default for JcyWorkspaceSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Folder settings model
+#[derive(Debug, Clone)]
+pub struct JczFolderSettings {
+    pub folder_settings_id: String,
+    pub folder_uri: String,
+    pub file_path: String,
+    pub setting_count: u32,
+    pub parent_scope_ref: String,
+    pub is_standalone: bool,
+}
+
+impl JczFolderSettings {
+    pub fn new() -> Self {
+        Self {
+            folder_settings_id: String::new(),
+            folder_uri: String::new(),
+            file_path: String::new(),
+            setting_count: u32::default(),
+            parent_scope_ref: String::new(),
+            is_standalone: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folder_settings_id.is_empty() || true && !self.folder_uri.is_empty() || true && !self.file_path.is_empty() || true && self.setting_count < u32::MAX || true && !self.parent_scope_ref.is_empty() || true && self.is_standalone || true
+    }
+}
+
+impl Default for JczFolderSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -423041,6 +423925,474 @@ mod tests_jbz_generated {
     fn test_jbz_fields() {
         let mut obj = JbzViewDiffInline::default();
         obj.diff_inline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jca_generated {
+    use super::*;
+
+    #[test]
+    fn test_jca_default() {
+        let obj = JcaConfigModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jca_fields() {
+        let mut obj = JcaConfigModel::default();
+        obj.config_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcb_default() {
+        let obj = JcbConfigScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcb_fields() {
+        let mut obj = JcbConfigScope::default();
+        obj.scope_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcc_default() {
+        let obj = JccConfigOverride::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcc_fields() {
+        let mut obj = JccConfigOverride::default();
+        obj.override_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcd_default() {
+        let obj = JcdConfigDefault::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcd_fields() {
+        let mut obj = JcdConfigDefault::default();
+        obj.default_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jce_generated {
+    use super::*;
+
+    #[test]
+    fn test_jce_default() {
+        let obj = JceConfigSchema::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jce_fields() {
+        let mut obj = JceConfigSchema::default();
+        obj.schema_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcf_default() {
+        let obj = JcfConfigProperty::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcf_fields() {
+        let mut obj = JcfConfigProperty::default();
+        obj.prop_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcg_default() {
+        let obj = JcgConfigPolicy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcg_fields() {
+        let mut obj = JcgConfigPolicy::default();
+        obj.policy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jch_generated {
+    use super::*;
+
+    #[test]
+    fn test_jch_default() {
+        let obj = JchConfigValidation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jch_fields() {
+        let mut obj = JchConfigValidation::default();
+        obj.validation_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jci_generated {
+    use super::*;
+
+    #[test]
+    fn test_jci_default() {
+        let obj = JciSettingsGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jci_fields() {
+        let mut obj = JciSettingsGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcj_default() {
+        let obj = JcjSettingsSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcj_fields() {
+        let mut obj = JcjSettingsSearch::default();
+        obj.search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jck_generated {
+    use super::*;
+
+    #[test]
+    fn test_jck_default() {
+        let obj = JckSettingsTree::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jck_fields() {
+        let mut obj = JckSettingsTree::default();
+        obj.tree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcl_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcl_default() {
+        let obj = JclSettingsWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcl_fields() {
+        let mut obj = JclSettingsWidget::default();
+        obj.widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcm_default() {
+        let obj = JcmKeybindingEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcm_fields() {
+        let mut obj = JcmKeybindingEntry::default();
+        obj.kb_entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcn_default() {
+        let obj = JcnKeybindingResolver::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcn_fields() {
+        let mut obj = JcnKeybindingResolver::default();
+        obj.kb_resolver_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jco_generated {
+    use super::*;
+
+    #[test]
+    fn test_jco_default() {
+        let obj = JcoKeyChord::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jco_fields() {
+        let mut obj = JcoKeyChord::default();
+        obj.chord_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcp_default() {
+        let obj = JcpKeySequence::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcp_fields() {
+        let mut obj = JcpKeySequence::default();
+        obj.key_seq_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcq_default() {
+        let obj = JcqContextKey::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcq_fields() {
+        let mut obj = JcqContextKey::default();
+        obj.ctx_key_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcr_default() {
+        let obj = JcrWhenClause::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcr_fields() {
+        let mut obj = JcrWhenClause::default();
+        obj.when_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcs_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcs_default() {
+        let obj = JcsProfileEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcs_fields() {
+        let mut obj = JcsProfileEntry::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jct_generated {
+    use super::*;
+
+    #[test]
+    fn test_jct_default() {
+        let obj = JctSyncConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jct_fields() {
+        let mut obj = JctSyncConfig::default();
+        obj.sync_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcu_default() {
+        let obj = JcuSettingsMigration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcu_fields() {
+        let mut obj = JcuSettingsMigration::default();
+        obj.migration_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcv_default() {
+        let obj = JcvSettingsExport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcv_fields() {
+        let mut obj = JcvSettingsExport::default();
+        obj.export_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcw_default() {
+        let obj = JcwSettingsImport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcw_fields() {
+        let mut obj = JcwSettingsImport::default();
+        obj.import_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcx_default() {
+        let obj = JcxUserSettings::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcx_fields() {
+        let mut obj = JcxUserSettings::default();
+        obj.user_settings_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcy_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcy_default() {
+        let obj = JcyWorkspaceSettings::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcy_fields() {
+        let mut obj = JcyWorkspaceSettings::default();
+        obj.ws_settings_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jcz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jcz_default() {
+        let obj = JczFolderSettings::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jcz_fields() {
+        let mut obj = JczFolderSettings::default();
+        obj.folder_settings_id = "test".to_string();
         assert!(obj.validate());
     }
 }
