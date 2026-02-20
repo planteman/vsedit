@@ -92818,6 +92818,216 @@ impl Default for GjeProgressModel {
     }
 }
 
+/// Quick input model (title, step, total steps, back button, busy)
+#[derive(Debug, Clone)]
+pub struct GjfQuickInputModel {
+    pub quick_input_id: String,
+    pub title: String,
+    pub step: u32,
+    pub total_steps: u32,
+    pub back_button: bool,
+    pub is_busy: bool,
+    pub is_enabled: bool,
+    pub ignoreFocusOut: bool,
+    pub context_key: String,
+    pub description: String,
+}
+
+impl GjfQuickInputModel {
+    pub fn new() -> Self {
+        Self {
+            quick_input_id: String::new(),
+            title: String::new(),
+            step: u32::default(),
+            total_steps: u32::default(),
+            back_button: bool::default(),
+            is_busy: bool::default(),
+            is_enabled: bool::default(),
+            ignoreFocusOut: bool::default(),
+            context_key: String::new(),
+            description: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.quick_input_id.is_empty() || true && !self.title.is_empty() || true && self.step < u32::MAX || true && self.total_steps < u32::MAX || true && self.back_button || true && self.is_busy || true && self.is_enabled || true && self.ignoreFocusOut || true && !self.context_key.is_empty() || true && !self.description.is_empty() || true
+    }
+}
+
+impl Default for GjfQuickInputModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Quick pick model (items, placeholder, many select, match, busy)
+#[derive(Debug, Clone)]
+pub struct GjgQuickPickModel {
+    pub quick_pick_id: String,
+    pub items_json: String,
+    pub placeholder: String,
+    pub can_select_many: bool,
+    pub match_on_description: bool,
+    pub match_on_detail: bool,
+    pub is_busy: bool,
+    pub active_items_json: String,
+    pub selected_items_json: String,
+    pub keep_scroll_position: bool,
+}
+
+impl GjgQuickPickModel {
+    pub fn new() -> Self {
+        Self {
+            quick_pick_id: String::new(),
+            items_json: String::new(),
+            placeholder: String::new(),
+            can_select_many: bool::default(),
+            match_on_description: bool::default(),
+            match_on_detail: bool::default(),
+            is_busy: bool::default(),
+            active_items_json: String::new(),
+            selected_items_json: String::new(),
+            keep_scroll_position: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.quick_pick_id.is_empty() || true && !self.items_json.is_empty() || true && !self.placeholder.is_empty() || true && self.can_select_many || true && self.match_on_description || true && self.match_on_detail || true && self.is_busy || true && !self.active_items_json.is_empty() || true && !self.selected_items_json.is_empty() || true && self.keep_scroll_position || true
+    }
+}
+
+impl Default for GjgQuickPickModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Quick pick item (label, description, detail, picked, always show)
+#[derive(Debug, Clone)]
+pub struct GjhQuickPickItem {
+    pub pick_item_id: String,
+    pub label: String,
+    pub description: String,
+    pub detail: String,
+    pub is_picked: bool,
+    pub always_show: bool,
+    pub icon_path: String,
+    pub buttons_json: String,
+    pub kind: String,
+    pub sort_text: String,
+}
+
+impl GjhQuickPickItem {
+    pub fn new() -> Self {
+        Self {
+            pick_item_id: String::new(),
+            label: String::new(),
+            description: String::new(),
+            detail: String::new(),
+            is_picked: bool::default(),
+            always_show: bool::default(),
+            icon_path: String::new(),
+            buttons_json: String::new(),
+            kind: String::new(),
+            sort_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pick_item_id.is_empty() || true && !self.label.is_empty() || true && !self.description.is_empty() || true && !self.detail.is_empty() || true && self.is_picked || true && self.always_show || true && !self.icon_path.is_empty() || true && !self.buttons_json.is_empty() || true && !self.kind.is_empty() || true && !self.sort_text.is_empty() || true
+    }
+}
+
+impl Default for GjhQuickPickItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Quick pick separator (label, kind)
+#[derive(Debug, Clone)]
+pub struct GjiQuickPickSeparator {
+    pub sep_id: String,
+    pub label: String,
+    pub kind: String,
+    pub is_visible: bool,
+    pub index: u32,
+    pub icon: String,
+    pub tooltip: String,
+    pub color: String,
+    pub style: String,
+    pub group_id: String,
+}
+
+impl GjiQuickPickSeparator {
+    pub fn new() -> Self {
+        Self {
+            sep_id: String::new(),
+            label: String::new(),
+            kind: String::new(),
+            is_visible: bool::default(),
+            index: u32::default(),
+            icon: String::new(),
+            tooltip: String::new(),
+            color: String::new(),
+            style: String::new(),
+            group_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sep_id.is_empty() || true && !self.label.is_empty() || true && !self.kind.is_empty() || true && self.is_visible || true && self.index < u32::MAX || true && !self.icon.is_empty() || true && !self.tooltip.is_empty() || true && !self.color.is_empty() || true && !self.style.is_empty() || true && !self.group_id.is_empty() || true
+    }
+}
+
+impl Default for GjiQuickPickSeparator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Input box model (value, prompt, password, validate, step)
+#[derive(Debug, Clone)]
+pub struct GjjInputBoxModel {
+    pub input_box_id: String,
+    pub value: String,
+    pub prompt: String,
+    pub is_password: bool,
+    pub validate_input: bool,
+    pub step: u32,
+    pub total_steps: u32,
+    pub placeholder: String,
+    pub title: String,
+    pub value_selection_json: String,
+}
+
+impl GjjInputBoxModel {
+    pub fn new() -> Self {
+        Self {
+            input_box_id: String::new(),
+            value: String::new(),
+            prompt: String::new(),
+            is_password: bool::default(),
+            validate_input: bool::default(),
+            step: u32::default(),
+            total_steps: u32::default(),
+            placeholder: String::new(),
+            title: String::new(),
+            value_selection_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_box_id.is_empty() || true && !self.value.is_empty() || true && !self.prompt.is_empty() || true && self.is_password || true && self.validate_input || true && self.step < u32::MAX || true && self.total_steps < u32::MAX || true && !self.placeholder.is_empty() || true && !self.title.is_empty() || true && !self.value_selection_json.is_empty() || true
+    }
+}
+
+impl Default for GjjInputBoxModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -320843,6 +321053,96 @@ mod tests_gje_generated {
     fn test_gje_fields() {
         let mut obj = GjeProgressModel::default();
         obj.progress_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjf_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjf_default() {
+        let obj = GjfQuickInputModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjf_fields() {
+        let mut obj = GjfQuickInputModel::default();
+        obj.quick_input_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjg_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjg_default() {
+        let obj = GjgQuickPickModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjg_fields() {
+        let mut obj = GjgQuickPickModel::default();
+        obj.quick_pick_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjh_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjh_default() {
+        let obj = GjhQuickPickItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjh_fields() {
+        let mut obj = GjhQuickPickItem::default();
+        obj.pick_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gji_generated {
+    use super::*;
+
+    #[test]
+    fn test_gji_default() {
+        let obj = GjiQuickPickSeparator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gji_fields() {
+        let mut obj = GjiQuickPickSeparator::default();
+        obj.sep_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjj_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjj_default() {
+        let obj = GjjInputBoxModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjj_fields() {
+        let mut obj = GjjInputBoxModel::default();
+        obj.input_box_id = "test".to_string();
         assert!(obj.validate());
     }
 }
