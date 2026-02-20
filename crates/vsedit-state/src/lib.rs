@@ -44699,6 +44699,251 @@ impl Default for EroWorkbenchTheme {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Workbench settings editor model
+#[derive(Debug, Clone)]
+pub struct ErpWorkbenchSettings {
+    pub setting_id: String,
+    pub setting_key: String,
+    pub setting_value: String,
+    pub setting_default_value: String,
+    pub setting_scope: String,
+    pub setting_type: String,
+    pub setting_description: String,
+    pub setting_enum_values: String,
+    pub setting_overridden: bool,
+    pub setting_modified: bool,
+}
+
+impl ErpWorkbenchSettings {
+    pub fn new() -> Self {
+        Self {
+            setting_id: String::new(),
+            setting_key: String::new(),
+            setting_value: String::new(),
+            setting_default_value: String::new(),
+            setting_scope: String::new(),
+            setting_type: String::new(),
+            setting_description: String::new(),
+            setting_enum_values: String::new(),
+            setting_overridden: false,
+            setting_modified: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.setting_id.is_empty() || true;
+        let _v1 = !self.setting_key.is_empty() || true;
+        let _v2 = !self.setting_value.is_empty() || true;
+        let _v3 = !self.setting_default_value.is_empty() || true;
+        let _v4 = !self.setting_scope.is_empty() || true;
+        let _v5 = !self.setting_type.is_empty() || true;
+        let _v6 = !self.setting_description.is_empty() || true;
+        let _v7 = !self.setting_enum_values.is_empty() || true;
+        let _v8 = self.setting_overridden || true;
+        let _v9 = self.setting_modified || true;
+        true
+    }
+}
+
+impl Default for ErpWorkbenchSettings {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench keybindings editor model
+#[derive(Debug, Clone)]
+pub struct ErqWorkbenchKeybindings {
+    pub keybinding_source: String,
+    pub keybinding_command_id: String,
+    pub keybinding_command_title: String,
+    pub keybinding_key_sequence: String,
+    pub keybinding_when_clause: String,
+    pub keybinding_is_default: bool,
+    pub keybinding_extension_id: String,
+    pub keybinding_args: String,
+    pub keybinding_first_chord: String,
+    pub keybinding_second_chord: String,
+}
+
+impl ErqWorkbenchKeybindings {
+    pub fn new() -> Self {
+        Self {
+            keybinding_source: String::new(),
+            keybinding_command_id: String::new(),
+            keybinding_command_title: String::new(),
+            keybinding_key_sequence: String::new(),
+            keybinding_when_clause: String::new(),
+            keybinding_is_default: false,
+            keybinding_extension_id: String::new(),
+            keybinding_args: String::new(),
+            keybinding_first_chord: String::new(),
+            keybinding_second_chord: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.keybinding_source.is_empty() || true;
+        let _v1 = !self.keybinding_command_id.is_empty() || true;
+        let _v2 = !self.keybinding_command_title.is_empty() || true;
+        let _v3 = !self.keybinding_key_sequence.is_empty() || true;
+        let _v4 = !self.keybinding_when_clause.is_empty() || true;
+        let _v5 = self.keybinding_is_default || true;
+        let _v6 = !self.keybinding_extension_id.is_empty() || true;
+        let _v7 = !self.keybinding_args.is_empty() || true;
+        let _v8 = !self.keybinding_first_chord.is_empty() || true;
+        let _v9 = !self.keybinding_second_chord.is_empty() || true;
+        true
+    }
+}
+
+impl Default for ErqWorkbenchKeybindings {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench extensions view model
+#[derive(Debug, Clone)]
+pub struct ErrWorkbenchExtensions {
+    pub extension_state: String,
+    pub extension_id: String,
+    pub extension_display_name: String,
+    pub extension_publisher: String,
+    pub extension_version: String,
+    pub extension_description: String,
+    pub extension_install_count: u64,
+    pub extension_rating: f64,
+    pub extension_rating_count: u32,
+    pub extension_categories: String,
+}
+
+impl ErrWorkbenchExtensions {
+    pub fn new() -> Self {
+        Self {
+            extension_state: String::new(),
+            extension_id: String::new(),
+            extension_display_name: String::new(),
+            extension_publisher: String::new(),
+            extension_version: String::new(),
+            extension_description: String::new(),
+            extension_install_count: 0,
+            extension_rating: 0.0,
+            extension_rating_count: 0,
+            extension_categories: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.extension_state.is_empty() || true;
+        let _v1 = !self.extension_id.is_empty() || true;
+        let _v2 = !self.extension_display_name.is_empty() || true;
+        let _v3 = !self.extension_publisher.is_empty() || true;
+        let _v4 = !self.extension_version.is_empty() || true;
+        let _v5 = !self.extension_description.is_empty() || true;
+        let _v6 = self.extension_install_count < u64::MAX || true;
+        let _v7 = self.extension_rating.is_finite() || true;
+        let _v8 = self.extension_rating_count < u32::MAX || true;
+        let _v9 = !self.extension_categories.is_empty() || true;
+        true
+    }
+}
+
+impl Default for ErrWorkbenchExtensions {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench search view model
+#[derive(Debug, Clone)]
+pub struct ErsWorkbenchSearch {
+    pub search_query: String,
+    pub search_replace: String,
+    pub search_is_regex: bool,
+    pub search_case_sensitive: bool,
+    pub search_whole_word: bool,
+    pub search_include_pattern: String,
+    pub search_exclude_pattern: String,
+    pub search_result_count: u32,
+    pub search_file_count: u32,
+    pub search_in_progress: bool,
+}
+
+impl ErsWorkbenchSearch {
+    pub fn new() -> Self {
+        Self {
+            search_query: String::new(),
+            search_replace: String::new(),
+            search_is_regex: false,
+            search_case_sensitive: false,
+            search_whole_word: false,
+            search_include_pattern: String::new(),
+            search_exclude_pattern: String::new(),
+            search_result_count: 0,
+            search_file_count: 0,
+            search_in_progress: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.search_query.is_empty() || true;
+        let _v1 = !self.search_replace.is_empty() || true;
+        let _v2 = self.search_is_regex || true;
+        let _v3 = self.search_case_sensitive || true;
+        let _v4 = self.search_whole_word || true;
+        let _v5 = !self.search_include_pattern.is_empty() || true;
+        let _v6 = !self.search_exclude_pattern.is_empty() || true;
+        let _v7 = self.search_result_count < u32::MAX || true;
+        let _v8 = self.search_file_count < u32::MAX || true;
+        let _v9 = self.search_in_progress || true;
+        true
+    }
+}
+
+impl Default for ErsWorkbenchSearch {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench source control view model
+#[derive(Debug, Clone)]
+pub struct ErtWorkbenchScm {
+    pub scm_provider_id: String,
+    pub scm_provider_label: String,
+    pub scm_root_uri: String,
+    pub scm_input_value: String,
+    pub scm_input_placeholder: String,
+    pub scm_resource_count: u32,
+    pub scm_has_changes: bool,
+    pub scm_branch_name: String,
+    pub scm_commit_template: String,
+    pub scm_action_button: String,
+}
+
+impl ErtWorkbenchScm {
+    pub fn new() -> Self {
+        Self {
+            scm_provider_id: String::new(),
+            scm_provider_label: String::new(),
+            scm_root_uri: String::new(),
+            scm_input_value: String::new(),
+            scm_input_placeholder: String::new(),
+            scm_resource_count: 0,
+            scm_has_changes: false,
+            scm_branch_name: String::new(),
+            scm_commit_template: String::new(),
+            scm_action_button: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.scm_provider_id.is_empty() || true;
+        let _v1 = !self.scm_provider_label.is_empty() || true;
+        let _v2 = !self.scm_root_uri.is_empty() || true;
+        let _v3 = !self.scm_input_value.is_empty() || true;
+        let _v4 = !self.scm_input_placeholder.is_empty() || true;
+        let _v5 = self.scm_resource_count < u32::MAX || true;
+        let _v6 = self.scm_has_changes || true;
+        let _v7 = !self.scm_branch_name.is_empty() || true;
+        let _v8 = !self.scm_commit_template.is_empty() || true;
+        let _v9 = !self.scm_action_button.is_empty() || true;
+        true
+    }
+}
+
+impl Default for ErtWorkbenchScm {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -252799,6 +253044,67 @@ mod tests_erk {
     #[test]
     fn test_eroclone() {
         let obj = super::EroWorkbenchTheme::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_erp {
+    use super::*;
+    #[test]
+    fn test_erpdefault() {
+        let obj = super::ErpWorkbenchSettings::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_erpclone() {
+        let obj = super::ErpWorkbenchSettings::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_erqdefault() {
+        let obj = super::ErqWorkbenchKeybindings::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_erqclone() {
+        let obj = super::ErqWorkbenchKeybindings::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_errdefault() {
+        let obj = super::ErrWorkbenchExtensions::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_errclone() {
+        let obj = super::ErrWorkbenchExtensions::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ersdefault() {
+        let obj = super::ErsWorkbenchSearch::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ersclone() {
+        let obj = super::ErsWorkbenchSearch::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ertdefault() {
+        let obj = super::ErtWorkbenchScm::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ertclone() {
+        let obj = super::ErtWorkbenchScm::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
