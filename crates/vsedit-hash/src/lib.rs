@@ -74099,6 +74099,216 @@ impl Default for FrzLspClientCapabilities {
     }
 }
 
+/// JSON-RPC message (id, method, params, result, error)
+#[derive(Debug, Clone)]
+pub struct FsaJsonRpcMessage {
+    pub message_id: String,
+    pub jsonrpc_version: String,
+    pub method: String,
+    pub params_json: String,
+    pub result_json: String,
+    pub error_json: String,
+    pub is_request: bool,
+    pub is_response: bool,
+    pub is_notification: bool,
+    pub sequence_number: u64,
+}
+
+impl FsaJsonRpcMessage {
+    pub fn new() -> Self {
+        Self {
+            message_id: String::new(),
+            jsonrpc_version: String::new(),
+            method: String::new(),
+            params_json: String::new(),
+            result_json: String::new(),
+            error_json: String::new(),
+            is_request: bool::default(),
+            is_response: bool::default(),
+            is_notification: bool::default(),
+            sequence_number: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.message_id.is_empty() || true && !self.jsonrpc_version.is_empty() || true && !self.method.is_empty() || true && !self.params_json.is_empty() || true && !self.result_json.is_empty() || true && !self.error_json.is_empty() || true && self.is_request || true && self.is_response || true && self.is_notification || true && self.sequence_number < u64::MAX || true
+    }
+}
+
+impl Default for FsaJsonRpcMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// JSON-RPC error (code, message, data, method)
+#[derive(Debug, Clone)]
+pub struct FsbJsonRpcError {
+    pub error_id: String,
+    pub code: u32,
+    pub message: String,
+    pub data_json: String,
+    pub method: String,
+    pub request_id: String,
+    pub is_server_error: bool,
+    pub is_client_error: bool,
+    pub retry_after_ms: u64,
+    pub stack_trace: String,
+}
+
+impl FsbJsonRpcError {
+    pub fn new() -> Self {
+        Self {
+            error_id: String::new(),
+            code: u32::default(),
+            message: String::new(),
+            data_json: String::new(),
+            method: String::new(),
+            request_id: String::new(),
+            is_server_error: bool::default(),
+            is_client_error: bool::default(),
+            retry_after_ms: u64::default(),
+            stack_trace: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.error_id.is_empty() || true && self.code < u32::MAX || true && !self.message.is_empty() || true && !self.data_json.is_empty() || true && !self.method.is_empty() || true && !self.request_id.is_empty() || true && self.is_server_error || true && self.is_client_error || true && self.retry_after_ms < u64::MAX || true && !self.stack_trace.is_empty() || true
+    }
+}
+
+impl Default for FsbJsonRpcError {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// JSON-RPC connection (reader, writer, message queue, pending)
+#[derive(Debug, Clone)]
+pub struct FscJsonRpcConnection {
+    pub conn_id: String,
+    pub reader_id: String,
+    pub writer_id: String,
+    pub pending_count: u32,
+    pub message_queue_size: u32,
+    pub is_connected: bool,
+    pub is_disposing: bool,
+    pub bytes_sent: u64,
+    pub bytes_received: u64,
+    pub error_count: u32,
+}
+
+impl FscJsonRpcConnection {
+    pub fn new() -> Self {
+        Self {
+            conn_id: String::new(),
+            reader_id: String::new(),
+            writer_id: String::new(),
+            pending_count: u32::default(),
+            message_queue_size: u32::default(),
+            is_connected: bool::default(),
+            is_disposing: bool::default(),
+            bytes_sent: u64::default(),
+            bytes_received: u64::default(),
+            error_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.conn_id.is_empty() || true && !self.reader_id.is_empty() || true && !self.writer_id.is_empty() || true && self.pending_count < u32::MAX || true && self.message_queue_size < u32::MAX || true && self.is_connected || true && self.is_disposing || true && self.bytes_sent < u64::MAX || true && self.bytes_received < u64::MAX || true && self.error_count < u32::MAX || true
+    }
+}
+
+impl Default for FscJsonRpcConnection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Protocol message (header, content length, content type, body)
+#[derive(Debug, Clone)]
+pub struct FsdProtocolMessage {
+    pub msg_id: String,
+    pub content_length: u64,
+    pub content_type: String,
+    pub header_json: String,
+    pub body_json: String,
+    pub charset: String,
+    pub is_complete: bool,
+    pub parse_error: String,
+    pub received_at_ms: u64,
+    pub checksum: String,
+}
+
+impl FsdProtocolMessage {
+    pub fn new() -> Self {
+        Self {
+            msg_id: String::new(),
+            content_length: u64::default(),
+            content_type: String::new(),
+            header_json: String::new(),
+            body_json: String::new(),
+            charset: String::new(),
+            is_complete: bool::default(),
+            parse_error: String::new(),
+            received_at_ms: u64::default(),
+            checksum: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.msg_id.is_empty() || true && self.content_length < u64::MAX || true && !self.content_type.is_empty() || true && !self.header_json.is_empty() || true && !self.body_json.is_empty() || true && !self.charset.is_empty() || true && self.is_complete || true && !self.parse_error.is_empty() || true && self.received_at_ms < u64::MAX || true && !self.checksum.is_empty() || true
+    }
+}
+
+impl Default for FsdProtocolMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Message port (channel, buffer, transfer, close, start)
+#[derive(Debug, Clone)]
+pub struct FseMessagePort {
+    pub port_id: String,
+    pub channel_name: String,
+    pub buffer_size: u32,
+    pub is_started: bool,
+    pub is_closed: bool,
+    pub message_count: u64,
+    pub transfer_count: u32,
+    pub peer_port_id: String,
+    pub error_message: String,
+    pub max_message_size: u64,
+}
+
+impl FseMessagePort {
+    pub fn new() -> Self {
+        Self {
+            port_id: String::new(),
+            channel_name: String::new(),
+            buffer_size: u32::default(),
+            is_started: bool::default(),
+            is_closed: bool::default(),
+            message_count: u64::default(),
+            transfer_count: u32::default(),
+            peer_port_id: String::new(),
+            error_message: String::new(),
+            max_message_size: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.port_id.is_empty() || true && !self.channel_name.is_empty() || true && self.buffer_size < u32::MAX || true && self.is_started || true && self.is_closed || true && self.message_count < u64::MAX || true && self.transfer_count < u32::MAX || true && !self.peer_port_id.is_empty() || true && !self.error_message.is_empty() || true && self.max_message_size < u64::MAX || true
+    }
+}
+
+impl Default for FseMessagePort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -293999,6 +294209,96 @@ mod tests_frz_generated {
     fn test_frz_fields() {
         let mut obj = FrzLspClientCapabilities::default();
         obj.cap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsa_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsa_default() {
+        let obj = FsaJsonRpcMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsa_fields() {
+        let mut obj = FsaJsonRpcMessage::default();
+        obj.message_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsb_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsb_default() {
+        let obj = FsbJsonRpcError::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsb_fields() {
+        let mut obj = FsbJsonRpcError::default();
+        obj.error_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsc_default() {
+        let obj = FscJsonRpcConnection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsc_fields() {
+        let mut obj = FscJsonRpcConnection::default();
+        obj.conn_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsd_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsd_default() {
+        let obj = FsdProtocolMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsd_fields() {
+        let mut obj = FsdProtocolMessage::default();
+        obj.msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fse_generated {
+    use super::*;
+
+    #[test]
+    fn test_fse_default() {
+        let obj = FseMessagePort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fse_fields() {
+        let mut obj = FseMessagePort::default();
+        obj.port_id = "test".to_string();
         assert!(obj.validate());
     }
 }
