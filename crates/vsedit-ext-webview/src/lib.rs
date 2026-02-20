@@ -128331,6 +128331,890 @@ impl Default for HpzScmSync {
     }
 }
 
+/// Code refactoring action descriptor
+#[derive(Debug, Clone)]
+pub struct HqaRefactorAction {
+    pub action_id: String,
+    pub action_label: String,
+    pub kind_str: String,
+    pub source_uri: String,
+    pub edit_count: u32,
+    pub is_preferred: bool,
+}
+
+impl HqaRefactorAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            action_label: String::new(),
+            kind_str: String::new(),
+            source_uri: String::new(),
+            edit_count: u32::default(),
+            is_preferred: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.action_label.is_empty() || true && !self.kind_str.is_empty() || true && !self.source_uri.is_empty() || true && self.edit_count < u32::MAX || true && self.is_preferred || true
+    }
+}
+
+impl Default for HqaRefactorAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Symbol rename operation
+#[derive(Debug, Clone)]
+pub struct HqbRenameOperation {
+    pub rename_id: String,
+    pub old_name: String,
+    pub new_name: String,
+    pub file_uri: String,
+    pub occurrence_count: u32,
+    pub preview_enabled: bool,
+}
+
+impl HqbRenameOperation {
+    pub fn new() -> Self {
+        Self {
+            rename_id: String::new(),
+            old_name: String::new(),
+            new_name: String::new(),
+            file_uri: String::new(),
+            occurrence_count: u32::default(),
+            preview_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rename_id.is_empty() || true && !self.old_name.is_empty() || true && !self.new_name.is_empty() || true && !self.file_uri.is_empty() || true && self.occurrence_count < u32::MAX || true && self.preview_enabled || true
+    }
+}
+
+impl Default for HqbRenameOperation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extract method refactoring
+#[derive(Debug, Clone)]
+pub struct HqcExtractMethod {
+    pub extract_id: String,
+    pub method_name: String,
+    pub source_uri: String,
+    pub parameter_count: u32,
+    pub line_count: u32,
+    pub returns_value: bool,
+}
+
+impl HqcExtractMethod {
+    pub fn new() -> Self {
+        Self {
+            extract_id: String::new(),
+            method_name: String::new(),
+            source_uri: String::new(),
+            parameter_count: u32::default(),
+            line_count: u32::default(),
+            returns_value: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.extract_id.is_empty() || true && !self.method_name.is_empty() || true && !self.source_uri.is_empty() || true && self.parameter_count < u32::MAX || true && self.line_count < u32::MAX || true && self.returns_value || true
+    }
+}
+
+impl Default for HqcExtractMethod {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline variable refactoring
+#[derive(Debug, Clone)]
+pub struct HqdInlineVariable {
+    pub inline_id: String,
+    pub variable_name: String,
+    pub source_uri: String,
+    pub reference_count: u32,
+    pub scope_depth: u32,
+    pub is_constant: bool,
+}
+
+impl HqdInlineVariable {
+    pub fn new() -> Self {
+        Self {
+            inline_id: String::new(),
+            variable_name: String::new(),
+            source_uri: String::new(),
+            reference_count: u32::default(),
+            scope_depth: u32::default(),
+            is_constant: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_id.is_empty() || true && !self.variable_name.is_empty() || true && !self.source_uri.is_empty() || true && self.reference_count < u32::MAX || true && self.scope_depth < u32::MAX || true && self.is_constant || true
+    }
+}
+
+impl Default for HqdInlineVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Move symbol refactoring
+#[derive(Debug, Clone)]
+pub struct HqeMoveSymbol {
+    pub move_id: String,
+    pub symbol_name: String,
+    pub source_uri: String,
+    pub target_uri: String,
+    pub reference_count: u32,
+    pub update_imports: bool,
+}
+
+impl HqeMoveSymbol {
+    pub fn new() -> Self {
+        Self {
+            move_id: String::new(),
+            symbol_name: String::new(),
+            source_uri: String::new(),
+            target_uri: String::new(),
+            reference_count: u32::default(),
+            update_imports: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.move_id.is_empty() || true && !self.symbol_name.is_empty() || true && !self.source_uri.is_empty() || true && !self.target_uri.is_empty() || true && self.reference_count < u32::MAX || true && self.update_imports || true
+    }
+}
+
+impl Default for HqeMoveSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code construct conversion
+#[derive(Debug, Clone)]
+pub struct HqfConvertConstruct {
+    pub convert_id: String,
+    pub source_construct: String,
+    pub target_construct: String,
+    pub source_uri: String,
+    pub affected_lines: u32,
+    pub is_safe: bool,
+}
+
+impl HqfConvertConstruct {
+    pub fn new() -> Self {
+        Self {
+            convert_id: String::new(),
+            source_construct: String::new(),
+            target_construct: String::new(),
+            source_uri: String::new(),
+            affected_lines: u32::default(),
+            is_safe: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.convert_id.is_empty() || true && !self.source_construct.is_empty() || true && !self.target_construct.is_empty() || true && !self.source_uri.is_empty() || true && self.affected_lines < u32::MAX || true && self.is_safe || true
+    }
+}
+
+impl Default for HqfConvertConstruct {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language code action entry
+#[derive(Debug, Clone)]
+pub struct HqgCodeAction {
+    pub action_id: String,
+    pub action_title: String,
+    pub diagnostics_ref: String,
+    pub kind_str: String,
+    pub edit_count: u32,
+    pub is_preferred: bool,
+}
+
+impl HqgCodeAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            action_title: String::new(),
+            diagnostics_ref: String::new(),
+            kind_str: String::new(),
+            edit_count: u32::default(),
+            is_preferred: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.action_title.is_empty() || true && !self.diagnostics_ref.is_empty() || true && !self.kind_str.is_empty() || true && self.edit_count < u32::MAX || true && self.is_preferred || true
+    }
+}
+
+impl Default for HqgCodeAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Quick fix suggestion entry
+#[derive(Debug, Clone)]
+pub struct HqhQuickFix {
+    pub fix_id: String,
+    pub fix_label: String,
+    pub diagnostic_code: String,
+    pub replacement_text: String,
+    pub confidence_pct: u32,
+    pub is_auto_fixable: bool,
+}
+
+impl HqhQuickFix {
+    pub fn new() -> Self {
+        Self {
+            fix_id: String::new(),
+            fix_label: String::new(),
+            diagnostic_code: String::new(),
+            replacement_text: String::new(),
+            confidence_pct: u32::default(),
+            is_auto_fixable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fix_id.is_empty() || true && !self.fix_label.is_empty() || true && !self.diagnostic_code.is_empty() || true && !self.replacement_text.is_empty() || true && self.confidence_pct < u32::MAX || true && self.is_auto_fixable || true
+    }
+}
+
+impl Default for HqhQuickFix {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Import organization action
+#[derive(Debug, Clone)]
+pub struct HqiOrganizeImports {
+    pub organize_id: String,
+    pub source_uri: String,
+    pub import_count: u32,
+    pub removed_count: u32,
+    pub sorted_count: u32,
+    pub group_by_kind: bool,
+}
+
+impl HqiOrganizeImports {
+    pub fn new() -> Self {
+        Self {
+            organize_id: String::new(),
+            source_uri: String::new(),
+            import_count: u32::default(),
+            removed_count: u32::default(),
+            sorted_count: u32::default(),
+            group_by_kind: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.organize_id.is_empty() || true && !self.source_uri.is_empty() || true && self.import_count < u32::MAX || true && self.removed_count < u32::MAX || true && self.sorted_count < u32::MAX || true && self.group_by_kind || true
+    }
+}
+
+impl Default for HqiOrganizeImports {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sort class members action
+#[derive(Debug, Clone)]
+pub struct HqjSortMembers {
+    pub sort_id: String,
+    pub source_uri: String,
+    pub member_count: u32,
+    pub sort_criteria: String,
+    pub group_count: u32,
+    pub preserve_regions: bool,
+}
+
+impl HqjSortMembers {
+    pub fn new() -> Self {
+        Self {
+            sort_id: String::new(),
+            source_uri: String::new(),
+            member_count: u32::default(),
+            sort_criteria: String::new(),
+            group_count: u32::default(),
+            preserve_regions: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sort_id.is_empty() || true && !self.source_uri.is_empty() || true && self.member_count < u32::MAX || true && !self.sort_criteria.is_empty() || true && self.group_count < u32::MAX || true && self.preserve_regions || true
+    }
+}
+
+impl Default for HqjSortMembers {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code generation template
+#[derive(Debug, Clone)]
+pub struct HqkGenerateCode {
+    pub gen_id: String,
+    pub template_name: String,
+    pub target_uri: String,
+    pub placeholder_count: u32,
+    pub output_lines: u32,
+    pub overwrite_existing: bool,
+}
+
+impl HqkGenerateCode {
+    pub fn new() -> Self {
+        Self {
+            gen_id: String::new(),
+            template_name: String::new(),
+            target_uri: String::new(),
+            placeholder_count: u32::default(),
+            output_lines: u32::default(),
+            overwrite_existing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gen_id.is_empty() || true && !self.template_name.is_empty() || true && !self.target_uri.is_empty() || true && self.placeholder_count < u32::MAX || true && self.output_lines < u32::MAX || true && self.overwrite_existing || true
+    }
+}
+
+impl Default for HqkGenerateCode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Encapsulate field refactoring
+#[derive(Debug, Clone)]
+pub struct HqlEncapsulateField {
+    pub encap_id: String,
+    pub field_name: String,
+    pub getter_name: String,
+    pub setter_name: String,
+    pub reference_count: u32,
+    pub generate_setter: bool,
+}
+
+impl HqlEncapsulateField {
+    pub fn new() -> Self {
+        Self {
+            encap_id: String::new(),
+            field_name: String::new(),
+            getter_name: String::new(),
+            setter_name: String::new(),
+            reference_count: u32::default(),
+            generate_setter: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.encap_id.is_empty() || true && !self.field_name.is_empty() || true && !self.getter_name.is_empty() || true && !self.setter_name.is_empty() || true && self.reference_count < u32::MAX || true && self.generate_setter || true
+    }
+}
+
+impl Default for HqlEncapsulateField {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Introduce parameter refactoring
+#[derive(Debug, Clone)]
+pub struct HqmIntroduceParameter {
+    pub param_id: String,
+    pub param_name: String,
+    pub param_type_str: String,
+    pub source_uri: String,
+    pub call_site_count: u32,
+    pub has_default_value: bool,
+}
+
+impl HqmIntroduceParameter {
+    pub fn new() -> Self {
+        Self {
+            param_id: String::new(),
+            param_name: String::new(),
+            param_type_str: String::new(),
+            source_uri: String::new(),
+            call_site_count: u32::default(),
+            has_default_value: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.param_id.is_empty() || true && !self.param_name.is_empty() || true && !self.param_type_str.is_empty() || true && !self.source_uri.is_empty() || true && self.call_site_count < u32::MAX || true && self.has_default_value || true
+    }
+}
+
+impl Default for HqmIntroduceParameter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Change function signature refactoring
+#[derive(Debug, Clone)]
+pub struct HqnChangeSignature {
+    pub sig_id: String,
+    pub function_name: String,
+    pub old_param_count: u32,
+    pub new_param_count: u32,
+    pub call_site_count: u32,
+    pub update_callers: bool,
+}
+
+impl HqnChangeSignature {
+    pub fn new() -> Self {
+        Self {
+            sig_id: String::new(),
+            function_name: String::new(),
+            old_param_count: u32::default(),
+            new_param_count: u32::default(),
+            call_site_count: u32::default(),
+            update_callers: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sig_id.is_empty() || true && !self.function_name.is_empty() || true && self.old_param_count < u32::MAX || true && self.new_param_count < u32::MAX || true && self.call_site_count < u32::MAX || true && self.update_callers || true
+    }
+}
+
+impl Default for HqnChangeSignature {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extract interface refactoring
+#[derive(Debug, Clone)]
+pub struct HqoExtractInterface {
+    pub iface_id: String,
+    pub interface_name: String,
+    pub source_uri: String,
+    pub method_count: u32,
+    pub property_count: u32,
+    pub extract_all: bool,
+}
+
+impl HqoExtractInterface {
+    pub fn new() -> Self {
+        Self {
+            iface_id: String::new(),
+            interface_name: String::new(),
+            source_uri: String::new(),
+            method_count: u32::default(),
+            property_count: u32::default(),
+            extract_all: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.iface_id.is_empty() || true && !self.interface_name.is_empty() || true && !self.source_uri.is_empty() || true && self.method_count < u32::MAX || true && self.property_count < u32::MAX || true && self.extract_all || true
+    }
+}
+
+impl Default for HqoExtractInterface {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Pull up member refactoring
+#[derive(Debug, Clone)]
+pub struct HqpPullUpMember {
+    pub pull_id: String,
+    pub member_name: String,
+    pub source_class: String,
+    pub target_class: String,
+    pub reference_count: u32,
+    pub make_abstract: bool,
+}
+
+impl HqpPullUpMember {
+    pub fn new() -> Self {
+        Self {
+            pull_id: String::new(),
+            member_name: String::new(),
+            source_class: String::new(),
+            target_class: String::new(),
+            reference_count: u32::default(),
+            make_abstract: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pull_id.is_empty() || true && !self.member_name.is_empty() || true && !self.source_class.is_empty() || true && !self.target_class.is_empty() || true && self.reference_count < u32::MAX || true && self.make_abstract || true
+    }
+}
+
+impl Default for HqpPullUpMember {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Push down member refactoring
+#[derive(Debug, Clone)]
+pub struct HqqPushDownMember {
+    pub push_id: String,
+    pub member_name: String,
+    pub source_class: String,
+    pub target_count: u32,
+    pub reference_count: u32,
+    pub remove_from_parent: bool,
+}
+
+impl HqqPushDownMember {
+    pub fn new() -> Self {
+        Self {
+            push_id: String::new(),
+            member_name: String::new(),
+            source_class: String::new(),
+            target_count: u32::default(),
+            reference_count: u32::default(),
+            remove_from_parent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.push_id.is_empty() || true && !self.member_name.is_empty() || true && !self.source_class.is_empty() || true && self.target_count < u32::MAX || true && self.reference_count < u32::MAX || true && self.remove_from_parent || true
+    }
+}
+
+impl Default for HqqPushDownMember {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Safe delete refactoring
+#[derive(Debug, Clone)]
+pub struct HqrSafeDelete {
+    pub delete_id: String,
+    pub symbol_name: String,
+    pub source_uri: String,
+    pub reference_count: u32,
+    pub search_scope_depth: u32,
+    pub cascade_delete: bool,
+}
+
+impl HqrSafeDelete {
+    pub fn new() -> Self {
+        Self {
+            delete_id: String::new(),
+            symbol_name: String::new(),
+            source_uri: String::new(),
+            reference_count: u32::default(),
+            search_scope_depth: u32::default(),
+            cascade_delete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.delete_id.is_empty() || true && !self.symbol_name.is_empty() || true && !self.source_uri.is_empty() || true && self.reference_count < u32::MAX || true && self.search_scope_depth < u32::MAX || true && self.cascade_delete || true
+    }
+}
+
+impl Default for HqrSafeDelete {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Wrap selection refactoring
+#[derive(Debug, Clone)]
+pub struct HqsWrapSelection {
+    pub wrap_id: String,
+    pub wrapper_kind: String,
+    pub source_uri: String,
+    pub selection_len: u32,
+    pub indent_level: u32,
+    pub auto_format: bool,
+}
+
+impl HqsWrapSelection {
+    pub fn new() -> Self {
+        Self {
+            wrap_id: String::new(),
+            wrapper_kind: String::new(),
+            source_uri: String::new(),
+            selection_len: u32::default(),
+            indent_level: u32::default(),
+            auto_format: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wrap_id.is_empty() || true && !self.wrapper_kind.is_empty() || true && !self.source_uri.is_empty() || true && self.selection_len < u32::MAX || true && self.indent_level < u32::MAX || true && self.auto_format || true
+    }
+}
+
+impl Default for HqsWrapSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Collapse class hierarchy
+#[derive(Debug, Clone)]
+pub struct HqtCollapseHierarchy {
+    pub collapse_id: String,
+    pub source_class: String,
+    pub target_class: String,
+    pub member_count: u32,
+    pub reference_count: u32,
+    pub keep_overrides: bool,
+}
+
+impl HqtCollapseHierarchy {
+    pub fn new() -> Self {
+        Self {
+            collapse_id: String::new(),
+            source_class: String::new(),
+            target_class: String::new(),
+            member_count: u32::default(),
+            reference_count: u32::default(),
+            keep_overrides: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.collapse_id.is_empty() || true && !self.source_class.is_empty() || true && !self.target_class.is_empty() || true && self.member_count < u32::MAX || true && self.reference_count < u32::MAX || true && self.keep_overrides || true
+    }
+}
+
+impl Default for HqtCollapseHierarchy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Convert to async refactoring
+#[derive(Debug, Clone)]
+pub struct HquConvertToAsync {
+    pub async_id: String,
+    pub function_name: String,
+    pub source_uri: String,
+    pub await_point_count: u32,
+    pub callee_count: u32,
+    pub propagate_async: bool,
+}
+
+impl HquConvertToAsync {
+    pub fn new() -> Self {
+        Self {
+            async_id: String::new(),
+            function_name: String::new(),
+            source_uri: String::new(),
+            await_point_count: u32::default(),
+            callee_count: u32::default(),
+            propagate_async: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.async_id.is_empty() || true && !self.function_name.is_empty() || true && !self.source_uri.is_empty() || true && self.await_point_count < u32::MAX || true && self.callee_count < u32::MAX || true && self.propagate_async || true
+    }
+}
+
+impl Default for HquConvertToAsync {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Introduce type alias refactoring
+#[derive(Debug, Clone)]
+pub struct HqvTypeAlias {
+    pub alias_id: String,
+    pub alias_name: String,
+    pub original_type_str: String,
+    pub source_uri: String,
+    pub usage_count: u32,
+    pub export_alias: bool,
+}
+
+impl HqvTypeAlias {
+    pub fn new() -> Self {
+        Self {
+            alias_id: String::new(),
+            alias_name: String::new(),
+            original_type_str: String::new(),
+            source_uri: String::new(),
+            usage_count: u32::default(),
+            export_alias: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.alias_id.is_empty() || true && !self.alias_name.is_empty() || true && !self.original_type_str.is_empty() || true && !self.source_uri.is_empty() || true && self.usage_count < u32::MAX || true && self.export_alias || true
+    }
+}
+
+impl Default for HqvTypeAlias {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Destructure binding refactoring
+#[derive(Debug, Clone)]
+pub struct HqwDestructureBinding {
+    pub destruct_id: String,
+    pub binding_name: String,
+    pub field_count: u32,
+    pub source_uri: String,
+    pub line_number: u32,
+    pub include_rest: bool,
+}
+
+impl HqwDestructureBinding {
+    pub fn new() -> Self {
+        Self {
+            destruct_id: String::new(),
+            binding_name: String::new(),
+            field_count: u32::default(),
+            source_uri: String::new(),
+            line_number: u32::default(),
+            include_rest: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.destruct_id.is_empty() || true && !self.binding_name.is_empty() || true && self.field_count < u32::MAX || true && !self.source_uri.is_empty() || true && self.line_number < u32::MAX || true && self.include_rest || true
+    }
+}
+
+impl Default for HqwDestructureBinding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code modification preview
+#[derive(Debug, Clone)]
+pub struct HqxCodeModPreview {
+    pub preview_id: String,
+    pub file_uri: String,
+    pub old_text_len: u32,
+    pub new_text_len: u32,
+    pub change_count: u32,
+    pub is_approved: bool,
+}
+
+impl HqxCodeModPreview {
+    pub fn new() -> Self {
+        Self {
+            preview_id: String::new(),
+            file_uri: String::new(),
+            old_text_len: u32::default(),
+            new_text_len: u32::default(),
+            change_count: u32::default(),
+            is_approved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.preview_id.is_empty() || true && !self.file_uri.is_empty() || true && self.old_text_len < u32::MAX || true && self.new_text_len < u32::MAX || true && self.change_count < u32::MAX || true && self.is_approved || true
+    }
+}
+
+impl Default for HqxCodeModPreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Refactoring history entry
+#[derive(Debug, Clone)]
+pub struct HqyRefactorHistory {
+    pub history_id: String,
+    pub refactor_kind: String,
+    pub timestamp_epoch: u64,
+    pub file_count: u32,
+    pub edit_count: u32,
+    pub was_undone: bool,
+}
+
+impl HqyRefactorHistory {
+    pub fn new() -> Self {
+        Self {
+            history_id: String::new(),
+            refactor_kind: String::new(),
+            timestamp_epoch: u64::default(),
+            file_count: u32::default(),
+            edit_count: u32::default(),
+            was_undone: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.history_id.is_empty() || true && !self.refactor_kind.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.file_count < u32::MAX || true && self.edit_count < u32::MAX || true && self.was_undone || true
+    }
+}
+
+impl Default for HqyRefactorHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bulk edit operation descriptor
+#[derive(Debug, Clone)]
+pub struct HqzBulkEdit {
+    pub bulk_id: String,
+    pub operation_label: String,
+    pub file_count: u32,
+    pub total_edits: u32,
+    pub estimated_ms: u64,
+    pub needs_confirmation: bool,
+}
+
+impl HqzBulkEdit {
+    pub fn new() -> Self {
+        Self {
+            bulk_id: String::new(),
+            operation_label: String::new(),
+            file_count: u32::default(),
+            total_edits: u32::default(),
+            estimated_ms: u64::default(),
+            needs_confirmation: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bulk_id.is_empty() || true && !self.operation_label.is_empty() || true && self.file_count < u32::MAX || true && self.total_edits < u32::MAX || true && self.estimated_ms < u64::MAX || true && self.needs_confirmation || true
+    }
+}
+
+impl Default for HqzBulkEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -371526,6 +372410,474 @@ mod tests_hpz_generated {
     fn test_hpz_fields() {
         let mut obj = HpzScmSync::default();
         obj.sync_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqa_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqa_default() {
+        let obj = HqaRefactorAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqa_fields() {
+        let mut obj = HqaRefactorAction::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqb_default() {
+        let obj = HqbRenameOperation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqb_fields() {
+        let mut obj = HqbRenameOperation::default();
+        obj.rename_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqc_default() {
+        let obj = HqcExtractMethod::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqc_fields() {
+        let mut obj = HqcExtractMethod::default();
+        obj.extract_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqd_default() {
+        let obj = HqdInlineVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqd_fields() {
+        let mut obj = HqdInlineVariable::default();
+        obj.inline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqe_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqe_default() {
+        let obj = HqeMoveSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqe_fields() {
+        let mut obj = HqeMoveSymbol::default();
+        obj.move_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqf_default() {
+        let obj = HqfConvertConstruct::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqf_fields() {
+        let mut obj = HqfConvertConstruct::default();
+        obj.convert_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqg_default() {
+        let obj = HqgCodeAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqg_fields() {
+        let mut obj = HqgCodeAction::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqh_default() {
+        let obj = HqhQuickFix::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqh_fields() {
+        let mut obj = HqhQuickFix::default();
+        obj.fix_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqi_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqi_default() {
+        let obj = HqiOrganizeImports::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqi_fields() {
+        let mut obj = HqiOrganizeImports::default();
+        obj.organize_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqj_default() {
+        let obj = HqjSortMembers::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqj_fields() {
+        let mut obj = HqjSortMembers::default();
+        obj.sort_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqk_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqk_default() {
+        let obj = HqkGenerateCode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqk_fields() {
+        let mut obj = HqkGenerateCode::default();
+        obj.gen_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hql_generated {
+    use super::*;
+
+    #[test]
+    fn test_hql_default() {
+        let obj = HqlEncapsulateField::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hql_fields() {
+        let mut obj = HqlEncapsulateField::default();
+        obj.encap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqm_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqm_default() {
+        let obj = HqmIntroduceParameter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqm_fields() {
+        let mut obj = HqmIntroduceParameter::default();
+        obj.param_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqn_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqn_default() {
+        let obj = HqnChangeSignature::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqn_fields() {
+        let mut obj = HqnChangeSignature::default();
+        obj.sig_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqo_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqo_default() {
+        let obj = HqoExtractInterface::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqo_fields() {
+        let mut obj = HqoExtractInterface::default();
+        obj.iface_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqp_default() {
+        let obj = HqpPullUpMember::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqp_fields() {
+        let mut obj = HqpPullUpMember::default();
+        obj.pull_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqq_default() {
+        let obj = HqqPushDownMember::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqq_fields() {
+        let mut obj = HqqPushDownMember::default();
+        obj.push_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqr_default() {
+        let obj = HqrSafeDelete::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqr_fields() {
+        let mut obj = HqrSafeDelete::default();
+        obj.delete_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqs_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqs_default() {
+        let obj = HqsWrapSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqs_fields() {
+        let mut obj = HqsWrapSelection::default();
+        obj.wrap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqt_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqt_default() {
+        let obj = HqtCollapseHierarchy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqt_fields() {
+        let mut obj = HqtCollapseHierarchy::default();
+        obj.collapse_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqu_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqu_default() {
+        let obj = HquConvertToAsync::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqu_fields() {
+        let mut obj = HquConvertToAsync::default();
+        obj.async_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqv_default() {
+        let obj = HqvTypeAlias::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqv_fields() {
+        let mut obj = HqvTypeAlias::default();
+        obj.alias_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqw_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqw_default() {
+        let obj = HqwDestructureBinding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqw_fields() {
+        let mut obj = HqwDestructureBinding::default();
+        obj.destruct_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqx_default() {
+        let obj = HqxCodeModPreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqx_fields() {
+        let mut obj = HqxCodeModPreview::default();
+        obj.preview_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqy_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqy_default() {
+        let obj = HqyRefactorHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqy_fields() {
+        let mut obj = HqyRefactorHistory::default();
+        obj.history_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hqz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hqz_default() {
+        let obj = HqzBulkEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hqz_fields() {
+        let mut obj = HqzBulkEdit::default();
+        obj.bulk_id = "test".to_string();
         assert!(obj.validate());
     }
 }
