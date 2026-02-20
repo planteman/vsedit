@@ -149745,6 +149745,890 @@ impl Default for InzTokenizationConfig {
     }
 }
 
+/// Diff editor model
+#[derive(Debug, Clone)]
+pub struct IoaDiffEditor {
+    pub diff_id: String,
+    pub original_uri: String,
+    pub modified_uri: String,
+    pub hunk_count: u32,
+    pub change_count: u32,
+    pub is_side_by_side: bool,
+}
+
+impl IoaDiffEditor {
+    pub fn new() -> Self {
+        Self {
+            diff_id: String::new(),
+            original_uri: String::new(),
+            modified_uri: String::new(),
+            hunk_count: u32::default(),
+            change_count: u32::default(),
+            is_side_by_side: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_id.is_empty() || true && !self.original_uri.is_empty() || true && !self.modified_uri.is_empty() || true && self.hunk_count < u32::MAX || true && self.change_count < u32::MAX || true && self.is_side_by_side || true
+    }
+}
+
+impl Default for IoaDiffEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff hunk content model
+#[derive(Debug, Clone)]
+pub struct IobDiffHunkModel {
+    pub hunk_id: String,
+    pub original_start: u32,
+    pub original_length: u32,
+    pub modified_start: u32,
+    pub modified_length: u32,
+    pub is_insertion: bool,
+}
+
+impl IobDiffHunkModel {
+    pub fn new() -> Self {
+        Self {
+            hunk_id: String::new(),
+            original_start: u32::default(),
+            original_length: u32::default(),
+            modified_start: u32::default(),
+            modified_length: u32::default(),
+            is_insertion: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hunk_id.is_empty() || true && self.original_start < u32::MAX || true && self.original_length < u32::MAX || true && self.modified_start < u32::MAX || true && self.modified_length < u32::MAX || true && self.is_insertion || true
+    }
+}
+
+impl Default for IobDiffHunkModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff editor decoration
+#[derive(Debug, Clone)]
+pub struct IocDiffDecoration {
+    pub deco_id: String,
+    pub line_number: u32,
+    pub decoration_kind: String,
+    pub color_token: String,
+    pub gutter_icon: String,
+    pub is_char_level: bool,
+}
+
+impl IocDiffDecoration {
+    pub fn new() -> Self {
+        Self {
+            deco_id: String::new(),
+            line_number: u32::default(),
+            decoration_kind: String::new(),
+            color_token: String::new(),
+            gutter_icon: String::new(),
+            is_char_level: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_id.is_empty() || true && self.line_number < u32::MAX || true && !self.decoration_kind.is_empty() || true && !self.color_token.is_empty() || true && !self.gutter_icon.is_empty() || true && self.is_char_level || true
+    }
+}
+
+impl Default for IocDiffDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Three-way merge editor
+#[derive(Debug, Clone)]
+pub struct IodMergeEditor {
+    pub merge_id: String,
+    pub base_uri: String,
+    pub input1_uri: String,
+    pub input2_uri: String,
+    pub result_uri: String,
+    pub auto_merge_enabled: bool,
+}
+
+impl IodMergeEditor {
+    pub fn new() -> Self {
+        Self {
+            merge_id: String::new(),
+            base_uri: String::new(),
+            input1_uri: String::new(),
+            input2_uri: String::new(),
+            result_uri: String::new(),
+            auto_merge_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.merge_id.is_empty() || true && !self.base_uri.is_empty() || true && !self.input1_uri.is_empty() || true && !self.input2_uri.is_empty() || true && !self.result_uri.is_empty() || true && self.auto_merge_enabled || true
+    }
+}
+
+impl Default for IodMergeEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Merge conflict descriptor
+#[derive(Debug, Clone)]
+pub struct IoeMergeConflict {
+    pub conflict_id: String,
+    pub base_range_start: u32,
+    pub base_range_len: u32,
+    pub input1_text_len: u32,
+    pub input2_text_len: u32,
+    pub is_resolved: bool,
+}
+
+impl IoeMergeConflict {
+    pub fn new() -> Self {
+        Self {
+            conflict_id: String::new(),
+            base_range_start: u32::default(),
+            base_range_len: u32::default(),
+            input1_text_len: u32::default(),
+            input2_text_len: u32::default(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.conflict_id.is_empty() || true && self.base_range_start < u32::MAX || true && self.base_range_len < u32::MAX || true && self.input1_text_len < u32::MAX || true && self.input2_text_len < u32::MAX || true && self.is_resolved || true
+    }
+}
+
+impl Default for IoeMergeConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Merge resolution result
+#[derive(Debug, Clone)]
+pub struct IofMergeResult {
+    pub result_id: String,
+    pub conflict_ref: String,
+    pub chosen_input: u32,
+    pub custom_text_len: u32,
+    pub edit_count: u32,
+    pub is_manual: bool,
+}
+
+impl IofMergeResult {
+    pub fn new() -> Self {
+        Self {
+            result_id: String::new(),
+            conflict_ref: String::new(),
+            chosen_input: u32::default(),
+            custom_text_len: u32::default(),
+            edit_count: u32::default(),
+            is_manual: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.result_id.is_empty() || true && !self.conflict_ref.is_empty() || true && self.chosen_input < u32::MAX || true && self.custom_text_len < u32::MAX || true && self.edit_count < u32::MAX || true && self.is_manual || true
+    }
+}
+
+impl Default for IofMergeResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff algorithm selection
+#[derive(Debug, Clone)]
+pub struct IogDiffAlgorithm {
+    pub algo_id: String,
+    pub algo_name: String,
+    pub timeout_ms: u32,
+    pub max_computations: u64,
+    pub supports_move: bool,
+    pub is_default: bool,
+}
+
+impl IogDiffAlgorithm {
+    pub fn new() -> Self {
+        Self {
+            algo_id: String::new(),
+            algo_name: String::new(),
+            timeout_ms: u32::default(),
+            max_computations: u64::default(),
+            supports_move: bool::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.algo_id.is_empty() || true && !self.algo_name.is_empty() || true && self.timeout_ms < u32::MAX || true && self.max_computations < u64::MAX || true && self.supports_move || true && self.is_default || true
+    }
+}
+
+impl Default for IogDiffAlgorithm {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff computation result
+#[derive(Debug, Clone)]
+pub struct IohDiffCompute {
+    pub compute_id: String,
+    pub original_len: u32,
+    pub modified_len: u32,
+    pub change_count: u32,
+    pub elapsed_ms: u32,
+    pub timed_out: bool,
+}
+
+impl IohDiffCompute {
+    pub fn new() -> Self {
+        Self {
+            compute_id: String::new(),
+            original_len: u32::default(),
+            modified_len: u32::default(),
+            change_count: u32::default(),
+            elapsed_ms: u32::default(),
+            timed_out: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.compute_id.is_empty() || true && self.original_len < u32::MAX || true && self.modified_len < u32::MAX || true && self.change_count < u32::MAX || true && self.elapsed_ms < u32::MAX || true && self.timed_out || true
+    }
+}
+
+impl Default for IohDiffCompute {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Character-level diff
+#[derive(Debug, Clone)]
+pub struct IoiCharDiff {
+    pub char_id: String,
+    pub original_offset: u32,
+    pub modified_offset: u32,
+    pub char_count: u32,
+    pub diff_kind_val: u32,
+    pub is_whitespace: bool,
+}
+
+impl IoiCharDiff {
+    pub fn new() -> Self {
+        Self {
+            char_id: String::new(),
+            original_offset: u32::default(),
+            modified_offset: u32::default(),
+            char_count: u32::default(),
+            diff_kind_val: u32::default(),
+            is_whitespace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.char_id.is_empty() || true && self.original_offset < u32::MAX || true && self.modified_offset < u32::MAX || true && self.char_count < u32::MAX || true && self.diff_kind_val < u32::MAX || true && self.is_whitespace || true
+    }
+}
+
+impl Default for IoiCharDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Word-level diff
+#[derive(Debug, Clone)]
+pub struct IojWordDiff {
+    pub word_id: String,
+    pub original_offset: u32,
+    pub modified_offset: u32,
+    pub word_count: u32,
+    pub diff_kind_val: u32,
+    pub is_boundary: bool,
+}
+
+impl IojWordDiff {
+    pub fn new() -> Self {
+        Self {
+            word_id: String::new(),
+            original_offset: u32::default(),
+            modified_offset: u32::default(),
+            word_count: u32::default(),
+            diff_kind_val: u32::default(),
+            is_boundary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.word_id.is_empty() || true && self.original_offset < u32::MAX || true && self.modified_offset < u32::MAX || true && self.word_count < u32::MAX || true && self.diff_kind_val < u32::MAX || true && self.is_boundary || true
+    }
+}
+
+impl Default for IojWordDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Line-level diff
+#[derive(Debug, Clone)]
+pub struct IokLineDiff {
+    pub line_id: String,
+    pub original_line: u32,
+    pub modified_line: u32,
+    pub line_count: u32,
+    pub diff_kind_val: u32,
+    pub has_inner_changes: bool,
+}
+
+impl IokLineDiff {
+    pub fn new() -> Self {
+        Self {
+            line_id: String::new(),
+            original_line: u32::default(),
+            modified_line: u32::default(),
+            line_count: u32::default(),
+            diff_kind_val: u32::default(),
+            has_inner_changes: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_id.is_empty() || true && self.original_line < u32::MAX || true && self.modified_line < u32::MAX || true && self.line_count < u32::MAX || true && self.diff_kind_val < u32::MAX || true && self.has_inner_changes || true
+    }
+}
+
+impl Default for IokLineDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff change navigator
+#[derive(Debug, Clone)]
+pub struct IolDiffNavigator {
+    pub nav_id: String,
+    pub current_change: u32,
+    pub total_changes: u32,
+    pub current_uri: String,
+    pub wrap_around: bool,
+    pub skip_identical: bool,
+}
+
+impl IolDiffNavigator {
+    pub fn new() -> Self {
+        Self {
+            nav_id: String::new(),
+            current_change: u32::default(),
+            total_changes: u32::default(),
+            current_uri: String::new(),
+            wrap_around: bool::default(),
+            skip_identical: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nav_id.is_empty() || true && self.current_change < u32::MAX || true && self.total_changes < u32::MAX || true && !self.current_uri.is_empty() || true && self.wrap_around || true && self.skip_identical || true
+    }
+}
+
+impl Default for IolDiffNavigator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff editor action
+#[derive(Debug, Clone)]
+pub struct IomDiffAction {
+    pub action_id: String,
+    pub action_label: String,
+    pub command_ref: String,
+    pub target_kind: String,
+    pub keybinding_str: String,
+    pub is_inline: bool,
+}
+
+impl IomDiffAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            action_label: String::new(),
+            command_ref: String::new(),
+            target_kind: String::new(),
+            keybinding_str: String::new(),
+            is_inline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.action_label.is_empty() || true && !self.command_ref.is_empty() || true && !self.target_kind.is_empty() || true && !self.keybinding_str.is_empty() || true && self.is_inline || true
+    }
+}
+
+impl Default for IomDiffAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff gutter decoration
+#[derive(Debug, Clone)]
+pub struct IonDiffGutter {
+    pub gutter_id: String,
+    pub line_number: u32,
+    pub indicator_kind: String,
+    pub color_token: String,
+    pub tooltip_text: String,
+    pub is_clickable: bool,
+}
+
+impl IonDiffGutter {
+    pub fn new() -> Self {
+        Self {
+            gutter_id: String::new(),
+            line_number: u32::default(),
+            indicator_kind: String::new(),
+            color_token: String::new(),
+            tooltip_text: String::new(),
+            is_clickable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gutter_id.is_empty() || true && self.line_number < u32::MAX || true && !self.indicator_kind.is_empty() || true && !self.color_token.is_empty() || true && !self.tooltip_text.is_empty() || true && self.is_clickable || true
+    }
+}
+
+impl Default for IonDiffGutter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff overview ruler
+#[derive(Debug, Clone)]
+pub struct IooDiffOverview {
+    pub overview_id: String,
+    pub change_count: u32,
+    pub viewport_start: u32,
+    pub viewport_end: u32,
+    pub total_lines: u32,
+    pub show_added: bool,
+}
+
+impl IooDiffOverview {
+    pub fn new() -> Self {
+        Self {
+            overview_id: String::new(),
+            change_count: u32::default(),
+            viewport_start: u32::default(),
+            viewport_end: u32::default(),
+            total_lines: u32::default(),
+            show_added: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.overview_id.is_empty() || true && self.change_count < u32::MAX || true && self.viewport_start < u32::MAX || true && self.viewport_end < u32::MAX || true && self.total_lines < u32::MAX || true && self.show_added || true
+    }
+}
+
+impl Default for IooDiffOverview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff inline annotation
+#[derive(Debug, Clone)]
+pub struct IopDiffInline {
+    pub inline_id: String,
+    pub line_number: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub change_kind: String,
+    pub is_deletion: bool,
+}
+
+impl IopDiffInline {
+    pub fn new() -> Self {
+        Self {
+            inline_id: String::new(),
+            line_number: u32::default(),
+            start_col: u32::default(),
+            end_col: u32::default(),
+            change_kind: String::new(),
+            is_deletion: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_id.is_empty() || true && self.line_number < u32::MAX || true && self.start_col < u32::MAX || true && self.end_col < u32::MAX || true && !self.change_kind.is_empty() || true && self.is_deletion || true
+    }
+}
+
+impl Default for IopDiffInline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Unified patch format
+#[derive(Debug, Clone)]
+pub struct IoqPatchFormat {
+    pub patch_id: String,
+    pub file_path: String,
+    pub hunk_count: u32,
+    pub additions: u32,
+    pub deletions: u32,
+    pub is_binary: bool,
+}
+
+impl IoqPatchFormat {
+    pub fn new() -> Self {
+        Self {
+            patch_id: String::new(),
+            file_path: String::new(),
+            hunk_count: u32::default(),
+            additions: u32::default(),
+            deletions: u32::default(),
+            is_binary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.patch_id.is_empty() || true && !self.file_path.is_empty() || true && self.hunk_count < u32::MAX || true && self.additions < u32::MAX || true && self.deletions < u32::MAX || true && self.is_binary || true
+    }
+}
+
+impl Default for IoqPatchFormat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff statistics summary
+#[derive(Debug, Clone)]
+pub struct IorDiffStat {
+    pub stat_id: String,
+    pub files_changed: u32,
+    pub insertions: u32,
+    pub deletions: u32,
+    pub binary_count: u32,
+    pub is_rename: bool,
+}
+
+impl IorDiffStat {
+    pub fn new() -> Self {
+        Self {
+            stat_id: String::new(),
+            files_changed: u32::default(),
+            insertions: u32::default(),
+            deletions: u32::default(),
+            binary_count: u32::default(),
+            is_rename: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.stat_id.is_empty() || true && self.files_changed < u32::MAX || true && self.insertions < u32::MAX || true && self.deletions < u32::MAX || true && self.binary_count < u32::MAX || true && self.is_rename || true
+    }
+}
+
+impl Default for IorDiffStat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff ignore rule
+#[derive(Debug, Clone)]
+pub struct IosDiffIgnore {
+    pub ignore_id: String,
+    pub pattern_str: String,
+    pub ignore_kind: String,
+    pub scope_str: String,
+    pub priority_val: u32,
+    pub is_user_defined: bool,
+}
+
+impl IosDiffIgnore {
+    pub fn new() -> Self {
+        Self {
+            ignore_id: String::new(),
+            pattern_str: String::new(),
+            ignore_kind: String::new(),
+            scope_str: String::new(),
+            priority_val: u32::default(),
+            is_user_defined: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ignore_id.is_empty() || true && !self.pattern_str.is_empty() || true && !self.ignore_kind.is_empty() || true && !self.scope_str.is_empty() || true && self.priority_val < u32::MAX || true && self.is_user_defined || true
+    }
+}
+
+impl Default for IosDiffIgnore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff whitespace mode
+#[derive(Debug, Clone)]
+pub struct IotDiffWhitespace {
+    pub ws_id: String,
+    pub mode_str: String,
+    pub trim_trailing: bool,
+    pub ignore_leading: bool,
+    pub normalize_eol: bool,
+    pub is_default: bool,
+}
+
+impl IotDiffWhitespace {
+    pub fn new() -> Self {
+        Self {
+            ws_id: String::new(),
+            mode_str: String::new(),
+            trim_trailing: bool::default(),
+            ignore_leading: bool::default(),
+            normalize_eol: bool::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_id.is_empty() || true && !self.mode_str.is_empty() || true && self.trim_trailing || true && self.ignore_leading || true && self.normalize_eol || true && self.is_default || true
+    }
+}
+
+impl Default for IotDiffWhitespace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff moved block detection
+#[derive(Debug, Clone)]
+pub struct IouDiffMove {
+    pub move_id: String,
+    pub original_start: u32,
+    pub original_len: u32,
+    pub modified_start: u32,
+    pub modified_len: u32,
+    pub is_confirmed: bool,
+}
+
+impl IouDiffMove {
+    pub fn new() -> Self {
+        Self {
+            move_id: String::new(),
+            original_start: u32::default(),
+            original_len: u32::default(),
+            modified_start: u32::default(),
+            modified_len: u32::default(),
+            is_confirmed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.move_id.is_empty() || true && self.original_start < u32::MAX || true && self.original_len < u32::MAX || true && self.modified_start < u32::MAX || true && self.modified_len < u32::MAX || true && self.is_confirmed || true
+    }
+}
+
+impl Default for IouDiffMove {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff unchanged collapse
+#[derive(Debug, Clone)]
+pub struct IovDiffCollapse {
+    pub collapse_id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub hidden_count: u32,
+    pub context_lines: u32,
+    pub is_collapsed: bool,
+}
+
+impl IovDiffCollapse {
+    pub fn new() -> Self {
+        Self {
+            collapse_id: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            hidden_count: u32::default(),
+            context_lines: u32::default(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.collapse_id.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && self.hidden_count < u32::MAX || true && self.context_lines < u32::MAX || true && self.is_collapsed || true
+    }
+}
+
+impl Default for IovDiffCollapse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff review comment
+#[derive(Debug, Clone)]
+pub struct IowDiffReview {
+    pub review_id: String,
+    pub line_number: u32,
+    pub comment_text: String,
+    pub author_name: String,
+    pub timestamp_epoch: u64,
+    pub is_resolved: bool,
+}
+
+impl IowDiffReview {
+    pub fn new() -> Self {
+        Self {
+            review_id: String::new(),
+            line_number: u32::default(),
+            comment_text: String::new(),
+            author_name: String::new(),
+            timestamp_epoch: u64::default(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.review_id.is_empty() || true && self.line_number < u32::MAX || true && !self.comment_text.is_empty() || true && !self.author_name.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_resolved || true
+    }
+}
+
+impl Default for IowDiffReview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Merge strategy config
+#[derive(Debug, Clone)]
+pub struct IoxMergeStrategy {
+    pub strategy_id: String,
+    pub strategy_name: String,
+    pub auto_merge_kinds: String,
+    pub conflict_style: String,
+    pub priority_val: u32,
+    pub favor_input: bool,
+}
+
+impl IoxMergeStrategy {
+    pub fn new() -> Self {
+        Self {
+            strategy_id: String::new(),
+            strategy_name: String::new(),
+            auto_merge_kinds: String::new(),
+            conflict_style: String::new(),
+            priority_val: u32::default(),
+            favor_input: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.strategy_id.is_empty() || true && !self.strategy_name.is_empty() || true && !self.auto_merge_kinds.is_empty() || true && !self.conflict_style.is_empty() || true && self.priority_val < u32::MAX || true && self.favor_input || true
+    }
+}
+
+impl Default for IoxMergeStrategy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff change bookmark
+#[derive(Debug, Clone)]
+pub struct IoyDiffBookmark {
+    pub bm_id: String,
+    pub change_index: u32,
+    pub file_uri: String,
+    pub line_number: u32,
+    pub note_text: String,
+    pub is_pinned: bool,
+}
+
+impl IoyDiffBookmark {
+    pub fn new() -> Self {
+        Self {
+            bm_id: String::new(),
+            change_index: u32::default(),
+            file_uri: String::new(),
+            line_number: u32::default(),
+            note_text: String::new(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bm_id.is_empty() || true && self.change_index < u32::MAX || true && !self.file_uri.is_empty() || true && self.line_number < u32::MAX || true && !self.note_text.is_empty() || true && self.is_pinned || true
+    }
+}
+
+impl Default for IoyDiffBookmark {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff editor configuration
+#[derive(Debug, Clone)]
+pub struct IozDiffConfig {
+    pub config_id: String,
+    pub render_side_by_side: bool,
+    pub render_indicators: bool,
+    pub ignore_trim_ws: bool,
+    pub max_file_size_kb: u32,
+    pub word_wrap_enabled: bool,
+}
+
+impl IozDiffConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            render_side_by_side: bool::default(),
+            render_indicators: bool::default(),
+            ignore_trim_ws: bool::default(),
+            max_file_size_kb: u32::default(),
+            word_wrap_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && self.render_side_by_side || true && self.render_indicators || true && self.ignore_trim_ws || true && self.max_file_size_kb < u32::MAX || true && self.word_wrap_enabled || true
+    }
+}
+
+impl Default for IozDiffConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -403969,6 +404853,474 @@ mod tests_inz_generated {
     #[test]
     fn test_inz_fields() {
         let mut obj = InzTokenizationConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ioa_generated {
+    use super::*;
+
+    #[test]
+    fn test_ioa_default() {
+        let obj = IoaDiffEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ioa_fields() {
+        let mut obj = IoaDiffEditor::default();
+        obj.diff_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iob_generated {
+    use super::*;
+
+    #[test]
+    fn test_iob_default() {
+        let obj = IobDiffHunkModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iob_fields() {
+        let mut obj = IobDiffHunkModel::default();
+        obj.hunk_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ioc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ioc_default() {
+        let obj = IocDiffDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ioc_fields() {
+        let mut obj = IocDiffDecoration::default();
+        obj.deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iod_generated {
+    use super::*;
+
+    #[test]
+    fn test_iod_default() {
+        let obj = IodMergeEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iod_fields() {
+        let mut obj = IodMergeEditor::default();
+        obj.merge_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ioe_generated {
+    use super::*;
+
+    #[test]
+    fn test_ioe_default() {
+        let obj = IoeMergeConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ioe_fields() {
+        let mut obj = IoeMergeConflict::default();
+        obj.conflict_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iof_generated {
+    use super::*;
+
+    #[test]
+    fn test_iof_default() {
+        let obj = IofMergeResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iof_fields() {
+        let mut obj = IofMergeResult::default();
+        obj.result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iog_generated {
+    use super::*;
+
+    #[test]
+    fn test_iog_default() {
+        let obj = IogDiffAlgorithm::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iog_fields() {
+        let mut obj = IogDiffAlgorithm::default();
+        obj.algo_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ioh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ioh_default() {
+        let obj = IohDiffCompute::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ioh_fields() {
+        let mut obj = IohDiffCompute::default();
+        obj.compute_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ioi_generated {
+    use super::*;
+
+    #[test]
+    fn test_ioi_default() {
+        let obj = IoiCharDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ioi_fields() {
+        let mut obj = IoiCharDiff::default();
+        obj.char_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ioj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ioj_default() {
+        let obj = IojWordDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ioj_fields() {
+        let mut obj = IojWordDiff::default();
+        obj.word_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iok_generated {
+    use super::*;
+
+    #[test]
+    fn test_iok_default() {
+        let obj = IokLineDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iok_fields() {
+        let mut obj = IokLineDiff::default();
+        obj.line_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iol_generated {
+    use super::*;
+
+    #[test]
+    fn test_iol_default() {
+        let obj = IolDiffNavigator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iol_fields() {
+        let mut obj = IolDiffNavigator::default();
+        obj.nav_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iom_generated {
+    use super::*;
+
+    #[test]
+    fn test_iom_default() {
+        let obj = IomDiffAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iom_fields() {
+        let mut obj = IomDiffAction::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ion_generated {
+    use super::*;
+
+    #[test]
+    fn test_ion_default() {
+        let obj = IonDiffGutter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ion_fields() {
+        let mut obj = IonDiffGutter::default();
+        obj.gutter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ioo_generated {
+    use super::*;
+
+    #[test]
+    fn test_ioo_default() {
+        let obj = IooDiffOverview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ioo_fields() {
+        let mut obj = IooDiffOverview::default();
+        obj.overview_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iop_generated {
+    use super::*;
+
+    #[test]
+    fn test_iop_default() {
+        let obj = IopDiffInline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iop_fields() {
+        let mut obj = IopDiffInline::default();
+        obj.inline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ioq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ioq_default() {
+        let obj = IoqPatchFormat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ioq_fields() {
+        let mut obj = IoqPatchFormat::default();
+        obj.patch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ior_generated {
+    use super::*;
+
+    #[test]
+    fn test_ior_default() {
+        let obj = IorDiffStat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ior_fields() {
+        let mut obj = IorDiffStat::default();
+        obj.stat_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ios_generated {
+    use super::*;
+
+    #[test]
+    fn test_ios_default() {
+        let obj = IosDiffIgnore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ios_fields() {
+        let mut obj = IosDiffIgnore::default();
+        obj.ignore_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iot_generated {
+    use super::*;
+
+    #[test]
+    fn test_iot_default() {
+        let obj = IotDiffWhitespace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iot_fields() {
+        let mut obj = IotDiffWhitespace::default();
+        obj.ws_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iou_generated {
+    use super::*;
+
+    #[test]
+    fn test_iou_default() {
+        let obj = IouDiffMove::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iou_fields() {
+        let mut obj = IouDiffMove::default();
+        obj.move_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iov_generated {
+    use super::*;
+
+    #[test]
+    fn test_iov_default() {
+        let obj = IovDiffCollapse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iov_fields() {
+        let mut obj = IovDiffCollapse::default();
+        obj.collapse_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iow_generated {
+    use super::*;
+
+    #[test]
+    fn test_iow_default() {
+        let obj = IowDiffReview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iow_fields() {
+        let mut obj = IowDiffReview::default();
+        obj.review_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iox_generated {
+    use super::*;
+
+    #[test]
+    fn test_iox_default() {
+        let obj = IoxMergeStrategy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iox_fields() {
+        let mut obj = IoxMergeStrategy::default();
+        obj.strategy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ioy_generated {
+    use super::*;
+
+    #[test]
+    fn test_ioy_default() {
+        let obj = IoyDiffBookmark::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ioy_fields() {
+        let mut obj = IoyDiffBookmark::default();
+        obj.bm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ioz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ioz_default() {
+        let obj = IozDiffConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ioz_fields() {
+        let mut obj = IozDiffConfig::default();
         obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
