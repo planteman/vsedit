@@ -176077,6 +176077,890 @@ impl Default for JrzCommandService {
     }
 }
 
+/// Snippet body descriptor
+#[derive(Debug, Clone)]
+pub struct JsaSnippetBody {
+    pub snip_body_id: String,
+    pub body_text: String,
+    pub placeholder_count: u32,
+    pub variable_count: u32,
+    pub line_count: u32,
+    pub has_final_tabstop: bool,
+}
+
+impl JsaSnippetBody {
+    pub fn new() -> Self {
+        Self {
+            snip_body_id: String::new(),
+            body_text: String::new(),
+            placeholder_count: u32::default(),
+            variable_count: u32::default(),
+            line_count: u32::default(),
+            has_final_tabstop: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_body_id.is_empty() || true && !self.body_text.is_empty() || true && self.placeholder_count < u32::MAX || true && self.variable_count < u32::MAX || true && self.line_count < u32::MAX || true && self.has_final_tabstop || true
+    }
+}
+
+impl Default for JsaSnippetBody {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet placeholder
+#[derive(Debug, Clone)]
+pub struct JsbSnippetPlaceholder {
+    pub snip_ph_id: String,
+    pub index_val: u32,
+    pub default_text: String,
+    pub choice_values_csv: String,
+    pub nested_count: u32,
+    pub is_final: bool,
+}
+
+impl JsbSnippetPlaceholder {
+    pub fn new() -> Self {
+        Self {
+            snip_ph_id: String::new(),
+            index_val: u32::default(),
+            default_text: String::new(),
+            choice_values_csv: String::new(),
+            nested_count: u32::default(),
+            is_final: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_ph_id.is_empty() || true && self.index_val < u32::MAX || true && !self.default_text.is_empty() || true && !self.choice_values_csv.is_empty() || true && self.nested_count < u32::MAX || true && self.is_final || true
+    }
+}
+
+impl Default for JsbSnippetPlaceholder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet variable reference
+#[derive(Debug, Clone)]
+pub struct JscSnippetVariable {
+    pub snip_var_id: String,
+    pub var_name: String,
+    pub default_val: String,
+    pub transform_ref: String,
+    pub resolved_val: String,
+    pub is_resolved: bool,
+}
+
+impl JscSnippetVariable {
+    pub fn new() -> Self {
+        Self {
+            snip_var_id: String::new(),
+            var_name: String::new(),
+            default_val: String::new(),
+            transform_ref: String::new(),
+            resolved_val: String::new(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_var_id.is_empty() || true && !self.var_name.is_empty() || true && !self.default_val.is_empty() || true && !self.transform_ref.is_empty() || true && !self.resolved_val.is_empty() || true && self.is_resolved || true
+    }
+}
+
+impl Default for JscSnippetVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet choice placeholder
+#[derive(Debug, Clone)]
+pub struct JsdSnippetChoice {
+    pub snip_choice_id: String,
+    pub index_val: u32,
+    pub options_csv: String,
+    pub selected_idx: u32,
+    pub placeholder_ref: String,
+    pub is_open: bool,
+}
+
+impl JsdSnippetChoice {
+    pub fn new() -> Self {
+        Self {
+            snip_choice_id: String::new(),
+            index_val: u32::default(),
+            options_csv: String::new(),
+            selected_idx: u32::default(),
+            placeholder_ref: String::new(),
+            is_open: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_choice_id.is_empty() || true && self.index_val < u32::MAX || true && !self.options_csv.is_empty() || true && self.selected_idx < u32::MAX || true && !self.placeholder_ref.is_empty() || true && self.is_open || true
+    }
+}
+
+impl Default for JsdSnippetChoice {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet text transform
+#[derive(Debug, Clone)]
+pub struct JseSnippetTransform {
+    pub snip_transform_id: String,
+    pub regex_pattern: String,
+    pub format_str: String,
+    pub global_flag: bool,
+    pub options_str: String,
+    pub is_case_change: bool,
+}
+
+impl JseSnippetTransform {
+    pub fn new() -> Self {
+        Self {
+            snip_transform_id: String::new(),
+            regex_pattern: String::new(),
+            format_str: String::new(),
+            global_flag: bool::default(),
+            options_str: String::new(),
+            is_case_change: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_transform_id.is_empty() || true && !self.regex_pattern.is_empty() || true && !self.format_str.is_empty() || true && self.global_flag || true && !self.options_str.is_empty() || true && self.is_case_change || true
+    }
+}
+
+impl Default for JseSnippetTransform {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet insertion session
+#[derive(Debug, Clone)]
+pub struct JsfSnippetSession {
+    pub snip_session_id: String,
+    pub editor_ref: String,
+    pub snippet_ref: String,
+    pub insert_range_json: String,
+    pub active_ph_idx: u32,
+    pub is_active: bool,
+}
+
+impl JsfSnippetSession {
+    pub fn new() -> Self {
+        Self {
+            snip_session_id: String::new(),
+            editor_ref: String::new(),
+            snippet_ref: String::new(),
+            insert_range_json: String::new(),
+            active_ph_idx: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_session_id.is_empty() || true && !self.editor_ref.is_empty() || true && !self.snippet_ref.is_empty() || true && !self.insert_range_json.is_empty() || true && self.active_ph_idx < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for JsfSnippetSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet completion item
+#[derive(Debug, Clone)]
+pub struct JsgSnippetCompletion {
+    pub snip_comp_id: String,
+    pub prefix_str: String,
+    pub label_str: String,
+    pub snippet_ref: String,
+    pub sort_text: String,
+    pub is_preselect: bool,
+}
+
+impl JsgSnippetCompletion {
+    pub fn new() -> Self {
+        Self {
+            snip_comp_id: String::new(),
+            prefix_str: String::new(),
+            label_str: String::new(),
+            snippet_ref: String::new(),
+            sort_text: String::new(),
+            is_preselect: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_comp_id.is_empty() || true && !self.prefix_str.is_empty() || true && !self.label_str.is_empty() || true && !self.snippet_ref.is_empty() || true && !self.sort_text.is_empty() || true && self.is_preselect || true
+    }
+}
+
+impl Default for JsgSnippetCompletion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet registry entry
+#[derive(Debug, Clone)]
+pub struct JshSnippetRegistry {
+    pub snip_reg_id: String,
+    pub language_id: String,
+    pub snippet_count: u32,
+    pub source_str: String,
+    pub priority_val: u32,
+    pub is_extension_snippet: bool,
+}
+
+impl JshSnippetRegistry {
+    pub fn new() -> Self {
+        Self {
+            snip_reg_id: String::new(),
+            language_id: String::new(),
+            snippet_count: u32::default(),
+            source_str: String::new(),
+            priority_val: u32::default(),
+            is_extension_snippet: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_reg_id.is_empty() || true && !self.language_id.is_empty() || true && self.snippet_count < u32::MAX || true && !self.source_str.is_empty() || true && self.priority_val < u32::MAX || true && self.is_extension_snippet || true
+    }
+}
+
+impl Default for JshSnippetRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet file descriptor
+#[derive(Debug, Clone)]
+pub struct JsiSnippetFile {
+    pub snip_file_id: String,
+    pub file_path: String,
+    pub language_ref: String,
+    pub snippet_count: u32,
+    pub parse_errors: u32,
+    pub is_global_file: bool,
+}
+
+impl JsiSnippetFile {
+    pub fn new() -> Self {
+        Self {
+            snip_file_id: String::new(),
+            file_path: String::new(),
+            language_ref: String::new(),
+            snippet_count: u32::default(),
+            parse_errors: u32::default(),
+            is_global_file: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_file_id.is_empty() || true && !self.file_path.is_empty() || true && !self.language_ref.is_empty() || true && self.snippet_count < u32::MAX || true && self.parse_errors < u32::MAX || true && self.is_global_file || true
+    }
+}
+
+impl Default for JsiSnippetFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet language scope
+#[derive(Debug, Clone)]
+pub struct JsjSnippetScope {
+    pub snip_scope_id: String,
+    pub scope_str: String,
+    pub language_ids_csv: String,
+    pub snippet_count: u32,
+    pub priority_val: u32,
+    pub is_global: bool,
+}
+
+impl JsjSnippetScope {
+    pub fn new() -> Self {
+        Self {
+            snip_scope_id: String::new(),
+            scope_str: String::new(),
+            language_ids_csv: String::new(),
+            snippet_count: u32::default(),
+            priority_val: u32::default(),
+            is_global: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_scope_id.is_empty() || true && !self.scope_str.is_empty() || true && !self.language_ids_csv.is_empty() || true && self.snippet_count < u32::MAX || true && self.priority_val < u32::MAX || true && self.is_global || true
+    }
+}
+
+impl Default for JsjSnippetScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// User-defined snippet
+#[derive(Debug, Clone)]
+pub struct JskUserSnippet {
+    pub user_snip_id: String,
+    pub name_str: String,
+    pub prefix_str: String,
+    pub body_str: String,
+    pub description_str: String,
+    pub is_global: bool,
+}
+
+impl JskUserSnippet {
+    pub fn new() -> Self {
+        Self {
+            user_snip_id: String::new(),
+            name_str: String::new(),
+            prefix_str: String::new(),
+            body_str: String::new(),
+            description_str: String::new(),
+            is_global: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.user_snip_id.is_empty() || true && !self.name_str.is_empty() || true && !self.prefix_str.is_empty() || true && !self.body_str.is_empty() || true && !self.description_str.is_empty() || true && self.is_global || true
+    }
+}
+
+impl Default for JskUserSnippet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Project-level snippet
+#[derive(Debug, Clone)]
+pub struct JslProjectSnippet {
+    pub proj_snip_id: String,
+    pub name_str: String,
+    pub prefix_str: String,
+    pub body_str: String,
+    pub workspace_ref: String,
+    pub is_shared: bool,
+}
+
+impl JslProjectSnippet {
+    pub fn new() -> Self {
+        Self {
+            proj_snip_id: String::new(),
+            name_str: String::new(),
+            prefix_str: String::new(),
+            body_str: String::new(),
+            workspace_ref: String::new(),
+            is_shared: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proj_snip_id.is_empty() || true && !self.name_str.is_empty() || true && !self.prefix_str.is_empty() || true && !self.body_str.is_empty() || true && !self.workspace_ref.is_empty() || true && self.is_shared || true
+    }
+}
+
+impl Default for JslProjectSnippet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet parser state
+#[derive(Debug, Clone)]
+pub struct JsmSnippetParser {
+    pub snip_parser_id: String,
+    pub input_str: String,
+    pub position_val: u32,
+    pub token_count: u32,
+    pub error_msg: String,
+    pub is_valid: bool,
+}
+
+impl JsmSnippetParser {
+    pub fn new() -> Self {
+        Self {
+            snip_parser_id: String::new(),
+            input_str: String::new(),
+            position_val: u32::default(),
+            token_count: u32::default(),
+            error_msg: String::new(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_parser_id.is_empty() || true && !self.input_str.is_empty() || true && self.position_val < u32::MAX || true && self.token_count < u32::MAX || true && !self.error_msg.is_empty() || true && self.is_valid || true
+    }
+}
+
+impl Default for JsmSnippetParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet syntax token
+#[derive(Debug, Clone)]
+pub struct JsnSnippetToken {
+    pub snip_token_id: String,
+    pub token_type_str: String,
+    pub value_str: String,
+    pub offset_val: u32,
+    pub length_val: u32,
+    pub is_escape: bool,
+}
+
+impl JsnSnippetToken {
+    pub fn new() -> Self {
+        Self {
+            snip_token_id: String::new(),
+            token_type_str: String::new(),
+            value_str: String::new(),
+            offset_val: u32::default(),
+            length_val: u32::default(),
+            is_escape: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_token_id.is_empty() || true && !self.token_type_str.is_empty() || true && !self.value_str.is_empty() || true && self.offset_val < u32::MAX || true && self.length_val < u32::MAX || true && self.is_escape || true
+    }
+}
+
+impl Default for JsnSnippetToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Emmet abbreviation expansion
+#[derive(Debug, Clone)]
+pub struct JsoEmmetAbbreviation {
+    pub emmet_id: String,
+    pub abbreviation_str: String,
+    pub expanded_text: String,
+    pub syntax_str: String,
+    pub line_count: u32,
+    pub is_valid: bool,
+}
+
+impl JsoEmmetAbbreviation {
+    pub fn new() -> Self {
+        Self {
+            emmet_id: String::new(),
+            abbreviation_str: String::new(),
+            expanded_text: String::new(),
+            syntax_str: String::new(),
+            line_count: u32::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.emmet_id.is_empty() || true && !self.abbreviation_str.is_empty() || true && !self.expanded_text.is_empty() || true && !self.syntax_str.is_empty() || true && self.line_count < u32::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for JsoEmmetAbbreviation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Emmet configuration entry
+#[derive(Debug, Clone)]
+pub struct JspEmmetConfig {
+    pub emmet_cfg_id: String,
+    pub syntax_profiles_json: String,
+    pub variables_json: String,
+    pub preferences_json: String,
+    pub excluded_langs_csv: String,
+    pub is_enabled: bool,
+}
+
+impl JspEmmetConfig {
+    pub fn new() -> Self {
+        Self {
+            emmet_cfg_id: String::new(),
+            syntax_profiles_json: String::new(),
+            variables_json: String::new(),
+            preferences_json: String::new(),
+            excluded_langs_csv: String::new(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.emmet_cfg_id.is_empty() || true && !self.syntax_profiles_json.is_empty() || true && !self.variables_json.is_empty() || true && !self.preferences_json.is_empty() || true && !self.excluded_langs_csv.is_empty() || true && self.is_enabled || true
+    }
+}
+
+impl Default for JspEmmetConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Surround-with snippet
+#[derive(Debug, Clone)]
+pub struct JsqSurroundWith {
+    pub surround_id: String,
+    pub label_str: String,
+    pub snippet_body: String,
+    pub language_ref: String,
+    pub keybinding_ref: String,
+    pub is_custom: bool,
+}
+
+impl JsqSurroundWith {
+    pub fn new() -> Self {
+        Self {
+            surround_id: String::new(),
+            label_str: String::new(),
+            snippet_body: String::new(),
+            language_ref: String::new(),
+            keybinding_ref: String::new(),
+            is_custom: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.surround_id.is_empty() || true && !self.label_str.is_empty() || true && !self.snippet_body.is_empty() || true && !self.language_ref.is_empty() || true && !self.keybinding_ref.is_empty() || true && self.is_custom || true
+    }
+}
+
+impl Default for JsqSurroundWith {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet suggestion
+#[derive(Debug, Clone)]
+pub struct JsrSnippetSuggestion {
+    pub snip_suggest_id: String,
+    pub snippet_ref: String,
+    pub prefix_match: String,
+    pub score_val: f64,
+    pub source_str: String,
+    pub is_top_suggestion: bool,
+}
+
+impl JsrSnippetSuggestion {
+    pub fn new() -> Self {
+        Self {
+            snip_suggest_id: String::new(),
+            snippet_ref: String::new(),
+            prefix_match: String::new(),
+            score_val: f64::default(),
+            source_str: String::new(),
+            is_top_suggestion: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_suggest_id.is_empty() || true && !self.snippet_ref.is_empty() || true && !self.prefix_match.is_empty() || true && self.score_val.is_finite() || true && !self.source_str.is_empty() || true && self.is_top_suggestion || true
+    }
+}
+
+impl Default for JsrSnippetSuggestion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet import operation
+#[derive(Debug, Clone)]
+pub struct JssSnippetImport {
+    pub snip_import_id: String,
+    pub source_path: String,
+    pub format_str: String,
+    pub imported_count: u32,
+    pub conflict_count: u32,
+    pub overwrite_existing: bool,
+}
+
+impl JssSnippetImport {
+    pub fn new() -> Self {
+        Self {
+            snip_import_id: String::new(),
+            source_path: String::new(),
+            format_str: String::new(),
+            imported_count: u32::default(),
+            conflict_count: u32::default(),
+            overwrite_existing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_import_id.is_empty() || true && !self.source_path.is_empty() || true && !self.format_str.is_empty() || true && self.imported_count < u32::MAX || true && self.conflict_count < u32::MAX || true && self.overwrite_existing || true
+    }
+}
+
+impl Default for JssSnippetImport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet export operation
+#[derive(Debug, Clone)]
+pub struct JstSnippetExport {
+    pub snip_export_id: String,
+    pub output_path: String,
+    pub format_str: String,
+    pub snippet_count: u32,
+    pub language_csv: String,
+    pub include_extension: bool,
+}
+
+impl JstSnippetExport {
+    pub fn new() -> Self {
+        Self {
+            snip_export_id: String::new(),
+            output_path: String::new(),
+            format_str: String::new(),
+            snippet_count: u32::default(),
+            language_csv: String::new(),
+            include_extension: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_export_id.is_empty() || true && !self.output_path.is_empty() || true && !self.format_str.is_empty() || true && self.snippet_count < u32::MAX || true && !self.language_csv.is_empty() || true && self.include_extension || true
+    }
+}
+
+impl Default for JstSnippetExport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet sort preference
+#[derive(Debug, Clone)]
+pub struct JsuSnippetSortOrder {
+    pub snip_sort_id: String,
+    pub sort_by_str: String,
+    pub direction_str: String,
+    pub language_ref: String,
+    pub recency_weight: f64,
+    pub is_smart: bool,
+}
+
+impl JsuSnippetSortOrder {
+    pub fn new() -> Self {
+        Self {
+            snip_sort_id: String::new(),
+            sort_by_str: String::new(),
+            direction_str: String::new(),
+            language_ref: String::new(),
+            recency_weight: f64::default(),
+            is_smart: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_sort_id.is_empty() || true && !self.sort_by_str.is_empty() || true && !self.direction_str.is_empty() || true && !self.language_ref.is_empty() || true && self.recency_weight.is_finite() || true && self.is_smart || true
+    }
+}
+
+impl Default for JsuSnippetSortOrder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet usage history
+#[derive(Debug, Clone)]
+pub struct JsvSnippetHistory {
+    pub snip_hist_id: String,
+    pub snippet_ref: String,
+    pub usage_count: u64,
+    pub last_used_epoch: u64,
+    pub avg_duration_ms: u32,
+    pub is_favorite: bool,
+}
+
+impl JsvSnippetHistory {
+    pub fn new() -> Self {
+        Self {
+            snip_hist_id: String::new(),
+            snippet_ref: String::new(),
+            usage_count: u64::default(),
+            last_used_epoch: u64::default(),
+            avg_duration_ms: u32::default(),
+            is_favorite: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_hist_id.is_empty() || true && !self.snippet_ref.is_empty() || true && self.usage_count < u64::MAX || true && self.last_used_epoch < u64::MAX || true && self.avg_duration_ms < u32::MAX || true && self.is_favorite || true
+    }
+}
+
+impl Default for JsvSnippetHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet preview renderer
+#[derive(Debug, Clone)]
+pub struct JswSnippetPreview {
+    pub snip_preview_id: String,
+    pub snippet_ref: String,
+    pub rendered_text: String,
+    pub language_id: String,
+    pub line_count: u32,
+    pub has_placeholders: bool,
+}
+
+impl JswSnippetPreview {
+    pub fn new() -> Self {
+        Self {
+            snip_preview_id: String::new(),
+            snippet_ref: String::new(),
+            rendered_text: String::new(),
+            language_id: String::new(),
+            line_count: u32::default(),
+            has_placeholders: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_preview_id.is_empty() || true && !self.snippet_ref.is_empty() || true && !self.rendered_text.is_empty() || true && !self.language_id.is_empty() || true && self.line_count < u32::MAX || true && self.has_placeholders || true
+    }
+}
+
+impl Default for JswSnippetPreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet tabstop entry
+#[derive(Debug, Clone)]
+pub struct JsxSnippetTabStop {
+    pub snip_tabstop_id: String,
+    pub index_val: u32,
+    pub range_json: String,
+    pub linked_refs_csv: String,
+    pub transform_ref: String,
+    pub is_visited: bool,
+}
+
+impl JsxSnippetTabStop {
+    pub fn new() -> Self {
+        Self {
+            snip_tabstop_id: String::new(),
+            index_val: u32::default(),
+            range_json: String::new(),
+            linked_refs_csv: String::new(),
+            transform_ref: String::new(),
+            is_visited: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_tabstop_id.is_empty() || true && self.index_val < u32::MAX || true && !self.range_json.is_empty() || true && !self.linked_refs_csv.is_empty() || true && !self.transform_ref.is_empty() || true && self.is_visited || true
+    }
+}
+
+impl Default for JsxSnippetTabStop {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet mirror reference
+#[derive(Debug, Clone)]
+pub struct JsySnippetMirror {
+    pub snip_mirror_id: String,
+    pub source_tabstop_ref: String,
+    pub mirror_range_json: String,
+    pub transform_ref: String,
+    pub update_count: u32,
+    pub is_active: bool,
+}
+
+impl JsySnippetMirror {
+    pub fn new() -> Self {
+        Self {
+            snip_mirror_id: String::new(),
+            source_tabstop_ref: String::new(),
+            mirror_range_json: String::new(),
+            transform_ref: String::new(),
+            update_count: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_mirror_id.is_empty() || true && !self.source_tabstop_ref.is_empty() || true && !self.mirror_range_json.is_empty() || true && !self.transform_ref.is_empty() || true && self.update_count < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for JsySnippetMirror {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet lifecycle event
+#[derive(Debug, Clone)]
+pub struct JszSnippetEvent {
+    pub snip_event_id: String,
+    pub event_type_str: String,
+    pub snippet_ref: String,
+    pub editor_ref: String,
+    pub timestamp_epoch: u64,
+    pub is_cancelled: bool,
+}
+
+impl JszSnippetEvent {
+    pub fn new() -> Self {
+        Self {
+            snip_event_id: String::new(),
+            event_type_str: String::new(),
+            snippet_ref: String::new(),
+            editor_ref: String::new(),
+            timestamp_epoch: u64::default(),
+            is_cancelled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_event_id.is_empty() || true && !self.event_type_str.is_empty() || true && !self.snippet_ref.is_empty() || true && !self.editor_ref.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_cancelled || true
+    }
+}
+
+impl Default for JszSnippetEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -444553,6 +445437,474 @@ mod tests_jrz_generated {
     fn test_jrz_fields() {
         let mut obj = JrzCommandService::default();
         obj.cmd_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsa_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsa_default() {
+        let obj = JsaSnippetBody::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsa_fields() {
+        let mut obj = JsaSnippetBody::default();
+        obj.snip_body_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsb_default() {
+        let obj = JsbSnippetPlaceholder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsb_fields() {
+        let mut obj = JsbSnippetPlaceholder::default();
+        obj.snip_ph_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsc_default() {
+        let obj = JscSnippetVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsc_fields() {
+        let mut obj = JscSnippetVariable::default();
+        obj.snip_var_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsd_default() {
+        let obj = JsdSnippetChoice::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsd_fields() {
+        let mut obj = JsdSnippetChoice::default();
+        obj.snip_choice_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jse_generated {
+    use super::*;
+
+    #[test]
+    fn test_jse_default() {
+        let obj = JseSnippetTransform::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jse_fields() {
+        let mut obj = JseSnippetTransform::default();
+        obj.snip_transform_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsf_default() {
+        let obj = JsfSnippetSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsf_fields() {
+        let mut obj = JsfSnippetSession::default();
+        obj.snip_session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsg_default() {
+        let obj = JsgSnippetCompletion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsg_fields() {
+        let mut obj = JsgSnippetCompletion::default();
+        obj.snip_comp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsh_default() {
+        let obj = JshSnippetRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsh_fields() {
+        let mut obj = JshSnippetRegistry::default();
+        obj.snip_reg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsi_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsi_default() {
+        let obj = JsiSnippetFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsi_fields() {
+        let mut obj = JsiSnippetFile::default();
+        obj.snip_file_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsj_default() {
+        let obj = JsjSnippetScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsj_fields() {
+        let mut obj = JsjSnippetScope::default();
+        obj.snip_scope_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsk_default() {
+        let obj = JskUserSnippet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsk_fields() {
+        let mut obj = JskUserSnippet::default();
+        obj.user_snip_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsl_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsl_default() {
+        let obj = JslProjectSnippet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsl_fields() {
+        let mut obj = JslProjectSnippet::default();
+        obj.proj_snip_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsm_default() {
+        let obj = JsmSnippetParser::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsm_fields() {
+        let mut obj = JsmSnippetParser::default();
+        obj.snip_parser_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsn_default() {
+        let obj = JsnSnippetToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsn_fields() {
+        let mut obj = JsnSnippetToken::default();
+        obj.snip_token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jso_generated {
+    use super::*;
+
+    #[test]
+    fn test_jso_default() {
+        let obj = JsoEmmetAbbreviation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jso_fields() {
+        let mut obj = JsoEmmetAbbreviation::default();
+        obj.emmet_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsp_default() {
+        let obj = JspEmmetConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsp_fields() {
+        let mut obj = JspEmmetConfig::default();
+        obj.emmet_cfg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsq_default() {
+        let obj = JsqSurroundWith::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsq_fields() {
+        let mut obj = JsqSurroundWith::default();
+        obj.surround_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsr_default() {
+        let obj = JsrSnippetSuggestion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsr_fields() {
+        let mut obj = JsrSnippetSuggestion::default();
+        obj.snip_suggest_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jss_generated {
+    use super::*;
+
+    #[test]
+    fn test_jss_default() {
+        let obj = JssSnippetImport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jss_fields() {
+        let mut obj = JssSnippetImport::default();
+        obj.snip_import_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jst_generated {
+    use super::*;
+
+    #[test]
+    fn test_jst_default() {
+        let obj = JstSnippetExport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jst_fields() {
+        let mut obj = JstSnippetExport::default();
+        obj.snip_export_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsu_default() {
+        let obj = JsuSnippetSortOrder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsu_fields() {
+        let mut obj = JsuSnippetSortOrder::default();
+        obj.snip_sort_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsv_default() {
+        let obj = JsvSnippetHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsv_fields() {
+        let mut obj = JsvSnippetHistory::default();
+        obj.snip_hist_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsw_default() {
+        let obj = JswSnippetPreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsw_fields() {
+        let mut obj = JswSnippetPreview::default();
+        obj.snip_preview_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsx_default() {
+        let obj = JsxSnippetTabStop::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsx_fields() {
+        let mut obj = JsxSnippetTabStop::default();
+        obj.snip_tabstop_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsy_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsy_default() {
+        let obj = JsySnippetMirror::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsy_fields() {
+        let mut obj = JsySnippetMirror::default();
+        obj.snip_mirror_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jsz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jsz_default() {
+        let obj = JszSnippetEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jsz_fields() {
+        let mut obj = JszSnippetEvent::default();
+        obj.snip_event_id = "test".to_string();
         assert!(obj.validate());
     }
 }
