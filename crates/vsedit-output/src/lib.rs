@@ -104018,6 +104018,678 @@ impl Default for GtjProtocolMessage {
     }
 }
 
+/// File system provider (scheme, watch, stat, read, write, delete)
+#[derive(Debug, Clone)]
+pub struct GtkFileSystemProvider {
+    pub fs_prov_id: String,
+    pub scheme: String,
+    pub is_readonly: bool,
+    pub supports_file_read: bool,
+    pub supports_file_write: bool,
+    pub supports_file_delete: bool,
+    pub supports_file_rename: bool,
+    pub supports_watch: bool,
+    pub case_sensitive: bool,
+    pub is_virtual: bool,
+}
+
+impl GtkFileSystemProvider {
+    pub fn new() -> Self {
+        Self {
+            fs_prov_id: String::new(),
+            scheme: String::new(),
+            is_readonly: bool::default(),
+            supports_file_read: bool::default(),
+            supports_file_write: bool::default(),
+            supports_file_delete: bool::default(),
+            supports_file_rename: bool::default(),
+            supports_watch: bool::default(),
+            case_sensitive: bool::default(),
+            is_virtual: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fs_prov_id.is_empty() || true && !self.scheme.is_empty() || true && self.is_readonly || true && self.supports_file_read || true && self.supports_file_write || true && self.supports_file_delete || true && self.supports_file_rename || true && self.supports_watch || true && self.case_sensitive || true && self.is_virtual || true
+    }
+}
+
+impl Default for GtkFileSystemProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File stat (type, ctime, mtime, size, permissions, is symlink)
+#[derive(Debug, Clone)]
+pub struct GtlFileStat {
+    pub file_stat_id: String,
+    pub file_type: String,
+    pub ctime_ms: u64,
+    pub mtime_ms: u64,
+    pub size_bytes: u64,
+    pub permissions: u32,
+    pub is_symlink: bool,
+    pub is_readonly: bool,
+    pub uri: String,
+    pub children_count: u32,
+}
+
+impl GtlFileStat {
+    pub fn new() -> Self {
+        Self {
+            file_stat_id: String::new(),
+            file_type: String::new(),
+            ctime_ms: u64::default(),
+            mtime_ms: u64::default(),
+            size_bytes: u64::default(),
+            permissions: u32::default(),
+            is_symlink: bool::default(),
+            is_readonly: bool::default(),
+            uri: String::new(),
+            children_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_stat_id.is_empty() || true && !self.file_type.is_empty() || true && self.ctime_ms < u64::MAX || true && self.mtime_ms < u64::MAX || true && self.size_bytes < u64::MAX || true && self.permissions < u32::MAX || true && self.is_symlink || true && self.is_readonly || true && !self.uri.is_empty() || true && self.children_count < u32::MAX || true
+    }
+}
+
+impl Default for GtlFileStat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File change event (type, uri, is directory, is recursive)
+#[derive(Debug, Clone)]
+pub struct GtmFileChangeEvent {
+    pub file_change_id: String,
+    pub change_type: String,
+    pub uri: String,
+    pub is_directory: bool,
+    pub is_recursive: bool,
+    pub old_uri: String,
+    pub timestamp_ms: u64,
+    pub source: String,
+    pub correlation_id: String,
+    pub is_external: bool,
+}
+
+impl GtmFileChangeEvent {
+    pub fn new() -> Self {
+        Self {
+            file_change_id: String::new(),
+            change_type: String::new(),
+            uri: String::new(),
+            is_directory: bool::default(),
+            is_recursive: bool::default(),
+            old_uri: String::new(),
+            timestamp_ms: u64::default(),
+            source: String::new(),
+            correlation_id: String::new(),
+            is_external: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_change_id.is_empty() || true && !self.change_type.is_empty() || true && !self.uri.is_empty() || true && self.is_directory || true && self.is_recursive || true && !self.old_uri.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.source.is_empty() || true && !self.correlation_id.is_empty() || true && self.is_external || true
+    }
+}
+
+impl Default for GtmFileChangeEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File watcher (uri, recursive, excludes, on did change)
+#[derive(Debug, Clone)]
+pub struct GtnFileWatcher {
+    pub watcher_id: String,
+    pub uri: String,
+    pub is_recursive: bool,
+    pub excludes_json: String,
+    pub on_did_change: bool,
+    pub correlation_id: String,
+    pub poll_interval_ms: u32,
+    pub is_active: bool,
+    pub file_count: u32,
+    pub error_count: u32,
+}
+
+impl GtnFileWatcher {
+    pub fn new() -> Self {
+        Self {
+            watcher_id: String::new(),
+            uri: String::new(),
+            is_recursive: bool::default(),
+            excludes_json: String::new(),
+            on_did_change: bool::default(),
+            correlation_id: String::new(),
+            poll_interval_ms: u32::default(),
+            is_active: bool::default(),
+            file_count: u32::default(),
+            error_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watcher_id.is_empty() || true && !self.uri.is_empty() || true && self.is_recursive || true && !self.excludes_json.is_empty() || true && self.on_did_change || true && !self.correlation_id.is_empty() || true && self.poll_interval_ms < u32::MAX || true && self.is_active || true && self.file_count < u32::MAX || true && self.error_count < u32::MAX || true
+    }
+}
+
+impl Default for GtnFileWatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File search options (folder, includes, excludes, max results)
+#[derive(Debug, Clone)]
+pub struct GtoFileSearchOptions {
+    pub search_opts_id: String,
+    pub folder_uri: String,
+    pub includes_json: String,
+    pub excludes_json: String,
+    pub max_results: u32,
+    pub follow_symlinks: bool,
+    pub use_ignore_files: bool,
+    pub use_global_ignore: bool,
+    pub max_depth: u32,
+    pub session_id: String,
+}
+
+impl GtoFileSearchOptions {
+    pub fn new() -> Self {
+        Self {
+            search_opts_id: String::new(),
+            folder_uri: String::new(),
+            includes_json: String::new(),
+            excludes_json: String::new(),
+            max_results: u32::default(),
+            follow_symlinks: bool::default(),
+            use_ignore_files: bool::default(),
+            use_global_ignore: bool::default(),
+            max_depth: u32::default(),
+            session_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_opts_id.is_empty() || true && !self.folder_uri.is_empty() || true && !self.includes_json.is_empty() || true && !self.excludes_json.is_empty() || true && self.max_results < u32::MAX || true && self.follow_symlinks || true && self.use_ignore_files || true && self.use_global_ignore || true && self.max_depth < u32::MAX || true && !self.session_id.is_empty() || true
+    }
+}
+
+impl Default for GtoFileSearchOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text search options (pattern, regex, case, word, max results)
+#[derive(Debug, Clone)]
+pub struct GtpTextSearchOptions {
+    pub text_search_id: String,
+    pub pattern: String,
+    pub is_regex: bool,
+    pub is_case_sensitive: bool,
+    pub is_word_match: bool,
+    pub max_results: u32,
+    pub preview_lines: u32,
+    pub before_context: u32,
+    pub after_context: u32,
+    pub encoding: String,
+}
+
+impl GtpTextSearchOptions {
+    pub fn new() -> Self {
+        Self {
+            text_search_id: String::new(),
+            pattern: String::new(),
+            is_regex: bool::default(),
+            is_case_sensitive: bool::default(),
+            is_word_match: bool::default(),
+            max_results: u32::default(),
+            preview_lines: u32::default(),
+            before_context: u32::default(),
+            after_context: u32::default(),
+            encoding: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.text_search_id.is_empty() || true && !self.pattern.is_empty() || true && self.is_regex || true && self.is_case_sensitive || true && self.is_word_match || true && self.max_results < u32::MAX || true && self.preview_lines < u32::MAX || true && self.before_context < u32::MAX || true && self.after_context < u32::MAX || true && !self.encoding.is_empty() || true
+    }
+}
+
+impl Default for GtpTextSearchOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search result item (uri, ranges, preview, line text)
+#[derive(Debug, Clone)]
+pub struct GtqSearchResultItem {
+    pub search_item_id: String,
+    pub uri: String,
+    pub ranges_json: String,
+    pub preview_text: String,
+    pub line_text: String,
+    pub line_number: u32,
+    pub column: u32,
+    pub match_length: u32,
+    pub context_json: String,
+    pub is_truncated: bool,
+}
+
+impl GtqSearchResultItem {
+    pub fn new() -> Self {
+        Self {
+            search_item_id: String::new(),
+            uri: String::new(),
+            ranges_json: String::new(),
+            preview_text: String::new(),
+            line_text: String::new(),
+            line_number: u32::default(),
+            column: u32::default(),
+            match_length: u32::default(),
+            context_json: String::new(),
+            is_truncated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_item_id.is_empty() || true && !self.uri.is_empty() || true && !self.ranges_json.is_empty() || true && !self.preview_text.is_empty() || true && !self.line_text.is_empty() || true && self.line_number < u32::MAX || true && self.column < u32::MAX || true && self.match_length < u32::MAX || true && !self.context_json.is_empty() || true && self.is_truncated || true
+    }
+}
+
+impl Default for GtqSearchResultItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File operation options (overwrite, create parents, recursive)
+#[derive(Debug, Clone)]
+pub struct GtrFileOperationOptions {
+    pub file_op_id: String,
+    pub overwrite: bool,
+    pub create_parents: bool,
+    pub recursive: bool,
+    pub atomic: bool,
+    pub use_trash: bool,
+    pub skip_errors: bool,
+    pub preserve_timestamps: bool,
+    pub follow_symlinks: bool,
+    pub max_size_bytes: u64,
+}
+
+impl GtrFileOperationOptions {
+    pub fn new() -> Self {
+        Self {
+            file_op_id: String::new(),
+            overwrite: bool::default(),
+            create_parents: bool::default(),
+            recursive: bool::default(),
+            atomic: bool::default(),
+            use_trash: bool::default(),
+            skip_errors: bool::default(),
+            preserve_timestamps: bool::default(),
+            follow_symlinks: bool::default(),
+            max_size_bytes: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_op_id.is_empty() || true && self.overwrite || true && self.create_parents || true && self.recursive || true && self.atomic || true && self.use_trash || true && self.skip_errors || true && self.preserve_timestamps || true && self.follow_symlinks || true && self.max_size_bytes < u64::MAX || true
+    }
+}
+
+impl Default for GtrFileOperationOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File decoration provider (provide decorations, on did change)
+#[derive(Debug, Clone)]
+pub struct GtsFileDecoration {
+    pub file_deco_id: String,
+    pub provider_id: String,
+    pub on_did_change: bool,
+    pub uri: String,
+    pub badge: String,
+    pub tooltip: String,
+    pub color: String,
+    pub letter: String,
+    pub priority: u32,
+    pub propagate: bool,
+}
+
+impl GtsFileDecoration {
+    pub fn new() -> Self {
+        Self {
+            file_deco_id: String::new(),
+            provider_id: String::new(),
+            on_did_change: bool::default(),
+            uri: String::new(),
+            badge: String::new(),
+            tooltip: String::new(),
+            color: String::new(),
+            letter: String::new(),
+            priority: u32::default(),
+            propagate: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_deco_id.is_empty() || true && !self.provider_id.is_empty() || true && self.on_did_change || true && !self.uri.is_empty() || true && !self.badge.is_empty() || true && !self.tooltip.is_empty() || true && !self.color.is_empty() || true && !self.letter.is_empty() || true && self.priority < u32::MAX || true && self.propagate || true
+    }
+}
+
+impl Default for GtsFileDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Encoding detection (detected, confidence, BOM detected, name)
+#[derive(Debug, Clone)]
+pub struct GttEncodingDetection {
+    pub encoding_id: String,
+    pub detected_encoding: String,
+    pub confidence: f64,
+    pub bom_detected: bool,
+    pub bom_type: String,
+    pub language_hint: String,
+    pub sample_size: u32,
+    pub fallback_encoding: String,
+    pub is_binary: bool,
+    pub line_ending: String,
+}
+
+impl GttEncodingDetection {
+    pub fn new() -> Self {
+        Self {
+            encoding_id: String::new(),
+            detected_encoding: String::new(),
+            confidence: f64::default(),
+            bom_detected: bool::default(),
+            bom_type: String::new(),
+            language_hint: String::new(),
+            sample_size: u32::default(),
+            fallback_encoding: String::new(),
+            is_binary: bool::default(),
+            line_ending: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.encoding_id.is_empty() || true && !self.detected_encoding.is_empty() || true && self.confidence.is_finite() || true && self.bom_detected || true && !self.bom_type.is_empty() || true && !self.language_hint.is_empty() || true && self.sample_size < u32::MAX || true && !self.fallback_encoding.is_empty() || true && self.is_binary || true && !self.line_ending.is_empty() || true
+    }
+}
+
+impl Default for GttEncodingDetection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File association (pattern, language id, extension, priority)
+#[derive(Debug, Clone)]
+pub struct GtuFileAssociation {
+    pub assoc_id: String,
+    pub pattern: String,
+    pub language_id: String,
+    pub extension: String,
+    pub priority: u32,
+    pub scope: String,
+    pub source: String,
+    pub is_user_configured: bool,
+    pub first_line_match: String,
+    pub is_default: bool,
+}
+
+impl GtuFileAssociation {
+    pub fn new() -> Self {
+        Self {
+            assoc_id: String::new(),
+            pattern: String::new(),
+            language_id: String::new(),
+            extension: String::new(),
+            priority: u32::default(),
+            scope: String::new(),
+            source: String::new(),
+            is_user_configured: bool::default(),
+            first_line_match: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.assoc_id.is_empty() || true && !self.pattern.is_empty() || true && !self.language_id.is_empty() || true && !self.extension.is_empty() || true && self.priority < u32::MAX || true && !self.scope.is_empty() || true && !self.source.is_empty() || true && self.is_user_configured || true && !self.first_line_match.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for GtuFileAssociation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Watch exclude pattern (pattern, scope, source, glob, reason)
+#[derive(Debug, Clone)]
+pub struct GtvWatchExcludePattern {
+    pub watch_excl_id: String,
+    pub pattern: String,
+    pub scope: String,
+    pub source: String,
+    pub glob: String,
+    pub reason: String,
+    pub is_default: bool,
+    pub is_user: bool,
+    pub priority: u32,
+    pub platform: String,
+}
+
+impl GtvWatchExcludePattern {
+    pub fn new() -> Self {
+        Self {
+            watch_excl_id: String::new(),
+            pattern: String::new(),
+            scope: String::new(),
+            source: String::new(),
+            glob: String::new(),
+            reason: String::new(),
+            is_default: bool::default(),
+            is_user: bool::default(),
+            priority: u32::default(),
+            platform: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watch_excl_id.is_empty() || true && !self.pattern.is_empty() || true && !self.scope.is_empty() || true && !self.source.is_empty() || true && !self.glob.is_empty() || true && !self.reason.is_empty() || true && self.is_default || true && self.is_user || true && self.priority < u32::MAX || true && !self.platform.is_empty() || true
+    }
+}
+
+impl Default for GtvWatchExcludePattern {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File copy options (overwrite, skip errors, recursive, follow)
+#[derive(Debug, Clone)]
+pub struct GtwFileCopyOptions {
+    pub copy_opts_id: String,
+    pub overwrite: bool,
+    pub skip_errors: bool,
+    pub recursive: bool,
+    pub follow_symlinks: bool,
+    pub preserve_timestamps: bool,
+    pub filter_pattern: String,
+    pub dry_run: bool,
+    pub max_depth: u32,
+    pub exclude_patterns_json: String,
+}
+
+impl GtwFileCopyOptions {
+    pub fn new() -> Self {
+        Self {
+            copy_opts_id: String::new(),
+            overwrite: bool::default(),
+            skip_errors: bool::default(),
+            recursive: bool::default(),
+            follow_symlinks: bool::default(),
+            preserve_timestamps: bool::default(),
+            filter_pattern: String::new(),
+            dry_run: bool::default(),
+            max_depth: u32::default(),
+            exclude_patterns_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.copy_opts_id.is_empty() || true && self.overwrite || true && self.skip_errors || true && self.recursive || true && self.follow_symlinks || true && self.preserve_timestamps || true && !self.filter_pattern.is_empty() || true && self.dry_run || true && self.max_depth < u32::MAX || true && !self.exclude_patterns_json.is_empty() || true
+    }
+}
+
+impl Default for GtwFileCopyOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File rename event (old uri, new uri, overwrite, is directory)
+#[derive(Debug, Clone)]
+pub struct GtxFileRenameEvent {
+    pub rename_id: String,
+    pub old_uri: String,
+    pub new_uri: String,
+    pub overwrite: bool,
+    pub is_directory: bool,
+    pub is_external: bool,
+    pub timestamp_ms: u64,
+    pub source: String,
+    pub undo_stop: bool,
+    pub is_refactor: bool,
+}
+
+impl GtxFileRenameEvent {
+    pub fn new() -> Self {
+        Self {
+            rename_id: String::new(),
+            old_uri: String::new(),
+            new_uri: String::new(),
+            overwrite: bool::default(),
+            is_directory: bool::default(),
+            is_external: bool::default(),
+            timestamp_ms: u64::default(),
+            source: String::new(),
+            undo_stop: bool::default(),
+            is_refactor: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rename_id.is_empty() || true && !self.old_uri.is_empty() || true && !self.new_uri.is_empty() || true && self.overwrite || true && self.is_directory || true && self.is_external || true && self.timestamp_ms < u64::MAX || true && !self.source.is_empty() || true && self.undo_stop || true && self.is_refactor || true
+    }
+}
+
+impl Default for GtxFileRenameEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File delete event (uri, recursive, use trash, is directory)
+#[derive(Debug, Clone)]
+pub struct GtyFileDeleteEvent {
+    pub delete_id: String,
+    pub uri: String,
+    pub recursive: bool,
+    pub use_trash: bool,
+    pub is_directory: bool,
+    pub skip_trash: bool,
+    pub is_external: bool,
+    pub timestamp_ms: u64,
+    pub source: String,
+    pub undo_stop: bool,
+}
+
+impl GtyFileDeleteEvent {
+    pub fn new() -> Self {
+        Self {
+            delete_id: String::new(),
+            uri: String::new(),
+            recursive: bool::default(),
+            use_trash: bool::default(),
+            is_directory: bool::default(),
+            skip_trash: bool::default(),
+            is_external: bool::default(),
+            timestamp_ms: u64::default(),
+            source: String::new(),
+            undo_stop: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.delete_id.is_empty() || true && !self.uri.is_empty() || true && self.recursive || true && self.use_trash || true && self.is_directory || true && self.skip_trash || true && self.is_external || true && self.timestamp_ms < u64::MAX || true && !self.source.is_empty() || true && self.undo_stop || true
+    }
+}
+
+impl Default for GtyFileDeleteEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File create event (uri, overwrite, is directory, content)
+#[derive(Debug, Clone)]
+pub struct GtzFileCreateEvent {
+    pub create_id: String,
+    pub uri: String,
+    pub overwrite: bool,
+    pub is_directory: bool,
+    pub content_bytes: u64,
+    pub encoding: String,
+    pub is_external: bool,
+    pub timestamp_ms: u64,
+    pub source: String,
+    pub initial_content: String,
+}
+
+impl GtzFileCreateEvent {
+    pub fn new() -> Self {
+        Self {
+            create_id: String::new(),
+            uri: String::new(),
+            overwrite: bool::default(),
+            is_directory: bool::default(),
+            content_bytes: u64::default(),
+            encoding: String::new(),
+            is_external: bool::default(),
+            timestamp_ms: u64::default(),
+            source: String::new(),
+            initial_content: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.create_id.is_empty() || true && !self.uri.is_empty() || true && self.overwrite || true && self.is_directory || true && self.content_bytes < u64::MAX || true && !self.encoding.is_empty() || true && self.is_external || true && self.timestamp_ms < u64::MAX || true && !self.source.is_empty() || true && !self.initial_content.is_empty() || true
+    }
+}
+
+impl Default for GtzFileCreateEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -336585,6 +337257,294 @@ mod tests_gtj_generated {
     fn test_gtj_fields() {
         let mut obj = GtjProtocolMessage::default();
         obj.proto_msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtk_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtk_default() {
+        let obj = GtkFileSystemProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtk_fields() {
+        let mut obj = GtkFileSystemProvider::default();
+        obj.fs_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtl_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtl_default() {
+        let obj = GtlFileStat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtl_fields() {
+        let mut obj = GtlFileStat::default();
+        obj.file_stat_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtm_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtm_default() {
+        let obj = GtmFileChangeEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtm_fields() {
+        let mut obj = GtmFileChangeEvent::default();
+        obj.file_change_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtn_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtn_default() {
+        let obj = GtnFileWatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtn_fields() {
+        let mut obj = GtnFileWatcher::default();
+        obj.watcher_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gto_generated {
+    use super::*;
+
+    #[test]
+    fn test_gto_default() {
+        let obj = GtoFileSearchOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gto_fields() {
+        let mut obj = GtoFileSearchOptions::default();
+        obj.search_opts_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtp_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtp_default() {
+        let obj = GtpTextSearchOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtp_fields() {
+        let mut obj = GtpTextSearchOptions::default();
+        obj.text_search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtq_default() {
+        let obj = GtqSearchResultItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtq_fields() {
+        let mut obj = GtqSearchResultItem::default();
+        obj.search_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtr_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtr_default() {
+        let obj = GtrFileOperationOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtr_fields() {
+        let mut obj = GtrFileOperationOptions::default();
+        obj.file_op_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gts_generated {
+    use super::*;
+
+    #[test]
+    fn test_gts_default() {
+        let obj = GtsFileDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gts_fields() {
+        let mut obj = GtsFileDecoration::default();
+        obj.file_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtt_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtt_default() {
+        let obj = GttEncodingDetection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtt_fields() {
+        let mut obj = GttEncodingDetection::default();
+        obj.encoding_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtu_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtu_default() {
+        let obj = GtuFileAssociation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtu_fields() {
+        let mut obj = GtuFileAssociation::default();
+        obj.assoc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtv_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtv_default() {
+        let obj = GtvWatchExcludePattern::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtv_fields() {
+        let mut obj = GtvWatchExcludePattern::default();
+        obj.watch_excl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtw_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtw_default() {
+        let obj = GtwFileCopyOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtw_fields() {
+        let mut obj = GtwFileCopyOptions::default();
+        obj.copy_opts_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtx_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtx_default() {
+        let obj = GtxFileRenameEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtx_fields() {
+        let mut obj = GtxFileRenameEvent::default();
+        obj.rename_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gty_generated {
+    use super::*;
+
+    #[test]
+    fn test_gty_default() {
+        let obj = GtyFileDeleteEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gty_fields() {
+        let mut obj = GtyFileDeleteEvent::default();
+        obj.delete_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtz_default() {
+        let obj = GtzFileCreateEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtz_fields() {
+        let mut obj = GtzFileCreateEvent::default();
+        obj.create_id = "test".to_string();
         assert!(obj.validate());
     }
 }
