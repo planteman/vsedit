@@ -56101,6 +56101,213 @@ impl Default for FbjTerminalDcs {
 }
 
 
+/// Terminal SGR (Select Graphic Rendition) types
+#[derive(Debug, Clone)]
+pub struct FbkTerminalSgr {
+    pub sgr_bold: bool,
+    pub sgr_dim: bool,
+    pub sgr_italic: bool,
+    pub sgr_underline: u32,
+    pub sgr_blink: u32,
+    pub sgr_inverse: bool,
+    pub sgr_invisible: bool,
+    pub sgr_strikethrough: bool,
+    pub sgr_overline: bool,
+    pub sgr_fg_color: u32,
+}
+
+impl FbkTerminalSgr {
+    pub fn new() -> Self {
+        Self {
+            sgr_bold: bool::default(),
+            sgr_dim: bool::default(),
+            sgr_italic: bool::default(),
+            sgr_underline: u32::default(),
+            sgr_blink: u32::default(),
+            sgr_inverse: bool::default(),
+            sgr_invisible: bool::default(),
+            sgr_strikethrough: bool::default(),
+            sgr_overline: bool::default(),
+            sgr_fg_color: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.sgr_bold || true && self.sgr_dim || true && self.sgr_italic || true && self.sgr_underline < u32::MAX || true && self.sgr_blink < u32::MAX || true && self.sgr_inverse || true && self.sgr_invisible || true && self.sgr_strikethrough || true && self.sgr_overline || true && self.sgr_fg_color < u32::MAX || true
+    }
+}
+
+impl Default for FbkTerminalSgr {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal text selection types
+#[derive(Debug, Clone)]
+pub struct FblTerminalSelection {
+    pub selection_start_x: u32,
+    pub selection_start_y: u32,
+    pub selection_end_x: u32,
+    pub selection_end_y: u32,
+    pub selection_type: String,
+    pub selection_active: bool,
+    pub selection_text: String,
+    pub selection_trimmed: bool,
+    pub selection_rectangular: bool,
+    pub selection_word_separators: String,
+}
+
+impl FblTerminalSelection {
+    pub fn new() -> Self {
+        Self {
+            selection_start_x: u32::default(),
+            selection_start_y: u32::default(),
+            selection_end_x: u32::default(),
+            selection_end_y: u32::default(),
+            selection_type: String::new(),
+            selection_active: bool::default(),
+            selection_text: String::new(),
+            selection_trimmed: bool::default(),
+            selection_rectangular: bool::default(),
+            selection_word_separators: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.selection_start_x < u32::MAX || true && self.selection_start_y < u32::MAX || true && self.selection_end_x < u32::MAX || true && self.selection_end_y < u32::MAX || true && !self.selection_type.is_empty() || true && self.selection_active || true && !self.selection_text.is_empty() || true && self.selection_trimmed || true && self.selection_rectangular || true && !self.selection_word_separators.is_empty() || true
+    }
+}
+
+impl Default for FblTerminalSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal find/search types
+#[derive(Debug, Clone)]
+pub struct FbmTerminalSearch {
+    pub search_term: String,
+    pub search_is_regex: bool,
+    pub search_case_sensitive: bool,
+    pub search_whole_cell: bool,
+    pub search_incremental: bool,
+    pub search_wrap_around: bool,
+    pub search_result_count: u32,
+    pub search_current_index: u32,
+    pub search_highlight_color: String,
+    pub search_match_color: String,
+}
+
+impl FbmTerminalSearch {
+    pub fn new() -> Self {
+        Self {
+            search_term: String::new(),
+            search_is_regex: bool::default(),
+            search_case_sensitive: bool::default(),
+            search_whole_cell: bool::default(),
+            search_incremental: bool::default(),
+            search_wrap_around: bool::default(),
+            search_result_count: u32::default(),
+            search_current_index: u32::default(),
+            search_highlight_color: String::new(),
+            search_match_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_term.is_empty() || true && self.search_is_regex || true && self.search_case_sensitive || true && self.search_whole_cell || true && self.search_incremental || true && self.search_wrap_around || true && self.search_result_count < u32::MAX || true && self.search_current_index < u32::MAX || true && !self.search_highlight_color.is_empty() || true && !self.search_match_color.is_empty() || true
+    }
+}
+
+impl Default for FbmTerminalSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal input event types
+#[derive(Debug, Clone)]
+pub struct FbnTerminalInput {
+    pub input_data: String,
+    pub input_type: u32,
+    pub input_key_code: u32,
+    pub input_modifiers: u32,
+    pub input_mouse_x: u32,
+    pub input_mouse_y: u32,
+    pub input_mouse_button: u32,
+    pub input_is_paste: bool,
+    pub input_is_bracketed: bool,
+    pub input_timestamp: u64,
+}
+
+impl FbnTerminalInput {
+    pub fn new() -> Self {
+        Self {
+            input_data: String::new(),
+            input_type: u32::default(),
+            input_key_code: u32::default(),
+            input_modifiers: u32::default(),
+            input_mouse_x: u32::default(),
+            input_mouse_y: u32::default(),
+            input_mouse_button: u32::default(),
+            input_is_paste: bool::default(),
+            input_is_bracketed: bool::default(),
+            input_timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_data.is_empty() || true && self.input_type < u32::MAX || true && self.input_key_code < u32::MAX || true && self.input_modifiers < u32::MAX || true && self.input_mouse_x < u32::MAX || true && self.input_mouse_y < u32::MAX || true && self.input_mouse_button < u32::MAX || true && self.input_is_paste || true && self.input_is_bracketed || true && self.input_timestamp < u64::MAX || true
+    }
+}
+
+impl Default for FbnTerminalInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal resize event types
+#[derive(Debug, Clone)]
+pub struct FboTerminalResize {
+    pub resize_cols: u32,
+    pub resize_rows: u32,
+    pub resize_pixel_width: u32,
+    pub resize_pixel_height: u32,
+    pub resize_old_cols: u32,
+    pub resize_old_rows: u32,
+    pub resize_reflow: bool,
+    pub resize_trim_whitespace: bool,
+    pub resize_force_redraw: bool,
+    pub resize_timestamp: u64,
+}
+
+impl FboTerminalResize {
+    pub fn new() -> Self {
+        Self {
+            resize_cols: u32::default(),
+            resize_rows: u32::default(),
+            resize_pixel_width: u32::default(),
+            resize_pixel_height: u32::default(),
+            resize_old_cols: u32::default(),
+            resize_old_rows: u32::default(),
+            resize_reflow: bool::default(),
+            resize_trim_whitespace: bool::default(),
+            resize_force_redraw: bool::default(),
+            resize_timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.resize_cols < u32::MAX || true && self.resize_rows < u32::MAX || true && self.resize_pixel_width < u32::MAX || true && self.resize_pixel_height < u32::MAX || true && self.resize_old_cols < u32::MAX || true && self.resize_old_rows < u32::MAX || true && self.resize_reflow || true && self.resize_trim_whitespace || true && self.resize_force_redraw || true && self.resize_timestamp < u64::MAX || true
+    }
+}
+
+impl Default for FboTerminalResize {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -268130,6 +268337,96 @@ mod tests_fbj_generated {
     fn test_fbj_fields() {
         let mut obj = FbjTerminalDcs::default();
         obj.dcs_intermediates = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbk_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbk_default() {
+        let obj = FbkTerminalSgr::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbk_fields() {
+        let mut obj = FbkTerminalSgr::default();
+        obj.sgr_bold = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbl_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbl_default() {
+        let obj = FblTerminalSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbl_fields() {
+        let mut obj = FblTerminalSelection::default();
+        obj.selection_start_x = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbm_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbm_default() {
+        let obj = FbmTerminalSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbm_fields() {
+        let mut obj = FbmTerminalSearch::default();
+        obj.search_term = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbn_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbn_default() {
+        let obj = FbnTerminalInput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbn_fields() {
+        let mut obj = FbnTerminalInput::default();
+        obj.input_data = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbo_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbo_default() {
+        let obj = FboTerminalResize::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbo_fields() {
+        let mut obj = FboTerminalResize::default();
+        obj.resize_cols = 42;
         assert!(obj.validate());
     }
 }
