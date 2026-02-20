@@ -52347,6 +52347,213 @@ impl Default for ExuTestTag {
 }
 
 
+/// Snippet template body and placeholder types
+#[derive(Debug, Clone)]
+pub struct ExvSnippetBody {
+    pub snippet_body_text: String,
+    pub snippet_prefix: String,
+    pub snippet_description: String,
+    pub snippet_scope: String,
+    pub snippet_is_file_template: bool,
+    pub snippet_source: String,
+    pub snippet_extension_id: String,
+    pub snippet_placeholders: String,
+    pub snippet_variables: String,
+    pub snippet_final_tabstop: u32,
+}
+
+impl ExvSnippetBody {
+    pub fn new() -> Self {
+        Self {
+            snippet_body_text: String::new(),
+            snippet_prefix: String::new(),
+            snippet_description: String::new(),
+            snippet_scope: String::new(),
+            snippet_is_file_template: bool::default(),
+            snippet_source: String::new(),
+            snippet_extension_id: String::new(),
+            snippet_placeholders: String::new(),
+            snippet_variables: String::new(),
+            snippet_final_tabstop: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_body_text.is_empty() || true && !self.snippet_prefix.is_empty() || true && !self.snippet_description.is_empty() || true && !self.snippet_scope.is_empty() || true && self.snippet_is_file_template || true && !self.snippet_source.is_empty() || true && !self.snippet_extension_id.is_empty() || true && !self.snippet_placeholders.is_empty() || true && !self.snippet_variables.is_empty() || true && self.snippet_final_tabstop < u32::MAX || true
+    }
+}
+
+impl Default for ExvSnippetBody {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Snippet file (.code-snippets) model types
+#[derive(Debug, Clone)]
+pub struct ExwSnippetFile {
+    pub snippet_file_uri: String,
+    pub snippet_file_scope: String,
+    pub snippet_file_is_global: bool,
+    pub snippet_file_is_extension: bool,
+    pub snippet_file_entries_count: u32,
+    pub snippet_file_language: String,
+    pub snippet_file_is_user: bool,
+    pub snippet_file_source: String,
+    pub snippet_file_encoding: String,
+    pub snippet_file_version: u32,
+}
+
+impl ExwSnippetFile {
+    pub fn new() -> Self {
+        Self {
+            snippet_file_uri: String::new(),
+            snippet_file_scope: String::new(),
+            snippet_file_is_global: bool::default(),
+            snippet_file_is_extension: bool::default(),
+            snippet_file_entries_count: u32::default(),
+            snippet_file_language: String::new(),
+            snippet_file_is_user: bool::default(),
+            snippet_file_source: String::new(),
+            snippet_file_encoding: String::new(),
+            snippet_file_version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_file_uri.is_empty() || true && !self.snippet_file_scope.is_empty() || true && self.snippet_file_is_global || true && self.snippet_file_is_extension || true && self.snippet_file_entries_count < u32::MAX || true && !self.snippet_file_language.is_empty() || true && self.snippet_file_is_user || true && !self.snippet_file_source.is_empty() || true && !self.snippet_file_encoding.is_empty() || true && self.snippet_file_version < u32::MAX || true
+    }
+}
+
+impl Default for ExwSnippetFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Emmet abbreviation expansion configuration
+#[derive(Debug, Clone)]
+pub struct ExxEmmetConfig {
+    pub emmet_show_abbreviation: String,
+    pub emmet_show_expanded: bool,
+    pub emmet_show_suggestions: bool,
+    pub emmet_trigger_expansion: bool,
+    pub emmet_use_inline_completions: bool,
+    pub emmet_excluded_languages: String,
+    pub emmet_extensions_path: String,
+    pub emmet_preferences: String,
+    pub emmet_syntax_profiles: String,
+    pub emmet_variables: String,
+}
+
+impl ExxEmmetConfig {
+    pub fn new() -> Self {
+        Self {
+            emmet_show_abbreviation: String::new(),
+            emmet_show_expanded: bool::default(),
+            emmet_show_suggestions: bool::default(),
+            emmet_trigger_expansion: bool::default(),
+            emmet_use_inline_completions: bool::default(),
+            emmet_excluded_languages: String::new(),
+            emmet_extensions_path: String::new(),
+            emmet_preferences: String::new(),
+            emmet_syntax_profiles: String::new(),
+            emmet_variables: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.emmet_show_abbreviation.is_empty() || true && self.emmet_show_expanded || true && self.emmet_show_suggestions || true && self.emmet_trigger_expansion || true && self.emmet_use_inline_completions || true && !self.emmet_excluded_languages.is_empty() || true && !self.emmet_extensions_path.is_empty() || true && !self.emmet_preferences.is_empty() || true && !self.emmet_syntax_profiles.is_empty() || true && !self.emmet_variables.is_empty() || true
+    }
+}
+
+impl Default for ExxEmmetConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Breadcrumb navigation types
+#[derive(Debug, Clone)]
+pub struct ExyBreadcrumb {
+    pub breadcrumb_element: String,
+    pub breadcrumb_kind: u32,
+    pub breadcrumb_uri: String,
+    pub breadcrumb_range_start: u32,
+    pub breadcrumb_range_end: u32,
+    pub breadcrumb_icon_path: String,
+    pub breadcrumb_tooltip: String,
+    pub breadcrumb_is_active: bool,
+    pub breadcrumb_children_count: u32,
+    pub breadcrumb_file_path: String,
+}
+
+impl ExyBreadcrumb {
+    pub fn new() -> Self {
+        Self {
+            breadcrumb_element: String::new(),
+            breadcrumb_kind: u32::default(),
+            breadcrumb_uri: String::new(),
+            breadcrumb_range_start: u32::default(),
+            breadcrumb_range_end: u32::default(),
+            breadcrumb_icon_path: String::new(),
+            breadcrumb_tooltip: String::new(),
+            breadcrumb_is_active: bool::default(),
+            breadcrumb_children_count: u32::default(),
+            breadcrumb_file_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.breadcrumb_element.is_empty() || true && self.breadcrumb_kind < u32::MAX || true && !self.breadcrumb_uri.is_empty() || true && self.breadcrumb_range_start < u32::MAX || true && self.breadcrumb_range_end < u32::MAX || true && !self.breadcrumb_icon_path.is_empty() || true && !self.breadcrumb_tooltip.is_empty() || true && self.breadcrumb_is_active || true && self.breadcrumb_children_count < u32::MAX || true && !self.breadcrumb_file_path.is_empty() || true
+    }
+}
+
+impl Default for ExyBreadcrumb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Document outline model types
+#[derive(Debug, Clone)]
+pub struct ExzOutlineModel {
+    pub outline_element_kind: u32,
+    pub outline_element_name: String,
+    pub outline_element_detail: String,
+    pub outline_element_uri: String,
+    pub outline_element_range_start: u32,
+    pub outline_element_range_end: u32,
+    pub outline_element_children_count: u32,
+    pub outline_element_icon_path: String,
+    pub outline_element_deprecated: bool,
+    pub outline_element_container: String,
+}
+
+impl ExzOutlineModel {
+    pub fn new() -> Self {
+        Self {
+            outline_element_kind: u32::default(),
+            outline_element_name: String::new(),
+            outline_element_detail: String::new(),
+            outline_element_uri: String::new(),
+            outline_element_range_start: u32::default(),
+            outline_element_range_end: u32::default(),
+            outline_element_children_count: u32::default(),
+            outline_element_icon_path: String::new(),
+            outline_element_deprecated: bool::default(),
+            outline_element_container: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.outline_element_kind < u32::MAX || true && !self.outline_element_name.is_empty() || true && !self.outline_element_detail.is_empty() || true && !self.outline_element_uri.is_empty() || true && self.outline_element_range_start < u32::MAX || true && self.outline_element_range_end < u32::MAX || true && self.outline_element_children_count < u32::MAX || true && !self.outline_element_icon_path.is_empty() || true && self.outline_element_deprecated || true && !self.outline_element_container.is_empty() || true
+    }
+}
+
+impl Default for ExzOutlineModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -262745,6 +262952,96 @@ mod tests_exu_generated {
     fn test_exu_fields() {
         let mut obj = ExuTestTag::default();
         obj.test_tag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exv_generated {
+    use super::*;
+
+    #[test]
+    fn test_exv_default() {
+        let obj = ExvSnippetBody::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exv_fields() {
+        let mut obj = ExvSnippetBody::default();
+        obj.snippet_body_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exw_generated {
+    use super::*;
+
+    #[test]
+    fn test_exw_default() {
+        let obj = ExwSnippetFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exw_fields() {
+        let mut obj = ExwSnippetFile::default();
+        obj.snippet_file_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exx_generated {
+    use super::*;
+
+    #[test]
+    fn test_exx_default() {
+        let obj = ExxEmmetConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exx_fields() {
+        let mut obj = ExxEmmetConfig::default();
+        obj.emmet_show_abbreviation = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exy_generated {
+    use super::*;
+
+    #[test]
+    fn test_exy_default() {
+        let obj = ExyBreadcrumb::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exy_fields() {
+        let mut obj = ExyBreadcrumb::default();
+        obj.breadcrumb_element = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exz_generated {
+    use super::*;
+
+    #[test]
+    fn test_exz_default() {
+        let obj = ExzOutlineModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exz_fields() {
+        let mut obj = ExzOutlineModel::default();
+        obj.outline_element_kind = 42;
         assert!(obj.validate());
     }
 }
