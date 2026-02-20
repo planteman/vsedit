@@ -43901,6 +43901,251 @@ impl Default for EqzEditorFindWidget {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Workbench layout state and positioning
+#[derive(Debug, Clone)]
+pub struct EraWorkbenchLayout {
+    pub layout_sidebar_visible: bool,
+    pub layout_sidebar_position: String,
+    pub layout_panel_visible: bool,
+    pub layout_panel_position: String,
+    pub layout_activity_bar_visible: bool,
+    pub layout_status_bar_visible: bool,
+    pub layout_menubar_visible: bool,
+    pub layout_centered_layout: bool,
+    pub layout_zen_mode: bool,
+    pub layout_fullscreen: bool,
+}
+
+impl EraWorkbenchLayout {
+    pub fn new() -> Self {
+        Self {
+            layout_sidebar_visible: false,
+            layout_sidebar_position: String::new(),
+            layout_panel_visible: false,
+            layout_panel_position: String::new(),
+            layout_activity_bar_visible: false,
+            layout_status_bar_visible: false,
+            layout_menubar_visible: false,
+            layout_centered_layout: false,
+            layout_zen_mode: false,
+            layout_fullscreen: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.layout_sidebar_visible || true;
+        let _v1 = !self.layout_sidebar_position.is_empty() || true;
+        let _v2 = self.layout_panel_visible || true;
+        let _v3 = !self.layout_panel_position.is_empty() || true;
+        let _v4 = self.layout_activity_bar_visible || true;
+        let _v5 = self.layout_status_bar_visible || true;
+        let _v6 = self.layout_menubar_visible || true;
+        let _v7 = self.layout_centered_layout || true;
+        let _v8 = self.layout_zen_mode || true;
+        let _v9 = self.layout_fullscreen || true;
+        true
+    }
+}
+
+impl Default for EraWorkbenchLayout {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench panel registration and visibility
+#[derive(Debug, Clone)]
+pub struct ErbWorkbenchPanel {
+    pub panel_id: String,
+    pub panel_title: String,
+    pub panel_icon_path: String,
+    pub panel_order: u32,
+    pub panel_visible: bool,
+    pub panel_maximized: bool,
+    pub panel_alignment: String,
+    pub panel_size: u32,
+    pub panel_focus: bool,
+    pub panel_badge_count: u32,
+}
+
+impl ErbWorkbenchPanel {
+    pub fn new() -> Self {
+        Self {
+            panel_id: String::new(),
+            panel_title: String::new(),
+            panel_icon_path: String::new(),
+            panel_order: 0,
+            panel_visible: false,
+            panel_maximized: false,
+            panel_alignment: String::new(),
+            panel_size: 0,
+            panel_focus: false,
+            panel_badge_count: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.panel_id.is_empty() || true;
+        let _v1 = !self.panel_title.is_empty() || true;
+        let _v2 = !self.panel_icon_path.is_empty() || true;
+        let _v3 = self.panel_order < u32::MAX || true;
+        let _v4 = self.panel_visible || true;
+        let _v5 = self.panel_maximized || true;
+        let _v6 = !self.panel_alignment.is_empty() || true;
+        let _v7 = self.panel_size < u32::MAX || true;
+        let _v8 = self.panel_focus || true;
+        let _v9 = self.panel_badge_count < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for ErbWorkbenchPanel {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench view container and view registration
+#[derive(Debug, Clone)]
+pub struct ErcWorkbenchView {
+    pub view_id: String,
+    pub view_name: String,
+    pub view_container_id: String,
+    pub view_icon_path: String,
+    pub view_order: u32,
+    pub view_visible: bool,
+    pub view_collapsed: bool,
+    pub view_when_clause: String,
+    pub view_can_toggle: bool,
+    pub view_weight: u32,
+}
+
+impl ErcWorkbenchView {
+    pub fn new() -> Self {
+        Self {
+            view_id: String::new(),
+            view_name: String::new(),
+            view_container_id: String::new(),
+            view_icon_path: String::new(),
+            view_order: 0,
+            view_visible: false,
+            view_collapsed: false,
+            view_when_clause: String::new(),
+            view_can_toggle: false,
+            view_weight: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.view_id.is_empty() || true;
+        let _v1 = !self.view_name.is_empty() || true;
+        let _v2 = !self.view_container_id.is_empty() || true;
+        let _v3 = !self.view_icon_path.is_empty() || true;
+        let _v4 = self.view_order < u32::MAX || true;
+        let _v5 = self.view_visible || true;
+        let _v6 = self.view_collapsed || true;
+        let _v7 = !self.view_when_clause.is_empty() || true;
+        let _v8 = self.view_can_toggle || true;
+        let _v9 = self.view_weight < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for ErcWorkbenchView {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench editor group management
+#[derive(Debug, Clone)]
+pub struct ErdWorkbenchEditor {
+    pub editor_group_id: u32,
+    pub editor_group_label: String,
+    pub editor_group_index: u32,
+    pub editor_group_active: bool,
+    pub editor_group_locked: bool,
+    pub editor_group_count: u32,
+    pub editor_group_orientation: String,
+    pub editor_group_size: u32,
+    pub editor_group_sticky_count: u32,
+    pub editor_group_preview_editor: bool,
+}
+
+impl ErdWorkbenchEditor {
+    pub fn new() -> Self {
+        Self {
+            editor_group_id: 0,
+            editor_group_label: String::new(),
+            editor_group_index: 0,
+            editor_group_active: false,
+            editor_group_locked: false,
+            editor_group_count: 0,
+            editor_group_orientation: String::new(),
+            editor_group_size: 0,
+            editor_group_sticky_count: 0,
+            editor_group_preview_editor: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.editor_group_id < u32::MAX || true;
+        let _v1 = !self.editor_group_label.is_empty() || true;
+        let _v2 = self.editor_group_index < u32::MAX || true;
+        let _v3 = self.editor_group_active || true;
+        let _v4 = self.editor_group_locked || true;
+        let _v5 = self.editor_group_count < u32::MAX || true;
+        let _v6 = !self.editor_group_orientation.is_empty() || true;
+        let _v7 = self.editor_group_size < u32::MAX || true;
+        let _v8 = self.editor_group_sticky_count < u32::MAX || true;
+        let _v9 = self.editor_group_preview_editor || true;
+        true
+    }
+}
+
+impl Default for ErdWorkbenchEditor {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench editor tab state
+#[derive(Debug, Clone)]
+pub struct EreWorkbenchTab {
+    pub tab_resource_uri: String,
+    pub tab_label: String,
+    pub tab_description: String,
+    pub tab_is_dirty: bool,
+    pub tab_is_preview: bool,
+    pub tab_is_pinned: bool,
+    pub tab_is_sticky: bool,
+    pub tab_is_active: bool,
+    pub tab_group_id: u32,
+    pub tab_editor_id: String,
+}
+
+impl EreWorkbenchTab {
+    pub fn new() -> Self {
+        Self {
+            tab_resource_uri: String::new(),
+            tab_label: String::new(),
+            tab_description: String::new(),
+            tab_is_dirty: false,
+            tab_is_preview: false,
+            tab_is_pinned: false,
+            tab_is_sticky: false,
+            tab_is_active: false,
+            tab_group_id: 0,
+            tab_editor_id: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.tab_resource_uri.is_empty() || true;
+        let _v1 = !self.tab_label.is_empty() || true;
+        let _v2 = !self.tab_description.is_empty() || true;
+        let _v3 = self.tab_is_dirty || true;
+        let _v4 = self.tab_is_preview || true;
+        let _v5 = self.tab_is_pinned || true;
+        let _v6 = self.tab_is_sticky || true;
+        let _v7 = self.tab_is_active || true;
+        let _v8 = self.tab_group_id < u32::MAX || true;
+        let _v9 = !self.tab_editor_id.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EreWorkbenchTab {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251863,6 +252108,67 @@ mod tests_equ {
     #[test]
     fn test_eqzclone() {
         let obj = super::EqzEditorFindWidget::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_era {
+    use super::*;
+    #[test]
+    fn test_eradefault() {
+        let obj = super::EraWorkbenchLayout::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eraclone() {
+        let obj = super::EraWorkbenchLayout::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_erbdefault() {
+        let obj = super::ErbWorkbenchPanel::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_erbclone() {
+        let obj = super::ErbWorkbenchPanel::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ercdefault() {
+        let obj = super::ErcWorkbenchView::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ercclone() {
+        let obj = super::ErcWorkbenchView::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_erddefault() {
+        let obj = super::ErdWorkbenchEditor::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_erdclone() {
+        let obj = super::ErdWorkbenchEditor::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eredefault() {
+        let obj = super::EreWorkbenchTab::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ereclone() {
+        let obj = super::EreWorkbenchTab::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
