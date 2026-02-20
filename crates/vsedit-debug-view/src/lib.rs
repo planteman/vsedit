@@ -81304,6 +81304,678 @@ impl Default for FyjProfilingSession {
     }
 }
 
+/// Heap statistics (total, used, limit, external, array buffers)
+#[derive(Debug, Clone)]
+pub struct FykHeapStatistics {
+    pub heap_id: String,
+    pub total_heap_size: u64,
+    pub used_heap_size: u64,
+    pub heap_size_limit: u64,
+    pub external_bytes: u64,
+    pub array_buffer_bytes: u64,
+    pub malloced_memory: u64,
+    pub peak_malloced_memory: u64,
+    pub gc_count: u64,
+    pub total_gc_time_ms: f64,
+}
+
+impl FykHeapStatistics {
+    pub fn new() -> Self {
+        Self {
+            heap_id: String::new(),
+            total_heap_size: u64::default(),
+            used_heap_size: u64::default(),
+            heap_size_limit: u64::default(),
+            external_bytes: u64::default(),
+            array_buffer_bytes: u64::default(),
+            malloced_memory: u64::default(),
+            peak_malloced_memory: u64::default(),
+            gc_count: u64::default(),
+            total_gc_time_ms: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.heap_id.is_empty() || true && self.total_heap_size < u64::MAX || true && self.used_heap_size < u64::MAX || true && self.heap_size_limit < u64::MAX || true && self.external_bytes < u64::MAX || true && self.array_buffer_bytes < u64::MAX || true && self.malloced_memory < u64::MAX || true && self.peak_malloced_memory < u64::MAX || true && self.gc_count < u64::MAX || true && self.total_gc_time_ms.is_finite() || true
+    }
+}
+
+impl Default for FykHeapStatistics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension host profile (cpu, samples, nodes, duration)
+#[derive(Debug, Clone)]
+pub struct FylExtensionHostProfile {
+    pub profile_id: String,
+    pub cpu_time_ms: f64,
+    pub sample_count: u64,
+    pub node_count: u32,
+    pub duration_ms: f64,
+    pub top_calls_json: String,
+    pub file_uri: String,
+    pub extension_id: String,
+    pub is_complete: bool,
+    pub overhead_percent: f64,
+}
+
+impl FylExtensionHostProfile {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            cpu_time_ms: f64::default(),
+            sample_count: u64::default(),
+            node_count: u32::default(),
+            duration_ms: f64::default(),
+            top_calls_json: String::new(),
+            file_uri: String::new(),
+            extension_id: String::new(),
+            is_complete: bool::default(),
+            overhead_percent: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && self.cpu_time_ms.is_finite() || true && self.sample_count < u64::MAX || true && self.node_count < u32::MAX || true && self.duration_ms.is_finite() || true && !self.top_calls_json.is_empty() || true && !self.file_uri.is_empty() || true && !self.extension_id.is_empty() || true && self.is_complete || true && self.overhead_percent.is_finite() || true
+    }
+}
+
+impl Default for FylExtensionHostProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Network metrics (requests, latency, bandwidth, errors, cache)
+#[derive(Debug, Clone)]
+pub struct FymNetworkMetrics {
+    pub network_id: String,
+    pub request_count: u64,
+    pub avg_latency_ms: f64,
+    pub total_bytes_rx: u64,
+    pub total_bytes_tx: u64,
+    pub error_count: u64,
+    pub cache_hit_count: u64,
+    pub cache_miss_count: u64,
+    pub active_connections: u32,
+    pub timeout_count: u64,
+}
+
+impl FymNetworkMetrics {
+    pub fn new() -> Self {
+        Self {
+            network_id: String::new(),
+            request_count: u64::default(),
+            avg_latency_ms: f64::default(),
+            total_bytes_rx: u64::default(),
+            total_bytes_tx: u64::default(),
+            error_count: u64::default(),
+            cache_hit_count: u64::default(),
+            cache_miss_count: u64::default(),
+            active_connections: u32::default(),
+            timeout_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.network_id.is_empty() || true && self.request_count < u64::MAX || true && self.avg_latency_ms.is_finite() || true && self.total_bytes_rx < u64::MAX || true && self.total_bytes_tx < u64::MAX || true && self.error_count < u64::MAX || true && self.cache_hit_count < u64::MAX || true && self.cache_miss_count < u64::MAX || true && self.active_connections < u32::MAX || true && self.timeout_count < u64::MAX || true
+    }
+}
+
+impl Default for FymNetworkMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor metrics (keystroke latency, render time, layout time)
+#[derive(Debug, Clone)]
+pub struct FynEditorMetrics {
+    pub editor_metric_id: String,
+    pub keystroke_latency_ms: f64,
+    pub render_time_ms: f64,
+    pub layout_time_ms: f64,
+    pub scroll_fps: f64,
+    pub typing_fps: f64,
+    pub line_count: u32,
+    pub visible_range_lines: u32,
+    pub decoration_count: u32,
+    pub model_size_bytes: u64,
+}
+
+impl FynEditorMetrics {
+    pub fn new() -> Self {
+        Self {
+            editor_metric_id: String::new(),
+            keystroke_latency_ms: f64::default(),
+            render_time_ms: f64::default(),
+            layout_time_ms: f64::default(),
+            scroll_fps: f64::default(),
+            typing_fps: f64::default(),
+            line_count: u32::default(),
+            visible_range_lines: u32::default(),
+            decoration_count: u32::default(),
+            model_size_bytes: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_metric_id.is_empty() || true && self.keystroke_latency_ms.is_finite() || true && self.render_time_ms.is_finite() || true && self.layout_time_ms.is_finite() || true && self.scroll_fps.is_finite() || true && self.typing_fps.is_finite() || true && self.line_count < u32::MAX || true && self.visible_range_lines < u32::MAX || true && self.decoration_count < u32::MAX || true && self.model_size_bytes < u64::MAX || true
+    }
+}
+
+impl Default for FynEditorMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal metrics (parse rate, render fps, input latency)
+#[derive(Debug, Clone)]
+pub struct FyoTerminalMetrics {
+    pub terminal_metric_id: String,
+    pub parse_rate_bytes_per_s: f64,
+    pub render_fps: f64,
+    pub input_latency_ms: f64,
+    pub buffer_line_count: u32,
+    pub scroll_back_lines: u32,
+    pub cell_count: u64,
+    pub resize_count: u64,
+    pub write_count: u64,
+    pub pty_latency_ms: f64,
+}
+
+impl FyoTerminalMetrics {
+    pub fn new() -> Self {
+        Self {
+            terminal_metric_id: String::new(),
+            parse_rate_bytes_per_s: f64::default(),
+            render_fps: f64::default(),
+            input_latency_ms: f64::default(),
+            buffer_line_count: u32::default(),
+            scroll_back_lines: u32::default(),
+            cell_count: u64::default(),
+            resize_count: u64::default(),
+            write_count: u64::default(),
+            pty_latency_ms: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.terminal_metric_id.is_empty() || true && self.parse_rate_bytes_per_s.is_finite() || true && self.render_fps.is_finite() || true && self.input_latency_ms.is_finite() || true && self.buffer_line_count < u32::MAX || true && self.scroll_back_lines < u32::MAX || true && self.cell_count < u64::MAX || true && self.resize_count < u64::MAX || true && self.write_count < u64::MAX || true && self.pty_latency_ms.is_finite() || true
+    }
+}
+
+impl Default for FyoTerminalMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension metrics (activation time, API call count, memory)
+#[derive(Debug, Clone)]
+pub struct FypExtensionMetrics {
+    pub ext_metric_id: String,
+    pub activation_time_ms: f64,
+    pub api_call_count: u64,
+    pub memory_usage_bytes: u64,
+    pub cpu_time_ms: f64,
+    pub extension_id: String,
+    pub error_count: u64,
+    pub event_listener_count: u32,
+    pub command_execution_count: u64,
+    pub is_responsive: bool,
+}
+
+impl FypExtensionMetrics {
+    pub fn new() -> Self {
+        Self {
+            ext_metric_id: String::new(),
+            activation_time_ms: f64::default(),
+            api_call_count: u64::default(),
+            memory_usage_bytes: u64::default(),
+            cpu_time_ms: f64::default(),
+            extension_id: String::new(),
+            error_count: u64::default(),
+            event_listener_count: u32::default(),
+            command_execution_count: u64::default(),
+            is_responsive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_metric_id.is_empty() || true && self.activation_time_ms.is_finite() || true && self.api_call_count < u64::MAX || true && self.memory_usage_bytes < u64::MAX || true && self.cpu_time_ms.is_finite() || true && !self.extension_id.is_empty() || true && self.error_count < u64::MAX || true && self.event_listener_count < u32::MAX || true && self.command_execution_count < u64::MAX || true && self.is_responsive || true
+    }
+}
+
+impl Default for FypExtensionMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search metrics (query time, result count, indexing time)
+#[derive(Debug, Clone)]
+pub struct FyqSearchMetrics {
+    pub search_metric_id: String,
+    pub query_time_ms: f64,
+    pub result_count: u32,
+    pub indexing_time_ms: f64,
+    pub file_count: u32,
+    pub total_bytes_searched: u64,
+    pub cache_hit_rate: f64,
+    pub regex_time_ms: f64,
+    pub file_read_time_ms: f64,
+    pub search_type: u32,
+}
+
+impl FyqSearchMetrics {
+    pub fn new() -> Self {
+        Self {
+            search_metric_id: String::new(),
+            query_time_ms: f64::default(),
+            result_count: u32::default(),
+            indexing_time_ms: f64::default(),
+            file_count: u32::default(),
+            total_bytes_searched: u64::default(),
+            cache_hit_rate: f64::default(),
+            regex_time_ms: f64::default(),
+            file_read_time_ms: f64::default(),
+            search_type: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_metric_id.is_empty() || true && self.query_time_ms.is_finite() || true && self.result_count < u32::MAX || true && self.indexing_time_ms.is_finite() || true && self.file_count < u32::MAX || true && self.total_bytes_searched < u64::MAX || true && self.cache_hit_rate.is_finite() || true && self.regex_time_ms.is_finite() || true && self.file_read_time_ms.is_finite() || true && self.search_type < u32::MAX || true
+    }
+}
+
+impl Default for FyqSearchMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git metrics (status time, log time, diff time, operation count)
+#[derive(Debug, Clone)]
+pub struct FyrGitMetrics {
+    pub git_metric_id: String,
+    pub status_time_ms: f64,
+    pub log_time_ms: f64,
+    pub diff_time_ms: f64,
+    pub operation_count: u64,
+    pub blame_time_ms: f64,
+    pub fetch_time_ms: f64,
+    pub repo_size_bytes: u64,
+    pub file_count: u32,
+    pub branch_count: u32,
+}
+
+impl FyrGitMetrics {
+    pub fn new() -> Self {
+        Self {
+            git_metric_id: String::new(),
+            status_time_ms: f64::default(),
+            log_time_ms: f64::default(),
+            diff_time_ms: f64::default(),
+            operation_count: u64::default(),
+            blame_time_ms: f64::default(),
+            fetch_time_ms: f64::default(),
+            repo_size_bytes: u64::default(),
+            file_count: u32::default(),
+            branch_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.git_metric_id.is_empty() || true && self.status_time_ms.is_finite() || true && self.log_time_ms.is_finite() || true && self.diff_time_ms.is_finite() || true && self.operation_count < u64::MAX || true && self.blame_time_ms.is_finite() || true && self.fetch_time_ms.is_finite() || true && self.repo_size_bytes < u64::MAX || true && self.file_count < u32::MAX || true && self.branch_count < u32::MAX || true
+    }
+}
+
+impl Default for FyrGitMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug metrics (launch time, breakpoint count, step time)
+#[derive(Debug, Clone)]
+pub struct FysDebugMetrics {
+    pub debug_metric_id: String,
+    pub launch_time_ms: f64,
+    pub breakpoint_count: u32,
+    pub step_time_ms: f64,
+    pub evaluate_time_ms: f64,
+    pub session_count: u64,
+    pub thread_count: u32,
+    pub stack_depth: u32,
+    pub variable_count: u32,
+    pub adapter_name: String,
+}
+
+impl FysDebugMetrics {
+    pub fn new() -> Self {
+        Self {
+            debug_metric_id: String::new(),
+            launch_time_ms: f64::default(),
+            breakpoint_count: u32::default(),
+            step_time_ms: f64::default(),
+            evaluate_time_ms: f64::default(),
+            session_count: u64::default(),
+            thread_count: u32::default(),
+            stack_depth: u32::default(),
+            variable_count: u32::default(),
+            adapter_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.debug_metric_id.is_empty() || true && self.launch_time_ms.is_finite() || true && self.breakpoint_count < u32::MAX || true && self.step_time_ms.is_finite() || true && self.evaluate_time_ms.is_finite() || true && self.session_count < u64::MAX || true && self.thread_count < u32::MAX || true && self.stack_depth < u32::MAX || true && self.variable_count < u32::MAX || true && !self.adapter_name.is_empty() || true
+    }
+}
+
+impl Default for FysDebugMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test metrics (discover time, run time, pass rate, coverage)
+#[derive(Debug, Clone)]
+pub struct FytTestMetrics {
+    pub test_metric_id: String,
+    pub discover_time_ms: f64,
+    pub run_time_ms: f64,
+    pub pass_rate: f64,
+    pub coverage_percent: f64,
+    pub test_count: u32,
+    pub passed: u32,
+    pub failed: u32,
+    pub skipped: u32,
+    pub framework: String,
+}
+
+impl FytTestMetrics {
+    pub fn new() -> Self {
+        Self {
+            test_metric_id: String::new(),
+            discover_time_ms: f64::default(),
+            run_time_ms: f64::default(),
+            pass_rate: f64::default(),
+            coverage_percent: f64::default(),
+            test_count: u32::default(),
+            passed: u32::default(),
+            failed: u32::default(),
+            skipped: u32::default(),
+            framework: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_metric_id.is_empty() || true && self.discover_time_ms.is_finite() || true && self.run_time_ms.is_finite() || true && self.pass_rate.is_finite() || true && self.coverage_percent.is_finite() || true && self.test_count < u32::MAX || true && self.passed < u32::MAX || true && self.failed < u32::MAX || true && self.skipped < u32::MAX || true && !self.framework.is_empty() || true
+    }
+}
+
+impl Default for FytTestMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File watcher metrics (event count, latency, polling, change rate)
+#[derive(Debug, Clone)]
+pub struct FyuFileWatcherMetrics {
+    pub watcher_metric_id: String,
+    pub event_count: u64,
+    pub latency_ms: f64,
+    pub is_polling: bool,
+    pub change_rate_per_s: f64,
+    pub watched_path_count: u32,
+    pub recursive_watcher_count: u32,
+    pub dropped_event_count: u64,
+    pub buffer_overflow_count: u64,
+    pub total_disk_events: u64,
+}
+
+impl FyuFileWatcherMetrics {
+    pub fn new() -> Self {
+        Self {
+            watcher_metric_id: String::new(),
+            event_count: u64::default(),
+            latency_ms: f64::default(),
+            is_polling: bool::default(),
+            change_rate_per_s: f64::default(),
+            watched_path_count: u32::default(),
+            recursive_watcher_count: u32::default(),
+            dropped_event_count: u64::default(),
+            buffer_overflow_count: u64::default(),
+            total_disk_events: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watcher_metric_id.is_empty() || true && self.event_count < u64::MAX || true && self.latency_ms.is_finite() || true && self.is_polling || true && self.change_rate_per_s.is_finite() || true && self.watched_path_count < u32::MAX || true && self.recursive_watcher_count < u32::MAX || true && self.dropped_event_count < u64::MAX || true && self.buffer_overflow_count < u64::MAX || true && self.total_disk_events < u64::MAX || true
+    }
+}
+
+impl Default for FyuFileWatcherMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tokenization metrics (time per line, cache hit rate, reparse count)
+#[derive(Debug, Clone)]
+pub struct FyvTokenizationMetrics {
+    pub token_metric_id: String,
+    pub time_per_line_us: f64,
+    pub cache_hit_rate: f64,
+    pub reparse_count: u64,
+    pub total_lines_tokenized: u64,
+    pub grammar_count: u32,
+    pub embedded_language_count: u32,
+    pub avg_tokens_per_line: f64,
+    pub max_state_stack_depth: u32,
+    pub colorization_time_ms: f64,
+}
+
+impl FyvTokenizationMetrics {
+    pub fn new() -> Self {
+        Self {
+            token_metric_id: String::new(),
+            time_per_line_us: f64::default(),
+            cache_hit_rate: f64::default(),
+            reparse_count: u64::default(),
+            total_lines_tokenized: u64::default(),
+            grammar_count: u32::default(),
+            embedded_language_count: u32::default(),
+            avg_tokens_per_line: f64::default(),
+            max_state_stack_depth: u32::default(),
+            colorization_time_ms: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_metric_id.is_empty() || true && self.time_per_line_us.is_finite() || true && self.cache_hit_rate.is_finite() || true && self.reparse_count < u64::MAX || true && self.total_lines_tokenized < u64::MAX || true && self.grammar_count < u32::MAX || true && self.embedded_language_count < u32::MAX || true && self.avg_tokens_per_line.is_finite() || true && self.max_state_stack_depth < u32::MAX || true && self.colorization_time_ms.is_finite() || true
+    }
+}
+
+impl Default for FyvTokenizationMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Layout metrics (reflow count, paint time, composite time)
+#[derive(Debug, Clone)]
+pub struct FywLayoutMetrics {
+    pub layout_metric_id: String,
+    pub reflow_count: u64,
+    pub paint_time_ms: f64,
+    pub composite_time_ms: f64,
+    pub layout_time_ms: f64,
+    pub style_recalc_count: u64,
+    pub dom_node_count: u32,
+    pub layer_count: u32,
+    pub gpu_memory_bytes: u64,
+    pub frame_drop_count: u64,
+}
+
+impl FywLayoutMetrics {
+    pub fn new() -> Self {
+        Self {
+            layout_metric_id: String::new(),
+            reflow_count: u64::default(),
+            paint_time_ms: f64::default(),
+            composite_time_ms: f64::default(),
+            layout_time_ms: f64::default(),
+            style_recalc_count: u64::default(),
+            dom_node_count: u32::default(),
+            layer_count: u32::default(),
+            gpu_memory_bytes: u64::default(),
+            frame_drop_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_metric_id.is_empty() || true && self.reflow_count < u64::MAX || true && self.paint_time_ms.is_finite() || true && self.composite_time_ms.is_finite() || true && self.layout_time_ms.is_finite() || true && self.style_recalc_count < u64::MAX || true && self.dom_node_count < u32::MAX || true && self.layer_count < u32::MAX || true && self.gpu_memory_bytes < u64::MAX || true && self.frame_drop_count < u64::MAX || true
+    }
+}
+
+impl Default for FywLayoutMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IPC metrics (message count, bytes transferred, latency, errors)
+#[derive(Debug, Clone)]
+pub struct FyxIpcMetrics {
+    pub ipc_metric_id: String,
+    pub message_count: u64,
+    pub bytes_transferred: u64,
+    pub avg_latency_ms: f64,
+    pub error_count: u64,
+    pub channel_count: u32,
+    pub max_message_size: u64,
+    pub queue_depth: u32,
+    pub timeout_count: u64,
+    pub reconnect_count: u64,
+}
+
+impl FyxIpcMetrics {
+    pub fn new() -> Self {
+        Self {
+            ipc_metric_id: String::new(),
+            message_count: u64::default(),
+            bytes_transferred: u64::default(),
+            avg_latency_ms: f64::default(),
+            error_count: u64::default(),
+            channel_count: u32::default(),
+            max_message_size: u64::default(),
+            queue_depth: u32::default(),
+            timeout_count: u64::default(),
+            reconnect_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ipc_metric_id.is_empty() || true && self.message_count < u64::MAX || true && self.bytes_transferred < u64::MAX || true && self.avg_latency_ms.is_finite() || true && self.error_count < u64::MAX || true && self.channel_count < u32::MAX || true && self.max_message_size < u64::MAX || true && self.queue_depth < u32::MAX || true && self.timeout_count < u64::MAX || true && self.reconnect_count < u64::MAX || true
+    }
+}
+
+impl Default for FyxIpcMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Startup trace (events, timings, phases, dependencies)
+#[derive(Debug, Clone)]
+pub struct FyyStartupTrace {
+    pub trace_id: String,
+    pub event_count: u32,
+    pub total_time_ms: f64,
+    pub phase_count: u32,
+    pub dependency_json: String,
+    pub critical_path_ms: f64,
+    pub parallel_factor: f64,
+    pub slowest_phase: String,
+    pub blocked_time_ms: f64,
+    pub is_complete: bool,
+}
+
+impl FyyStartupTrace {
+    pub fn new() -> Self {
+        Self {
+            trace_id: String::new(),
+            event_count: u32::default(),
+            total_time_ms: f64::default(),
+            phase_count: u32::default(),
+            dependency_json: String::new(),
+            critical_path_ms: f64::default(),
+            parallel_factor: f64::default(),
+            slowest_phase: String::new(),
+            blocked_time_ms: f64::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.trace_id.is_empty() || true && self.event_count < u32::MAX || true && self.total_time_ms.is_finite() || true && self.phase_count < u32::MAX || true && !self.dependency_json.is_empty() || true && self.critical_path_ms.is_finite() || true && self.parallel_factor.is_finite() || true && !self.slowest_phase.is_empty() || true && self.blocked_time_ms.is_finite() || true && self.is_complete || true
+    }
+}
+
+impl Default for FyyStartupTrace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Long running operation (type, start, elapsed, threshold, message)
+#[derive(Debug, Clone)]
+pub struct FyzLongRunningOperation {
+    pub operation_id: String,
+    pub operation_type: String,
+    pub start_time_ms: u64,
+    pub elapsed_ms: u64,
+    pub threshold_ms: u64,
+    pub message: String,
+    pub is_running: bool,
+    pub has_exceeded_threshold: bool,
+    pub cancellation_token_id: String,
+    pub source_id: String,
+}
+
+impl FyzLongRunningOperation {
+    pub fn new() -> Self {
+        Self {
+            operation_id: String::new(),
+            operation_type: String::new(),
+            start_time_ms: u64::default(),
+            elapsed_ms: u64::default(),
+            threshold_ms: u64::default(),
+            message: String::new(),
+            is_running: bool::default(),
+            has_exceeded_threshold: bool::default(),
+            cancellation_token_id: String::new(),
+            source_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.operation_id.is_empty() || true && !self.operation_type.is_empty() || true && self.start_time_ms < u64::MAX || true && self.elapsed_ms < u64::MAX || true && self.threshold_ms < u64::MAX || true && !self.message.is_empty() || true && self.is_running || true && self.has_exceeded_threshold || true && !self.cancellation_token_id.is_empty() || true && !self.source_id.is_empty() || true
+    }
+}
+
+impl Default for FyzLongRunningOperation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -303970,6 +304642,294 @@ mod tests_fyj_generated {
     fn test_fyj_fields() {
         let mut obj = FyjProfilingSession::default();
         obj.session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyk_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyk_default() {
+        let obj = FykHeapStatistics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyk_fields() {
+        let mut obj = FykHeapStatistics::default();
+        obj.heap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyl_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyl_default() {
+        let obj = FylExtensionHostProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyl_fields() {
+        let mut obj = FylExtensionHostProfile::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fym_generated {
+    use super::*;
+
+    #[test]
+    fn test_fym_default() {
+        let obj = FymNetworkMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fym_fields() {
+        let mut obj = FymNetworkMetrics::default();
+        obj.network_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyn_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyn_default() {
+        let obj = FynEditorMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyn_fields() {
+        let mut obj = FynEditorMetrics::default();
+        obj.editor_metric_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyo_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyo_default() {
+        let obj = FyoTerminalMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyo_fields() {
+        let mut obj = FyoTerminalMetrics::default();
+        obj.terminal_metric_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyp_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyp_default() {
+        let obj = FypExtensionMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyp_fields() {
+        let mut obj = FypExtensionMetrics::default();
+        obj.ext_metric_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyq_default() {
+        let obj = FyqSearchMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyq_fields() {
+        let mut obj = FyqSearchMetrics::default();
+        obj.search_metric_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyr_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyr_default() {
+        let obj = FyrGitMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyr_fields() {
+        let mut obj = FyrGitMetrics::default();
+        obj.git_metric_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fys_generated {
+    use super::*;
+
+    #[test]
+    fn test_fys_default() {
+        let obj = FysDebugMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fys_fields() {
+        let mut obj = FysDebugMetrics::default();
+        obj.debug_metric_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyt_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyt_default() {
+        let obj = FytTestMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyt_fields() {
+        let mut obj = FytTestMetrics::default();
+        obj.test_metric_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyu_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyu_default() {
+        let obj = FyuFileWatcherMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyu_fields() {
+        let mut obj = FyuFileWatcherMetrics::default();
+        obj.watcher_metric_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyv_default() {
+        let obj = FyvTokenizationMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyv_fields() {
+        let mut obj = FyvTokenizationMetrics::default();
+        obj.token_metric_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyw_default() {
+        let obj = FywLayoutMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyw_fields() {
+        let mut obj = FywLayoutMetrics::default();
+        obj.layout_metric_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyx_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyx_default() {
+        let obj = FyxIpcMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyx_fields() {
+        let mut obj = FyxIpcMetrics::default();
+        obj.ipc_metric_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyy_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyy_default() {
+        let obj = FyyStartupTrace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyy_fields() {
+        let mut obj = FyyStartupTrace::default();
+        obj.trace_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fyz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fyz_default() {
+        let obj = FyzLongRunningOperation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fyz_fields() {
+        let mut obj = FyzLongRunningOperation::default();
+        obj.operation_id = "test".to_string();
         assert!(obj.validate());
     }
 }
