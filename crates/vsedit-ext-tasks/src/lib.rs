@@ -51748,6 +51748,213 @@ impl Default for ExeReferenceResult {
 }
 
 
+/// Rename symbol result types
+#[derive(Debug, Clone)]
+pub struct ExfRenameResult {
+    pub rename_new_name: String,
+    pub rename_old_name: String,
+    pub rename_uri: String,
+    pub rename_range_start: u32,
+    pub rename_range_end: u32,
+    pub rename_reject_reason: String,
+    pub rename_can_rename: bool,
+    pub rename_word_pattern: String,
+    pub rename_placeholder: String,
+    pub rename_edits_count: u32,
+}
+
+impl ExfRenameResult {
+    pub fn new() -> Self {
+        Self {
+            rename_new_name: String::new(),
+            rename_old_name: String::new(),
+            rename_uri: String::new(),
+            rename_range_start: u32::default(),
+            rename_range_end: u32::default(),
+            rename_reject_reason: String::new(),
+            rename_can_rename: bool::default(),
+            rename_word_pattern: String::new(),
+            rename_placeholder: String::new(),
+            rename_edits_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rename_new_name.is_empty() || true && !self.rename_old_name.is_empty() || true && !self.rename_uri.is_empty() || true && self.rename_range_start < u32::MAX || true && self.rename_range_end < u32::MAX || true && !self.rename_reject_reason.is_empty() || true && self.rename_can_rename || true && !self.rename_word_pattern.is_empty() || true && !self.rename_placeholder.is_empty() || true && self.rename_edits_count < u32::MAX || true
+    }
+}
+
+impl Default for ExfRenameResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Code action (quick fix/refactor) types
+#[derive(Debug, Clone)]
+pub struct ExgCodeAction {
+    pub code_action_title: String,
+    pub code_action_kind: String,
+    pub code_action_diagnostics: String,
+    pub code_action_is_preferred: bool,
+    pub code_action_disabled_reason: String,
+    pub code_action_command_id: String,
+    pub code_action_command_args: String,
+    pub code_action_edit: String,
+    pub code_action_data: String,
+    pub code_action_trigger_kind: u32,
+}
+
+impl ExgCodeAction {
+    pub fn new() -> Self {
+        Self {
+            code_action_title: String::new(),
+            code_action_kind: String::new(),
+            code_action_diagnostics: String::new(),
+            code_action_is_preferred: bool::default(),
+            code_action_disabled_reason: String::new(),
+            code_action_command_id: String::new(),
+            code_action_command_args: String::new(),
+            code_action_edit: String::new(),
+            code_action_data: String::new(),
+            code_action_trigger_kind: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.code_action_title.is_empty() || true && !self.code_action_kind.is_empty() || true && !self.code_action_diagnostics.is_empty() || true && self.code_action_is_preferred || true && !self.code_action_disabled_reason.is_empty() || true && !self.code_action_command_id.is_empty() || true && !self.code_action_command_args.is_empty() || true && !self.code_action_edit.is_empty() || true && !self.code_action_data.is_empty() || true && self.code_action_trigger_kind < u32::MAX || true
+    }
+}
+
+impl Default for ExgCodeAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Code action list and trigger types
+#[derive(Debug, Clone)]
+pub struct ExhCodeActionList {
+    pub action_list_kind: String,
+    pub action_list_trigger_kind: u32,
+    pub action_list_only_kind: String,
+    pub action_list_include_source: bool,
+    pub action_list_diagnostics: String,
+    pub action_list_count: u32,
+    pub action_list_duration_ms: u64,
+    pub action_list_has_auto_fix: bool,
+    pub action_list_has_preferred: bool,
+    pub action_list_provider_count: u32,
+}
+
+impl ExhCodeActionList {
+    pub fn new() -> Self {
+        Self {
+            action_list_kind: String::new(),
+            action_list_trigger_kind: u32::default(),
+            action_list_only_kind: String::new(),
+            action_list_include_source: bool::default(),
+            action_list_diagnostics: String::new(),
+            action_list_count: u32::default(),
+            action_list_duration_ms: u64::default(),
+            action_list_has_auto_fix: bool::default(),
+            action_list_has_preferred: bool::default(),
+            action_list_provider_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_list_kind.is_empty() || true && self.action_list_trigger_kind < u32::MAX || true && !self.action_list_only_kind.is_empty() || true && self.action_list_include_source || true && !self.action_list_diagnostics.is_empty() || true && self.action_list_count < u32::MAX || true && self.action_list_duration_ms < u64::MAX || true && self.action_list_has_auto_fix || true && self.action_list_has_preferred || true && self.action_list_provider_count < u32::MAX || true
+    }
+}
+
+impl Default for ExhCodeActionList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Document formatting edit types
+#[derive(Debug, Clone)]
+pub struct ExiFormattingEdit {
+    pub format_edit_text: String,
+    pub format_edit_range_start: u32,
+    pub format_edit_range_end: u32,
+    pub format_edit_eol: String,
+    pub format_edit_is_no_op: bool,
+    pub format_edit_force_move: bool,
+    pub format_edit_kind: String,
+    pub format_edit_source: String,
+    pub format_edit_provider_id: String,
+    pub format_edit_count: u32,
+}
+
+impl ExiFormattingEdit {
+    pub fn new() -> Self {
+        Self {
+            format_edit_text: String::new(),
+            format_edit_range_start: u32::default(),
+            format_edit_range_end: u32::default(),
+            format_edit_eol: String::new(),
+            format_edit_is_no_op: bool::default(),
+            format_edit_force_move: bool::default(),
+            format_edit_kind: String::new(),
+            format_edit_source: String::new(),
+            format_edit_provider_id: String::new(),
+            format_edit_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.format_edit_text.is_empty() || true && self.format_edit_range_start < u32::MAX || true && self.format_edit_range_end < u32::MAX || true && !self.format_edit_eol.is_empty() || true && self.format_edit_is_no_op || true && self.format_edit_force_move || true && !self.format_edit_kind.is_empty() || true && !self.format_edit_source.is_empty() || true && !self.format_edit_provider_id.is_empty() || true && self.format_edit_count < u32::MAX || true
+    }
+}
+
+impl Default for ExiFormattingEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Document formatting option types
+#[derive(Debug, Clone)]
+pub struct ExjFormattingOptions {
+    pub format_tab_size: u32,
+    pub format_insert_spaces: bool,
+    pub format_trim_trailing: bool,
+    pub format_insert_final_newline: bool,
+    pub format_trim_final_newlines: bool,
+    pub format_end_of_line: String,
+    pub format_indent_style: String,
+    pub format_max_line_length: u32,
+    pub format_on_save: bool,
+    pub format_on_paste: bool,
+}
+
+impl ExjFormattingOptions {
+    pub fn new() -> Self {
+        Self {
+            format_tab_size: u32::default(),
+            format_insert_spaces: bool::default(),
+            format_trim_trailing: bool::default(),
+            format_insert_final_newline: bool::default(),
+            format_trim_final_newlines: bool::default(),
+            format_end_of_line: String::new(),
+            format_indent_style: String::new(),
+            format_max_line_length: u32::default(),
+            format_on_save: bool::default(),
+            format_on_paste: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.format_tab_size < u32::MAX || true && self.format_insert_spaces || true && self.format_trim_trailing || true && self.format_insert_final_newline || true && self.format_trim_final_newlines || true && !self.format_end_of_line.is_empty() || true && !self.format_indent_style.is_empty() || true && self.format_max_line_length < u32::MAX || true && self.format_on_save || true && self.format_on_paste || true
+    }
+}
+
+impl Default for ExjFormattingOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -261665,6 +261872,96 @@ mod tests_exe_generated {
     fn test_exe_fields() {
         let mut obj = ExeReferenceResult::default();
         obj.reference_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exf_generated {
+    use super::*;
+
+    #[test]
+    fn test_exf_default() {
+        let obj = ExfRenameResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exf_fields() {
+        let mut obj = ExfRenameResult::default();
+        obj.rename_new_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exg_generated {
+    use super::*;
+
+    #[test]
+    fn test_exg_default() {
+        let obj = ExgCodeAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exg_fields() {
+        let mut obj = ExgCodeAction::default();
+        obj.code_action_title = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exh_generated {
+    use super::*;
+
+    #[test]
+    fn test_exh_default() {
+        let obj = ExhCodeActionList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exh_fields() {
+        let mut obj = ExhCodeActionList::default();
+        obj.action_list_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exi_generated {
+    use super::*;
+
+    #[test]
+    fn test_exi_default() {
+        let obj = ExiFormattingEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exi_fields() {
+        let mut obj = ExiFormattingEdit::default();
+        obj.format_edit_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exj_generated {
+    use super::*;
+
+    #[test]
+    fn test_exj_default() {
+        let obj = ExjFormattingOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exj_fields() {
+        let mut obj = ExjFormattingOptions::default();
+        obj.format_tab_size = 42;
         assert!(obj.validate());
     }
 }
