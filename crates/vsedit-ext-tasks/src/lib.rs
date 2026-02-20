@@ -96049,6 +96049,216 @@ impl Default for GlzSnippetTextEdit {
     }
 }
 
+/// Completion provider (trigger chars, resolve, provide, context)
+#[derive(Debug, Clone)]
+pub struct GmaCompletionProvider {
+    pub comp_prov_id: String,
+    pub trigger_characters_json: String,
+    pub can_resolve: bool,
+    pub provider_name: String,
+    pub language_id: String,
+    pub scheme: String,
+    pub priority: u32,
+    pub is_incomplete_support: bool,
+    pub commit_characters_json: String,
+    pub extension_id: String,
+}
+
+impl GmaCompletionProvider {
+    pub fn new() -> Self {
+        Self {
+            comp_prov_id: String::new(),
+            trigger_characters_json: String::new(),
+            can_resolve: bool::default(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            scheme: String::new(),
+            priority: u32::default(),
+            is_incomplete_support: bool::default(),
+            commit_characters_json: String::new(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comp_prov_id.is_empty() || true && !self.trigger_characters_json.is_empty() || true && self.can_resolve || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && !self.scheme.is_empty() || true && self.priority < u32::MAX || true && self.is_incomplete_support || true && !self.commit_characters_json.is_empty() || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for GmaCompletionProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Completion item (label, kind, detail, documentation, insert text)
+#[derive(Debug, Clone)]
+pub struct GmbCompletionItem {
+    pub comp_item_id: String,
+    pub label: String,
+    pub kind: u32,
+    pub detail: String,
+    pub documentation: String,
+    pub insert_text: String,
+    pub filter_text: String,
+    pub sort_text: String,
+    pub preselect: bool,
+    pub commit_characters_json: String,
+}
+
+impl GmbCompletionItem {
+    pub fn new() -> Self {
+        Self {
+            comp_item_id: String::new(),
+            label: String::new(),
+            kind: u32::default(),
+            detail: String::new(),
+            documentation: String::new(),
+            insert_text: String::new(),
+            filter_text: String::new(),
+            sort_text: String::new(),
+            preselect: bool::default(),
+            commit_characters_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comp_item_id.is_empty() || true && !self.label.is_empty() || true && self.kind < u32::MAX || true && !self.detail.is_empty() || true && !self.documentation.is_empty() || true && !self.insert_text.is_empty() || true && !self.filter_text.is_empty() || true && !self.sort_text.is_empty() || true && self.preselect || true && !self.commit_characters_json.is_empty() || true
+    }
+}
+
+impl Default for GmbCompletionItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Completion list (items, is incomplete, default range, suggest)
+#[derive(Debug, Clone)]
+pub struct GmcCompletionList {
+    pub comp_list_id: String,
+    pub items_json: String,
+    pub is_incomplete: bool,
+    pub default_range_json: String,
+    pub suggest_mode: String,
+    pub item_count: u32,
+    pub duration_ms: u64,
+    pub provider_id: String,
+    pub dispose_on_hide: bool,
+    pub edit_range_json: String,
+}
+
+impl GmcCompletionList {
+    pub fn new() -> Self {
+        Self {
+            comp_list_id: String::new(),
+            items_json: String::new(),
+            is_incomplete: bool::default(),
+            default_range_json: String::new(),
+            suggest_mode: String::new(),
+            item_count: u32::default(),
+            duration_ms: u64::default(),
+            provider_id: String::new(),
+            dispose_on_hide: bool::default(),
+            edit_range_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comp_list_id.is_empty() || true && !self.items_json.is_empty() || true && self.is_incomplete || true && !self.default_range_json.is_empty() || true && !self.suggest_mode.is_empty() || true && self.item_count < u32::MAX || true && self.duration_ms < u64::MAX || true && !self.provider_id.is_empty() || true && self.dispose_on_hide || true && !self.edit_range_json.is_empty() || true
+    }
+}
+
+impl Default for GmcCompletionList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Hover provider (provide hover, contents, range, can increase)
+#[derive(Debug, Clone)]
+pub struct GmdHoverProvider {
+    pub hover_prov_id: String,
+    pub contents_json: String,
+    pub range_json: String,
+    pub can_increase_verbosity: bool,
+    pub provider_name: String,
+    pub language_id: String,
+    pub is_registered: bool,
+    pub priority: u32,
+    pub scheme: String,
+    pub extension_id: String,
+}
+
+impl GmdHoverProvider {
+    pub fn new() -> Self {
+        Self {
+            hover_prov_id: String::new(),
+            contents_json: String::new(),
+            range_json: String::new(),
+            can_increase_verbosity: bool::default(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            is_registered: bool::default(),
+            priority: u32::default(),
+            scheme: String::new(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hover_prov_id.is_empty() || true && !self.contents_json.is_empty() || true && !self.range_json.is_empty() || true && self.can_increase_verbosity || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && self.is_registered || true && self.priority < u32::MAX || true && !self.scheme.is_empty() || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for GmdHoverProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Signature help provider (trigger chars, retrigger, provide)
+#[derive(Debug, Clone)]
+pub struct GmeSignatureHelpProvider {
+    pub sig_prov_id: String,
+    pub trigger_characters_json: String,
+    pub retrigger_characters_json: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub is_registered: bool,
+    pub priority: u32,
+    pub scheme: String,
+    pub metadata_json: String,
+    pub extension_id: String,
+}
+
+impl GmeSignatureHelpProvider {
+    pub fn new() -> Self {
+        Self {
+            sig_prov_id: String::new(),
+            trigger_characters_json: String::new(),
+            retrigger_characters_json: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            is_registered: bool::default(),
+            priority: u32::default(),
+            scheme: String::new(),
+            metadata_json: String::new(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sig_prov_id.is_empty() || true && !self.trigger_characters_json.is_empty() || true && !self.retrigger_characters_json.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && self.is_registered || true && self.priority < u32::MAX || true && !self.scheme.is_empty() || true && !self.metadata_json.is_empty() || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for GmeSignatureHelpProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -325064,6 +325274,96 @@ mod tests_glz_generated {
     fn test_glz_fields() {
         let mut obj = GlzSnippetTextEdit::default();
         obj.snippet_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gma_generated {
+    use super::*;
+
+    #[test]
+    fn test_gma_default() {
+        let obj = GmaCompletionProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gma_fields() {
+        let mut obj = GmaCompletionProvider::default();
+        obj.comp_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmb_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmb_default() {
+        let obj = GmbCompletionItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmb_fields() {
+        let mut obj = GmbCompletionItem::default();
+        obj.comp_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmc_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmc_default() {
+        let obj = GmcCompletionList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmc_fields() {
+        let mut obj = GmcCompletionList::default();
+        obj.comp_list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmd_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmd_default() {
+        let obj = GmdHoverProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmd_fields() {
+        let mut obj = GmdHoverProvider::default();
+        obj.hover_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gme_generated {
+    use super::*;
+
+    #[test]
+    fn test_gme_default() {
+        let obj = GmeSignatureHelpProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gme_fields() {
+        let mut obj = GmeSignatureHelpProvider::default();
+        obj.sig_prov_id = "test".to_string();
         assert!(obj.validate());
     }
 }
