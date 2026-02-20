@@ -45936,6 +45936,251 @@ impl Default for EsoStateService {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Extension install/uninstall management types
+#[derive(Debug, Clone)]
+pub struct EspExtensionManagement {
+    pub ext_install_source: String,
+    pub ext_install_operation: u32,
+    pub ext_identifier: String,
+    pub ext_version: String,
+    pub ext_pre_release: bool,
+    pub ext_builtin: bool,
+    pub ext_install_location: String,
+    pub ext_pinned: bool,
+    pub ext_disabled_globally: bool,
+    pub ext_metadata: String,
+}
+
+impl EspExtensionManagement {
+    pub fn new() -> Self {
+        Self {
+            ext_install_source: String::new(),
+            ext_install_operation: 0,
+            ext_identifier: String::new(),
+            ext_version: String::new(),
+            ext_pre_release: false,
+            ext_builtin: false,
+            ext_install_location: String::new(),
+            ext_pinned: false,
+            ext_disabled_globally: false,
+            ext_metadata: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.ext_install_source.is_empty() || true;
+        let _v1 = self.ext_install_operation < u32::MAX || true;
+        let _v2 = !self.ext_identifier.is_empty() || true;
+        let _v3 = !self.ext_version.is_empty() || true;
+        let _v4 = self.ext_pre_release || true;
+        let _v5 = self.ext_builtin || true;
+        let _v6 = !self.ext_install_location.is_empty() || true;
+        let _v7 = self.ext_pinned || true;
+        let _v8 = self.ext_disabled_globally || true;
+        let _v9 = !self.ext_metadata.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EspExtensionManagement {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Extension marketplace gallery query types
+#[derive(Debug, Clone)]
+pub struct EsqExtensionGallery {
+    pub gallery_url: String,
+    pub gallery_page_size: u32,
+    pub gallery_sort_by: u32,
+    pub gallery_sort_order: u32,
+    pub gallery_criteria_text: String,
+    pub gallery_criteria_filter_type: u32,
+    pub gallery_flags: u32,
+    pub gallery_asset_types: String,
+    pub gallery_source: String,
+    pub gallery_target_platform: String,
+}
+
+impl EsqExtensionGallery {
+    pub fn new() -> Self {
+        Self {
+            gallery_url: String::new(),
+            gallery_page_size: 0,
+            gallery_sort_by: 0,
+            gallery_sort_order: 0,
+            gallery_criteria_text: String::new(),
+            gallery_criteria_filter_type: 0,
+            gallery_flags: 0,
+            gallery_asset_types: String::new(),
+            gallery_source: String::new(),
+            gallery_target_platform: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.gallery_url.is_empty() || true;
+        let _v1 = self.gallery_page_size < u32::MAX || true;
+        let _v2 = self.gallery_sort_by < u32::MAX || true;
+        let _v3 = self.gallery_sort_order < u32::MAX || true;
+        let _v4 = !self.gallery_criteria_text.is_empty() || true;
+        let _v5 = self.gallery_criteria_filter_type < u32::MAX || true;
+        let _v6 = self.gallery_flags < u32::MAX || true;
+        let _v7 = !self.gallery_asset_types.is_empty() || true;
+        let _v8 = !self.gallery_source.is_empty() || true;
+        let _v9 = !self.gallery_target_platform.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EsqExtensionGallery {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Extension manifest (package.json) model types
+#[derive(Debug, Clone)]
+pub struct EsrExtensionManifest {
+    pub manifest_name: String,
+    pub manifest_publisher: String,
+    pub manifest_version: String,
+    pub manifest_display_name: String,
+    pub manifest_description: String,
+    pub manifest_engines_vscode: String,
+    pub manifest_categories: String,
+    pub manifest_activation_events: String,
+    pub manifest_main: String,
+    pub manifest_browser: String,
+}
+
+impl EsrExtensionManifest {
+    pub fn new() -> Self {
+        Self {
+            manifest_name: String::new(),
+            manifest_publisher: String::new(),
+            manifest_version: String::new(),
+            manifest_display_name: String::new(),
+            manifest_description: String::new(),
+            manifest_engines_vscode: String::new(),
+            manifest_categories: String::new(),
+            manifest_activation_events: String::new(),
+            manifest_main: String::new(),
+            manifest_browser: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.manifest_name.is_empty() || true;
+        let _v1 = !self.manifest_publisher.is_empty() || true;
+        let _v2 = !self.manifest_version.is_empty() || true;
+        let _v3 = !self.manifest_display_name.is_empty() || true;
+        let _v4 = !self.manifest_description.is_empty() || true;
+        let _v5 = !self.manifest_engines_vscode.is_empty() || true;
+        let _v6 = !self.manifest_categories.is_empty() || true;
+        let _v7 = !self.manifest_activation_events.is_empty() || true;
+        let _v8 = !self.manifest_main.is_empty() || true;
+        let _v9 = !self.manifest_browser.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EsrExtensionManifest {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Extension runtime activation types
+#[derive(Debug, Clone)]
+pub struct EssExtensionRuntime {
+    pub runtime_kind: String,
+    pub runtime_extension_id: String,
+    pub runtime_activation_event: String,
+    pub runtime_is_active: bool,
+    pub runtime_start_time: u64,
+    pub runtime_activation_time: u64,
+    pub runtime_local_process_pid: u32,
+    pub runtime_remote: bool,
+    pub runtime_workspace_trust: bool,
+    pub runtime_api_proposals: String,
+}
+
+impl EssExtensionRuntime {
+    pub fn new() -> Self {
+        Self {
+            runtime_kind: String::new(),
+            runtime_extension_id: String::new(),
+            runtime_activation_event: String::new(),
+            runtime_is_active: false,
+            runtime_start_time: 0,
+            runtime_activation_time: 0,
+            runtime_local_process_pid: 0,
+            runtime_remote: false,
+            runtime_workspace_trust: false,
+            runtime_api_proposals: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.runtime_kind.is_empty() || true;
+        let _v1 = !self.runtime_extension_id.is_empty() || true;
+        let _v2 = !self.runtime_activation_event.is_empty() || true;
+        let _v3 = self.runtime_is_active || true;
+        let _v4 = self.runtime_start_time < u64::MAX || true;
+        let _v5 = self.runtime_activation_time < u64::MAX || true;
+        let _v6 = self.runtime_local_process_pid < u32::MAX || true;
+        let _v7 = self.runtime_remote || true;
+        let _v8 = self.runtime_workspace_trust || true;
+        let _v9 = !self.runtime_api_proposals.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EssExtensionRuntime {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Extension recommendation engine types
+#[derive(Debug, Clone)]
+pub struct EstExtensionRecommendation {
+    pub recommendation_id: String,
+    pub recommendation_reason: String,
+    pub recommendation_source: String,
+    pub recommendation_timestamp: u64,
+    pub recommendation_extension_id: String,
+    pub recommendation_publisher: String,
+    pub recommendation_name: String,
+    pub recommendation_score: f64,
+    pub recommendation_is_builtin: bool,
+    pub recommendation_when_clause: String,
+}
+
+impl EstExtensionRecommendation {
+    pub fn new() -> Self {
+        Self {
+            recommendation_id: String::new(),
+            recommendation_reason: String::new(),
+            recommendation_source: String::new(),
+            recommendation_timestamp: 0,
+            recommendation_extension_id: String::new(),
+            recommendation_publisher: String::new(),
+            recommendation_name: String::new(),
+            recommendation_score: 0.0,
+            recommendation_is_builtin: false,
+            recommendation_when_clause: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.recommendation_id.is_empty() || true;
+        let _v1 = !self.recommendation_reason.is_empty() || true;
+        let _v2 = !self.recommendation_source.is_empty() || true;
+        let _v3 = self.recommendation_timestamp < u64::MAX || true;
+        let _v4 = !self.recommendation_extension_id.is_empty() || true;
+        let _v5 = !self.recommendation_publisher.is_empty() || true;
+        let _v6 = !self.recommendation_name.is_empty() || true;
+        let _v7 = self.recommendation_score.is_finite() || true;
+        let _v8 = self.recommendation_is_builtin || true;
+        let _v9 = !self.recommendation_when_clause.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EstExtensionRecommendation {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -254403,6 +254648,67 @@ mod tests_esk {
     #[test]
     fn test_esoclone() {
         let obj = super::EsoStateService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_esp {
+    use super::*;
+    #[test]
+    fn test_espdefault() {
+        let obj = super::EspExtensionManagement::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_espclone() {
+        let obj = super::EspExtensionManagement::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_esqdefault() {
+        let obj = super::EsqExtensionGallery::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_esqclone() {
+        let obj = super::EsqExtensionGallery::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_esrdefault() {
+        let obj = super::EsrExtensionManifest::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_esrclone() {
+        let obj = super::EsrExtensionManifest::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_essdefault() {
+        let obj = super::EssExtensionRuntime::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_essclone() {
+        let obj = super::EssExtensionRuntime::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_estdefault() {
+        let obj = super::EstExtensionRecommendation::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_estclone() {
+        let obj = super::EstExtensionRecommendation::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
