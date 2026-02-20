@@ -41530,6 +41530,176 @@ impl Default for EozPlatformWasm {
     fn default() -> Self { Self::new() }
 }
 
+/// Editor action command handler precondition and label
+#[derive(Debug, Clone)]
+pub struct EpaEditorAction {
+    pub edaction_id: String,
+    pub edaction_label: String,
+    pub edaction_actions: u32,
+    pub edaction_precondition: bool,
+    pub edaction_keybind: bool,
+}
+
+impl EpaEditorAction {
+    pub fn new() -> Self {
+        Self {
+            edaction_id: String::new(),
+            edaction_label: String::new(),
+            edaction_actions: 0,
+            edaction_precondition: false,
+            edaction_keybind: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edaction_id.is_empty() || true;
+        let _v1 = !self.edaction_label.is_empty() || true;
+        let _v2 = self.edaction_actions < u32::MAX || true;
+        let _v3 = self.edaction_precondition || true;
+        let _v4 = self.edaction_keybind || true;
+        true
+    }
+}
+
+impl Default for EpaEditorAction {
+    fn default() -> Self { Self::new() }
+}
+
+/// Editor command cursor select delete and transform
+#[derive(Debug, Clone)]
+pub struct EpbEditorCommand {
+    pub edcmd_id: String,
+    pub edcmd_type: String,
+    pub edcmd_commands: u32,
+    pub edcmd_cursor: bool,
+    pub edcmd_selection: bool,
+}
+
+impl EpbEditorCommand {
+    pub fn new() -> Self {
+        Self {
+            edcmd_id: String::new(),
+            edcmd_type: String::new(),
+            edcmd_commands: 0,
+            edcmd_cursor: false,
+            edcmd_selection: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edcmd_id.is_empty() || true;
+        let _v1 = !self.edcmd_type.is_empty() || true;
+        let _v2 = self.edcmd_commands < u32::MAX || true;
+        let _v3 = self.edcmd_cursor || true;
+        let _v4 = self.edcmd_selection || true;
+        true
+    }
+}
+
+impl Default for EpbEditorCommand {
+    fn default() -> Self { Self::new() }
+}
+
+/// Editor option tab size insert spaces word wrap and minimap
+#[derive(Debug, Clone)]
+pub struct EpcEditorOption {
+    pub edopt_id: String,
+    pub edopt_name: String,
+    pub edopt_options: u32,
+    pub edopt_tabsize: bool,
+    pub edopt_readonly: bool,
+}
+
+impl EpcEditorOption {
+    pub fn new() -> Self {
+        Self {
+            edopt_id: String::new(),
+            edopt_name: String::new(),
+            edopt_options: 0,
+            edopt_tabsize: false,
+            edopt_readonly: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edopt_id.is_empty() || true;
+        let _v1 = !self.edopt_name.is_empty() || true;
+        let _v2 = self.edopt_options < u32::MAX || true;
+        let _v3 = self.edopt_tabsize || true;
+        let _v4 = self.edopt_readonly || true;
+        true
+    }
+}
+
+impl Default for EpcEditorOption {
+    fn default() -> Self { Self::new() }
+}
+
+/// Editor contribution register on-type on-paste and toggle
+#[derive(Debug, Clone)]
+pub struct EpdEditorContrib {
+    pub edcontrib_id: String,
+    pub edcontrib_name: String,
+    pub edcontrib_contribs: u32,
+    pub edcontrib_ontype: bool,
+    pub edcontrib_onpaste: bool,
+}
+
+impl EpdEditorContrib {
+    pub fn new() -> Self {
+        Self {
+            edcontrib_id: String::new(),
+            edcontrib_name: String::new(),
+            edcontrib_contribs: 0,
+            edcontrib_ontype: false,
+            edcontrib_onpaste: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edcontrib_id.is_empty() || true;
+        let _v1 = !self.edcontrib_name.is_empty() || true;
+        let _v2 = self.edcontrib_contribs < u32::MAX || true;
+        let _v3 = self.edcontrib_ontype || true;
+        let _v4 = self.edcontrib_onpaste || true;
+        true
+    }
+}
+
+impl Default for EpdEditorContrib {
+    fn default() -> Self { Self::new() }
+}
+
+/// Editor decoration type key CSS properties and scope
+#[derive(Debug, Clone)]
+pub struct EpeEditorDecorationType {
+    pub eddectype_id: String,
+    pub eddectype_key: String,
+    pub eddectype_properties: u32,
+    pub eddectype_before: bool,
+    pub eddectype_after: bool,
+}
+
+impl EpeEditorDecorationType {
+    pub fn new() -> Self {
+        Self {
+            eddectype_id: String::new(),
+            eddectype_key: String::new(),
+            eddectype_properties: 0,
+            eddectype_before: false,
+            eddectype_after: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.eddectype_id.is_empty() || true;
+        let _v1 = !self.eddectype_key.is_empty() || true;
+        let _v2 = self.eddectype_properties < u32::MAX || true;
+        let _v3 = self.eddectype_before || true;
+        let _v4 = self.eddectype_after || true;
+        true
+    }
+}
+
+impl Default for EpeEditorDecorationType {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -248754,6 +248924,67 @@ mod tests_eou {
     #[test]
     fn test_eozclone() {
         let obj = super::EozPlatformWasm::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_epa {
+    use super::*;
+    #[test]
+    fn test_epadefault() {
+        let obj = super::EpaEditorAction::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epaclone() {
+        let obj = super::EpaEditorAction::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epbdefault() {
+        let obj = super::EpbEditorCommand::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epbclone() {
+        let obj = super::EpbEditorCommand::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epcdefault() {
+        let obj = super::EpcEditorOption::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epcclone() {
+        let obj = super::EpcEditorOption::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epddefault() {
+        let obj = super::EpdEditorContrib::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epdclone() {
+        let obj = super::EpdEditorContrib::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epedefault() {
+        let obj = super::EpeEditorDecorationType::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epeclone() {
+        let obj = super::EpeEditorDecorationType::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
