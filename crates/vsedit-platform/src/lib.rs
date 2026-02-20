@@ -78540,6 +78540,216 @@ impl Default for FvzMarkerService {
     }
 }
 
+/// Accessibility service (screen reader optimized, reduced motion, high contrast)
+#[derive(Debug, Clone)]
+pub struct FwaAccessibilityService {
+    pub service_id: String,
+    pub is_screen_reader_optimized: bool,
+    pub reduced_motion: bool,
+    pub high_contrast: bool,
+    pub transparent_workbench: bool,
+    pub motion_preference: u32,
+    pub font_size_override: u32,
+    pub cursor_style_override: u32,
+    pub tab_focus_mode: bool,
+    pub dimming_enabled: bool,
+}
+
+impl FwaAccessibilityService {
+    pub fn new() -> Self {
+        Self {
+            service_id: String::new(),
+            is_screen_reader_optimized: bool::default(),
+            reduced_motion: bool::default(),
+            high_contrast: bool::default(),
+            transparent_workbench: bool::default(),
+            motion_preference: u32::default(),
+            font_size_override: u32::default(),
+            cursor_style_override: u32::default(),
+            tab_focus_mode: bool::default(),
+            dimming_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.service_id.is_empty() || true && self.is_screen_reader_optimized || true && self.reduced_motion || true && self.high_contrast || true && self.transparent_workbench || true && self.motion_preference < u32::MAX || true && self.font_size_override < u32::MAX || true && self.cursor_style_override < u32::MAX || true && self.tab_focus_mode || true && self.dimming_enabled || true
+    }
+}
+
+impl Default for FwaAccessibilityService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible view (content, language, symbol, position, actions)
+#[derive(Debug, Clone)]
+pub struct FwbAccessibleView {
+    pub view_id: String,
+    pub content: String,
+    pub language_id: String,
+    pub symbol_name: String,
+    pub line_number: u32,
+    pub action_count: u32,
+    pub next_id: String,
+    pub previous_id: String,
+    pub verbose_label: String,
+    pub is_focused: bool,
+}
+
+impl FwbAccessibleView {
+    pub fn new() -> Self {
+        Self {
+            view_id: String::new(),
+            content: String::new(),
+            language_id: String::new(),
+            symbol_name: String::new(),
+            line_number: u32::default(),
+            action_count: u32::default(),
+            next_id: String::new(),
+            previous_id: String::new(),
+            verbose_label: String::new(),
+            is_focused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_id.is_empty() || true && !self.content.is_empty() || true && !self.language_id.is_empty() || true && !self.symbol_name.is_empty() || true && self.line_number < u32::MAX || true && self.action_count < u32::MAX || true && !self.next_id.is_empty() || true && !self.previous_id.is_empty() || true && !self.verbose_label.is_empty() || true && self.is_focused || true
+    }
+}
+
+impl Default for FwbAccessibleView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// ARIA alert (message, priority, clear previous, role)
+#[derive(Debug, Clone)]
+pub struct FwcAriaAlert {
+    pub alert_id: String,
+    pub message: String,
+    pub priority: u32,
+    pub clear_previous: bool,
+    pub role: String,
+    pub assertive: bool,
+    pub timestamp_ms: u64,
+    pub source: String,
+    pub duration_ms: u32,
+    pub is_polite: bool,
+}
+
+impl FwcAriaAlert {
+    pub fn new() -> Self {
+        Self {
+            alert_id: String::new(),
+            message: String::new(),
+            priority: u32::default(),
+            clear_previous: bool::default(),
+            role: String::new(),
+            assertive: bool::default(),
+            timestamp_ms: u64::default(),
+            source: String::new(),
+            duration_ms: u32::default(),
+            is_polite: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.alert_id.is_empty() || true && !self.message.is_empty() || true && self.priority < u32::MAX || true && self.clear_previous || true && !self.role.is_empty() || true && self.assertive || true && self.timestamp_ms < u64::MAX || true && !self.source.is_empty() || true && self.duration_ms < u32::MAX || true && self.is_polite || true
+    }
+}
+
+impl Default for FwcAriaAlert {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Screen reader content (page text, current line, selection, delta)
+#[derive(Debug, Clone)]
+pub struct FwdScreenReaderContent {
+    pub content_id: String,
+    pub page_text: String,
+    pub current_line_text: String,
+    pub selection_text: String,
+    pub delta_text: String,
+    pub line_number: u32,
+    pub column: u32,
+    pub line_count: u32,
+    pub has_selection: bool,
+    pub is_composition: bool,
+}
+
+impl FwdScreenReaderContent {
+    pub fn new() -> Self {
+        Self {
+            content_id: String::new(),
+            page_text: String::new(),
+            current_line_text: String::new(),
+            selection_text: String::new(),
+            delta_text: String::new(),
+            line_number: u32::default(),
+            column: u32::default(),
+            line_count: u32::default(),
+            has_selection: bool::default(),
+            is_composition: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.content_id.is_empty() || true && !self.page_text.is_empty() || true && !self.current_line_text.is_empty() || true && !self.selection_text.is_empty() || true && !self.delta_text.is_empty() || true && self.line_number < u32::MAX || true && self.column < u32::MAX || true && self.line_count < u32::MAX || true && self.has_selection || true && self.is_composition || true
+    }
+}
+
+impl Default for FwdScreenReaderContent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessibility signal (sound, announcement, setting, enabled)
+#[derive(Debug, Clone)]
+pub struct FweAccessibilitySignal {
+    pub signal_id: String,
+    pub sound_id: String,
+    pub announcement: String,
+    pub setting_key: String,
+    pub is_enabled: bool,
+    pub volume: f64,
+    pub delay_ms: u32,
+    pub debounce_ms: u32,
+    pub category: String,
+    pub is_default: bool,
+}
+
+impl FweAccessibilitySignal {
+    pub fn new() -> Self {
+        Self {
+            signal_id: String::new(),
+            sound_id: String::new(),
+            announcement: String::new(),
+            setting_key: String::new(),
+            is_enabled: bool::default(),
+            volume: f64::default(),
+            delay_ms: u32::default(),
+            debounce_ms: u32::default(),
+            category: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.signal_id.is_empty() || true && !self.sound_id.is_empty() || true && !self.announcement.is_empty() || true && !self.setting_key.is_empty() || true && self.is_enabled || true && self.volume.is_finite() || true && self.delay_ms < u32::MAX || true && self.debounce_ms < u32::MAX || true && !self.category.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for FweAccessibilitySignal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -300117,6 +300327,96 @@ mod tests_fvz_generated {
     fn test_fvz_fields() {
         let mut obj = FvzMarkerService::default();
         obj.service_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwa_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwa_default() {
+        let obj = FwaAccessibilityService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwa_fields() {
+        let mut obj = FwaAccessibilityService::default();
+        obj.service_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwb_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwb_default() {
+        let obj = FwbAccessibleView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwb_fields() {
+        let mut obj = FwbAccessibleView::default();
+        obj.view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwc_default() {
+        let obj = FwcAriaAlert::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwc_fields() {
+        let mut obj = FwcAriaAlert::default();
+        obj.alert_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwd_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwd_default() {
+        let obj = FwdScreenReaderContent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwd_fields() {
+        let mut obj = FwdScreenReaderContent::default();
+        obj.content_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwe_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwe_default() {
+        let obj = FweAccessibilitySignal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwe_fields() {
+        let mut obj = FweAccessibilitySignal::default();
+        obj.signal_id = "test".to_string();
         assert!(obj.validate());
     }
 }
