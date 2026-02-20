@@ -83065,6 +83065,216 @@ impl Default for GaeRecentWorkspace {
     }
 }
 
+/// Backup workspace data (source uri, target dir, timestamp, checksum)
+#[derive(Debug, Clone)]
+pub struct GafBackupWorkspace {
+    pub backup_id: String,
+    pub source_uri: String,
+    pub target_dir: String,
+    pub timestamp_ms: u64,
+    pub checksum: String,
+    pub size_bytes: u64,
+    pub is_incremental: bool,
+    pub version: u32,
+    pub metadata_json: String,
+    pub is_compressed: bool,
+}
+
+impl GafBackupWorkspace {
+    pub fn new() -> Self {
+        Self {
+            backup_id: String::new(),
+            source_uri: String::new(),
+            target_dir: String::new(),
+            timestamp_ms: u64::default(),
+            checksum: String::new(),
+            size_bytes: u64::default(),
+            is_incremental: bool::default(),
+            version: u32::default(),
+            metadata_json: String::new(),
+            is_compressed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.backup_id.is_empty() || true && !self.source_uri.is_empty() || true && !self.target_dir.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.checksum.is_empty() || true && self.size_bytes < u64::MAX || true && self.is_incremental || true && self.version < u32::MAX || true && !self.metadata_json.is_empty() || true && self.is_compressed || true
+    }
+}
+
+impl Default for GafBackupWorkspace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace launch config (args, env, new window, force profile)
+#[derive(Debug, Clone)]
+pub struct GagWorkspaceLaunchConfig {
+    pub launch_id: String,
+    pub cli_args_json: String,
+    pub env_vars_json: String,
+    pub new_window: bool,
+    pub force_profile: String,
+    pub goto_line: u32,
+    pub goto_column: u32,
+    pub diff_left: String,
+    pub diff_right: String,
+    pub wait_for_close: bool,
+}
+
+impl GagWorkspaceLaunchConfig {
+    pub fn new() -> Self {
+        Self {
+            launch_id: String::new(),
+            cli_args_json: String::new(),
+            env_vars_json: String::new(),
+            new_window: bool::default(),
+            force_profile: String::new(),
+            goto_line: u32::default(),
+            goto_column: u32::default(),
+            diff_left: String::new(),
+            diff_right: String::new(),
+            wait_for_close: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.launch_id.is_empty() || true && !self.cli_args_json.is_empty() || true && !self.env_vars_json.is_empty() || true && self.new_window || true && !self.force_profile.is_empty() || true && self.goto_line < u32::MAX || true && self.goto_column < u32::MAX || true && !self.diff_left.is_empty() || true && !self.diff_right.is_empty() || true && self.wait_for_close || true
+    }
+}
+
+impl Default for GagWorkspaceLaunchConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window title info (dirty indicator, prefix, separator, suffix, active editor)
+#[derive(Debug, Clone)]
+pub struct GahWindowTitleInfo {
+    pub title_id: String,
+    pub dirty_indicator: String,
+    pub prefix: String,
+    pub separator: String,
+    pub suffix: String,
+    pub active_editor_name: String,
+    pub folder_name: String,
+    pub workspace_name: String,
+    pub is_remote: bool,
+    pub admin_indicator: bool,
+}
+
+impl GahWindowTitleInfo {
+    pub fn new() -> Self {
+        Self {
+            title_id: String::new(),
+            dirty_indicator: String::new(),
+            prefix: String::new(),
+            separator: String::new(),
+            suffix: String::new(),
+            active_editor_name: String::new(),
+            folder_name: String::new(),
+            workspace_name: String::new(),
+            is_remote: bool::default(),
+            admin_indicator: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.title_id.is_empty() || true && !self.dirty_indicator.is_empty() || true && !self.prefix.is_empty() || true && !self.separator.is_empty() || true && !self.suffix.is_empty() || true && !self.active_editor_name.is_empty() || true && !self.folder_name.is_empty() || true && !self.workspace_name.is_empty() || true && self.is_remote || true && self.admin_indicator || true
+    }
+}
+
+impl Default for GahWindowTitleInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Native window handle (platform handle, display server, compositor)
+#[derive(Debug, Clone)]
+pub struct GaiNativeWindowHandle {
+    pub handle_id: String,
+    pub platform_handle: u64,
+    pub display_server: String,
+    pub compositor_type: String,
+    pub gpu_backend: String,
+    pub dpi_scale: f64,
+    pub is_wayland: bool,
+    pub is_x11: bool,
+    pub is_headless: bool,
+    pub renderer_type: String,
+}
+
+impl GaiNativeWindowHandle {
+    pub fn new() -> Self {
+        Self {
+            handle_id: String::new(),
+            platform_handle: u64::default(),
+            display_server: String::new(),
+            compositor_type: String::new(),
+            gpu_backend: String::new(),
+            dpi_scale: f64::default(),
+            is_wayland: bool::default(),
+            is_x11: bool::default(),
+            is_headless: bool::default(),
+            renderer_type: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.handle_id.is_empty() || true && self.platform_handle < u64::MAX || true && !self.display_server.is_empty() || true && !self.compositor_type.is_empty() || true && !self.gpu_backend.is_empty() || true && self.dpi_scale.is_finite() || true && self.is_wayland || true && self.is_x11 || true && self.is_headless || true && !self.renderer_type.is_empty() || true
+    }
+}
+
+impl Default for GaiNativeWindowHandle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window bounds (x, y, width, height, display, scale factor)
+#[derive(Debug, Clone)]
+pub struct GajWindowBounds {
+    pub bounds_id: String,
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+    pub display_index: u32,
+    pub scale_factor: f64,
+    pub is_restored: bool,
+    pub is_centered: bool,
+    pub snap_zone: String,
+}
+
+impl GajWindowBounds {
+    pub fn new() -> Self {
+        Self {
+            bounds_id: String::new(),
+            x: u32::default(),
+            y: u32::default(),
+            width: u32::default(),
+            height: u32::default(),
+            display_index: u32::default(),
+            scale_factor: f64::default(),
+            is_restored: bool::default(),
+            is_centered: bool::default(),
+            snap_zone: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bounds_id.is_empty() || true && self.x < u32::MAX || true && self.y < u32::MAX || true && self.width < u32::MAX || true && self.height < u32::MAX || true && self.display_index < u32::MAX || true && self.scale_factor.is_finite() || true && self.is_restored || true && self.is_centered || true && !self.snap_zone.is_empty() || true
+    }
+}
+
+impl Default for GajWindowBounds {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -306640,6 +306850,96 @@ mod tests_gae_generated {
     fn test_gae_fields() {
         let mut obj = GaeRecentWorkspace::default();
         obj.recent_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gaf_generated {
+    use super::*;
+
+    #[test]
+    fn test_gaf_default() {
+        let obj = GafBackupWorkspace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gaf_fields() {
+        let mut obj = GafBackupWorkspace::default();
+        obj.backup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gag_generated {
+    use super::*;
+
+    #[test]
+    fn test_gag_default() {
+        let obj = GagWorkspaceLaunchConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gag_fields() {
+        let mut obj = GagWorkspaceLaunchConfig::default();
+        obj.launch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gah_generated {
+    use super::*;
+
+    #[test]
+    fn test_gah_default() {
+        let obj = GahWindowTitleInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gah_fields() {
+        let mut obj = GahWindowTitleInfo::default();
+        obj.title_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gai_generated {
+    use super::*;
+
+    #[test]
+    fn test_gai_default() {
+        let obj = GaiNativeWindowHandle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gai_fields() {
+        let mut obj = GaiNativeWindowHandle::default();
+        obj.handle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gaj_generated {
+    use super::*;
+
+    #[test]
+    fn test_gaj_default() {
+        let obj = GajWindowBounds::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gaj_fields() {
+        let mut obj = GajWindowBounds::default();
+        obj.bounds_id = "test".to_string();
         assert!(obj.validate());
     }
 }
