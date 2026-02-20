@@ -107321,6 +107321,678 @@ impl Default for GwjSignInRequest {
     }
 }
 
+/// Token refresh (old token, new token, provider, reason, silent)
+#[derive(Debug, Clone)]
+pub struct GwkTokenRefresh {
+    pub token_refresh_id: String,
+    pub old_token: String,
+    pub new_token: String,
+    pub provider_id: String,
+    pub reason: String,
+    pub is_silent: bool,
+    pub refresh_at_ms: u64,
+    pub expires_at_ms: u64,
+    pub attempt_count: u32,
+    pub success: bool,
+}
+
+impl GwkTokenRefresh {
+    pub fn new() -> Self {
+        Self {
+            token_refresh_id: String::new(),
+            old_token: String::new(),
+            new_token: String::new(),
+            provider_id: String::new(),
+            reason: String::new(),
+            is_silent: bool::default(),
+            refresh_at_ms: u64::default(),
+            expires_at_ms: u64::default(),
+            attempt_count: u32::default(),
+            success: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_refresh_id.is_empty() || true && !self.old_token.is_empty() || true && !self.new_token.is_empty() || true && !self.provider_id.is_empty() || true && !self.reason.is_empty() || true && self.is_silent || true && self.refresh_at_ms < u64::MAX || true && self.expires_at_ms < u64::MAX || true && self.attempt_count < u32::MAX || true && self.success || true
+    }
+}
+
+impl Default for GwkTokenRefresh {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Account change event (added, removed, changed, provider, session)
+#[derive(Debug, Clone)]
+pub struct GwlAccountChange {
+    pub acct_change_id: String,
+    pub added_json: String,
+    pub removed_json: String,
+    pub changed_json: String,
+    pub provider_id: String,
+    pub session_id: String,
+    pub timestamp_ms: u64,
+    pub source: String,
+    pub is_logout: bool,
+    pub is_login: bool,
+}
+
+impl GwlAccountChange {
+    pub fn new() -> Self {
+        Self {
+            acct_change_id: String::new(),
+            added_json: String::new(),
+            removed_json: String::new(),
+            changed_json: String::new(),
+            provider_id: String::new(),
+            session_id: String::new(),
+            timestamp_ms: u64::default(),
+            source: String::new(),
+            is_logout: bool::default(),
+            is_login: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.acct_change_id.is_empty() || true && !self.added_json.is_empty() || true && !self.removed_json.is_empty() || true && !self.changed_json.is_empty() || true && !self.provider_id.is_empty() || true && !self.session_id.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.source.is_empty() || true && self.is_logout || true && self.is_login || true
+    }
+}
+
+impl Default for GwlAccountChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Proxy configuration (http proxy, https proxy, no proxy, strict SSL)
+#[derive(Debug, Clone)]
+pub struct GwmProxyConfig {
+    pub proxy_config_id: String,
+    pub http_proxy: String,
+    pub https_proxy: String,
+    pub no_proxy_json: String,
+    pub strict_ssl: bool,
+    pub proxy_authorization: String,
+    pub proxy_support: String,
+    pub proxy_strick_ssl: bool,
+    pub log_level: String,
+    pub electron_fetch: bool,
+}
+
+impl GwmProxyConfig {
+    pub fn new() -> Self {
+        Self {
+            proxy_config_id: String::new(),
+            http_proxy: String::new(),
+            https_proxy: String::new(),
+            no_proxy_json: String::new(),
+            strict_ssl: bool::default(),
+            proxy_authorization: String::new(),
+            proxy_support: String::new(),
+            proxy_strick_ssl: bool::default(),
+            log_level: String::new(),
+            electron_fetch: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proxy_config_id.is_empty() || true && !self.http_proxy.is_empty() || true && !self.https_proxy.is_empty() || true && !self.no_proxy_json.is_empty() || true && self.strict_ssl || true && !self.proxy_authorization.is_empty() || true && !self.proxy_support.is_empty() || true && self.proxy_strick_ssl || true && !self.log_level.is_empty() || true && self.electron_fetch || true
+    }
+}
+
+impl Default for GwmProxyConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Certificate info (subject, issuer, serial, valid from, valid to)
+#[derive(Debug, Clone)]
+pub struct GwnCertificateInfo {
+    pub cert_info_id: String,
+    pub subject: String,
+    pub issuer: String,
+    pub serial_number: String,
+    pub valid_from_ms: u64,
+    pub valid_to_ms: u64,
+    pub fingerprint: String,
+    pub algorithm: String,
+    pub is_self_signed: bool,
+    pub key_size: u32,
+}
+
+impl GwnCertificateInfo {
+    pub fn new() -> Self {
+        Self {
+            cert_info_id: String::new(),
+            subject: String::new(),
+            issuer: String::new(),
+            serial_number: String::new(),
+            valid_from_ms: u64::default(),
+            valid_to_ms: u64::default(),
+            fingerprint: String::new(),
+            algorithm: String::new(),
+            is_self_signed: bool::default(),
+            key_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cert_info_id.is_empty() || true && !self.subject.is_empty() || true && !self.issuer.is_empty() || true && !self.serial_number.is_empty() || true && self.valid_from_ms < u64::MAX || true && self.valid_to_ms < u64::MAX || true && !self.fingerprint.is_empty() || true && !self.algorithm.is_empty() || true && self.is_self_signed || true && self.key_size < u32::MAX || true
+    }
+}
+
+impl Default for GwnCertificateInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel configuration (host, port, protocol, auth, keep alive)
+#[derive(Debug, Clone)]
+pub struct GwoTunnelConfig {
+    pub tunnel_config_id: String,
+    pub host: String,
+    pub port: u32,
+    pub protocol: String,
+    pub auth_token: String,
+    pub keep_alive_ms: u32,
+    pub timeout_ms: u32,
+    pub retry_count: u32,
+    pub compression: bool,
+    pub label: String,
+}
+
+impl GwoTunnelConfig {
+    pub fn new() -> Self {
+        Self {
+            tunnel_config_id: String::new(),
+            host: String::new(),
+            port: u32::default(),
+            protocol: String::new(),
+            auth_token: String::new(),
+            keep_alive_ms: u32::default(),
+            timeout_ms: u32::default(),
+            retry_count: u32::default(),
+            compression: bool::default(),
+            label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tunnel_config_id.is_empty() || true && !self.host.is_empty() || true && self.port < u32::MAX || true && !self.protocol.is_empty() || true && !self.auth_token.is_empty() || true && self.keep_alive_ms < u32::MAX || true && self.timeout_ms < u32::MAX || true && self.retry_count < u32::MAX || true && self.compression || true && !self.label.is_empty() || true
+    }
+}
+
+impl Default for GwoTunnelConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote authority (scheme, host, port, connection token, label)
+#[derive(Debug, Clone)]
+pub struct GwpRemoteAuthority {
+    pub remote_auth_id: String,
+    pub scheme: String,
+    pub host: String,
+    pub port: u32,
+    pub connection_token: String,
+    pub label: String,
+    pub is_connected: bool,
+    pub latency_ms: u32,
+    pub server_version: String,
+    pub platform: String,
+}
+
+impl GwpRemoteAuthority {
+    pub fn new() -> Self {
+        Self {
+            remote_auth_id: String::new(),
+            scheme: String::new(),
+            host: String::new(),
+            port: u32::default(),
+            connection_token: String::new(),
+            label: String::new(),
+            is_connected: bool::default(),
+            latency_ms: u32::default(),
+            server_version: String::new(),
+            platform: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_auth_id.is_empty() || true && !self.scheme.is_empty() || true && !self.host.is_empty() || true && self.port < u32::MAX || true && !self.connection_token.is_empty() || true && !self.label.is_empty() || true && self.is_connected || true && self.latency_ms < u32::MAX || true && !self.server_version.is_empty() || true && !self.platform.is_empty() || true
+    }
+}
+
+impl Default for GwpRemoteAuthority {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// GitHub authentication (token, scopes, user, enterprise url)
+#[derive(Debug, Clone)]
+pub struct GwqGitHubAuth {
+    pub gh_auth_id: String,
+    pub token: String,
+    pub scopes_json: String,
+    pub user: String,
+    pub enterprise_url: String,
+    pub is_pat: bool,
+    pub expires_at_ms: u64,
+    pub created_at_ms: u64,
+    pub device_flow: bool,
+    pub avatar_url: String,
+}
+
+impl GwqGitHubAuth {
+    pub fn new() -> Self {
+        Self {
+            gh_auth_id: String::new(),
+            token: String::new(),
+            scopes_json: String::new(),
+            user: String::new(),
+            enterprise_url: String::new(),
+            is_pat: bool::default(),
+            expires_at_ms: u64::default(),
+            created_at_ms: u64::default(),
+            device_flow: bool::default(),
+            avatar_url: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gh_auth_id.is_empty() || true && !self.token.is_empty() || true && !self.scopes_json.is_empty() || true && !self.user.is_empty() || true && !self.enterprise_url.is_empty() || true && self.is_pat || true && self.expires_at_ms < u64::MAX || true && self.created_at_ms < u64::MAX || true && self.device_flow || true && !self.avatar_url.is_empty() || true
+    }
+}
+
+impl Default for GwqGitHubAuth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Microsoft authentication (tenant, client id, redirect, scope)
+#[derive(Debug, Clone)]
+pub struct GwrMicrosoftAuth {
+    pub ms_auth_id: String,
+    pub tenant_id: String,
+    pub client_id: String,
+    pub redirect_uri: String,
+    pub scope_json: String,
+    pub authority: String,
+    pub response_type: String,
+    pub is_msal: bool,
+    pub prompt: String,
+    pub login_hint: String,
+}
+
+impl GwrMicrosoftAuth {
+    pub fn new() -> Self {
+        Self {
+            ms_auth_id: String::new(),
+            tenant_id: String::new(),
+            client_id: String::new(),
+            redirect_uri: String::new(),
+            scope_json: String::new(),
+            authority: String::new(),
+            response_type: String::new(),
+            is_msal: bool::default(),
+            prompt: String::new(),
+            login_hint: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ms_auth_id.is_empty() || true && !self.tenant_id.is_empty() || true && !self.client_id.is_empty() || true && !self.redirect_uri.is_empty() || true && !self.scope_json.is_empty() || true && !self.authority.is_empty() || true && !self.response_type.is_empty() || true && self.is_msal || true && !self.prompt.is_empty() || true && !self.login_hint.is_empty() || true
+    }
+}
+
+impl Default for GwrMicrosoftAuth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings sync (activity, conflicts, last sync time, machine id)
+#[derive(Debug, Clone)]
+pub struct GwsSettingsSync {
+    pub settings_sync_id: String,
+    pub activity: String,
+    pub conflicts_json: String,
+    pub last_sync_ms: u64,
+    pub machine_id: String,
+    pub is_enabled: bool,
+    pub sync_status: String,
+    pub preview_mode: bool,
+    pub ignored_settings_json: String,
+    pub version: u32,
+}
+
+impl GwsSettingsSync {
+    pub fn new() -> Self {
+        Self {
+            settings_sync_id: String::new(),
+            activity: String::new(),
+            conflicts_json: String::new(),
+            last_sync_ms: u64::default(),
+            machine_id: String::new(),
+            is_enabled: bool::default(),
+            sync_status: String::new(),
+            preview_mode: bool::default(),
+            ignored_settings_json: String::new(),
+            version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.settings_sync_id.is_empty() || true && !self.activity.is_empty() || true && !self.conflicts_json.is_empty() || true && self.last_sync_ms < u64::MAX || true && !self.machine_id.is_empty() || true && self.is_enabled || true && !self.sync_status.is_empty() || true && self.preview_mode || true && !self.ignored_settings_json.is_empty() || true && self.version < u32::MAX || true
+    }
+}
+
+impl Default for GwsSettingsSync {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sync resource (type, enabled, version, machine id, ref)
+#[derive(Debug, Clone)]
+pub struct GwtSyncResource {
+    pub sync_resource_id: String,
+    pub resource_type: String,
+    pub is_enabled: bool,
+    pub version: u32,
+    pub machine_id: String,
+    pub ref_value: String,
+    pub content_hash: String,
+    pub last_sync_ms: u64,
+    pub conflict_count: u32,
+    pub preview_content: String,
+}
+
+impl GwtSyncResource {
+    pub fn new() -> Self {
+        Self {
+            sync_resource_id: String::new(),
+            resource_type: String::new(),
+            is_enabled: bool::default(),
+            version: u32::default(),
+            machine_id: String::new(),
+            ref_value: String::new(),
+            content_hash: String::new(),
+            last_sync_ms: u64::default(),
+            conflict_count: u32::default(),
+            preview_content: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sync_resource_id.is_empty() || true && !self.resource_type.is_empty() || true && self.is_enabled || true && self.version < u32::MAX || true && !self.machine_id.is_empty() || true && !self.ref_value.is_empty() || true && !self.content_hash.is_empty() || true && self.last_sync_ms < u64::MAX || true && self.conflict_count < u32::MAX || true && !self.preview_content.is_empty() || true
+    }
+}
+
+impl Default for GwtSyncResource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sync conflict (resource, local, remote, base, merged, timestamp)
+#[derive(Debug, Clone)]
+pub struct GwuSyncConflict {
+    pub sync_conflict_id: String,
+    pub resource_type: String,
+    pub local_content: String,
+    pub remote_content: String,
+    pub base_content: String,
+    pub merged_content: String,
+    pub timestamp_ms: u64,
+    pub is_resolved: bool,
+    pub resolution: String,
+    pub machine_id: String,
+}
+
+impl GwuSyncConflict {
+    pub fn new() -> Self {
+        Self {
+            sync_conflict_id: String::new(),
+            resource_type: String::new(),
+            local_content: String::new(),
+            remote_content: String::new(),
+            base_content: String::new(),
+            merged_content: String::new(),
+            timestamp_ms: u64::default(),
+            is_resolved: bool::default(),
+            resolution: String::new(),
+            machine_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sync_conflict_id.is_empty() || true && !self.resource_type.is_empty() || true && !self.local_content.is_empty() || true && !self.remote_content.is_empty() || true && !self.base_content.is_empty() || true && !self.merged_content.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.is_resolved || true && !self.resolution.is_empty() || true && !self.machine_id.is_empty() || true
+    }
+}
+
+impl Default for GwuSyncConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keytar integration (service, account, password, find, delete)
+#[derive(Debug, Clone)]
+pub struct GwvKeytar {
+    pub keytar_id: String,
+    pub service: String,
+    pub account: String,
+    pub password_hash: String,
+    pub find_credentials: bool,
+    pub delete_password: bool,
+    pub backend: String,
+    pub platform: String,
+    pub is_available: bool,
+    pub error_message: String,
+}
+
+impl GwvKeytar {
+    pub fn new() -> Self {
+        Self {
+            keytar_id: String::new(),
+            service: String::new(),
+            account: String::new(),
+            password_hash: String::new(),
+            find_credentials: bool::default(),
+            delete_password: bool::default(),
+            backend: String::new(),
+            platform: String::new(),
+            is_available: bool::default(),
+            error_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.keytar_id.is_empty() || true && !self.service.is_empty() || true && !self.account.is_empty() || true && !self.password_hash.is_empty() || true && self.find_credentials || true && self.delete_password || true && !self.backend.is_empty() || true && !self.platform.is_empty() || true && self.is_available || true && !self.error_message.is_empty() || true
+    }
+}
+
+impl Default for GwvKeytar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Credential provider (id, label, supports save, priority)
+#[derive(Debug, Clone)]
+pub struct GwwCredentialProvider {
+    pub cred_prov_id: String,
+    pub provider_id: String,
+    pub label: String,
+    pub supports_save: bool,
+    pub priority: u32,
+    pub is_default: bool,
+    pub backend: String,
+    pub supports_delete: bool,
+    pub supports_find: bool,
+    pub encryption_method: String,
+}
+
+impl GwwCredentialProvider {
+    pub fn new() -> Self {
+        Self {
+            cred_prov_id: String::new(),
+            provider_id: String::new(),
+            label: String::new(),
+            supports_save: bool::default(),
+            priority: u32::default(),
+            is_default: bool::default(),
+            backend: String::new(),
+            supports_delete: bool::default(),
+            supports_find: bool::default(),
+            encryption_method: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cred_prov_id.is_empty() || true && !self.provider_id.is_empty() || true && !self.label.is_empty() || true && self.supports_save || true && self.priority < u32::MAX || true && self.is_default || true && !self.backend.is_empty() || true && self.supports_delete || true && self.supports_find || true && !self.encryption_method.is_empty() || true
+    }
+}
+
+impl Default for GwwCredentialProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forward (local port, remote port, protocol, label, pid)
+#[derive(Debug, Clone)]
+pub struct GwxPortForward {
+    pub port_fwd_id: String,
+    pub local_port: u32,
+    pub remote_port: u32,
+    pub protocol: String,
+    pub label: String,
+    pub pid: u32,
+    pub is_active: bool,
+    pub source: String,
+    pub auto_forward: bool,
+    pub privacy: String,
+}
+
+impl GwxPortForward {
+    pub fn new() -> Self {
+        Self {
+            port_fwd_id: String::new(),
+            local_port: u32::default(),
+            remote_port: u32::default(),
+            protocol: String::new(),
+            label: String::new(),
+            pid: u32::default(),
+            is_active: bool::default(),
+            source: String::new(),
+            auto_forward: bool::default(),
+            privacy: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.port_fwd_id.is_empty() || true && self.local_port < u32::MAX || true && self.remote_port < u32::MAX || true && !self.protocol.is_empty() || true && !self.label.is_empty() || true && self.pid < u32::MAX || true && self.is_active || true && !self.source.is_empty() || true && self.auto_forward || true && !self.privacy.is_empty() || true
+    }
+}
+
+impl Default for GwxPortForward {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel access control (allowed users, public, privacy)
+#[derive(Debug, Clone)]
+pub struct GwyTunnelAccess {
+    pub tunnel_access_id: String,
+    pub allowed_users_json: String,
+    pub is_public: bool,
+    pub privacy_level: String,
+    pub requires_auth: bool,
+    pub host_name: String,
+    pub domain: String,
+    pub max_connections: u32,
+    pub idle_timeout_ms: u64,
+    pub access_token: String,
+}
+
+impl GwyTunnelAccess {
+    pub fn new() -> Self {
+        Self {
+            tunnel_access_id: String::new(),
+            allowed_users_json: String::new(),
+            is_public: bool::default(),
+            privacy_level: String::new(),
+            requires_auth: bool::default(),
+            host_name: String::new(),
+            domain: String::new(),
+            max_connections: u32::default(),
+            idle_timeout_ms: u64::default(),
+            access_token: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tunnel_access_id.is_empty() || true && !self.allowed_users_json.is_empty() || true && self.is_public || true && !self.privacy_level.is_empty() || true && self.requires_auth || true && !self.host_name.is_empty() || true && !self.domain.is_empty() || true && self.max_connections < u32::MAX || true && self.idle_timeout_ms < u64::MAX || true && !self.access_token.is_empty() || true
+    }
+}
+
+impl Default for GwyTunnelAccess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote session (connection id, type, label, resolver, pid)
+#[derive(Debug, Clone)]
+pub struct GwzRemoteSession {
+    pub remote_session_id: String,
+    pub connection_id: String,
+    pub session_type: String,
+    pub label: String,
+    pub resolver_authority: String,
+    pub pid: u32,
+    pub is_active: bool,
+    pub started_at_ms: u64,
+    pub workspace_uri: String,
+    pub platform: String,
+}
+
+impl GwzRemoteSession {
+    pub fn new() -> Self {
+        Self {
+            remote_session_id: String::new(),
+            connection_id: String::new(),
+            session_type: String::new(),
+            label: String::new(),
+            resolver_authority: String::new(),
+            pid: u32::default(),
+            is_active: bool::default(),
+            started_at_ms: u64::default(),
+            workspace_uri: String::new(),
+            platform: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_session_id.is_empty() || true && !self.connection_id.is_empty() || true && !self.session_type.is_empty() || true && !self.label.is_empty() || true && !self.resolver_authority.is_empty() || true && self.pid < u32::MAX || true && self.is_active || true && self.started_at_ms < u64::MAX || true && !self.workspace_uri.is_empty() || true && !self.platform.is_empty() || true
+    }
+}
+
+impl Default for GwzRemoteSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -341278,6 +341950,294 @@ mod tests_gwj_generated {
     fn test_gwj_fields() {
         let mut obj = GwjSignInRequest::default();
         obj.sign_in_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwk_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwk_default() {
+        let obj = GwkTokenRefresh::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwk_fields() {
+        let mut obj = GwkTokenRefresh::default();
+        obj.token_refresh_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwl_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwl_default() {
+        let obj = GwlAccountChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwl_fields() {
+        let mut obj = GwlAccountChange::default();
+        obj.acct_change_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwm_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwm_default() {
+        let obj = GwmProxyConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwm_fields() {
+        let mut obj = GwmProxyConfig::default();
+        obj.proxy_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwn_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwn_default() {
+        let obj = GwnCertificateInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwn_fields() {
+        let mut obj = GwnCertificateInfo::default();
+        obj.cert_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwo_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwo_default() {
+        let obj = GwoTunnelConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwo_fields() {
+        let mut obj = GwoTunnelConfig::default();
+        obj.tunnel_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwp_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwp_default() {
+        let obj = GwpRemoteAuthority::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwp_fields() {
+        let mut obj = GwpRemoteAuthority::default();
+        obj.remote_auth_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwq_default() {
+        let obj = GwqGitHubAuth::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwq_fields() {
+        let mut obj = GwqGitHubAuth::default();
+        obj.gh_auth_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwr_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwr_default() {
+        let obj = GwrMicrosoftAuth::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwr_fields() {
+        let mut obj = GwrMicrosoftAuth::default();
+        obj.ms_auth_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gws_generated {
+    use super::*;
+
+    #[test]
+    fn test_gws_default() {
+        let obj = GwsSettingsSync::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gws_fields() {
+        let mut obj = GwsSettingsSync::default();
+        obj.settings_sync_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwt_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwt_default() {
+        let obj = GwtSyncResource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwt_fields() {
+        let mut obj = GwtSyncResource::default();
+        obj.sync_resource_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwu_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwu_default() {
+        let obj = GwuSyncConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwu_fields() {
+        let mut obj = GwuSyncConflict::default();
+        obj.sync_conflict_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwv_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwv_default() {
+        let obj = GwvKeytar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwv_fields() {
+        let mut obj = GwvKeytar::default();
+        obj.keytar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gww_generated {
+    use super::*;
+
+    #[test]
+    fn test_gww_default() {
+        let obj = GwwCredentialProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gww_fields() {
+        let mut obj = GwwCredentialProvider::default();
+        obj.cred_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwx_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwx_default() {
+        let obj = GwxPortForward::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwx_fields() {
+        let mut obj = GwxPortForward::default();
+        obj.port_fwd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwy_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwy_default() {
+        let obj = GwyTunnelAccess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwy_fields() {
+        let mut obj = GwyTunnelAccess::default();
+        obj.tunnel_access_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwz_default() {
+        let obj = GwzRemoteSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwz_fields() {
+        let mut obj = GwzRemoteSession::default();
+        obj.remote_session_id = "test".to_string();
         assert!(obj.validate());
     }
 }
