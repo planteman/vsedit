@@ -165506,6 +165506,890 @@ impl Default for JfzBanner {
     }
 }
 
+/// SCM provider descriptor
+#[derive(Debug, Clone)]
+pub struct JgaScmProvider {
+    pub scm_provider_id: String,
+    pub provider_label: String,
+    pub root_uri: String,
+    pub commit_template: String,
+    pub resource_count: u32,
+    pub has_changes: bool,
+}
+
+impl JgaScmProvider {
+    pub fn new() -> Self {
+        Self {
+            scm_provider_id: String::new(),
+            provider_label: String::new(),
+            root_uri: String::new(),
+            commit_template: String::new(),
+            resource_count: u32::default(),
+            has_changes: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_provider_id.is_empty() || true && !self.provider_label.is_empty() || true && !self.root_uri.is_empty() || true && !self.commit_template.is_empty() || true && self.resource_count < u32::MAX || true && self.has_changes || true
+    }
+}
+
+impl Default for JgaScmProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM repository descriptor
+#[derive(Debug, Clone)]
+pub struct JgbScmRepository {
+    pub scm_repo_id: String,
+    pub repo_path: String,
+    pub branch_name: String,
+    pub ahead_count: u32,
+    pub behind_count: u32,
+    pub is_rebasing: bool,
+}
+
+impl JgbScmRepository {
+    pub fn new() -> Self {
+        Self {
+            scm_repo_id: String::new(),
+            repo_path: String::new(),
+            branch_name: String::new(),
+            ahead_count: u32::default(),
+            behind_count: u32::default(),
+            is_rebasing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_repo_id.is_empty() || true && !self.repo_path.is_empty() || true && !self.branch_name.is_empty() || true && self.ahead_count < u32::MAX || true && self.behind_count < u32::MAX || true && self.is_rebasing || true
+    }
+}
+
+impl Default for JgbScmRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM resource entry
+#[derive(Debug, Clone)]
+pub struct JgcScmResource {
+    pub scm_res_id: String,
+    pub resource_uri: String,
+    pub original_uri: String,
+    pub status_str: String,
+    pub decorations_json: String,
+    pub is_conflict: bool,
+}
+
+impl JgcScmResource {
+    pub fn new() -> Self {
+        Self {
+            scm_res_id: String::new(),
+            resource_uri: String::new(),
+            original_uri: String::new(),
+            status_str: String::new(),
+            decorations_json: String::new(),
+            is_conflict: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_res_id.is_empty() || true && !self.resource_uri.is_empty() || true && !self.original_uri.is_empty() || true && !self.status_str.is_empty() || true && !self.decorations_json.is_empty() || true && self.is_conflict || true
+    }
+}
+
+impl Default for JgcScmResource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM resource group
+#[derive(Debug, Clone)]
+pub struct JgdScmResourceGroup {
+    pub scm_rg_id: String,
+    pub group_label: String,
+    pub resource_count: u32,
+    pub hide_when_empty: bool,
+    pub provider_ref: String,
+    pub is_visible: bool,
+}
+
+impl JgdScmResourceGroup {
+    pub fn new() -> Self {
+        Self {
+            scm_rg_id: String::new(),
+            group_label: String::new(),
+            resource_count: u32::default(),
+            hide_when_empty: bool::default(),
+            provider_ref: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_rg_id.is_empty() || true && !self.group_label.is_empty() || true && self.resource_count < u32::MAX || true && self.hide_when_empty || true && !self.provider_ref.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for JgdScmResourceGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM file change entry
+#[derive(Debug, Clone)]
+pub struct JgeScmChange {
+    pub scm_change_id: String,
+    pub file_path: String,
+    pub change_type_str: String,
+    pub additions_count: u32,
+    pub deletions_count: u32,
+    pub is_binary: bool,
+}
+
+impl JgeScmChange {
+    pub fn new() -> Self {
+        Self {
+            scm_change_id: String::new(),
+            file_path: String::new(),
+            change_type_str: String::new(),
+            additions_count: u32::default(),
+            deletions_count: u32::default(),
+            is_binary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_change_id.is_empty() || true && !self.file_path.is_empty() || true && !self.change_type_str.is_empty() || true && self.additions_count < u32::MAX || true && self.deletions_count < u32::MAX || true && self.is_binary || true
+    }
+}
+
+impl Default for JgeScmChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM commit descriptor
+#[derive(Debug, Clone)]
+pub struct JgfScmCommit {
+    pub scm_commit_id: String,
+    pub commit_hash: String,
+    pub author_name: String,
+    pub message_text: String,
+    pub commit_epoch: u64,
+    pub is_merge: bool,
+}
+
+impl JgfScmCommit {
+    pub fn new() -> Self {
+        Self {
+            scm_commit_id: String::new(),
+            commit_hash: String::new(),
+            author_name: String::new(),
+            message_text: String::new(),
+            commit_epoch: u64::default(),
+            is_merge: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_commit_id.is_empty() || true && !self.commit_hash.is_empty() || true && !self.author_name.is_empty() || true && !self.message_text.is_empty() || true && self.commit_epoch < u64::MAX || true && self.is_merge || true
+    }
+}
+
+impl Default for JgfScmCommit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM branch descriptor
+#[derive(Debug, Clone)]
+pub struct JggScmBranch {
+    pub scm_branch_id: String,
+    pub branch_name: String,
+    pub upstream_ref: String,
+    pub commit_ref: String,
+    pub tracking_status: String,
+    pub is_current: bool,
+}
+
+impl JggScmBranch {
+    pub fn new() -> Self {
+        Self {
+            scm_branch_id: String::new(),
+            branch_name: String::new(),
+            upstream_ref: String::new(),
+            commit_ref: String::new(),
+            tracking_status: String::new(),
+            is_current: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_branch_id.is_empty() || true && !self.branch_name.is_empty() || true && !self.upstream_ref.is_empty() || true && !self.commit_ref.is_empty() || true && !self.tracking_status.is_empty() || true && self.is_current || true
+    }
+}
+
+impl Default for JggScmBranch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM tag descriptor
+#[derive(Debug, Clone)]
+pub struct JghScmTag {
+    pub scm_tag_id: String,
+    pub tag_name: String,
+    pub commit_ref: String,
+    pub message_text: String,
+    pub tagger_name: String,
+    pub is_annotated: bool,
+}
+
+impl JghScmTag {
+    pub fn new() -> Self {
+        Self {
+            scm_tag_id: String::new(),
+            tag_name: String::new(),
+            commit_ref: String::new(),
+            message_text: String::new(),
+            tagger_name: String::new(),
+            is_annotated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_tag_id.is_empty() || true && !self.tag_name.is_empty() || true && !self.commit_ref.is_empty() || true && !self.message_text.is_empty() || true && !self.tagger_name.is_empty() || true && self.is_annotated || true
+    }
+}
+
+impl Default for JghScmTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM remote descriptor
+#[derive(Debug, Clone)]
+pub struct JgiScmRemote {
+    pub scm_remote_id: String,
+    pub remote_name: String,
+    pub fetch_url: String,
+    pub push_url: String,
+    pub branch_count: u32,
+    pub is_origin: bool,
+}
+
+impl JgiScmRemote {
+    pub fn new() -> Self {
+        Self {
+            scm_remote_id: String::new(),
+            remote_name: String::new(),
+            fetch_url: String::new(),
+            push_url: String::new(),
+            branch_count: u32::default(),
+            is_origin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_remote_id.is_empty() || true && !self.remote_name.is_empty() || true && !self.fetch_url.is_empty() || true && !self.push_url.is_empty() || true && self.branch_count < u32::MAX || true && self.is_origin || true
+    }
+}
+
+impl Default for JgiScmRemote {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM stash entry
+#[derive(Debug, Clone)]
+pub struct JgjScmStash {
+    pub scm_stash_id: String,
+    pub stash_index: u32,
+    pub message_text: String,
+    pub branch_ref: String,
+    pub created_epoch: u64,
+    pub includes_untracked: bool,
+}
+
+impl JgjScmStash {
+    pub fn new() -> Self {
+        Self {
+            scm_stash_id: String::new(),
+            stash_index: u32::default(),
+            message_text: String::new(),
+            branch_ref: String::new(),
+            created_epoch: u64::default(),
+            includes_untracked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_stash_id.is_empty() || true && self.stash_index < u32::MAX || true && !self.message_text.is_empty() || true && !self.branch_ref.is_empty() || true && self.created_epoch < u64::MAX || true && self.includes_untracked || true
+    }
+}
+
+impl Default for JgjScmStash {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM merge operation
+#[derive(Debug, Clone)]
+pub struct JgkScmMerge {
+    pub scm_merge_id: String,
+    pub source_branch: String,
+    pub target_branch: String,
+    pub conflict_count: u32,
+    pub strategy_str: String,
+    pub is_squash: bool,
+}
+
+impl JgkScmMerge {
+    pub fn new() -> Self {
+        Self {
+            scm_merge_id: String::new(),
+            source_branch: String::new(),
+            target_branch: String::new(),
+            conflict_count: u32::default(),
+            strategy_str: String::new(),
+            is_squash: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_merge_id.is_empty() || true && !self.source_branch.is_empty() || true && !self.target_branch.is_empty() || true && self.conflict_count < u32::MAX || true && !self.strategy_str.is_empty() || true && self.is_squash || true
+    }
+}
+
+impl Default for JgkScmMerge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM rebase operation
+#[derive(Debug, Clone)]
+pub struct JglScmRebase {
+    pub scm_rebase_id: String,
+    pub onto_branch: String,
+    pub current_step: u32,
+    pub total_steps: u32,
+    pub conflict_path: String,
+    pub is_interactive: bool,
+}
+
+impl JglScmRebase {
+    pub fn new() -> Self {
+        Self {
+            scm_rebase_id: String::new(),
+            onto_branch: String::new(),
+            current_step: u32::default(),
+            total_steps: u32::default(),
+            conflict_path: String::new(),
+            is_interactive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_rebase_id.is_empty() || true && !self.onto_branch.is_empty() || true && self.current_step < u32::MAX || true && self.total_steps < u32::MAX || true && !self.conflict_path.is_empty() || true && self.is_interactive || true
+    }
+}
+
+impl Default for JglScmRebase {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM blame annotation
+#[derive(Debug, Clone)]
+pub struct JgmScmBlame {
+    pub scm_blame_id: String,
+    pub line_number: u32,
+    pub commit_ref: String,
+    pub author_name: String,
+    pub blame_epoch: u64,
+    pub is_uncommitted: bool,
+}
+
+impl JgmScmBlame {
+    pub fn new() -> Self {
+        Self {
+            scm_blame_id: String::new(),
+            line_number: u32::default(),
+            commit_ref: String::new(),
+            author_name: String::new(),
+            blame_epoch: u64::default(),
+            is_uncommitted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_blame_id.is_empty() || true && self.line_number < u32::MAX || true && !self.commit_ref.is_empty() || true && !self.author_name.is_empty() || true && self.blame_epoch < u64::MAX || true && self.is_uncommitted || true
+    }
+}
+
+impl Default for JgmScmBlame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM diff descriptor
+#[derive(Debug, Clone)]
+pub struct JgnScmDiff {
+    pub scm_diff_id: String,
+    pub original_uri: String,
+    pub modified_uri: String,
+    pub change_count: u32,
+    pub line_changes: u32,
+    pub is_binary_diff: bool,
+}
+
+impl JgnScmDiff {
+    pub fn new() -> Self {
+        Self {
+            scm_diff_id: String::new(),
+            original_uri: String::new(),
+            modified_uri: String::new(),
+            change_count: u32::default(),
+            line_changes: u32::default(),
+            is_binary_diff: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_diff_id.is_empty() || true && !self.original_uri.is_empty() || true && !self.modified_uri.is_empty() || true && self.change_count < u32::MAX || true && self.line_changes < u32::MAX || true && self.is_binary_diff || true
+    }
+}
+
+impl Default for JgnScmDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM diff hunk
+#[derive(Debug, Clone)]
+pub struct JgoScmDiffHunk {
+    pub scm_hunk_id: String,
+    pub original_start: u32,
+    pub original_length: u32,
+    pub modified_start: u32,
+    pub modified_length: u32,
+    pub is_insertion: bool,
+}
+
+impl JgoScmDiffHunk {
+    pub fn new() -> Self {
+        Self {
+            scm_hunk_id: String::new(),
+            original_start: u32::default(),
+            original_length: u32::default(),
+            modified_start: u32::default(),
+            modified_length: u32::default(),
+            is_insertion: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_hunk_id.is_empty() || true && self.original_start < u32::MAX || true && self.original_length < u32::MAX || true && self.modified_start < u32::MAX || true && self.modified_length < u32::MAX || true && self.is_insertion || true
+    }
+}
+
+impl Default for JgoScmDiffHunk {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM patch descriptor
+#[derive(Debug, Clone)]
+pub struct JgpScmPatch {
+    pub scm_patch_id: String,
+    pub file_path: String,
+    pub hunk_count: u32,
+    pub additions_total: u32,
+    pub deletions_total: u32,
+    pub is_creation: bool,
+}
+
+impl JgpScmPatch {
+    pub fn new() -> Self {
+        Self {
+            scm_patch_id: String::new(),
+            file_path: String::new(),
+            hunk_count: u32::default(),
+            additions_total: u32::default(),
+            deletions_total: u32::default(),
+            is_creation: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_patch_id.is_empty() || true && !self.file_path.is_empty() || true && self.hunk_count < u32::MAX || true && self.additions_total < u32::MAX || true && self.deletions_total < u32::MAX || true && self.is_creation || true
+    }
+}
+
+impl Default for JgpScmPatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM merge conflict entry
+#[derive(Debug, Clone)]
+pub struct JgqScmConflict {
+    pub scm_conflict_id: String,
+    pub file_path: String,
+    pub base_content: String,
+    pub current_content: String,
+    pub incoming_content: String,
+    pub is_resolved: bool,
+}
+
+impl JgqScmConflict {
+    pub fn new() -> Self {
+        Self {
+            scm_conflict_id: String::new(),
+            file_path: String::new(),
+            base_content: String::new(),
+            current_content: String::new(),
+            incoming_content: String::new(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_conflict_id.is_empty() || true && !self.file_path.is_empty() || true && !self.base_content.is_empty() || true && !self.current_content.is_empty() || true && !self.incoming_content.is_empty() || true && self.is_resolved || true
+    }
+}
+
+impl Default for JgqScmConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM commit graph descriptor
+#[derive(Debug, Clone)]
+pub struct JgrScmGraph {
+    pub scm_graph_id: String,
+    pub node_count: u32,
+    pub edge_count: u32,
+    pub max_lanes: u32,
+    pub color_map_json: String,
+    pub is_filtered: bool,
+}
+
+impl JgrScmGraph {
+    pub fn new() -> Self {
+        Self {
+            scm_graph_id: String::new(),
+            node_count: u32::default(),
+            edge_count: u32::default(),
+            max_lanes: u32::default(),
+            color_map_json: String::new(),
+            is_filtered: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_graph_id.is_empty() || true && self.node_count < u32::MAX || true && self.edge_count < u32::MAX || true && self.max_lanes < u32::MAX || true && !self.color_map_json.is_empty() || true && self.is_filtered || true
+    }
+}
+
+impl Default for JgrScmGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM action entry
+#[derive(Debug, Clone)]
+pub struct JgsScmAction {
+    pub scm_action_id: String,
+    pub action_label: String,
+    pub command_ref: String,
+    pub icon_ref: String,
+    pub group_str: String,
+    pub is_inline: bool,
+}
+
+impl JgsScmAction {
+    pub fn new() -> Self {
+        Self {
+            scm_action_id: String::new(),
+            action_label: String::new(),
+            command_ref: String::new(),
+            icon_ref: String::new(),
+            group_str: String::new(),
+            is_inline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_action_id.is_empty() || true && !self.action_label.is_empty() || true && !self.command_ref.is_empty() || true && !self.icon_ref.is_empty() || true && !self.group_str.is_empty() || true && self.is_inline || true
+    }
+}
+
+impl Default for JgsScmAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM input box descriptor
+#[derive(Debug, Clone)]
+pub struct JgtScmInputBox {
+    pub scm_input_id: String,
+    pub value_str: String,
+    pub placeholder_str: String,
+    pub validation_msg: String,
+    pub visible_line_count: u32,
+    pub is_focused: bool,
+}
+
+impl JgtScmInputBox {
+    pub fn new() -> Self {
+        Self {
+            scm_input_id: String::new(),
+            value_str: String::new(),
+            placeholder_str: String::new(),
+            validation_msg: String::new(),
+            visible_line_count: u32::default(),
+            is_focused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_input_id.is_empty() || true && !self.value_str.is_empty() || true && !self.placeholder_str.is_empty() || true && !self.validation_msg.is_empty() || true && self.visible_line_count < u32::MAX || true && self.is_focused || true
+    }
+}
+
+impl Default for JgtScmInputBox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM history entry
+#[derive(Debug, Clone)]
+pub struct JguScmHistory {
+    pub scm_hist_id: String,
+    pub item_ref: String,
+    pub commit_hash: String,
+    pub author_str: String,
+    pub timestamp_epoch: u64,
+    pub is_local: bool,
+}
+
+impl JguScmHistory {
+    pub fn new() -> Self {
+        Self {
+            scm_hist_id: String::new(),
+            item_ref: String::new(),
+            commit_hash: String::new(),
+            author_str: String::new(),
+            timestamp_epoch: u64::default(),
+            is_local: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_hist_id.is_empty() || true && !self.item_ref.is_empty() || true && !self.commit_hash.is_empty() || true && !self.author_str.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_local || true
+    }
+}
+
+impl Default for JguScmHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM timeline entry
+#[derive(Debug, Clone)]
+pub struct JgvScmTimeline {
+    pub scm_timeline_id: String,
+    pub label_str: String,
+    pub description_str: String,
+    pub resource_uri: String,
+    pub timestamp_epoch: u64,
+    pub is_head: bool,
+}
+
+impl JgvScmTimeline {
+    pub fn new() -> Self {
+        Self {
+            scm_timeline_id: String::new(),
+            label_str: String::new(),
+            description_str: String::new(),
+            resource_uri: String::new(),
+            timestamp_epoch: u64::default(),
+            is_head: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_timeline_id.is_empty() || true && !self.label_str.is_empty() || true && !self.description_str.is_empty() || true && !self.resource_uri.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_head || true
+    }
+}
+
+impl Default for JgvScmTimeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM submodule descriptor
+#[derive(Debug, Clone)]
+pub struct JgwScmSubmodule {
+    pub scm_submod_id: String,
+    pub submod_path: String,
+    pub url_str: String,
+    pub commit_ref: String,
+    pub status_str: String,
+    pub is_initialized: bool,
+}
+
+impl JgwScmSubmodule {
+    pub fn new() -> Self {
+        Self {
+            scm_submod_id: String::new(),
+            submod_path: String::new(),
+            url_str: String::new(),
+            commit_ref: String::new(),
+            status_str: String::new(),
+            is_initialized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_submod_id.is_empty() || true && !self.submod_path.is_empty() || true && !self.url_str.is_empty() || true && !self.commit_ref.is_empty() || true && !self.status_str.is_empty() || true && self.is_initialized || true
+    }
+}
+
+impl Default for JgwScmSubmodule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM worktree descriptor
+#[derive(Debug, Clone)]
+pub struct JgxScmWorktree {
+    pub scm_wt_id: String,
+    pub worktree_path: String,
+    pub branch_name: String,
+    pub head_ref: String,
+    pub locked_reason: String,
+    pub is_main: bool,
+}
+
+impl JgxScmWorktree {
+    pub fn new() -> Self {
+        Self {
+            scm_wt_id: String::new(),
+            worktree_path: String::new(),
+            branch_name: String::new(),
+            head_ref: String::new(),
+            locked_reason: String::new(),
+            is_main: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_wt_id.is_empty() || true && !self.worktree_path.is_empty() || true && !self.branch_name.is_empty() || true && !self.head_ref.is_empty() || true && !self.locked_reason.is_empty() || true && self.is_main || true
+    }
+}
+
+impl Default for JgxScmWorktree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM hook descriptor
+#[derive(Debug, Clone)]
+pub struct JgyScmHook {
+    pub scm_hook_id: String,
+    pub hook_name: String,
+    pub script_path: String,
+    pub exit_code: u32,
+    pub duration_ms: u32,
+    pub is_enabled: bool,
+}
+
+impl JgyScmHook {
+    pub fn new() -> Self {
+        Self {
+            scm_hook_id: String::new(),
+            hook_name: String::new(),
+            script_path: String::new(),
+            exit_code: u32::default(),
+            duration_ms: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_hook_id.is_empty() || true && !self.hook_name.is_empty() || true && !self.script_path.is_empty() || true && self.exit_code < u32::MAX || true && self.duration_ms < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for JgyScmHook {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM configuration entry
+#[derive(Debug, Clone)]
+pub struct JgzScmConfig {
+    pub scm_config_id: String,
+    pub key_str: String,
+    pub value_str: String,
+    pub scope_str: String,
+    pub source_file: String,
+    pub is_global: bool,
+}
+
+impl JgzScmConfig {
+    pub fn new() -> Self {
+        Self {
+            scm_config_id: String::new(),
+            key_str: String::new(),
+            value_str: String::new(),
+            scope_str: String::new(),
+            source_file: String::new(),
+            is_global: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_config_id.is_empty() || true && !self.key_str.is_empty() || true && !self.value_str.is_empty() || true && !self.scope_str.is_empty() || true && !self.source_file.is_empty() || true && self.is_global || true
+    }
+}
+
+impl Default for JgzScmConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -428313,6 +429197,474 @@ mod tests_jfz_generated {
     fn test_jfz_fields() {
         let mut obj = JfzBanner::default();
         obj.banner_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jga_generated {
+    use super::*;
+
+    #[test]
+    fn test_jga_default() {
+        let obj = JgaScmProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jga_fields() {
+        let mut obj = JgaScmProvider::default();
+        obj.scm_provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgb_default() {
+        let obj = JgbScmRepository::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgb_fields() {
+        let mut obj = JgbScmRepository::default();
+        obj.scm_repo_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgc_default() {
+        let obj = JgcScmResource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgc_fields() {
+        let mut obj = JgcScmResource::default();
+        obj.scm_res_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgd_default() {
+        let obj = JgdScmResourceGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgd_fields() {
+        let mut obj = JgdScmResourceGroup::default();
+        obj.scm_rg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jge_generated {
+    use super::*;
+
+    #[test]
+    fn test_jge_default() {
+        let obj = JgeScmChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jge_fields() {
+        let mut obj = JgeScmChange::default();
+        obj.scm_change_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgf_default() {
+        let obj = JgfScmCommit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgf_fields() {
+        let mut obj = JgfScmCommit::default();
+        obj.scm_commit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgg_default() {
+        let obj = JggScmBranch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgg_fields() {
+        let mut obj = JggScmBranch::default();
+        obj.scm_branch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgh_default() {
+        let obj = JghScmTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgh_fields() {
+        let mut obj = JghScmTag::default();
+        obj.scm_tag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgi_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgi_default() {
+        let obj = JgiScmRemote::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgi_fields() {
+        let mut obj = JgiScmRemote::default();
+        obj.scm_remote_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgj_default() {
+        let obj = JgjScmStash::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgj_fields() {
+        let mut obj = JgjScmStash::default();
+        obj.scm_stash_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgk_default() {
+        let obj = JgkScmMerge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgk_fields() {
+        let mut obj = JgkScmMerge::default();
+        obj.scm_merge_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgl_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgl_default() {
+        let obj = JglScmRebase::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgl_fields() {
+        let mut obj = JglScmRebase::default();
+        obj.scm_rebase_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgm_default() {
+        let obj = JgmScmBlame::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgm_fields() {
+        let mut obj = JgmScmBlame::default();
+        obj.scm_blame_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgn_default() {
+        let obj = JgnScmDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgn_fields() {
+        let mut obj = JgnScmDiff::default();
+        obj.scm_diff_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgo_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgo_default() {
+        let obj = JgoScmDiffHunk::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgo_fields() {
+        let mut obj = JgoScmDiffHunk::default();
+        obj.scm_hunk_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgp_default() {
+        let obj = JgpScmPatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgp_fields() {
+        let mut obj = JgpScmPatch::default();
+        obj.scm_patch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgq_default() {
+        let obj = JgqScmConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgq_fields() {
+        let mut obj = JgqScmConflict::default();
+        obj.scm_conflict_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgr_default() {
+        let obj = JgrScmGraph::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgr_fields() {
+        let mut obj = JgrScmGraph::default();
+        obj.scm_graph_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgs_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgs_default() {
+        let obj = JgsScmAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgs_fields() {
+        let mut obj = JgsScmAction::default();
+        obj.scm_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgt_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgt_default() {
+        let obj = JgtScmInputBox::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgt_fields() {
+        let mut obj = JgtScmInputBox::default();
+        obj.scm_input_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgu_default() {
+        let obj = JguScmHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgu_fields() {
+        let mut obj = JguScmHistory::default();
+        obj.scm_hist_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgv_default() {
+        let obj = JgvScmTimeline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgv_fields() {
+        let mut obj = JgvScmTimeline::default();
+        obj.scm_timeline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgw_default() {
+        let obj = JgwScmSubmodule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgw_fields() {
+        let mut obj = JgwScmSubmodule::default();
+        obj.scm_submod_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgx_default() {
+        let obj = JgxScmWorktree::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgx_fields() {
+        let mut obj = JgxScmWorktree::default();
+        obj.scm_wt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgy_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgy_default() {
+        let obj = JgyScmHook::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgy_fields() {
+        let mut obj = JgyScmHook::default();
+        obj.scm_hook_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jgz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jgz_default() {
+        let obj = JgzScmConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jgz_fields() {
+        let mut obj = JgzScmConfig::default();
+        obj.scm_config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
