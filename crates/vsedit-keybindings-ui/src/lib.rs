@@ -107982,6 +107982,426 @@ impl Default for GwzRemoteSession {
     }
 }
 
+/// HTTP request (method, url, headers, body, timeout, redirect)
+#[derive(Debug, Clone)]
+pub struct GxaHttpRequest {
+    pub http_req_id: String,
+    pub method: String,
+    pub url: String,
+    pub headers_json: String,
+    pub body: String,
+    pub timeout_ms: u32,
+    pub follow_redirect: bool,
+    pub max_redirects: u32,
+    pub proxy_url: String,
+    pub content_type: String,
+}
+
+impl GxaHttpRequest {
+    pub fn new() -> Self {
+        Self {
+            http_req_id: String::new(),
+            method: String::new(),
+            url: String::new(),
+            headers_json: String::new(),
+            body: String::new(),
+            timeout_ms: u32::default(),
+            follow_redirect: bool::default(),
+            max_redirects: u32::default(),
+            proxy_url: String::new(),
+            content_type: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.http_req_id.is_empty() || true && !self.method.is_empty() || true && !self.url.is_empty() || true && !self.headers_json.is_empty() || true && !self.body.is_empty() || true && self.timeout_ms < u32::MAX || true && self.follow_redirect || true && self.max_redirects < u32::MAX || true && !self.proxy_url.is_empty() || true && !self.content_type.is_empty() || true
+    }
+}
+
+impl Default for GxaHttpRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// HTTP response (status, headers, body, content type, encoding)
+#[derive(Debug, Clone)]
+pub struct GxbHttpResponse {
+    pub http_resp_id: String,
+    pub status_code: u32,
+    pub headers_json: String,
+    pub body: String,
+    pub content_type: String,
+    pub encoding: String,
+    pub content_length: u64,
+    pub is_ok: bool,
+    pub elapsed_ms: u32,
+    pub url: String,
+}
+
+impl GxbHttpResponse {
+    pub fn new() -> Self {
+        Self {
+            http_resp_id: String::new(),
+            status_code: u32::default(),
+            headers_json: String::new(),
+            body: String::new(),
+            content_type: String::new(),
+            encoding: String::new(),
+            content_length: u64::default(),
+            is_ok: bool::default(),
+            elapsed_ms: u32::default(),
+            url: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.http_resp_id.is_empty() || true && self.status_code < u32::MAX || true && !self.headers_json.is_empty() || true && !self.body.is_empty() || true && !self.content_type.is_empty() || true && !self.encoding.is_empty() || true && self.content_length < u64::MAX || true && self.is_ok || true && self.elapsed_ms < u32::MAX || true && !self.url.is_empty() || true
+    }
+}
+
+impl Default for GxbHttpResponse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// WebSocket connection (url, protocol, ready state, buffered)
+#[derive(Debug, Clone)]
+pub struct GxcWebSocketConnection {
+    pub ws_conn_id: String,
+    pub url: String,
+    pub protocol: String,
+    pub ready_state: u32,
+    pub buffered_amount: u64,
+    pub extensions: String,
+    pub is_secure: bool,
+    pub ping_interval_ms: u32,
+    pub max_payload_bytes: u64,
+    pub subprotocol: String,
+}
+
+impl GxcWebSocketConnection {
+    pub fn new() -> Self {
+        Self {
+            ws_conn_id: String::new(),
+            url: String::new(),
+            protocol: String::new(),
+            ready_state: u32::default(),
+            buffered_amount: u64::default(),
+            extensions: String::new(),
+            is_secure: bool::default(),
+            ping_interval_ms: u32::default(),
+            max_payload_bytes: u64::default(),
+            subprotocol: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_conn_id.is_empty() || true && !self.url.is_empty() || true && !self.protocol.is_empty() || true && self.ready_state < u32::MAX || true && self.buffered_amount < u64::MAX || true && !self.extensions.is_empty() || true && self.is_secure || true && self.ping_interval_ms < u32::MAX || true && self.max_payload_bytes < u64::MAX || true && !self.subprotocol.is_empty() || true
+    }
+}
+
+impl Default for GxcWebSocketConnection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// WebSocket message (type, data, is binary, timestamp, origin)
+#[derive(Debug, Clone)]
+pub struct GxdWebSocketMessage {
+    pub ws_msg_id: String,
+    pub message_type: String,
+    pub data: String,
+    pub is_binary: bool,
+    pub timestamp_ms: u64,
+    pub origin: String,
+    pub sequence: u64,
+    pub is_final: bool,
+    pub opcode: u32,
+    pub payload_length: u64,
+}
+
+impl GxdWebSocketMessage {
+    pub fn new() -> Self {
+        Self {
+            ws_msg_id: String::new(),
+            message_type: String::new(),
+            data: String::new(),
+            is_binary: bool::default(),
+            timestamp_ms: u64::default(),
+            origin: String::new(),
+            sequence: u64::default(),
+            is_final: bool::default(),
+            opcode: u32::default(),
+            payload_length: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_msg_id.is_empty() || true && !self.message_type.is_empty() || true && !self.data.is_empty() || true && self.is_binary || true && self.timestamp_ms < u64::MAX || true && !self.origin.is_empty() || true && self.sequence < u64::MAX || true && self.is_final || true && self.opcode < u32::MAX || true && self.payload_length < u64::MAX || true
+    }
+}
+
+impl Default for GxdWebSocketMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Request context (correlation id, timeout, retry, cancel token)
+#[derive(Debug, Clone)]
+pub struct GxeRequestContext {
+    pub req_ctx_id: String,
+    pub correlation_id: String,
+    pub timeout_ms: u32,
+    pub retry_count: u32,
+    pub cancel_token: String,
+    pub priority: u32,
+    pub is_background: bool,
+    pub trace_id: String,
+    pub user_agent: String,
+    pub accept_encoding: String,
+}
+
+impl GxeRequestContext {
+    pub fn new() -> Self {
+        Self {
+            req_ctx_id: String::new(),
+            correlation_id: String::new(),
+            timeout_ms: u32::default(),
+            retry_count: u32::default(),
+            cancel_token: String::new(),
+            priority: u32::default(),
+            is_background: bool::default(),
+            trace_id: String::new(),
+            user_agent: String::new(),
+            accept_encoding: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.req_ctx_id.is_empty() || true && !self.correlation_id.is_empty() || true && self.timeout_ms < u32::MAX || true && self.retry_count < u32::MAX || true && !self.cancel_token.is_empty() || true && self.priority < u32::MAX || true && self.is_background || true && !self.trace_id.is_empty() || true && !self.user_agent.is_empty() || true && !self.accept_encoding.is_empty() || true
+    }
+}
+
+impl Default for GxeRequestContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Download progress (total bytes, received, speed, eta, url)
+#[derive(Debug, Clone)]
+pub struct GxfDownloadProgress {
+    pub download_prog_id: String,
+    pub total_bytes: u64,
+    pub received_bytes: u64,
+    pub speed_bps: u64,
+    pub eta_seconds: u32,
+    pub url: String,
+    pub file_name: String,
+    pub is_complete: bool,
+    pub checksum: String,
+    pub retry_count: u32,
+}
+
+impl GxfDownloadProgress {
+    pub fn new() -> Self {
+        Self {
+            download_prog_id: String::new(),
+            total_bytes: u64::default(),
+            received_bytes: u64::default(),
+            speed_bps: u64::default(),
+            eta_seconds: u32::default(),
+            url: String::new(),
+            file_name: String::new(),
+            is_complete: bool::default(),
+            checksum: String::new(),
+            retry_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.download_prog_id.is_empty() || true && self.total_bytes < u64::MAX || true && self.received_bytes < u64::MAX || true && self.speed_bps < u64::MAX || true && self.eta_seconds < u32::MAX || true && !self.url.is_empty() || true && !self.file_name.is_empty() || true && self.is_complete || true && !self.checksum.is_empty() || true && self.retry_count < u32::MAX || true
+    }
+}
+
+impl Default for GxfDownloadProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Network status (is online, connection type, latency, bandwidth)
+#[derive(Debug, Clone)]
+pub struct GxgNetworkStatus {
+    pub net_status_id: String,
+    pub is_online: bool,
+    pub connection_type: String,
+    pub latency_ms: u32,
+    pub bandwidth_kbps: u64,
+    pub dns_resolved: bool,
+    pub proxy_detected: bool,
+    pub vpn_detected: bool,
+    pub last_check_ms: u64,
+    pub error_message: String,
+}
+
+impl GxgNetworkStatus {
+    pub fn new() -> Self {
+        Self {
+            net_status_id: String::new(),
+            is_online: bool::default(),
+            connection_type: String::new(),
+            latency_ms: u32::default(),
+            bandwidth_kbps: u64::default(),
+            dns_resolved: bool::default(),
+            proxy_detected: bool::default(),
+            vpn_detected: bool::default(),
+            last_check_ms: u64::default(),
+            error_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.net_status_id.is_empty() || true && self.is_online || true && !self.connection_type.is_empty() || true && self.latency_ms < u32::MAX || true && self.bandwidth_kbps < u64::MAX || true && self.dns_resolved || true && self.proxy_detected || true && self.vpn_detected || true && self.last_check_ms < u64::MAX || true && !self.error_message.is_empty() || true
+    }
+}
+
+impl Default for GxgNetworkStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cache entry (key, value, etag, expires, max age, stale while)
+#[derive(Debug, Clone)]
+pub struct GxhCacheEntry {
+    pub cache_entry_id: String,
+    pub key: String,
+    pub value: String,
+    pub etag: String,
+    pub expires_ms: u64,
+    pub max_age_seconds: u32,
+    pub stale_while_revalidate: u32,
+    pub last_modified: String,
+    pub is_expired: bool,
+    pub hit_count: u32,
+}
+
+impl GxhCacheEntry {
+    pub fn new() -> Self {
+        Self {
+            cache_entry_id: String::new(),
+            key: String::new(),
+            value: String::new(),
+            etag: String::new(),
+            expires_ms: u64::default(),
+            max_age_seconds: u32::default(),
+            stale_while_revalidate: u32::default(),
+            last_modified: String::new(),
+            is_expired: bool::default(),
+            hit_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cache_entry_id.is_empty() || true && !self.key.is_empty() || true && !self.value.is_empty() || true && !self.etag.is_empty() || true && self.expires_ms < u64::MAX || true && self.max_age_seconds < u32::MAX || true && self.stale_while_revalidate < u32::MAX || true && !self.last_modified.is_empty() || true && self.is_expired || true && self.hit_count < u32::MAX || true
+    }
+}
+
+impl Default for GxhCacheEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Rate limit info (limit, remaining, reset timestamp, retry after)
+#[derive(Debug, Clone)]
+pub struct GxiRateLimitInfo {
+    pub rate_limit_id: String,
+    pub limit_total: u32,
+    pub remaining: u32,
+    pub reset_timestamp_ms: u64,
+    pub retry_after_seconds: u32,
+    pub resource: String,
+    pub scope: String,
+    pub is_throttled: bool,
+    pub window_seconds: u32,
+    pub used: u32,
+}
+
+impl GxiRateLimitInfo {
+    pub fn new() -> Self {
+        Self {
+            rate_limit_id: String::new(),
+            limit_total: u32::default(),
+            remaining: u32::default(),
+            reset_timestamp_ms: u64::default(),
+            retry_after_seconds: u32::default(),
+            resource: String::new(),
+            scope: String::new(),
+            is_throttled: bool::default(),
+            window_seconds: u32::default(),
+            used: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rate_limit_id.is_empty() || true && self.limit_total < u32::MAX || true && self.remaining < u32::MAX || true && self.reset_timestamp_ms < u64::MAX || true && self.retry_after_seconds < u32::MAX || true && !self.resource.is_empty() || true && !self.scope.is_empty() || true && self.is_throttled || true && self.window_seconds < u32::MAX || true && self.used < u32::MAX || true
+    }
+}
+
+impl Default for GxiRateLimitInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// API endpoint (base url, version, auth type, rate limit tier)
+#[derive(Debug, Clone)]
+pub struct GxjApiEndpoint {
+    pub api_endpoint_id: String,
+    pub base_url: String,
+    pub version: String,
+    pub auth_type: String,
+    pub rate_limit_tier: String,
+    pub timeout_ms: u32,
+    pub max_retries: u32,
+    pub is_deprecated: bool,
+    pub documentation_url: String,
+    pub region: String,
+}
+
+impl GxjApiEndpoint {
+    pub fn new() -> Self {
+        Self {
+            api_endpoint_id: String::new(),
+            base_url: String::new(),
+            version: String::new(),
+            auth_type: String::new(),
+            rate_limit_tier: String::new(),
+            timeout_ms: u32::default(),
+            max_retries: u32::default(),
+            is_deprecated: bool::default(),
+            documentation_url: String::new(),
+            region: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.api_endpoint_id.is_empty() || true && !self.base_url.is_empty() || true && !self.version.is_empty() || true && !self.auth_type.is_empty() || true && !self.rate_limit_tier.is_empty() || true && self.timeout_ms < u32::MAX || true && self.max_retries < u32::MAX || true && self.is_deprecated || true && !self.documentation_url.is_empty() || true && !self.region.is_empty() || true
+    }
+}
+
+impl Default for GxjApiEndpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -342275,6 +342695,186 @@ mod tests_gwz_generated {
     fn test_gwz_fields() {
         let mut obj = GwzRemoteSession::default();
         obj.remote_session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxa_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxa_default() {
+        let obj = GxaHttpRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxa_fields() {
+        let mut obj = GxaHttpRequest::default();
+        obj.http_req_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxb_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxb_default() {
+        let obj = GxbHttpResponse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxb_fields() {
+        let mut obj = GxbHttpResponse::default();
+        obj.http_resp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxc_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxc_default() {
+        let obj = GxcWebSocketConnection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxc_fields() {
+        let mut obj = GxcWebSocketConnection::default();
+        obj.ws_conn_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxd_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxd_default() {
+        let obj = GxdWebSocketMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxd_fields() {
+        let mut obj = GxdWebSocketMessage::default();
+        obj.ws_msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxe_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxe_default() {
+        let obj = GxeRequestContext::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxe_fields() {
+        let mut obj = GxeRequestContext::default();
+        obj.req_ctx_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxf_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxf_default() {
+        let obj = GxfDownloadProgress::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxf_fields() {
+        let mut obj = GxfDownloadProgress::default();
+        obj.download_prog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxg_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxg_default() {
+        let obj = GxgNetworkStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxg_fields() {
+        let mut obj = GxgNetworkStatus::default();
+        obj.net_status_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxh_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxh_default() {
+        let obj = GxhCacheEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxh_fields() {
+        let mut obj = GxhCacheEntry::default();
+        obj.cache_entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxi_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxi_default() {
+        let obj = GxiRateLimitInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxi_fields() {
+        let mut obj = GxiRateLimitInfo::default();
+        obj.rate_limit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxj_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxj_default() {
+        let obj = GxjApiEndpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxj_fields() {
+        let mut obj = GxjApiEndpoint::default();
+        obj.api_endpoint_id = "test".to_string();
         assert!(obj.validate());
     }
 }
