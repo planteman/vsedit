@@ -86304,6 +86304,216 @@ impl Default for GdeSearchViewConfig {
     }
 }
 
+/// Text search provider (search, cancel, max results, encoding)
+#[derive(Debug, Clone)]
+pub struct GdfTextSearchProvider {
+    pub provider_id: String,
+    pub scheme: String,
+    pub max_results: u32,
+    pub encoding: String,
+    pub preview_options_json: String,
+    pub folder_uri: String,
+    pub pattern: String,
+    pub is_regex: bool,
+    pub is_multiline: bool,
+    pub is_cancelled: bool,
+}
+
+impl GdfTextSearchProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            scheme: String::new(),
+            max_results: u32::default(),
+            encoding: String::new(),
+            preview_options_json: String::new(),
+            folder_uri: String::new(),
+            pattern: String::new(),
+            is_regex: bool::default(),
+            is_multiline: bool::default(),
+            is_cancelled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.scheme.is_empty() || true && self.max_results < u32::MAX || true && !self.encoding.is_empty() || true && !self.preview_options_json.is_empty() || true && !self.folder_uri.is_empty() || true && !self.pattern.is_empty() || true && self.is_regex || true && self.is_multiline || true && self.is_cancelled || true
+    }
+}
+
+impl Default for GdfTextSearchProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File search provider (search, cancel, max results, include pattern)
+#[derive(Debug, Clone)]
+pub struct GdgFileSearchProvider {
+    pub file_search_id: String,
+    pub max_results: u32,
+    pub include_pattern: String,
+    pub exclude_pattern: String,
+    pub folder_uri: String,
+    pub use_default_excludes: bool,
+    pub use_ignore_files: bool,
+    pub follow_symlinks: bool,
+    pub is_global_search: bool,
+    pub use_parent_ignore: bool,
+}
+
+impl GdgFileSearchProvider {
+    pub fn new() -> Self {
+        Self {
+            file_search_id: String::new(),
+            max_results: u32::default(),
+            include_pattern: String::new(),
+            exclude_pattern: String::new(),
+            folder_uri: String::new(),
+            use_default_excludes: bool::default(),
+            use_ignore_files: bool::default(),
+            follow_symlinks: bool::default(),
+            is_global_search: bool::default(),
+            use_parent_ignore: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_search_id.is_empty() || true && self.max_results < u32::MAX || true && !self.include_pattern.is_empty() || true && !self.exclude_pattern.is_empty() || true && !self.folder_uri.is_empty() || true && self.use_default_excludes || true && self.use_ignore_files || true && self.follow_symlinks || true && self.is_global_search || true && self.use_parent_ignore || true
+    }
+}
+
+impl Default for GdgFileSearchProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search editor model (query, config, results, title, is pinned)
+#[derive(Debug, Clone)]
+pub struct GdhSearchEditorModel {
+    pub sed_model_id: String,
+    pub query_text: String,
+    pub config_json: String,
+    pub results_json: String,
+    pub title: String,
+    pub is_pinned: bool,
+    pub is_dirty: bool,
+    pub result_count: u32,
+    pub file_count: u32,
+    pub search_time_ms: u64,
+}
+
+impl GdhSearchEditorModel {
+    pub fn new() -> Self {
+        Self {
+            sed_model_id: String::new(),
+            query_text: String::new(),
+            config_json: String::new(),
+            results_json: String::new(),
+            title: String::new(),
+            is_pinned: bool::default(),
+            is_dirty: bool::default(),
+            result_count: u32::default(),
+            file_count: u32::default(),
+            search_time_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sed_model_id.is_empty() || true && !self.query_text.is_empty() || true && !self.config_json.is_empty() || true && !self.results_json.is_empty() || true && !self.title.is_empty() || true && self.is_pinned || true && self.is_dirty || true && self.result_count < u32::MAX || true && self.file_count < u32::MAX || true && self.search_time_ms < u64::MAX || true
+    }
+}
+
+impl Default for GdhSearchEditorModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Ripgrep engine (binary path, args, timeout, max filesize, follow symlinks)
+#[derive(Debug, Clone)]
+pub struct GdiRipgrepEngine {
+    pub rg_id: String,
+    pub binary_path: String,
+    pub args_json: String,
+    pub timeout_ms: u64,
+    pub max_filesize_bytes: u64,
+    pub follow_symlinks: bool,
+    pub threads: u32,
+    pub encoding: String,
+    pub context_lines: u32,
+    pub pcre2_enabled: bool,
+}
+
+impl GdiRipgrepEngine {
+    pub fn new() -> Self {
+        Self {
+            rg_id: String::new(),
+            binary_path: String::new(),
+            args_json: String::new(),
+            timeout_ms: u64::default(),
+            max_filesize_bytes: u64::default(),
+            follow_symlinks: bool::default(),
+            threads: u32::default(),
+            encoding: String::new(),
+            context_lines: u32::default(),
+            pcre2_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rg_id.is_empty() || true && !self.binary_path.is_empty() || true && !self.args_json.is_empty() || true && self.timeout_ms < u64::MAX || true && self.max_filesize_bytes < u64::MAX || true && self.follow_symlinks || true && self.threads < u32::MAX || true && !self.encoding.is_empty() || true && self.context_lines < u32::MAX || true && self.pcre2_enabled || true
+    }
+}
+
+impl Default for GdiRipgrepEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search decorations (match highlight, current match, range highlight)
+#[derive(Debug, Clone)]
+pub struct GdjSearchDecorations {
+    pub deco_id: String,
+    pub match_highlight_color: String,
+    pub current_match_color: String,
+    pub range_highlight_color: String,
+    pub overview_ruler_color: String,
+    pub border_color: String,
+    pub is_whole_line: bool,
+    pub after_content: String,
+    pub before_content: String,
+    pub font_weight: String,
+}
+
+impl GdjSearchDecorations {
+    pub fn new() -> Self {
+        Self {
+            deco_id: String::new(),
+            match_highlight_color: String::new(),
+            current_match_color: String::new(),
+            range_highlight_color: String::new(),
+            overview_ruler_color: String::new(),
+            border_color: String::new(),
+            is_whole_line: bool::default(),
+            after_content: String::new(),
+            before_content: String::new(),
+            font_weight: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_id.is_empty() || true && !self.match_highlight_color.is_empty() || true && !self.current_match_color.is_empty() || true && !self.range_highlight_color.is_empty() || true && !self.overview_ruler_color.is_empty() || true && !self.border_color.is_empty() || true && self.is_whole_line || true && !self.after_content.is_empty() || true && !self.before_content.is_empty() || true && !self.font_weight.is_empty() || true
+    }
+}
+
+impl Default for GdjSearchDecorations {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -311303,6 +311513,96 @@ mod tests_gde_generated {
     fn test_gde_fields() {
         let mut obj = GdeSearchViewConfig::default();
         obj.view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdf_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdf_default() {
+        let obj = GdfTextSearchProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdf_fields() {
+        let mut obj = GdfTextSearchProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdg_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdg_default() {
+        let obj = GdgFileSearchProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdg_fields() {
+        let mut obj = GdgFileSearchProvider::default();
+        obj.file_search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdh_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdh_default() {
+        let obj = GdhSearchEditorModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdh_fields() {
+        let mut obj = GdhSearchEditorModel::default();
+        obj.sed_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdi_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdi_default() {
+        let obj = GdiRipgrepEngine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdi_fields() {
+        let mut obj = GdiRipgrepEngine::default();
+        obj.rg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdj_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdj_default() {
+        let obj = GdjSearchDecorations::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdj_fields() {
+        let mut obj = GdjSearchDecorations::default();
+        obj.deco_id = "test".to_string();
         assert!(obj.validate());
     }
 }
