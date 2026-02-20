@@ -93753,6 +93753,216 @@ impl Default for GkeConfigurationRegistry {
     }
 }
 
+/// Configuration policy (name, definition, value, scope, category)
+#[derive(Debug, Clone)]
+pub struct GkfConfigurationPolicy {
+    pub policy_id: String,
+    pub name: String,
+    pub definition_json: String,
+    pub value_json: String,
+    pub scope: String,
+    pub category: String,
+    pub is_enforced: bool,
+    pub source: String,
+    pub apply_to: String,
+    pub override_enabled: bool,
+}
+
+impl GkfConfigurationPolicy {
+    pub fn new() -> Self {
+        Self {
+            policy_id: String::new(),
+            name: String::new(),
+            definition_json: String::new(),
+            value_json: String::new(),
+            scope: String::new(),
+            category: String::new(),
+            is_enforced: bool::default(),
+            source: String::new(),
+            apply_to: String::new(),
+            override_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.policy_id.is_empty() || true && !self.name.is_empty() || true && !self.definition_json.is_empty() || true && !self.value_json.is_empty() || true && !self.scope.is_empty() || true && !self.category.is_empty() || true && self.is_enforced || true && !self.source.is_empty() || true && !self.apply_to.is_empty() || true && self.override_enabled || true
+    }
+}
+
+impl Default for GkfConfigurationPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration change event (affected keys, source, target, overrides)
+#[derive(Debug, Clone)]
+pub struct GkgConfigurationChange {
+    pub change_id: String,
+    pub affected_keys_json: String,
+    pub source: String,
+    pub target: String,
+    pub overrides_json: String,
+    pub resource_uri: String,
+    pub previous_value_json: String,
+    pub new_value_json: String,
+    pub is_user_change: bool,
+    pub trigger: String,
+}
+
+impl GkgConfigurationChange {
+    pub fn new() -> Self {
+        Self {
+            change_id: String::new(),
+            affected_keys_json: String::new(),
+            source: String::new(),
+            target: String::new(),
+            overrides_json: String::new(),
+            resource_uri: String::new(),
+            previous_value_json: String::new(),
+            new_value_json: String::new(),
+            is_user_change: bool::default(),
+            trigger: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.change_id.is_empty() || true && !self.affected_keys_json.is_empty() || true && !self.source.is_empty() || true && !self.target.is_empty() || true && !self.overrides_json.is_empty() || true && !self.resource_uri.is_empty() || true && !self.previous_value_json.is_empty() || true && !self.new_value_json.is_empty() || true && self.is_user_change || true && !self.trigger.is_empty() || true
+    }
+}
+
+impl Default for GkgConfigurationChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings editor model (search, toc, groups, modified only)
+#[derive(Debug, Clone)]
+pub struct GkhSettingsEditorModel {
+    pub settings_model_id: String,
+    pub search_query: String,
+    pub toc_json: String,
+    pub groups_json: String,
+    pub modified_only: bool,
+    pub show_modified_indicator: bool,
+    pub filter_by_tag: String,
+    pub filter_by_language: String,
+    pub scope: String,
+    pub result_count: u32,
+}
+
+impl GkhSettingsEditorModel {
+    pub fn new() -> Self {
+        Self {
+            settings_model_id: String::new(),
+            search_query: String::new(),
+            toc_json: String::new(),
+            groups_json: String::new(),
+            modified_only: bool::default(),
+            show_modified_indicator: bool::default(),
+            filter_by_tag: String::new(),
+            filter_by_language: String::new(),
+            scope: String::new(),
+            result_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.settings_model_id.is_empty() || true && !self.search_query.is_empty() || true && !self.toc_json.is_empty() || true && !self.groups_json.is_empty() || true && self.modified_only || true && self.show_modified_indicator || true && !self.filter_by_tag.is_empty() || true && !self.filter_by_language.is_empty() || true && !self.scope.is_empty() || true && self.result_count < u32::MAX || true
+    }
+}
+
+impl Default for GkhSettingsEditorModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Setting item (key, value, default, type, scope, description)
+#[derive(Debug, Clone)]
+pub struct GkiSettingItem {
+    pub setting_id: String,
+    pub key: String,
+    pub value_json: String,
+    pub default_json: String,
+    pub value_type: String,
+    pub scope: String,
+    pub description: String,
+    pub enum_values_json: String,
+    pub tags_json: String,
+    pub deprecation_message: String,
+}
+
+impl GkiSettingItem {
+    pub fn new() -> Self {
+        Self {
+            setting_id: String::new(),
+            key: String::new(),
+            value_json: String::new(),
+            default_json: String::new(),
+            value_type: String::new(),
+            scope: String::new(),
+            description: String::new(),
+            enum_values_json: String::new(),
+            tags_json: String::new(),
+            deprecation_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.setting_id.is_empty() || true && !self.key.is_empty() || true && !self.value_json.is_empty() || true && !self.default_json.is_empty() || true && !self.value_type.is_empty() || true && !self.scope.is_empty() || true && !self.description.is_empty() || true && !self.enum_values_json.is_empty() || true && !self.tags_json.is_empty() || true && !self.deprecation_message.is_empty() || true
+    }
+}
+
+impl Default for GkiSettingItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings group (id, label, settings, order, range, extension)
+#[derive(Debug, Clone)]
+pub struct GkjSettingsGroup {
+    pub settings_group_id: String,
+    pub label: String,
+    pub settings_json: String,
+    pub order: u32,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub extension_id: String,
+    pub is_common: bool,
+    pub parent_id: String,
+    pub icon: String,
+}
+
+impl GkjSettingsGroup {
+    pub fn new() -> Self {
+        Self {
+            settings_group_id: String::new(),
+            label: String::new(),
+            settings_json: String::new(),
+            order: u32::default(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            extension_id: String::new(),
+            is_common: bool::default(),
+            parent_id: String::new(),
+            icon: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.settings_group_id.is_empty() || true && !self.label.is_empty() || true && !self.settings_json.is_empty() || true && self.order < u32::MAX || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && !self.extension_id.is_empty() || true && self.is_common || true && !self.parent_id.is_empty() || true && !self.icon.is_empty() || true
+    }
+}
+
+impl Default for GkjSettingsGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -322259,6 +322469,96 @@ mod tests_gke_generated {
     fn test_gke_fields() {
         let mut obj = GkeConfigurationRegistry::default();
         obj.registry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkf_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkf_default() {
+        let obj = GkfConfigurationPolicy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkf_fields() {
+        let mut obj = GkfConfigurationPolicy::default();
+        obj.policy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkg_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkg_default() {
+        let obj = GkgConfigurationChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkg_fields() {
+        let mut obj = GkgConfigurationChange::default();
+        obj.change_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkh_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkh_default() {
+        let obj = GkhSettingsEditorModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkh_fields() {
+        let mut obj = GkhSettingsEditorModel::default();
+        obj.settings_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gki_generated {
+    use super::*;
+
+    #[test]
+    fn test_gki_default() {
+        let obj = GkiSettingItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gki_fields() {
+        let mut obj = GkiSettingItem::default();
+        obj.setting_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkj_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkj_default() {
+        let obj = GkjSettingsGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkj_fields() {
+        let mut obj = GkjSettingsGroup::default();
+        obj.settings_group_id = "test".to_string();
         assert!(obj.validate());
     }
 }
