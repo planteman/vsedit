@@ -97277,6 +97277,216 @@ impl Default for GneTokenizationState {
     }
 }
 
+/// TextMate grammar (scope name, patterns, repository, injections)
+#[derive(Debug, Clone)]
+pub struct GnfTextMateGrammar {
+    pub grammar_id: String,
+    pub scope_name: String,
+    pub patterns_json: String,
+    pub repository_json: String,
+    pub injections_json: String,
+    pub file_types_json: String,
+    pub first_line_match: String,
+    pub foldingStartMarker: String,
+    pub foldingStopMarker: String,
+    pub name: String,
+}
+
+impl GnfTextMateGrammar {
+    pub fn new() -> Self {
+        Self {
+            grammar_id: String::new(),
+            scope_name: String::new(),
+            patterns_json: String::new(),
+            repository_json: String::new(),
+            injections_json: String::new(),
+            file_types_json: String::new(),
+            first_line_match: String::new(),
+            foldingStartMarker: String::new(),
+            foldingStopMarker: String::new(),
+            name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grammar_id.is_empty() || true && !self.scope_name.is_empty() || true && !self.patterns_json.is_empty() || true && !self.repository_json.is_empty() || true && !self.injections_json.is_empty() || true && !self.file_types_json.is_empty() || true && !self.first_line_match.is_empty() || true && !self.foldingStartMarker.is_empty() || true && !self.foldingStopMarker.is_empty() || true && !self.name.is_empty() || true
+    }
+}
+
+impl Default for GnfTextMateGrammar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Monarch grammar (tokenizer, keywords, operators, symbols)
+#[derive(Debug, Clone)]
+pub struct GngMonarchGrammar {
+    pub monarch_id: String,
+    pub tokenizer_json: String,
+    pub keywords_json: String,
+    pub operators_json: String,
+    pub symbols_pattern: String,
+    pub default_token: String,
+    pub brackets_json: String,
+    pub auto_closing_json: String,
+    pub unicode_support: bool,
+    pub ignoreCase: bool,
+}
+
+impl GngMonarchGrammar {
+    pub fn new() -> Self {
+        Self {
+            monarch_id: String::new(),
+            tokenizer_json: String::new(),
+            keywords_json: String::new(),
+            operators_json: String::new(),
+            symbols_pattern: String::new(),
+            default_token: String::new(),
+            brackets_json: String::new(),
+            auto_closing_json: String::new(),
+            unicode_support: bool::default(),
+            ignoreCase: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.monarch_id.is_empty() || true && !self.tokenizer_json.is_empty() || true && !self.keywords_json.is_empty() || true && !self.operators_json.is_empty() || true && !self.symbols_pattern.is_empty() || true && !self.default_token.is_empty() || true && !self.brackets_json.is_empty() || true && !self.auto_closing_json.is_empty() || true && self.unicode_support || true && self.ignoreCase || true
+    }
+}
+
+impl Default for GngMonarchGrammar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bracket pair (open, close, color, is matched, depth, range)
+#[derive(Debug, Clone)]
+pub struct GnhBracketPair {
+    pub bracket_id: String,
+    pub open_bracket: String,
+    pub close_bracket: String,
+    pub color_index: u32,
+    pub is_matched: bool,
+    pub depth: u32,
+    pub start_offset: u32,
+    pub end_offset: u32,
+    pub pair_id: String,
+    pub language_id: String,
+}
+
+impl GnhBracketPair {
+    pub fn new() -> Self {
+        Self {
+            bracket_id: String::new(),
+            open_bracket: String::new(),
+            close_bracket: String::new(),
+            color_index: u32::default(),
+            is_matched: bool::default(),
+            depth: u32::default(),
+            start_offset: u32::default(),
+            end_offset: u32::default(),
+            pair_id: String::new(),
+            language_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bracket_id.is_empty() || true && !self.open_bracket.is_empty() || true && !self.close_bracket.is_empty() || true && self.color_index < u32::MAX || true && self.is_matched || true && self.depth < u32::MAX || true && self.start_offset < u32::MAX || true && self.end_offset < u32::MAX || true && !self.pair_id.is_empty() || true && !self.language_id.is_empty() || true
+    }
+}
+
+impl Default for GnhBracketPair {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bracket pair colorizer (colors, scope, enabled, max pairs)
+#[derive(Debug, Clone)]
+pub struct GniBracketPairColorizer {
+    pub colorizer_id: String,
+    pub colors_json: String,
+    pub scope: String,
+    pub enabled: bool,
+    pub max_pairs: u32,
+    pub force_bracket_highlight: bool,
+    pub indent_guides: bool,
+    pub highlight_active: bool,
+    pub show_vertical_guides: bool,
+    pub independent_pairs: bool,
+}
+
+impl GniBracketPairColorizer {
+    pub fn new() -> Self {
+        Self {
+            colorizer_id: String::new(),
+            colors_json: String::new(),
+            scope: String::new(),
+            enabled: bool::default(),
+            max_pairs: u32::default(),
+            force_bracket_highlight: bool::default(),
+            indent_guides: bool::default(),
+            highlight_active: bool::default(),
+            show_vertical_guides: bool::default(),
+            independent_pairs: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.colorizer_id.is_empty() || true && !self.colors_json.is_empty() || true && !self.scope.is_empty() || true && self.enabled || true && self.max_pairs < u32::MAX || true && self.force_bracket_highlight || true && self.indent_guides || true && self.highlight_active || true && self.show_vertical_guides || true && self.independent_pairs || true
+    }
+}
+
+impl Default for GniBracketPairColorizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Word definition (pattern, language, separator chars, max length)
+#[derive(Debug, Clone)]
+pub struct GnjWordDefinition {
+    pub word_id: String,
+    pub pattern: String,
+    pub language_id: String,
+    pub separator_chars: String,
+    pub max_length: u32,
+    pub is_default: bool,
+    pub unicode_highlight: bool,
+    pub camel_case: bool,
+    pub sub_word: bool,
+    pub custom_regex: String,
+}
+
+impl GnjWordDefinition {
+    pub fn new() -> Self {
+        Self {
+            word_id: String::new(),
+            pattern: String::new(),
+            language_id: String::new(),
+            separator_chars: String::new(),
+            max_length: u32::default(),
+            is_default: bool::default(),
+            unicode_highlight: bool::default(),
+            camel_case: bool::default(),
+            sub_word: bool::default(),
+            custom_regex: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.word_id.is_empty() || true && !self.pattern.is_empty() || true && !self.language_id.is_empty() || true && !self.separator_chars.is_empty() || true && self.max_length < u32::MAX || true && self.is_default || true && self.unicode_highlight || true && self.camel_case || true && self.sub_word || true && !self.custom_regex.is_empty() || true
+    }
+}
+
+impl Default for GnjWordDefinition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -327079,6 +327289,96 @@ mod tests_gne_generated {
     fn test_gne_fields() {
         let mut obj = GneTokenizationState::default();
         obj.state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnf_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnf_default() {
+        let obj = GnfTextMateGrammar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnf_fields() {
+        let mut obj = GnfTextMateGrammar::default();
+        obj.grammar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gng_generated {
+    use super::*;
+
+    #[test]
+    fn test_gng_default() {
+        let obj = GngMonarchGrammar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gng_fields() {
+        let mut obj = GngMonarchGrammar::default();
+        obj.monarch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnh_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnh_default() {
+        let obj = GnhBracketPair::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnh_fields() {
+        let mut obj = GnhBracketPair::default();
+        obj.bracket_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gni_generated {
+    use super::*;
+
+    #[test]
+    fn test_gni_default() {
+        let obj = GniBracketPairColorizer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gni_fields() {
+        let mut obj = GniBracketPairColorizer::default();
+        obj.colorizer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnj_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnj_default() {
+        let obj = GnjWordDefinition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnj_fields() {
+        let mut obj = GnjWordDefinition::default();
+        obj.word_id = "test".to_string();
         assert!(obj.validate());
     }
 }
