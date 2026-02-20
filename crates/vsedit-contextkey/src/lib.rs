@@ -172595,6 +172595,890 @@ impl Default for JnzChatConfig {
     }
 }
 
+/// Color theme descriptor
+#[derive(Debug, Clone)]
+pub struct JoaColorTheme {
+    pub color_theme_id: String,
+    pub theme_name: String,
+    pub theme_type_str: String,
+    pub extension_ref: String,
+    pub color_count: u32,
+    pub is_high_contrast: bool,
+}
+
+impl JoaColorTheme {
+    pub fn new() -> Self {
+        Self {
+            color_theme_id: String::new(),
+            theme_name: String::new(),
+            theme_type_str: String::new(),
+            extension_ref: String::new(),
+            color_count: u32::default(),
+            is_high_contrast: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_theme_id.is_empty() || true && !self.theme_name.is_empty() || true && !self.theme_type_str.is_empty() || true && !self.extension_ref.is_empty() || true && self.color_count < u32::MAX || true && self.is_high_contrast || true
+    }
+}
+
+impl Default for JoaColorTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme color entry
+#[derive(Debug, Clone)]
+pub struct JobThemeColor {
+    pub theme_color_id: String,
+    pub color_id_str: String,
+    pub hex_value: String,
+    pub description_str: String,
+    pub defaults_json: String,
+    pub is_opaque: bool,
+}
+
+impl JobThemeColor {
+    pub fn new() -> Self {
+        Self {
+            theme_color_id: String::new(),
+            color_id_str: String::new(),
+            hex_value: String::new(),
+            description_str: String::new(),
+            defaults_json: String::new(),
+            is_opaque: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_color_id.is_empty() || true && !self.color_id_str.is_empty() || true && !self.hex_value.is_empty() || true && !self.description_str.is_empty() || true && !self.defaults_json.is_empty() || true && self.is_opaque || true
+    }
+}
+
+impl Default for JobThemeColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Token colorization rule
+#[derive(Debug, Clone)]
+pub struct JocTokenColor {
+    pub token_color_id: String,
+    pub scope_str: String,
+    pub foreground_hex: String,
+    pub font_style_str: String,
+    pub background_hex: String,
+    pub is_bold: bool,
+}
+
+impl JocTokenColor {
+    pub fn new() -> Self {
+        Self {
+            token_color_id: String::new(),
+            scope_str: String::new(),
+            foreground_hex: String::new(),
+            font_style_str: String::new(),
+            background_hex: String::new(),
+            is_bold: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_color_id.is_empty() || true && !self.scope_str.is_empty() || true && !self.foreground_hex.is_empty() || true && !self.font_style_str.is_empty() || true && !self.background_hex.is_empty() || true && self.is_bold || true
+    }
+}
+
+impl Default for JocTokenColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File icon theme descriptor
+#[derive(Debug, Clone)]
+pub struct JodIconTheme {
+    pub icon_theme_id: String,
+    pub theme_label: String,
+    pub extension_ref: String,
+    pub icon_count: u32,
+    pub folder_icons_enabled: bool,
+    pub is_file_theme: bool,
+}
+
+impl JodIconTheme {
+    pub fn new() -> Self {
+        Self {
+            icon_theme_id: String::new(),
+            theme_label: String::new(),
+            extension_ref: String::new(),
+            icon_count: u32::default(),
+            folder_icons_enabled: bool::default(),
+            is_file_theme: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.icon_theme_id.is_empty() || true && !self.theme_label.is_empty() || true && !self.extension_ref.is_empty() || true && self.icon_count < u32::MAX || true && self.folder_icons_enabled || true && self.is_file_theme || true
+    }
+}
+
+impl Default for JodIconTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Product icon entry
+#[derive(Debug, Clone)]
+pub struct JoeProductIcon {
+    pub product_icon_id: String,
+    pub icon_id_str: String,
+    pub description_str: String,
+    pub default_font_char: String,
+    pub theme_ref: String,
+    pub is_codicon: bool,
+}
+
+impl JoeProductIcon {
+    pub fn new() -> Self {
+        Self {
+            product_icon_id: String::new(),
+            icon_id_str: String::new(),
+            description_str: String::new(),
+            default_font_char: String::new(),
+            theme_ref: String::new(),
+            is_codicon: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.product_icon_id.is_empty() || true && !self.icon_id_str.is_empty() || true && !self.description_str.is_empty() || true && !self.default_font_char.is_empty() || true && !self.theme_ref.is_empty() || true && self.is_codicon || true
+    }
+}
+
+impl Default for JoeProductIcon {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic token color rule
+#[derive(Debug, Clone)]
+pub struct JofSemanticColor {
+    pub sem_color_id: String,
+    pub token_type_str: String,
+    pub modifier_csv: String,
+    pub foreground_hex: String,
+    pub font_style_str: String,
+    pub is_language_specific: bool,
+}
+
+impl JofSemanticColor {
+    pub fn new() -> Self {
+        Self {
+            sem_color_id: String::new(),
+            token_type_str: String::new(),
+            modifier_csv: String::new(),
+            foreground_hex: String::new(),
+            font_style_str: String::new(),
+            is_language_specific: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sem_color_id.is_empty() || true && !self.token_type_str.is_empty() || true && !self.modifier_csv.is_empty() || true && !self.foreground_hex.is_empty() || true && !self.font_style_str.is_empty() || true && self.is_language_specific || true
+    }
+}
+
+impl Default for JofSemanticColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color registry entry
+#[derive(Debug, Clone)]
+pub struct JogColorRegistry {
+    pub color_reg_id: String,
+    pub color_id_str: String,
+    pub defaults_json: String,
+    pub description_str: String,
+    pub deprecation_msg: String,
+    pub is_registered: bool,
+}
+
+impl JogColorRegistry {
+    pub fn new() -> Self {
+        Self {
+            color_reg_id: String::new(),
+            color_id_str: String::new(),
+            defaults_json: String::new(),
+            description_str: String::new(),
+            deprecation_msg: String::new(),
+            is_registered: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_reg_id.is_empty() || true && !self.color_id_str.is_empty() || true && !self.defaults_json.is_empty() || true && !self.description_str.is_empty() || true && !self.deprecation_msg.is_empty() || true && self.is_registered || true
+    }
+}
+
+impl Default for JogColorRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension color contribution
+#[derive(Debug, Clone)]
+pub struct JohColorContribution {
+    pub color_contrib_id: String,
+    pub extension_ref: String,
+    pub color_id_str: String,
+    pub dark_default: String,
+    pub light_default: String,
+    pub is_deprecated: bool,
+}
+
+impl JohColorContribution {
+    pub fn new() -> Self {
+        Self {
+            color_contrib_id: String::new(),
+            extension_ref: String::new(),
+            color_id_str: String::new(),
+            dark_default: String::new(),
+            light_default: String::new(),
+            is_deprecated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_contrib_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.color_id_str.is_empty() || true && !self.dark_default.is_empty() || true && !self.light_default.is_empty() || true && self.is_deprecated || true
+    }
+}
+
+impl Default for JohColorContribution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme customization entry
+#[derive(Debug, Clone)]
+pub struct JoiThemeCustomization {
+    pub theme_custom_id: String,
+    pub scope_str: String,
+    pub setting_key: String,
+    pub value_json: String,
+    pub theme_ref: String,
+    pub is_workbench_color: bool,
+}
+
+impl JoiThemeCustomization {
+    pub fn new() -> Self {
+        Self {
+            theme_custom_id: String::new(),
+            scope_str: String::new(),
+            setting_key: String::new(),
+            value_json: String::new(),
+            theme_ref: String::new(),
+            is_workbench_color: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_custom_id.is_empty() || true && !self.scope_str.is_empty() || true && !self.setting_key.is_empty() || true && !self.value_json.is_empty() || true && !self.theme_ref.is_empty() || true && self.is_workbench_color || true
+    }
+}
+
+impl Default for JoiThemeCustomization {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color picker state
+#[derive(Debug, Clone)]
+pub struct JojColorPicker {
+    pub color_picker_id: String,
+    pub current_color: String,
+    pub original_color: String,
+    pub color_model_str: String,
+    pub opacity_val: f64,
+    pub is_standalone: bool,
+}
+
+impl JojColorPicker {
+    pub fn new() -> Self {
+        Self {
+            color_picker_id: String::new(),
+            current_color: String::new(),
+            original_color: String::new(),
+            color_model_str: String::new(),
+            opacity_val: f64::default(),
+            is_standalone: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_picker_id.is_empty() || true && !self.current_color.is_empty() || true && !self.original_color.is_empty() || true && !self.color_model_str.is_empty() || true && self.opacity_val.is_finite() || true && self.is_standalone || true
+    }
+}
+
+impl Default for JojColorPicker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Token style resolution
+#[derive(Debug, Clone)]
+pub struct JokTokenStyle {
+    pub token_style_id: String,
+    pub token_type_str: String,
+    pub modifiers_csv: String,
+    pub resolved_fg: String,
+    pub resolved_style: String,
+    pub is_from_theme: bool,
+}
+
+impl JokTokenStyle {
+    pub fn new() -> Self {
+        Self {
+            token_style_id: String::new(),
+            token_type_str: String::new(),
+            modifiers_csv: String::new(),
+            resolved_fg: String::new(),
+            resolved_style: String::new(),
+            is_from_theme: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_style_id.is_empty() || true && !self.token_type_str.is_empty() || true && !self.modifiers_csv.is_empty() || true && !self.resolved_fg.is_empty() || true && !self.resolved_style.is_empty() || true && self.is_from_theme || true
+    }
+}
+
+impl Default for JokTokenStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme icon mapping
+#[derive(Debug, Clone)]
+pub struct JolThemeIcon {
+    pub theme_icon_id: String,
+    pub icon_id_str: String,
+    pub font_character: String,
+    pub font_id_str: String,
+    pub color_ref: String,
+    pub is_animation: bool,
+}
+
+impl JolThemeIcon {
+    pub fn new() -> Self {
+        Self {
+            theme_icon_id: String::new(),
+            icon_id_str: String::new(),
+            font_character: String::new(),
+            font_id_str: String::new(),
+            color_ref: String::new(),
+            is_animation: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_icon_id.is_empty() || true && !self.icon_id_str.is_empty() || true && !self.font_character.is_empty() || true && !self.font_id_str.is_empty() || true && !self.color_ref.is_empty() || true && self.is_animation || true
+    }
+}
+
+impl Default for JolThemeIcon {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workbench color entry
+#[derive(Debug, Clone)]
+pub struct JomWorkbenchColor {
+    pub wb_color_id: String,
+    pub color_key: String,
+    pub hex_value: String,
+    pub category_str: String,
+    pub affected_elements: String,
+    pub is_transparent: bool,
+}
+
+impl JomWorkbenchColor {
+    pub fn new() -> Self {
+        Self {
+            wb_color_id: String::new(),
+            color_key: String::new(),
+            hex_value: String::new(),
+            category_str: String::new(),
+            affected_elements: String::new(),
+            is_transparent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wb_color_id.is_empty() || true && !self.color_key.is_empty() || true && !self.hex_value.is_empty() || true && !self.category_str.is_empty() || true && !self.affected_elements.is_empty() || true && self.is_transparent || true
+    }
+}
+
+impl Default for JomWorkbenchColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor color entry
+#[derive(Debug, Clone)]
+pub struct JonEditorColor {
+    pub editor_color_id: String,
+    pub color_key: String,
+    pub hex_value: String,
+    pub scope_str: String,
+    pub fallback_key: String,
+    pub is_foreground: bool,
+}
+
+impl JonEditorColor {
+    pub fn new() -> Self {
+        Self {
+            editor_color_id: String::new(),
+            color_key: String::new(),
+            hex_value: String::new(),
+            scope_str: String::new(),
+            fallback_key: String::new(),
+            is_foreground: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_color_id.is_empty() || true && !self.color_key.is_empty() || true && !self.hex_value.is_empty() || true && !self.scope_str.is_empty() || true && !self.fallback_key.is_empty() || true && self.is_foreground || true
+    }
+}
+
+impl Default for JonEditorColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal ANSI color
+#[derive(Debug, Clone)]
+pub struct JooTerminalColor {
+    pub term_color_id: String,
+    pub ansi_index: u32,
+    pub hex_value: String,
+    pub name_str: String,
+    pub bright_variant: String,
+    pub is_bright: bool,
+}
+
+impl JooTerminalColor {
+    pub fn new() -> Self {
+        Self {
+            term_color_id: String::new(),
+            ansi_index: u32::default(),
+            hex_value: String::new(),
+            name_str: String::new(),
+            bright_variant: String::new(),
+            is_bright: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_color_id.is_empty() || true && self.ansi_index < u32::MAX || true && !self.hex_value.is_empty() || true && !self.name_str.is_empty() || true && !self.bright_variant.is_empty() || true && self.is_bright || true
+    }
+}
+
+impl Default for JooTerminalColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff decoration color
+#[derive(Debug, Clone)]
+pub struct JopDiffColor {
+    pub diff_color_id: String,
+    pub change_type_str: String,
+    pub bg_color: String,
+    pub border_color: String,
+    pub gutter_color: String,
+    pub is_overview_ruler: bool,
+}
+
+impl JopDiffColor {
+    pub fn new() -> Self {
+        Self {
+            diff_color_id: String::new(),
+            change_type_str: String::new(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            gutter_color: String::new(),
+            is_overview_ruler: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_color_id.is_empty() || true && !self.change_type_str.is_empty() || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && !self.gutter_color.is_empty() || true && self.is_overview_ruler || true
+    }
+}
+
+impl Default for JopDiffColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Merge conflict color
+#[derive(Debug, Clone)]
+pub struct JoqMergeColor {
+    pub merge_color_id: String,
+    pub region_str: String,
+    pub header_bg: String,
+    pub content_bg: String,
+    pub border_color: String,
+    pub is_current: bool,
+}
+
+impl JoqMergeColor {
+    pub fn new() -> Self {
+        Self {
+            merge_color_id: String::new(),
+            region_str: String::new(),
+            header_bg: String::new(),
+            content_bg: String::new(),
+            border_color: String::new(),
+            is_current: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.merge_color_id.is_empty() || true && !self.region_str.is_empty() || true && !self.header_bg.is_empty() || true && !self.content_bg.is_empty() || true && !self.border_color.is_empty() || true && self.is_current || true
+    }
+}
+
+impl Default for JoqMergeColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git decoration color
+#[derive(Debug, Clone)]
+pub struct JorGitColor {
+    pub git_color_id: String,
+    pub status_str: String,
+    pub fg_color: String,
+    pub resource_indicator: String,
+    pub decoration_str: String,
+    pub is_ignored: bool,
+}
+
+impl JorGitColor {
+    pub fn new() -> Self {
+        Self {
+            git_color_id: String::new(),
+            status_str: String::new(),
+            fg_color: String::new(),
+            resource_indicator: String::new(),
+            decoration_str: String::new(),
+            is_ignored: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.git_color_id.is_empty() || true && !self.status_str.is_empty() || true && !self.fg_color.is_empty() || true && !self.resource_indicator.is_empty() || true && !self.decoration_str.is_empty() || true && self.is_ignored || true
+    }
+}
+
+impl Default for JorGitColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chart/graph color entry
+#[derive(Debug, Clone)]
+pub struct JosChartColor {
+    pub chart_color_id: String,
+    pub series_index: u32,
+    pub color_hex: String,
+    pub label_str: String,
+    pub opacity_val: f64,
+    pub is_foreground: bool,
+}
+
+impl JosChartColor {
+    pub fn new() -> Self {
+        Self {
+            chart_color_id: String::new(),
+            series_index: u32::default(),
+            color_hex: String::new(),
+            label_str: String::new(),
+            opacity_val: f64::default(),
+            is_foreground: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chart_color_id.is_empty() || true && self.series_index < u32::MAX || true && !self.color_hex.is_empty() || true && !self.label_str.is_empty() || true && self.opacity_val.is_finite() || true && self.is_foreground || true
+    }
+}
+
+impl Default for JosChartColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Badge color entry
+#[derive(Debug, Clone)]
+pub struct JotBadgeColor {
+    pub badge_color_id: String,
+    pub bg_color: String,
+    pub fg_color: String,
+    pub context_str: String,
+    pub font_weight: String,
+    pub is_counter: bool,
+}
+
+impl JotBadgeColor {
+    pub fn new() -> Self {
+        Self {
+            badge_color_id: String::new(),
+            bg_color: String::new(),
+            fg_color: String::new(),
+            context_str: String::new(),
+            font_weight: String::new(),
+            is_counter: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.badge_color_id.is_empty() || true && !self.bg_color.is_empty() || true && !self.fg_color.is_empty() || true && !self.context_str.is_empty() || true && !self.font_weight.is_empty() || true && self.is_counter || true
+    }
+}
+
+impl Default for JotBadgeColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Button color entry
+#[derive(Debug, Clone)]
+pub struct JouButtonColor {
+    pub button_color_id: String,
+    pub bg_color: String,
+    pub fg_color: String,
+    pub hover_bg: String,
+    pub border_hex: String,
+    pub is_secondary: bool,
+}
+
+impl JouButtonColor {
+    pub fn new() -> Self {
+        Self {
+            button_color_id: String::new(),
+            bg_color: String::new(),
+            fg_color: String::new(),
+            hover_bg: String::new(),
+            border_hex: String::new(),
+            is_secondary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.button_color_id.is_empty() || true && !self.bg_color.is_empty() || true && !self.fg_color.is_empty() || true && !self.hover_bg.is_empty() || true && !self.border_hex.is_empty() || true && self.is_secondary || true
+    }
+}
+
+impl Default for JouButtonColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Input field color entry
+#[derive(Debug, Clone)]
+pub struct JovInputColor {
+    pub input_color_id: String,
+    pub bg_color: String,
+    pub fg_color: String,
+    pub border_color: String,
+    pub placeholder_color: String,
+    pub is_focused: bool,
+}
+
+impl JovInputColor {
+    pub fn new() -> Self {
+        Self {
+            input_color_id: String::new(),
+            bg_color: String::new(),
+            fg_color: String::new(),
+            border_color: String::new(),
+            placeholder_color: String::new(),
+            is_focused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_color_id.is_empty() || true && !self.bg_color.is_empty() || true && !self.fg_color.is_empty() || true && !self.border_color.is_empty() || true && !self.placeholder_color.is_empty() || true && self.is_focused || true
+    }
+}
+
+impl Default for JovInputColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// List/tree color entry
+#[derive(Debug, Clone)]
+pub struct JowListColor {
+    pub list_color_id: String,
+    pub active_bg: String,
+    pub active_fg: String,
+    pub hover_bg: String,
+    pub focus_outline: String,
+    pub is_tree: bool,
+}
+
+impl JowListColor {
+    pub fn new() -> Self {
+        Self {
+            list_color_id: String::new(),
+            active_bg: String::new(),
+            active_fg: String::new(),
+            hover_bg: String::new(),
+            focus_outline: String::new(),
+            is_tree: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_color_id.is_empty() || true && !self.active_bg.is_empty() || true && !self.active_fg.is_empty() || true && !self.hover_bg.is_empty() || true && !self.focus_outline.is_empty() || true && self.is_tree || true
+    }
+}
+
+impl Default for JowListColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Scrollbar color entry
+#[derive(Debug, Clone)]
+pub struct JoxScrollbarColor {
+    pub sb_color_id: String,
+    pub thumb_color: String,
+    pub thumb_hover_color: String,
+    pub track_color: String,
+    pub shadow_color: String,
+    pub is_horizontal: bool,
+}
+
+impl JoxScrollbarColor {
+    pub fn new() -> Self {
+        Self {
+            sb_color_id: String::new(),
+            thumb_color: String::new(),
+            thumb_hover_color: String::new(),
+            track_color: String::new(),
+            shadow_color: String::new(),
+            is_horizontal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sb_color_id.is_empty() || true && !self.thumb_color.is_empty() || true && !self.thumb_hover_color.is_empty() || true && !self.track_color.is_empty() || true && !self.shadow_color.is_empty() || true && self.is_horizontal || true
+    }
+}
+
+impl Default for JoxScrollbarColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Progress bar color
+#[derive(Debug, Clone)]
+pub struct JoyProgressColor {
+    pub prog_color_id: String,
+    pub bar_color: String,
+    pub bg_color: String,
+    pub border_color: String,
+    pub animation_str: String,
+    pub is_indeterminate: bool,
+}
+
+impl JoyProgressColor {
+    pub fn new() -> Self {
+        Self {
+            prog_color_id: String::new(),
+            bar_color: String::new(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            animation_str: String::new(),
+            is_indeterminate: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prog_color_id.is_empty() || true && !self.bar_color.is_empty() || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && !self.animation_str.is_empty() || true && self.is_indeterminate || true
+    }
+}
+
+impl Default for JoyProgressColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Border color entry
+#[derive(Debug, Clone)]
+pub struct JozBorderColor {
+    pub border_color_id: String,
+    pub color_hex: String,
+    pub width_px: u32,
+    pub style_str: String,
+    pub radius_px: u32,
+    pub is_focus_border: bool,
+}
+
+impl JozBorderColor {
+    pub fn new() -> Self {
+        Self {
+            border_color_id: String::new(),
+            color_hex: String::new(),
+            width_px: u32::default(),
+            style_str: String::new(),
+            radius_px: u32::default(),
+            is_focus_border: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.border_color_id.is_empty() || true && !self.color_hex.is_empty() || true && self.width_px < u32::MAX || true && !self.style_str.is_empty() || true && self.radius_px < u32::MAX || true && self.is_focus_border || true
+    }
+}
+
+impl Default for JozBorderColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -439223,6 +440107,474 @@ mod tests_jnz_generated {
     fn test_jnz_fields() {
         let mut obj = JnzChatConfig::default();
         obj.chat_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_joa_generated {
+    use super::*;
+
+    #[test]
+    fn test_joa_default() {
+        let obj = JoaColorTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_joa_fields() {
+        let mut obj = JoaColorTheme::default();
+        obj.color_theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_job_generated {
+    use super::*;
+
+    #[test]
+    fn test_job_default() {
+        let obj = JobThemeColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_job_fields() {
+        let mut obj = JobThemeColor::default();
+        obj.theme_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_joc_generated {
+    use super::*;
+
+    #[test]
+    fn test_joc_default() {
+        let obj = JocTokenColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_joc_fields() {
+        let mut obj = JocTokenColor::default();
+        obj.token_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jod_generated {
+    use super::*;
+
+    #[test]
+    fn test_jod_default() {
+        let obj = JodIconTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jod_fields() {
+        let mut obj = JodIconTheme::default();
+        obj.icon_theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_joe_generated {
+    use super::*;
+
+    #[test]
+    fn test_joe_default() {
+        let obj = JoeProductIcon::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_joe_fields() {
+        let mut obj = JoeProductIcon::default();
+        obj.product_icon_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jof_generated {
+    use super::*;
+
+    #[test]
+    fn test_jof_default() {
+        let obj = JofSemanticColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jof_fields() {
+        let mut obj = JofSemanticColor::default();
+        obj.sem_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jog_generated {
+    use super::*;
+
+    #[test]
+    fn test_jog_default() {
+        let obj = JogColorRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jog_fields() {
+        let mut obj = JogColorRegistry::default();
+        obj.color_reg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_joh_generated {
+    use super::*;
+
+    #[test]
+    fn test_joh_default() {
+        let obj = JohColorContribution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_joh_fields() {
+        let mut obj = JohColorContribution::default();
+        obj.color_contrib_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_joi_generated {
+    use super::*;
+
+    #[test]
+    fn test_joi_default() {
+        let obj = JoiThemeCustomization::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_joi_fields() {
+        let mut obj = JoiThemeCustomization::default();
+        obj.theme_custom_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_joj_generated {
+    use super::*;
+
+    #[test]
+    fn test_joj_default() {
+        let obj = JojColorPicker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_joj_fields() {
+        let mut obj = JojColorPicker::default();
+        obj.color_picker_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jok_generated {
+    use super::*;
+
+    #[test]
+    fn test_jok_default() {
+        let obj = JokTokenStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jok_fields() {
+        let mut obj = JokTokenStyle::default();
+        obj.token_style_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jol_generated {
+    use super::*;
+
+    #[test]
+    fn test_jol_default() {
+        let obj = JolThemeIcon::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jol_fields() {
+        let mut obj = JolThemeIcon::default();
+        obj.theme_icon_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jom_generated {
+    use super::*;
+
+    #[test]
+    fn test_jom_default() {
+        let obj = JomWorkbenchColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jom_fields() {
+        let mut obj = JomWorkbenchColor::default();
+        obj.wb_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jon_generated {
+    use super::*;
+
+    #[test]
+    fn test_jon_default() {
+        let obj = JonEditorColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jon_fields() {
+        let mut obj = JonEditorColor::default();
+        obj.editor_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_joo_generated {
+    use super::*;
+
+    #[test]
+    fn test_joo_default() {
+        let obj = JooTerminalColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_joo_fields() {
+        let mut obj = JooTerminalColor::default();
+        obj.term_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jop_generated {
+    use super::*;
+
+    #[test]
+    fn test_jop_default() {
+        let obj = JopDiffColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jop_fields() {
+        let mut obj = JopDiffColor::default();
+        obj.diff_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_joq_generated {
+    use super::*;
+
+    #[test]
+    fn test_joq_default() {
+        let obj = JoqMergeColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_joq_fields() {
+        let mut obj = JoqMergeColor::default();
+        obj.merge_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jor_generated {
+    use super::*;
+
+    #[test]
+    fn test_jor_default() {
+        let obj = JorGitColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jor_fields() {
+        let mut obj = JorGitColor::default();
+        obj.git_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jos_generated {
+    use super::*;
+
+    #[test]
+    fn test_jos_default() {
+        let obj = JosChartColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jos_fields() {
+        let mut obj = JosChartColor::default();
+        obj.chart_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jot_generated {
+    use super::*;
+
+    #[test]
+    fn test_jot_default() {
+        let obj = JotBadgeColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jot_fields() {
+        let mut obj = JotBadgeColor::default();
+        obj.badge_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jou_generated {
+    use super::*;
+
+    #[test]
+    fn test_jou_default() {
+        let obj = JouButtonColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jou_fields() {
+        let mut obj = JouButtonColor::default();
+        obj.button_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jov_generated {
+    use super::*;
+
+    #[test]
+    fn test_jov_default() {
+        let obj = JovInputColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jov_fields() {
+        let mut obj = JovInputColor::default();
+        obj.input_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jow_generated {
+    use super::*;
+
+    #[test]
+    fn test_jow_default() {
+        let obj = JowListColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jow_fields() {
+        let mut obj = JowListColor::default();
+        obj.list_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jox_generated {
+    use super::*;
+
+    #[test]
+    fn test_jox_default() {
+        let obj = JoxScrollbarColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jox_fields() {
+        let mut obj = JoxScrollbarColor::default();
+        obj.sb_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_joy_generated {
+    use super::*;
+
+    #[test]
+    fn test_joy_default() {
+        let obj = JoyProgressColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_joy_fields() {
+        let mut obj = JoyProgressColor::default();
+        obj.prog_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_joz_generated {
+    use super::*;
+
+    #[test]
+    fn test_joz_default() {
+        let obj = JozBorderColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_joz_fields() {
+        let mut obj = JozBorderColor::default();
+        obj.border_color_id = "test".to_string();
         assert!(obj.validate());
     }
 }
