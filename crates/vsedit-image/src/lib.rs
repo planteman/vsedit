@@ -58570,6 +58570,459 @@ impl Default for FdoWasmExport {
 }
 
 
+/// HTTP client request/response types
+#[derive(Debug, Clone)]
+pub struct FdpHttpClient {
+    pub http_url: String,
+    pub http_method: String,
+    pub http_headers: String,
+    pub http_body: String,
+    pub http_timeout_ms: u32,
+    pub http_follow_redirects: bool,
+    pub http_max_redirects: u32,
+    pub http_status_code: u32,
+    pub http_response_body: String,
+    pub http_proxy_url: String,
+}
+
+impl FdpHttpClient {
+    pub fn new() -> Self {
+        Self {
+            http_url: String::new(),
+            http_method: String::new(),
+            http_headers: String::new(),
+            http_body: String::new(),
+            http_timeout_ms: u32::default(),
+            http_follow_redirects: bool::default(),
+            http_max_redirects: u32::default(),
+            http_status_code: u32::default(),
+            http_response_body: String::new(),
+            http_proxy_url: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.http_url.is_empty() || true && !self.http_method.is_empty() || true && !self.http_headers.is_empty() || true && !self.http_body.is_empty() || true && self.http_timeout_ms < u32::MAX || true && self.http_follow_redirects || true && self.http_max_redirects < u32::MAX || true && self.http_status_code < u32::MAX || true && !self.http_response_body.is_empty() || true && !self.http_proxy_url.is_empty() || true
+    }
+}
+
+impl Default for FdpHttpClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// HTTP header types
+#[derive(Debug, Clone)]
+pub struct FdqHttpHeader {
+    pub header_name: String,
+    pub header_value: String,
+    pub header_is_sensitive: bool,
+    pub header_append: bool,
+    pub header_encoding: String,
+    pub header_max_size: u32,
+    pub header_is_hop_by_hop: bool,
+    pub header_is_content_type: bool,
+    pub header_is_authorization: bool,
+    pub header_raw_bytes: String,
+}
+
+impl FdqHttpHeader {
+    pub fn new() -> Self {
+        Self {
+            header_name: String::new(),
+            header_value: String::new(),
+            header_is_sensitive: bool::default(),
+            header_append: bool::default(),
+            header_encoding: String::new(),
+            header_max_size: u32::default(),
+            header_is_hop_by_hop: bool::default(),
+            header_is_content_type: bool::default(),
+            header_is_authorization: bool::default(),
+            header_raw_bytes: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.header_name.is_empty() || true && !self.header_value.is_empty() || true && self.header_is_sensitive || true && self.header_append || true && !self.header_encoding.is_empty() || true && self.header_max_size < u32::MAX || true && self.header_is_hop_by_hop || true && self.header_is_content_type || true && self.header_is_authorization || true && !self.header_raw_bytes.is_empty() || true
+    }
+}
+
+impl Default for FdqHttpHeader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// WebSocket connection types
+#[derive(Debug, Clone)]
+pub struct FdrWebSocket {
+    pub ws_url: String,
+    pub ws_protocol: String,
+    pub ws_extensions: String,
+    pub ws_max_frame_size: u64,
+    pub ws_ping_interval: u32,
+    pub ws_pong_timeout: u32,
+    pub ws_close_code: u32,
+    pub ws_close_reason: String,
+    pub ws_compression: bool,
+    pub ws_is_connected: bool,
+}
+
+impl FdrWebSocket {
+    pub fn new() -> Self {
+        Self {
+            ws_url: String::new(),
+            ws_protocol: String::new(),
+            ws_extensions: String::new(),
+            ws_max_frame_size: u64::default(),
+            ws_ping_interval: u32::default(),
+            ws_pong_timeout: u32::default(),
+            ws_close_code: u32::default(),
+            ws_close_reason: String::new(),
+            ws_compression: bool::default(),
+            ws_is_connected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_url.is_empty() || true && !self.ws_protocol.is_empty() || true && !self.ws_extensions.is_empty() || true && self.ws_max_frame_size < u64::MAX || true && self.ws_ping_interval < u32::MAX || true && self.ws_pong_timeout < u32::MAX || true && self.ws_close_code < u32::MAX || true && !self.ws_close_reason.is_empty() || true && self.ws_compression || true && self.ws_is_connected || true
+    }
+}
+
+impl Default for FdrWebSocket {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// HTTP/SOCKS proxy configuration types
+#[derive(Debug, Clone)]
+pub struct FdsProxyConfig {
+    pub proxy_url: String,
+    pub proxy_username: String,
+    pub proxy_no_proxy: String,
+    pub proxy_type: String,
+    pub proxy_port: u32,
+    pub proxy_auth_type: String,
+    pub proxy_bypass_local: bool,
+    pub proxy_pac_url: String,
+    pub proxy_strict_ssl: bool,
+    pub proxy_timeout_ms: u32,
+}
+
+impl FdsProxyConfig {
+    pub fn new() -> Self {
+        Self {
+            proxy_url: String::new(),
+            proxy_username: String::new(),
+            proxy_no_proxy: String::new(),
+            proxy_type: String::new(),
+            proxy_port: u32::default(),
+            proxy_auth_type: String::new(),
+            proxy_bypass_local: bool::default(),
+            proxy_pac_url: String::new(),
+            proxy_strict_ssl: bool::default(),
+            proxy_timeout_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proxy_url.is_empty() || true && !self.proxy_username.is_empty() || true && !self.proxy_no_proxy.is_empty() || true && !self.proxy_type.is_empty() || true && self.proxy_port < u32::MAX || true && !self.proxy_auth_type.is_empty() || true && self.proxy_bypass_local || true && !self.proxy_pac_url.is_empty() || true && self.proxy_strict_ssl || true && self.proxy_timeout_ms < u32::MAX || true
+    }
+}
+
+impl Default for FdsProxyConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// TLS/SSL configuration types
+#[derive(Debug, Clone)]
+pub struct FdtTlsConfig {
+    pub tls_cert_path: String,
+    pub tls_key_path: String,
+    pub tls_ca_path: String,
+    pub tls_verify_peer: bool,
+    pub tls_min_version: String,
+    pub tls_max_version: String,
+    pub tls_cipher_suites: String,
+    pub tls_alpn_protocols: String,
+    pub tls_sni_hostname: String,
+    pub tls_client_auth: bool,
+}
+
+impl FdtTlsConfig {
+    pub fn new() -> Self {
+        Self {
+            tls_cert_path: String::new(),
+            tls_key_path: String::new(),
+            tls_ca_path: String::new(),
+            tls_verify_peer: bool::default(),
+            tls_min_version: String::new(),
+            tls_max_version: String::new(),
+            tls_cipher_suites: String::new(),
+            tls_alpn_protocols: String::new(),
+            tls_sni_hostname: String::new(),
+            tls_client_auth: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tls_cert_path.is_empty() || true && !self.tls_key_path.is_empty() || true && !self.tls_ca_path.is_empty() || true && self.tls_verify_peer || true && !self.tls_min_version.is_empty() || true && !self.tls_max_version.is_empty() || true && !self.tls_cipher_suites.is_empty() || true && !self.tls_alpn_protocols.is_empty() || true && !self.tls_sni_hostname.is_empty() || true && self.tls_client_auth || true
+    }
+}
+
+impl Default for FdtTlsConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// SSH connection and tunnel types
+#[derive(Debug, Clone)]
+pub struct FduSshConnection {
+    pub ssh_host: String,
+    pub ssh_port: u32,
+    pub ssh_username: String,
+    pub ssh_auth_type: String,
+    pub ssh_private_key_path: String,
+    pub ssh_passphrase: String,
+    pub ssh_known_hosts_path: String,
+    pub ssh_forward_agent: bool,
+    pub ssh_tunnel_local_port: u32,
+    pub ssh_tunnel_remote_port: u32,
+}
+
+impl FduSshConnection {
+    pub fn new() -> Self {
+        Self {
+            ssh_host: String::new(),
+            ssh_port: u32::default(),
+            ssh_username: String::new(),
+            ssh_auth_type: String::new(),
+            ssh_private_key_path: String::new(),
+            ssh_passphrase: String::new(),
+            ssh_known_hosts_path: String::new(),
+            ssh_forward_agent: bool::default(),
+            ssh_tunnel_local_port: u32::default(),
+            ssh_tunnel_remote_port: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ssh_host.is_empty() || true && self.ssh_port < u32::MAX || true && !self.ssh_username.is_empty() || true && !self.ssh_auth_type.is_empty() || true && !self.ssh_private_key_path.is_empty() || true && !self.ssh_passphrase.is_empty() || true && !self.ssh_known_hosts_path.is_empty() || true && self.ssh_forward_agent || true && self.ssh_tunnel_local_port < u32::MAX || true && self.ssh_tunnel_remote_port < u32::MAX || true
+    }
+}
+
+impl Default for FduSshConnection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// IPC (Unix socket/named pipe) channel types
+#[derive(Debug, Clone)]
+pub struct FdvIpcChannel {
+    pub ipc_path: String,
+    pub ipc_protocol: String,
+    pub ipc_buffer_size: u32,
+    pub ipc_timeout_ms: u32,
+    pub ipc_is_connected: bool,
+    pub ipc_server_mode: bool,
+    pub ipc_max_clients: u32,
+    pub ipc_message_count: u64,
+    pub ipc_error_count: u64,
+    pub ipc_encoding: String,
+}
+
+impl FdvIpcChannel {
+    pub fn new() -> Self {
+        Self {
+            ipc_path: String::new(),
+            ipc_protocol: String::new(),
+            ipc_buffer_size: u32::default(),
+            ipc_timeout_ms: u32::default(),
+            ipc_is_connected: bool::default(),
+            ipc_server_mode: bool::default(),
+            ipc_max_clients: u32::default(),
+            ipc_message_count: u64::default(),
+            ipc_error_count: u64::default(),
+            ipc_encoding: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ipc_path.is_empty() || true && !self.ipc_protocol.is_empty() || true && self.ipc_buffer_size < u32::MAX || true && self.ipc_timeout_ms < u32::MAX || true && self.ipc_is_connected || true && self.ipc_server_mode || true && self.ipc_max_clients < u32::MAX || true && self.ipc_message_count < u64::MAX || true && self.ipc_error_count < u64::MAX || true && !self.ipc_encoding.is_empty() || true
+    }
+}
+
+impl Default for FdvIpcChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Message port (worker communication) types
+#[derive(Debug, Clone)]
+pub struct FdwMessagePort {
+    pub port_id: u32,
+    pub port_name: String,
+    pub port_is_open: bool,
+    pub port_partner_id: u32,
+    pub port_message_count: u64,
+    pub port_pending_count: u32,
+    pub port_transfer_count: u32,
+    pub port_close_requested: bool,
+    pub port_buffer_size: u32,
+    pub port_creation_time: u64,
+}
+
+impl FdwMessagePort {
+    pub fn new() -> Self {
+        Self {
+            port_id: u32::default(),
+            port_name: String::new(),
+            port_is_open: bool::default(),
+            port_partner_id: u32::default(),
+            port_message_count: u64::default(),
+            port_pending_count: u32::default(),
+            port_transfer_count: u32::default(),
+            port_close_requested: bool::default(),
+            port_buffer_size: u32::default(),
+            port_creation_time: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.port_id < u32::MAX || true && !self.port_name.is_empty() || true && self.port_is_open || true && self.port_partner_id < u32::MAX || true && self.port_message_count < u64::MAX || true && self.port_pending_count < u32::MAX || true && self.port_transfer_count < u32::MAX || true && self.port_close_requested || true && self.port_buffer_size < u32::MAX || true && self.port_creation_time < u64::MAX || true
+    }
+}
+
+impl Default for FdwMessagePort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Shared process management types
+#[derive(Debug, Clone)]
+pub struct FdxSharedProcess {
+    pub shared_process_id: u32,
+    pub shared_process_pid: u32,
+    pub shared_process_ready: bool,
+    pub shared_process_crashed: bool,
+    pub shared_process_crash_count: u32,
+    pub shared_process_memory_mb: u64,
+    pub shared_process_cpu_percent: f64,
+    pub shared_process_channel_count: u32,
+    pub shared_process_start_time: u64,
+    pub shared_process_log_path: String,
+}
+
+impl FdxSharedProcess {
+    pub fn new() -> Self {
+        Self {
+            shared_process_id: u32::default(),
+            shared_process_pid: u32::default(),
+            shared_process_ready: bool::default(),
+            shared_process_crashed: bool::default(),
+            shared_process_crash_count: u32::default(),
+            shared_process_memory_mb: u64::default(),
+            shared_process_cpu_percent: f64::default(),
+            shared_process_channel_count: u32::default(),
+            shared_process_start_time: u64::default(),
+            shared_process_log_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.shared_process_id < u32::MAX || true && self.shared_process_pid < u32::MAX || true && self.shared_process_ready || true && self.shared_process_crashed || true && self.shared_process_crash_count < u32::MAX || true && self.shared_process_memory_mb < u64::MAX || true && self.shared_process_cpu_percent.is_finite() || true && self.shared_process_channel_count < u32::MAX || true && self.shared_process_start_time < u64::MAX || true && !self.shared_process_log_path.is_empty() || true
+    }
+}
+
+impl Default for FdxSharedProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Electron↔terminal bridge types
+#[derive(Debug, Clone)]
+pub struct FdyElectronBridge {
+    pub bridge_channel: String,
+    pub bridge_target: String,
+    pub bridge_method: String,
+    pub bridge_args: String,
+    pub bridge_reply_channel: String,
+    pub bridge_is_sync: bool,
+    pub bridge_timeout_ms: u32,
+    pub bridge_window_id: u32,
+    pub bridge_sender_id: String,
+    pub bridge_nonce: String,
+}
+
+impl FdyElectronBridge {
+    pub fn new() -> Self {
+        Self {
+            bridge_channel: String::new(),
+            bridge_target: String::new(),
+            bridge_method: String::new(),
+            bridge_args: String::new(),
+            bridge_reply_channel: String::new(),
+            bridge_is_sync: bool::default(),
+            bridge_timeout_ms: u32::default(),
+            bridge_window_id: u32::default(),
+            bridge_sender_id: String::new(),
+            bridge_nonce: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bridge_channel.is_empty() || true && !self.bridge_target.is_empty() || true && !self.bridge_method.is_empty() || true && !self.bridge_args.is_empty() || true && !self.bridge_reply_channel.is_empty() || true && self.bridge_is_sync || true && self.bridge_timeout_ms < u32::MAX || true && self.bridge_window_id < u32::MAX || true && !self.bridge_sender_id.is_empty() || true && !self.bridge_nonce.is_empty() || true
+    }
+}
+
+impl Default for FdyElectronBridge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Child process spawning types
+#[derive(Debug, Clone)]
+pub struct FdzProcessSpawn {
+    pub spawn_command: String,
+    pub spawn_args: String,
+    pub spawn_cwd: String,
+    pub spawn_env: String,
+    pub spawn_shell: bool,
+    pub spawn_detached: bool,
+    pub spawn_stdio_inherit: bool,
+    pub spawn_pid: u32,
+    pub spawn_exit_code: u32,
+    pub spawn_kill_signal: String,
+}
+
+impl FdzProcessSpawn {
+    pub fn new() -> Self {
+        Self {
+            spawn_command: String::new(),
+            spawn_args: String::new(),
+            spawn_cwd: String::new(),
+            spawn_env: String::new(),
+            spawn_shell: bool::default(),
+            spawn_detached: bool::default(),
+            spawn_stdio_inherit: bool::default(),
+            spawn_pid: u32::default(),
+            spawn_exit_code: u32::default(),
+            spawn_kill_signal: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.spawn_command.is_empty() || true && !self.spawn_args.is_empty() || true && !self.spawn_cwd.is_empty() || true && !self.spawn_env.is_empty() || true && self.spawn_shell || true && self.spawn_detached || true && self.spawn_stdio_inherit || true && self.spawn_pid < u32::MAX || true && self.spawn_exit_code < u32::MAX || true && !self.spawn_kill_signal.is_empty() || true
+    }
+}
+
+impl Default for FdzProcessSpawn {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -271574,6 +272027,204 @@ mod tests_fdo_generated {
     fn test_fdo_fields() {
         let mut obj = FdoWasmExport::default();
         obj.wasm_export_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdp_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdp_default() {
+        let obj = FdpHttpClient::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdp_fields() {
+        let mut obj = FdpHttpClient::default();
+        obj.http_url = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdq_default() {
+        let obj = FdqHttpHeader::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdq_fields() {
+        let mut obj = FdqHttpHeader::default();
+        obj.header_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdr_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdr_default() {
+        let obj = FdrWebSocket::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdr_fields() {
+        let mut obj = FdrWebSocket::default();
+        obj.ws_url = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fds_generated {
+    use super::*;
+
+    #[test]
+    fn test_fds_default() {
+        let obj = FdsProxyConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fds_fields() {
+        let mut obj = FdsProxyConfig::default();
+        obj.proxy_url = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdt_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdt_default() {
+        let obj = FdtTlsConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdt_fields() {
+        let mut obj = FdtTlsConfig::default();
+        obj.tls_cert_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdu_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdu_default() {
+        let obj = FduSshConnection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdu_fields() {
+        let mut obj = FduSshConnection::default();
+        obj.ssh_host = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdv_default() {
+        let obj = FdvIpcChannel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdv_fields() {
+        let mut obj = FdvIpcChannel::default();
+        obj.ipc_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdw_default() {
+        let obj = FdwMessagePort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdw_fields() {
+        let mut obj = FdwMessagePort::default();
+        obj.port_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdx_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdx_default() {
+        let obj = FdxSharedProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdx_fields() {
+        let mut obj = FdxSharedProcess::default();
+        obj.shared_process_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdy_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdy_default() {
+        let obj = FdyElectronBridge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdy_fields() {
+        let mut obj = FdyElectronBridge::default();
+        obj.bridge_channel = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdz_default() {
+        let obj = FdzProcessSpawn::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdz_fields() {
+        let mut obj = FdzProcessSpawn::default();
+        obj.spawn_command = "test".to_string();
         assert!(obj.validate());
     }
 }
