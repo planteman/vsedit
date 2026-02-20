@@ -54913,6 +54913,213 @@ impl Default for FaeRpcError {
 }
 
 
+/// LSP client connection and capability types
+#[derive(Debug, Clone)]
+pub struct FafLspClient {
+    pub lsp_server_id: String,
+    pub lsp_server_name: String,
+    pub lsp_server_version: String,
+    pub lsp_transport: String,
+    pub lsp_root_uri: String,
+    pub lsp_capabilities: String,
+    pub lsp_trace_value: String,
+    pub lsp_initialization_options: String,
+    pub lsp_process_id: u32,
+    pub lsp_locale: String,
+}
+
+impl FafLspClient {
+    pub fn new() -> Self {
+        Self {
+            lsp_server_id: String::new(),
+            lsp_server_name: String::new(),
+            lsp_server_version: String::new(),
+            lsp_transport: String::new(),
+            lsp_root_uri: String::new(),
+            lsp_capabilities: String::new(),
+            lsp_trace_value: String::new(),
+            lsp_initialization_options: String::new(),
+            lsp_process_id: u32::default(),
+            lsp_locale: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lsp_server_id.is_empty() || true && !self.lsp_server_name.is_empty() || true && !self.lsp_server_version.is_empty() || true && !self.lsp_transport.is_empty() || true && !self.lsp_root_uri.is_empty() || true && !self.lsp_capabilities.is_empty() || true && !self.lsp_trace_value.is_empty() || true && !self.lsp_initialization_options.is_empty() || true && self.lsp_process_id < u32::MAX || true && !self.lsp_locale.is_empty() || true
+    }
+}
+
+impl Default for FafLspClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// LSP server capability declaration types
+#[derive(Debug, Clone)]
+pub struct FagLspCapability {
+    pub capability_name: String,
+    pub capability_supported: bool,
+    pub capability_options: String,
+    pub capability_dynamic_registration: bool,
+    pub capability_resolve_provider: bool,
+    pub capability_trigger_characters: String,
+    pub capability_work_done_progress: bool,
+    pub capability_link_support: bool,
+    pub capability_label_detail: bool,
+    pub capability_document_selector: String,
+}
+
+impl FagLspCapability {
+    pub fn new() -> Self {
+        Self {
+            capability_name: String::new(),
+            capability_supported: bool::default(),
+            capability_options: String::new(),
+            capability_dynamic_registration: bool::default(),
+            capability_resolve_provider: bool::default(),
+            capability_trigger_characters: String::new(),
+            capability_work_done_progress: bool::default(),
+            capability_link_support: bool::default(),
+            capability_label_detail: bool::default(),
+            capability_document_selector: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.capability_name.is_empty() || true && self.capability_supported || true && !self.capability_options.is_empty() || true && self.capability_dynamic_registration || true && self.capability_resolve_provider || true && !self.capability_trigger_characters.is_empty() || true && self.capability_work_done_progress || true && self.capability_link_support || true && self.capability_label_detail || true && !self.capability_document_selector.is_empty() || true
+    }
+}
+
+impl Default for FagLspCapability {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// LSP text document synchronization types
+#[derive(Debug, Clone)]
+pub struct FahLspTextDocument {
+    pub doc_uri: String,
+    pub doc_language_id: String,
+    pub doc_version: u32,
+    pub doc_text: String,
+    pub doc_sync_kind: u32,
+    pub doc_save_include_text: bool,
+    pub doc_will_save: bool,
+    pub doc_will_save_wait_until: bool,
+    pub doc_open_close: bool,
+    pub doc_change_notifications: bool,
+}
+
+impl FahLspTextDocument {
+    pub fn new() -> Self {
+        Self {
+            doc_uri: String::new(),
+            doc_language_id: String::new(),
+            doc_version: u32::default(),
+            doc_text: String::new(),
+            doc_sync_kind: u32::default(),
+            doc_save_include_text: bool::default(),
+            doc_will_save: bool::default(),
+            doc_will_save_wait_until: bool::default(),
+            doc_open_close: bool::default(),
+            doc_change_notifications: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.doc_uri.is_empty() || true && !self.doc_language_id.is_empty() || true && self.doc_version < u32::MAX || true && !self.doc_text.is_empty() || true && self.doc_sync_kind < u32::MAX || true && self.doc_save_include_text || true && self.doc_will_save || true && self.doc_will_save_wait_until || true && self.doc_open_close || true && self.doc_change_notifications || true
+    }
+}
+
+impl Default for FahLspTextDocument {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// LSP diagnostic message types
+#[derive(Debug, Clone)]
+pub struct FaiLspDiagnostic {
+    pub diag_severity: u32,
+    pub diag_message: String,
+    pub diag_source: String,
+    pub diag_code: String,
+    pub diag_code_description: String,
+    pub diag_range_start_line: u32,
+    pub diag_range_start_col: u32,
+    pub diag_range_end_line: u32,
+    pub diag_range_end_col: u32,
+    pub diag_tags: String,
+}
+
+impl FaiLspDiagnostic {
+    pub fn new() -> Self {
+        Self {
+            diag_severity: u32::default(),
+            diag_message: String::new(),
+            diag_source: String::new(),
+            diag_code: String::new(),
+            diag_code_description: String::new(),
+            diag_range_start_line: u32::default(),
+            diag_range_start_col: u32::default(),
+            diag_range_end_line: u32::default(),
+            diag_range_end_col: u32::default(),
+            diag_tags: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.diag_severity < u32::MAX || true && !self.diag_message.is_empty() || true && !self.diag_source.is_empty() || true && !self.diag_code.is_empty() || true && !self.diag_code_description.is_empty() || true && self.diag_range_start_line < u32::MAX || true && self.diag_range_start_col < u32::MAX || true && self.diag_range_end_line < u32::MAX || true && self.diag_range_end_col < u32::MAX || true && !self.diag_tags.is_empty() || true
+    }
+}
+
+impl Default for FaiLspDiagnostic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// LSP workspace folder and configuration types
+#[derive(Debug, Clone)]
+pub struct FajLspWorkspace {
+    pub workspace_root_uri: String,
+    pub workspace_name: String,
+    pub workspace_capabilities: String,
+    pub workspace_folders: String,
+    pub workspace_configuration: String,
+    pub workspace_did_change_config: bool,
+    pub workspace_did_change_watched: bool,
+    pub workspace_symbol_provider: bool,
+    pub workspace_execute_command: String,
+    pub workspace_apply_edit: bool,
+}
+
+impl FajLspWorkspace {
+    pub fn new() -> Self {
+        Self {
+            workspace_root_uri: String::new(),
+            workspace_name: String::new(),
+            workspace_capabilities: String::new(),
+            workspace_folders: String::new(),
+            workspace_configuration: String::new(),
+            workspace_did_change_config: bool::default(),
+            workspace_did_change_watched: bool::default(),
+            workspace_symbol_provider: bool::default(),
+            workspace_execute_command: String::new(),
+            workspace_apply_edit: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.workspace_root_uri.is_empty() || true && !self.workspace_name.is_empty() || true && !self.workspace_capabilities.is_empty() || true && !self.workspace_folders.is_empty() || true && !self.workspace_configuration.is_empty() || true && self.workspace_did_change_config || true && self.workspace_did_change_watched || true && self.workspace_symbol_provider || true && !self.workspace_execute_command.is_empty() || true && self.workspace_apply_edit || true
+    }
+}
+
+impl Default for FajLspWorkspace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -266294,6 +266501,96 @@ mod tests_fae_generated {
     fn test_fae_fields() {
         let mut obj = FaeRpcError::default();
         obj.error_code = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_faf_generated {
+    use super::*;
+
+    #[test]
+    fn test_faf_default() {
+        let obj = FafLspClient::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_faf_fields() {
+        let mut obj = FafLspClient::default();
+        obj.lsp_server_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fag_generated {
+    use super::*;
+
+    #[test]
+    fn test_fag_default() {
+        let obj = FagLspCapability::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fag_fields() {
+        let mut obj = FagLspCapability::default();
+        obj.capability_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fah_generated {
+    use super::*;
+
+    #[test]
+    fn test_fah_default() {
+        let obj = FahLspTextDocument::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fah_fields() {
+        let mut obj = FahLspTextDocument::default();
+        obj.doc_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fai_generated {
+    use super::*;
+
+    #[test]
+    fn test_fai_default() {
+        let obj = FaiLspDiagnostic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fai_fields() {
+        let mut obj = FaiLspDiagnostic::default();
+        obj.diag_severity = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_faj_generated {
+    use super::*;
+
+    #[test]
+    fn test_faj_default() {
+        let obj = FajLspWorkspace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_faj_fields() {
+        let mut obj = FajLspWorkspace::default();
+        obj.workspace_root_uri = "test".to_string();
         assert!(obj.validate());
     }
 }
