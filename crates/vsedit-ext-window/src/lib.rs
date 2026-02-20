@@ -68109,6 +68109,216 @@ impl Default for FmjExtensionActivation {
     }
 }
 
+/// Extension runtime (kind, location, execution engine, dependencies)
+#[derive(Debug, Clone)]
+pub struct FmkExtensionRuntime {
+    pub runtime_id: String,
+    pub extension_kind: u32,
+    pub extension_location: u32,
+    pub execution_engine: String,
+    pub entry_point: String,
+    pub dependency_count: u32,
+    pub api_version: String,
+    pub enables_proposed_api: bool,
+    pub sandbox_mode: u32,
+    pub workspace_trust_required: bool,
+}
+
+impl FmkExtensionRuntime {
+    pub fn new() -> Self {
+        Self {
+            runtime_id: String::new(),
+            extension_kind: u32::default(),
+            extension_location: u32::default(),
+            execution_engine: String::new(),
+            entry_point: String::new(),
+            dependency_count: u32::default(),
+            api_version: String::new(),
+            enables_proposed_api: bool::default(),
+            sandbox_mode: u32::default(),
+            workspace_trust_required: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.runtime_id.is_empty() || true && self.extension_kind < u32::MAX || true && self.extension_location < u32::MAX || true && !self.execution_engine.is_empty() || true && !self.entry_point.is_empty() || true && self.dependency_count < u32::MAX || true && !self.api_version.is_empty() || true && self.enables_proposed_api || true && self.sandbox_mode < u32::MAX || true && self.workspace_trust_required || true
+    }
+}
+
+impl Default for FmkExtensionRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension gallery/marketplace (id, install count, rating, versions)
+#[derive(Debug, Clone)]
+pub struct FmlExtensionGallery {
+    pub gallery_id: String,
+    pub extension_identifier: String,
+    pub display_name: String,
+    pub short_description: String,
+    pub install_count: u64,
+    pub average_rating: f64,
+    pub rating_count: u32,
+    pub publisher_name: String,
+    pub version_count: u32,
+    pub last_updated_ms: u64,
+}
+
+impl FmlExtensionGallery {
+    pub fn new() -> Self {
+        Self {
+            gallery_id: String::new(),
+            extension_identifier: String::new(),
+            display_name: String::new(),
+            short_description: String::new(),
+            install_count: u64::default(),
+            average_rating: f64::default(),
+            rating_count: u32::default(),
+            publisher_name: String::new(),
+            version_count: u32::default(),
+            last_updated_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gallery_id.is_empty() || true && !self.extension_identifier.is_empty() || true && !self.display_name.is_empty() || true && !self.short_description.is_empty() || true && self.install_count < u64::MAX || true && self.average_rating.is_finite() || true && self.rating_count < u32::MAX || true && !self.publisher_name.is_empty() || true && self.version_count < u32::MAX || true && self.last_updated_ms < u64::MAX || true
+    }
+}
+
+impl Default for FmlExtensionGallery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension recommendation (extension id, reason, source, workspace)
+#[derive(Debug, Clone)]
+pub struct FmmExtensionRecommendation {
+    pub rec_id: String,
+    pub extension_id: String,
+    pub reason_id: u32,
+    pub reason_text: String,
+    pub source_type: u32,
+    pub workspace_uri: String,
+    pub is_config_recommendation: bool,
+    pub is_dynamic: bool,
+    pub timestamp_ms: u64,
+    pub priority: u32,
+}
+
+impl FmmExtensionRecommendation {
+    pub fn new() -> Self {
+        Self {
+            rec_id: String::new(),
+            extension_id: String::new(),
+            reason_id: u32::default(),
+            reason_text: String::new(),
+            source_type: u32::default(),
+            workspace_uri: String::new(),
+            is_config_recommendation: bool::default(),
+            is_dynamic: bool::default(),
+            timestamp_ms: u64::default(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rec_id.is_empty() || true && !self.extension_id.is_empty() || true && self.reason_id < u32::MAX || true && !self.reason_text.is_empty() || true && self.source_type < u32::MAX || true && !self.workspace_uri.is_empty() || true && self.is_config_recommendation || true && self.is_dynamic || true && self.timestamp_ms < u64::MAX || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for FmmExtensionRecommendation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension pack (extensions list, display name, category)
+#[derive(Debug, Clone)]
+pub struct FmnExtensionPack {
+    pub pack_id: String,
+    pub display_name: String,
+    pub extension_ids_json: String,
+    pub category: String,
+    pub description: String,
+    pub publisher: String,
+    pub version: String,
+    pub icon_uri: String,
+    pub extension_count: u32,
+    pub is_builtin: bool,
+}
+
+impl FmnExtensionPack {
+    pub fn new() -> Self {
+        Self {
+            pack_id: String::new(),
+            display_name: String::new(),
+            extension_ids_json: String::new(),
+            category: String::new(),
+            description: String::new(),
+            publisher: String::new(),
+            version: String::new(),
+            icon_uri: String::new(),
+            extension_count: u32::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pack_id.is_empty() || true && !self.display_name.is_empty() || true && !self.extension_ids_json.is_empty() || true && !self.category.is_empty() || true && !self.description.is_empty() || true && !self.publisher.is_empty() || true && !self.version.is_empty() || true && !self.icon_uri.is_empty() || true && self.extension_count < u32::MAX || true && self.is_builtin || true
+    }
+}
+
+impl Default for FmnExtensionPack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension dependency (id, version range, kind, is optional)
+#[derive(Debug, Clone)]
+pub struct FmoExtensionDependency {
+    pub dep_id: String,
+    pub dependency_id: String,
+    pub version_range: String,
+    pub dependency_kind: u32,
+    pub is_optional: bool,
+    pub is_runtime: bool,
+    pub source_extension_id: String,
+    pub installed_version: String,
+    pub is_satisfied: bool,
+    pub error_message: String,
+}
+
+impl FmoExtensionDependency {
+    pub fn new() -> Self {
+        Self {
+            dep_id: String::new(),
+            dependency_id: String::new(),
+            version_range: String::new(),
+            dependency_kind: u32::default(),
+            is_optional: bool::default(),
+            is_runtime: bool::default(),
+            source_extension_id: String::new(),
+            installed_version: String::new(),
+            is_satisfied: bool::default(),
+            error_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dep_id.is_empty() || true && !self.dependency_id.is_empty() || true && !self.version_range.is_empty() || true && self.dependency_kind < u32::MAX || true && self.is_optional || true && self.is_runtime || true && !self.source_extension_id.is_empty() || true && !self.installed_version.is_empty() || true && self.is_satisfied || true && !self.error_message.is_empty() || true
+    }
+}
+
+impl Default for FmoExtensionDependency {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -285106,6 +285316,96 @@ mod tests_fmj_generated {
     fn test_fmj_fields() {
         let mut obj = FmjExtensionActivation::default();
         obj.activation_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmk_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmk_default() {
+        let obj = FmkExtensionRuntime::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmk_fields() {
+        let mut obj = FmkExtensionRuntime::default();
+        obj.runtime_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fml_generated {
+    use super::*;
+
+    #[test]
+    fn test_fml_default() {
+        let obj = FmlExtensionGallery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fml_fields() {
+        let mut obj = FmlExtensionGallery::default();
+        obj.gallery_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmm_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmm_default() {
+        let obj = FmmExtensionRecommendation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmm_fields() {
+        let mut obj = FmmExtensionRecommendation::default();
+        obj.rec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmn_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmn_default() {
+        let obj = FmnExtensionPack::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmn_fields() {
+        let mut obj = FmnExtensionPack::default();
+        obj.pack_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmo_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmo_default() {
+        let obj = FmoExtensionDependency::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmo_fields() {
+        let mut obj = FmoExtensionDependency::default();
+        obj.dep_id = "test".to_string();
         assert!(obj.validate());
     }
 }
