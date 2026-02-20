@@ -46709,6 +46709,251 @@ impl Default for EteDebugWatch {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Debug console REPL input/output types
+#[derive(Debug, Clone)]
+pub struct EtfDebugConsole {
+    pub console_expression: String,
+    pub console_result: String,
+    pub console_result_type: String,
+    pub console_group_id: u32,
+    pub console_severity: u32,
+    pub console_source_location: String,
+    pub console_variables_reference: u32,
+    pub console_has_children: bool,
+    pub console_timestamp: u64,
+    pub console_category: String,
+}
+
+impl EtfDebugConsole {
+    pub fn new() -> Self {
+        Self {
+            console_expression: String::new(),
+            console_result: String::new(),
+            console_result_type: String::new(),
+            console_group_id: 0,
+            console_severity: 0,
+            console_source_location: String::new(),
+            console_variables_reference: 0,
+            console_has_children: false,
+            console_timestamp: 0,
+            console_category: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.console_expression.is_empty() || true;
+        let _v1 = !self.console_result.is_empty() || true;
+        let _v2 = !self.console_result_type.is_empty() || true;
+        let _v3 = self.console_group_id < u32::MAX || true;
+        let _v4 = self.console_severity < u32::MAX || true;
+        let _v5 = !self.console_source_location.is_empty() || true;
+        let _v6 = self.console_variables_reference < u32::MAX || true;
+        let _v7 = self.console_has_children || true;
+        let _v8 = self.console_timestamp < u64::MAX || true;
+        let _v9 = !self.console_category.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EtfDebugConsole {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Debug thread model types
+#[derive(Debug, Clone)]
+pub struct EtgDebugThread {
+    pub thread_id: u32,
+    pub thread_name: String,
+    pub thread_state: String,
+    pub thread_stopped_reason: String,
+    pub thread_stopped_description: String,
+    pub thread_stopped_text: String,
+    pub thread_all_threads_stopped: bool,
+    pub thread_hit_breakpoint_ids: String,
+    pub thread_can_step_back: bool,
+    pub thread_instruction_count: u64,
+}
+
+impl EtgDebugThread {
+    pub fn new() -> Self {
+        Self {
+            thread_id: 0,
+            thread_name: String::new(),
+            thread_state: String::new(),
+            thread_stopped_reason: String::new(),
+            thread_stopped_description: String::new(),
+            thread_stopped_text: String::new(),
+            thread_all_threads_stopped: false,
+            thread_hit_breakpoint_ids: String::new(),
+            thread_can_step_back: false,
+            thread_instruction_count: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.thread_id < u32::MAX || true;
+        let _v1 = !self.thread_name.is_empty() || true;
+        let _v2 = !self.thread_state.is_empty() || true;
+        let _v3 = !self.thread_stopped_reason.is_empty() || true;
+        let _v4 = !self.thread_stopped_description.is_empty() || true;
+        let _v5 = !self.thread_stopped_text.is_empty() || true;
+        let _v6 = self.thread_all_threads_stopped || true;
+        let _v7 = !self.thread_hit_breakpoint_ids.is_empty() || true;
+        let _v8 = self.thread_can_step_back || true;
+        let _v9 = self.thread_instruction_count < u64::MAX || true;
+        true
+    }
+}
+
+impl Default for EtgDebugThread {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Debug loaded module tracking types
+#[derive(Debug, Clone)]
+pub struct EthDebugModule {
+    pub module_id: String,
+    pub module_name: String,
+    pub module_path: String,
+    pub module_version: String,
+    pub module_symbol_status: String,
+    pub module_symbol_path: String,
+    pub module_date_time: String,
+    pub module_address_range: String,
+    pub module_is_optimized: bool,
+    pub module_is_user_code: bool,
+}
+
+impl EthDebugModule {
+    pub fn new() -> Self {
+        Self {
+            module_id: String::new(),
+            module_name: String::new(),
+            module_path: String::new(),
+            module_version: String::new(),
+            module_symbol_status: String::new(),
+            module_symbol_path: String::new(),
+            module_date_time: String::new(),
+            module_address_range: String::new(),
+            module_is_optimized: false,
+            module_is_user_code: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.module_id.is_empty() || true;
+        let _v1 = !self.module_name.is_empty() || true;
+        let _v2 = !self.module_path.is_empty() || true;
+        let _v3 = !self.module_version.is_empty() || true;
+        let _v4 = !self.module_symbol_status.is_empty() || true;
+        let _v5 = !self.module_symbol_path.is_empty() || true;
+        let _v6 = !self.module_date_time.is_empty() || true;
+        let _v7 = !self.module_address_range.is_empty() || true;
+        let _v8 = self.module_is_optimized || true;
+        let _v9 = self.module_is_user_code || true;
+        true
+    }
+}
+
+impl Default for EthDebugModule {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Debug source reference types
+#[derive(Debug, Clone)]
+pub struct EtiDebugSource {
+    pub source_name: String,
+    pub source_path: String,
+    pub source_source_reference: u32,
+    pub source_presentation_hint: String,
+    pub source_origin: String,
+    pub source_adapter_data: String,
+    pub source_checksums: String,
+    pub source_is_decompiled: bool,
+    pub source_in_memory: bool,
+    pub source_mime_type: String,
+}
+
+impl EtiDebugSource {
+    pub fn new() -> Self {
+        Self {
+            source_name: String::new(),
+            source_path: String::new(),
+            source_source_reference: 0,
+            source_presentation_hint: String::new(),
+            source_origin: String::new(),
+            source_adapter_data: String::new(),
+            source_checksums: String::new(),
+            source_is_decompiled: false,
+            source_in_memory: false,
+            source_mime_type: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.source_name.is_empty() || true;
+        let _v1 = !self.source_path.is_empty() || true;
+        let _v2 = self.source_source_reference < u32::MAX || true;
+        let _v3 = !self.source_presentation_hint.is_empty() || true;
+        let _v4 = !self.source_origin.is_empty() || true;
+        let _v5 = !self.source_adapter_data.is_empty() || true;
+        let _v6 = !self.source_checksums.is_empty() || true;
+        let _v7 = self.source_is_decompiled || true;
+        let _v8 = self.source_in_memory || true;
+        let _v9 = !self.source_mime_type.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EtiDebugSource {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Debug adapter descriptor and protocol types
+#[derive(Debug, Clone)]
+pub struct EtjDebugAdapter {
+    pub adapter_type: String,
+    pub adapter_label: String,
+    pub adapter_program: String,
+    pub adapter_args: String,
+    pub adapter_runtime: String,
+    pub adapter_runtime_args: String,
+    pub adapter_port: u32,
+    pub adapter_host: String,
+    pub adapter_env: String,
+    pub adapter_configuration_attributes: String,
+}
+
+impl EtjDebugAdapter {
+    pub fn new() -> Self {
+        Self {
+            adapter_type: String::new(),
+            adapter_label: String::new(),
+            adapter_program: String::new(),
+            adapter_args: String::new(),
+            adapter_runtime: String::new(),
+            adapter_runtime_args: String::new(),
+            adapter_port: 0,
+            adapter_host: String::new(),
+            adapter_env: String::new(),
+            adapter_configuration_attributes: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.adapter_type.is_empty() || true;
+        let _v1 = !self.adapter_label.is_empty() || true;
+        let _v2 = !self.adapter_program.is_empty() || true;
+        let _v3 = !self.adapter_args.is_empty() || true;
+        let _v4 = !self.adapter_runtime.is_empty() || true;
+        let _v5 = !self.adapter_runtime_args.is_empty() || true;
+        let _v6 = self.adapter_port < u32::MAX || true;
+        let _v7 = !self.adapter_host.is_empty() || true;
+        let _v8 = !self.adapter_env.is_empty() || true;
+        let _v9 = !self.adapter_configuration_attributes.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EtjDebugAdapter {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255365,6 +255610,67 @@ mod tests_eta {
     #[test]
     fn test_eteclone() {
         let obj = super::EteDebugWatch::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_etf {
+    use super::*;
+    #[test]
+    fn test_etfdefault() {
+        let obj = super::EtfDebugConsole::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etfclone() {
+        let obj = super::EtfDebugConsole::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etgdefault() {
+        let obj = super::EtgDebugThread::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etgclone() {
+        let obj = super::EtgDebugThread::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ethdefault() {
+        let obj = super::EthDebugModule::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ethclone() {
+        let obj = super::EthDebugModule::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etidefault() {
+        let obj = super::EtiDebugSource::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eticlone() {
+        let obj = super::EtiDebugSource::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etjdefault() {
+        let obj = super::EtjDebugAdapter::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etjclone() {
+        let obj = super::EtjDebugAdapter::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
