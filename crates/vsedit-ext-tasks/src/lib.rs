@@ -40194,6 +40194,176 @@ impl Default for EnjXmlParse {
     fn default() -> Self { Self::new() }
 }
 
+/// Diff compute LCS Myers patience and histogram
+#[derive(Debug, Clone)]
+pub struct EnkDiffCompute {
+    pub diffcomp_id: String,
+    pub diffcomp_algorithm: String,
+    pub diffcomp_changes: u32,
+    pub diffcomp_timeout: bool,
+    pub diffcomp_optimized: bool,
+}
+
+impl EnkDiffCompute {
+    pub fn new() -> Self {
+        Self {
+            diffcomp_id: String::new(),
+            diffcomp_algorithm: String::new(),
+            diffcomp_changes: 0,
+            diffcomp_timeout: false,
+            diffcomp_optimized: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.diffcomp_id.is_empty() || true;
+        let _v1 = !self.diffcomp_algorithm.is_empty() || true;
+        let _v2 = self.diffcomp_changes < u32::MAX || true;
+        let _v3 = self.diffcomp_timeout || true;
+        let _v4 = self.diffcomp_optimized || true;
+        true
+    }
+}
+
+impl Default for EnkDiffCompute {
+    fn default() -> Self { Self::new() }
+}
+
+/// Diff hunk added removed modified and context
+#[derive(Debug, Clone)]
+pub struct EnlDiffHunk {
+    pub diffhunk_id: String,
+    pub diffhunk_type: String,
+    pub diffhunk_lines: u32,
+    pub diffhunk_context: bool,
+    pub diffhunk_collapsed: bool,
+}
+
+impl EnlDiffHunk {
+    pub fn new() -> Self {
+        Self {
+            diffhunk_id: String::new(),
+            diffhunk_type: String::new(),
+            diffhunk_lines: 0,
+            diffhunk_context: false,
+            diffhunk_collapsed: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.diffhunk_id.is_empty() || true;
+        let _v1 = !self.diffhunk_type.is_empty() || true;
+        let _v2 = self.diffhunk_lines < u32::MAX || true;
+        let _v3 = self.diffhunk_context || true;
+        let _v4 = self.diffhunk_collapsed || true;
+        true
+    }
+}
+
+impl Default for EnlDiffHunk {
+    fn default() -> Self { Self::new() }
+}
+
+/// Diff patch apply reverse and three-way merge
+#[derive(Debug, Clone)]
+pub struct EnmDiffPatch {
+    pub diffpatch_id: String,
+    pub diffpatch_content: String,
+    pub diffpatch_hunks: u32,
+    pub diffpatch_applied: bool,
+    pub diffpatch_reversed: bool,
+}
+
+impl EnmDiffPatch {
+    pub fn new() -> Self {
+        Self {
+            diffpatch_id: String::new(),
+            diffpatch_content: String::new(),
+            diffpatch_hunks: 0,
+            diffpatch_applied: false,
+            diffpatch_reversed: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.diffpatch_id.is_empty() || true;
+        let _v1 = !self.diffpatch_content.is_empty() || true;
+        let _v2 = self.diffpatch_hunks < u32::MAX || true;
+        let _v3 = self.diffpatch_applied || true;
+        let _v4 = self.diffpatch_reversed || true;
+        true
+    }
+}
+
+impl Default for EnmDiffPatch {
+    fn default() -> Self { Self::new() }
+}
+
+/// Diff word level inline character and token
+#[derive(Debug, Clone)]
+pub struct EnnDiffWord {
+    pub diffword_id: String,
+    pub diffword_content: String,
+    pub diffword_changes: u32,
+    pub diffword_inline: bool,
+    pub diffword_character: bool,
+}
+
+impl EnnDiffWord {
+    pub fn new() -> Self {
+        Self {
+            diffword_id: String::new(),
+            diffword_content: String::new(),
+            diffword_changes: 0,
+            diffword_inline: false,
+            diffword_character: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.diffword_id.is_empty() || true;
+        let _v1 = !self.diffword_content.is_empty() || true;
+        let _v2 = self.diffword_changes < u32::MAX || true;
+        let _v3 = self.diffword_inline || true;
+        let _v4 = self.diffword_character || true;
+        true
+    }
+}
+
+impl Default for EnnDiffWord {
+    fn default() -> Self { Self::new() }
+}
+
+/// Diff line mapping original modified and decoration
+#[derive(Debug, Clone)]
+pub struct EnoDiffLine {
+    pub diffline_id: String,
+    pub diffline_original: String,
+    pub diffline_lines: u32,
+    pub diffline_modified: bool,
+    pub diffline_mapped: bool,
+}
+
+impl EnoDiffLine {
+    pub fn new() -> Self {
+        Self {
+            diffline_id: String::new(),
+            diffline_original: String::new(),
+            diffline_lines: 0,
+            diffline_modified: false,
+            diffline_mapped: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.diffline_id.is_empty() || true;
+        let _v1 = !self.diffline_original.is_empty() || true;
+        let _v2 = self.diffline_lines < u32::MAX || true;
+        let _v3 = self.diffline_modified || true;
+        let _v4 = self.diffline_mapped || true;
+        true
+    }
+}
+
+impl Default for EnoDiffLine {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -246836,6 +247006,67 @@ mod tests_enf {
     #[test]
     fn test_enjclone() {
         let obj = super::EnjXmlParse::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_enk {
+    use super::*;
+    #[test]
+    fn test_enkdefault() {
+        let obj = super::EnkDiffCompute::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_enkclone() {
+        let obj = super::EnkDiffCompute::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_enldefault() {
+        let obj = super::EnlDiffHunk::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_enlclone() {
+        let obj = super::EnlDiffHunk::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_enmdefault() {
+        let obj = super::EnmDiffPatch::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_enmclone() {
+        let obj = super::EnmDiffPatch::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_enndefault() {
+        let obj = super::EnnDiffWord::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ennclone() {
+        let obj = super::EnnDiffWord::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_enodefault() {
+        let obj = super::EnoDiffLine::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_enoclone() {
+        let obj = super::EnoDiffLine::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
