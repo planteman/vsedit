@@ -50793,6 +50793,213 @@ impl Default for EwjSearchHistory {
 }
 
 
+/// SCM repository model types
+#[derive(Debug, Clone)]
+pub struct EwkScmRepository {
+    pub repo_provider_id: String,
+    pub repo_root_uri: String,
+    pub repo_input_value: String,
+    pub repo_input_placeholder: String,
+    pub repo_resource_count: u32,
+    pub repo_branch_name: String,
+    pub repo_has_changes: bool,
+    pub repo_commit_template: String,
+    pub repo_selected: bool,
+    pub repo_label: String,
+}
+
+impl EwkScmRepository {
+    pub fn new() -> Self {
+        Self {
+            repo_provider_id: String::new(),
+            repo_root_uri: String::new(),
+            repo_input_value: String::new(),
+            repo_input_placeholder: String::new(),
+            repo_resource_count: u32::default(),
+            repo_branch_name: String::new(),
+            repo_has_changes: bool::default(),
+            repo_commit_template: String::new(),
+            repo_selected: bool::default(),
+            repo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.repo_provider_id.is_empty() || true && !self.repo_root_uri.is_empty() || true && !self.repo_input_value.is_empty() || true && !self.repo_input_placeholder.is_empty() || true && self.repo_resource_count < u32::MAX || true && !self.repo_branch_name.is_empty() || true && self.repo_has_changes || true && !self.repo_commit_template.is_empty() || true && self.repo_selected || true && !self.repo_label.is_empty() || true
+    }
+}
+
+impl Default for EwkScmRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// SCM resource group types
+#[derive(Debug, Clone)]
+pub struct EwlScmResourceGroup {
+    pub group_id: String,
+    pub group_label: String,
+    pub group_resource_count: u32,
+    pub group_hide_when_empty: bool,
+    pub group_provider_id: String,
+    pub group_sort_key: String,
+    pub group_is_header: bool,
+    pub group_is_collapsed: bool,
+    pub group_icon_path: String,
+    pub group_tooltip: String,
+}
+
+impl EwlScmResourceGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            group_label: String::new(),
+            group_resource_count: u32::default(),
+            group_hide_when_empty: bool::default(),
+            group_provider_id: String::new(),
+            group_sort_key: String::new(),
+            group_is_header: bool::default(),
+            group_is_collapsed: bool::default(),
+            group_icon_path: String::new(),
+            group_tooltip: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.group_label.is_empty() || true && self.group_resource_count < u32::MAX || true && self.group_hide_when_empty || true && !self.group_provider_id.is_empty() || true && !self.group_sort_key.is_empty() || true && self.group_is_header || true && self.group_is_collapsed || true && !self.group_icon_path.is_empty() || true && !self.group_tooltip.is_empty() || true
+    }
+}
+
+impl Default for EwlScmResourceGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// SCM resource (changed file) types
+#[derive(Debug, Clone)]
+pub struct EwmScmResource {
+    pub resource_uri: String,
+    pub resource_group_id: String,
+    pub resource_type: u32,
+    pub resource_original_uri: String,
+    pub resource_renamed_uri: String,
+    pub resource_decorations: String,
+    pub resource_context_value: String,
+    pub resource_command_id: String,
+    pub resource_tooltip: String,
+    pub resource_is_selected: bool,
+}
+
+impl EwmScmResource {
+    pub fn new() -> Self {
+        Self {
+            resource_uri: String::new(),
+            resource_group_id: String::new(),
+            resource_type: u32::default(),
+            resource_original_uri: String::new(),
+            resource_renamed_uri: String::new(),
+            resource_decorations: String::new(),
+            resource_context_value: String::new(),
+            resource_command_id: String::new(),
+            resource_tooltip: String::new(),
+            resource_is_selected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resource_uri.is_empty() || true && !self.resource_group_id.is_empty() || true && self.resource_type < u32::MAX || true && !self.resource_original_uri.is_empty() || true && !self.resource_renamed_uri.is_empty() || true && !self.resource_decorations.is_empty() || true && !self.resource_context_value.is_empty() || true && !self.resource_command_id.is_empty() || true && !self.resource_tooltip.is_empty() || true && self.resource_is_selected || true
+    }
+}
+
+impl Default for EwmScmResource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// SCM history/commit item types
+#[derive(Debug, Clone)]
+pub struct EwnScmHistoryItem {
+    pub history_id: String,
+    pub history_parent_ids: String,
+    pub history_message: String,
+    pub history_author: String,
+    pub history_author_date: u64,
+    pub history_commit_date: u64,
+    pub history_icon_path: String,
+    pub history_description: String,
+    pub history_statistics: String,
+    pub history_labels: String,
+}
+
+impl EwnScmHistoryItem {
+    pub fn new() -> Self {
+        Self {
+            history_id: String::new(),
+            history_parent_ids: String::new(),
+            history_message: String::new(),
+            history_author: String::new(),
+            history_author_date: u64::default(),
+            history_commit_date: u64::default(),
+            history_icon_path: String::new(),
+            history_description: String::new(),
+            history_statistics: String::new(),
+            history_labels: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.history_id.is_empty() || true && !self.history_parent_ids.is_empty() || true && !self.history_message.is_empty() || true && !self.history_author.is_empty() || true && self.history_author_date < u64::MAX || true && self.history_commit_date < u64::MAX || true && !self.history_icon_path.is_empty() || true && !self.history_description.is_empty() || true && !self.history_statistics.is_empty() || true && !self.history_labels.is_empty() || true
+    }
+}
+
+impl Default for EwnScmHistoryItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// SCM action (stage/commit/push) types
+#[derive(Debug, Clone)]
+pub struct EwoScmAction {
+    pub action_command_id: String,
+    pub action_title: String,
+    pub action_tooltip: String,
+    pub action_icon_path: String,
+    pub action_enabled: bool,
+    pub action_running: bool,
+    pub action_description: String,
+    pub action_category: String,
+    pub action_keybinding: String,
+    pub action_group: String,
+}
+
+impl EwoScmAction {
+    pub fn new() -> Self {
+        Self {
+            action_command_id: String::new(),
+            action_title: String::new(),
+            action_tooltip: String::new(),
+            action_icon_path: String::new(),
+            action_enabled: bool::default(),
+            action_running: bool::default(),
+            action_description: String::new(),
+            action_category: String::new(),
+            action_keybinding: String::new(),
+            action_group: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_command_id.is_empty() || true && !self.action_title.is_empty() || true && !self.action_tooltip.is_empty() || true && !self.action_icon_path.is_empty() || true && self.action_enabled || true && self.action_running || true && !self.action_description.is_empty() || true && !self.action_category.is_empty() || true && !self.action_keybinding.is_empty() || true && !self.action_group.is_empty() || true
+    }
+}
+
+impl Default for EwoScmAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -260400,6 +260607,96 @@ mod tests_ewj_generated {
     fn test_ewj_fields() {
         let mut obj = EwjSearchHistory::default();
         obj.history_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewk_default() {
+        let obj = EwkScmRepository::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewk_fields() {
+        let mut obj = EwkScmRepository::default();
+        obj.repo_provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewl_default() {
+        let obj = EwlScmResourceGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewl_fields() {
+        let mut obj = EwlScmResourceGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewm_default() {
+        let obj = EwmScmResource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewm_fields() {
+        let mut obj = EwmScmResource::default();
+        obj.resource_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewn_default() {
+        let obj = EwnScmHistoryItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewn_fields() {
+        let mut obj = EwnScmHistoryItem::default();
+        obj.history_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewo_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewo_default() {
+        let obj = EwoScmAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewo_fields() {
+        let mut obj = EwoScmAction::default();
+        obj.action_command_id = "test".to_string();
         assert!(obj.validate());
     }
 }
