@@ -42308,6 +42308,251 @@ impl Default for EpoEditorGotoLocation {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Editor find/replace widget settings
+#[derive(Debug, Clone)]
+pub struct EppEditorFind {
+    pub find_auto_restart: bool,
+    pub find_seed_search: bool,
+    pub find_global_buffer: bool,
+    pub find_add_extra_space: bool,
+    pub find_loop: bool,
+    pub find_cursor_move_on_type: bool,
+    pub find_highlight_color: String,
+    pub find_match_bg_color: String,
+    pub find_widget_bg_color: String,
+    pub find_max_results: u32,
+}
+
+impl EppEditorFind {
+    pub fn new() -> Self {
+        Self {
+            find_auto_restart: false,
+            find_seed_search: false,
+            find_global_buffer: false,
+            find_add_extra_space: false,
+            find_loop: false,
+            find_cursor_move_on_type: false,
+            find_highlight_color: String::new(),
+            find_match_bg_color: String::new(),
+            find_widget_bg_color: String::new(),
+            find_max_results: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.find_auto_restart || true;
+        let _v1 = self.find_seed_search || true;
+        let _v2 = self.find_global_buffer || true;
+        let _v3 = self.find_add_extra_space || true;
+        let _v4 = self.find_loop || true;
+        let _v5 = self.find_cursor_move_on_type || true;
+        let _v6 = !self.find_highlight_color.is_empty() || true;
+        let _v7 = !self.find_match_bg_color.is_empty() || true;
+        let _v8 = !self.find_widget_bg_color.is_empty() || true;
+        let _v9 = self.find_max_results < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EppEditorFind {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor code folding configuration
+#[derive(Debug, Clone)]
+pub struct EpqEditorFolding {
+    pub folding_enabled: bool,
+    pub folding_strategy: String,
+    pub folding_highlight_enabled: bool,
+    pub folding_import_sections: bool,
+    pub folding_show_controls: String,
+    pub folding_max_regions: u32,
+    pub folding_decoration_color: String,
+    pub folding_collapsed_icon: String,
+    pub folding_expanded_icon: String,
+    pub folding_range_highlight: bool,
+}
+
+impl EpqEditorFolding {
+    pub fn new() -> Self {
+        Self {
+            folding_enabled: false,
+            folding_strategy: String::new(),
+            folding_highlight_enabled: false,
+            folding_import_sections: false,
+            folding_show_controls: String::new(),
+            folding_max_regions: 0,
+            folding_decoration_color: String::new(),
+            folding_collapsed_icon: String::new(),
+            folding_expanded_icon: String::new(),
+            folding_range_highlight: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.folding_enabled || true;
+        let _v1 = !self.folding_strategy.is_empty() || true;
+        let _v2 = self.folding_highlight_enabled || true;
+        let _v3 = self.folding_import_sections || true;
+        let _v4 = !self.folding_show_controls.is_empty() || true;
+        let _v5 = self.folding_max_regions < u32::MAX || true;
+        let _v6 = !self.folding_decoration_color.is_empty() || true;
+        let _v7 = !self.folding_collapsed_icon.is_empty() || true;
+        let _v8 = !self.folding_expanded_icon.is_empty() || true;
+        let _v9 = self.folding_range_highlight || true;
+        true
+    }
+}
+
+impl Default for EpqEditorFolding {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor word wrap settings
+#[derive(Debug, Clone)]
+pub struct EprEditorWordWrap {
+    pub wrap_column: u32,
+    pub wrap_min_column: u32,
+    pub wrap_bounded: bool,
+    pub wrap_word_pattern: String,
+    pub wrap_indent_mode: String,
+    pub wrap_decorations: bool,
+    pub wrap_visual_column: u32,
+    pub wrap_break_before_width: u32,
+    pub wrap_break_after_width: u32,
+    pub wrap_soft_visible: bool,
+}
+
+impl EprEditorWordWrap {
+    pub fn new() -> Self {
+        Self {
+            wrap_column: 0,
+            wrap_min_column: 0,
+            wrap_bounded: false,
+            wrap_word_pattern: String::new(),
+            wrap_indent_mode: String::new(),
+            wrap_decorations: false,
+            wrap_visual_column: 0,
+            wrap_break_before_width: 0,
+            wrap_break_after_width: 0,
+            wrap_soft_visible: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.wrap_column < u32::MAX || true;
+        let _v1 = self.wrap_min_column < u32::MAX || true;
+        let _v2 = self.wrap_bounded || true;
+        let _v3 = !self.wrap_word_pattern.is_empty() || true;
+        let _v4 = !self.wrap_indent_mode.is_empty() || true;
+        let _v5 = self.wrap_decorations || true;
+        let _v6 = self.wrap_visual_column < u32::MAX || true;
+        let _v7 = self.wrap_break_before_width < u32::MAX || true;
+        let _v8 = self.wrap_break_after_width < u32::MAX || true;
+        let _v9 = self.wrap_soft_visible || true;
+        true
+    }
+}
+
+impl Default for EprEditorWordWrap {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor minimap display settings
+#[derive(Debug, Clone)]
+pub struct EpsEditorMinimap {
+    pub minimap_enabled: bool,
+    pub minimap_side: String,
+    pub minimap_show_slider: String,
+    pub minimap_render_chars: bool,
+    pub minimap_max_column: u32,
+    pub minimap_scale: u32,
+    pub minimap_auto_hide: bool,
+    pub minimap_section_headers: bool,
+    pub minimap_bg_color: String,
+    pub minimap_slider_color: String,
+}
+
+impl EpsEditorMinimap {
+    pub fn new() -> Self {
+        Self {
+            minimap_enabled: false,
+            minimap_side: String::new(),
+            minimap_show_slider: String::new(),
+            minimap_render_chars: false,
+            minimap_max_column: 0,
+            minimap_scale: 0,
+            minimap_auto_hide: false,
+            minimap_section_headers: false,
+            minimap_bg_color: String::new(),
+            minimap_slider_color: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.minimap_enabled || true;
+        let _v1 = !self.minimap_side.is_empty() || true;
+        let _v2 = !self.minimap_show_slider.is_empty() || true;
+        let _v3 = self.minimap_render_chars || true;
+        let _v4 = self.minimap_max_column < u32::MAX || true;
+        let _v5 = self.minimap_scale < u32::MAX || true;
+        let _v6 = self.minimap_auto_hide || true;
+        let _v7 = self.minimap_section_headers || true;
+        let _v8 = !self.minimap_bg_color.is_empty() || true;
+        let _v9 = !self.minimap_slider_color.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EpsEditorMinimap {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor scrollbar appearance settings
+#[derive(Debug, Clone)]
+pub struct EptEditorScrollbar {
+    pub scrollbar_vertical: String,
+    pub scrollbar_horizontal: String,
+    pub scrollbar_vertical_size: u32,
+    pub scrollbar_horizontal_size: u32,
+    pub scrollbar_arrow_enabled: bool,
+    pub scrollbar_bg_color: String,
+    pub scrollbar_fg_color: String,
+    pub scrollbar_hover_color: String,
+    pub scrollbar_shadow_color: String,
+    pub scrollbar_border_radius: u32,
+}
+
+impl EptEditorScrollbar {
+    pub fn new() -> Self {
+        Self {
+            scrollbar_vertical: String::new(),
+            scrollbar_horizontal: String::new(),
+            scrollbar_vertical_size: 0,
+            scrollbar_horizontal_size: 0,
+            scrollbar_arrow_enabled: false,
+            scrollbar_bg_color: String::new(),
+            scrollbar_fg_color: String::new(),
+            scrollbar_hover_color: String::new(),
+            scrollbar_shadow_color: String::new(),
+            scrollbar_border_radius: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.scrollbar_vertical.is_empty() || true;
+        let _v1 = !self.scrollbar_horizontal.is_empty() || true;
+        let _v2 = self.scrollbar_vertical_size < u32::MAX || true;
+        let _v3 = self.scrollbar_horizontal_size < u32::MAX || true;
+        let _v4 = self.scrollbar_arrow_enabled || true;
+        let _v5 = !self.scrollbar_bg_color.is_empty() || true;
+        let _v6 = !self.scrollbar_fg_color.is_empty() || true;
+        let _v7 = !self.scrollbar_hover_color.is_empty() || true;
+        let _v8 = !self.scrollbar_shadow_color.is_empty() || true;
+        let _v9 = self.scrollbar_border_radius < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EptEditorScrollbar {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -249746,6 +249991,67 @@ mod tests_epk {
     #[test]
     fn test_epoclone() {
         let obj = super::EpoEditorGotoLocation::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_epp {
+    use super::*;
+    #[test]
+    fn test_eppdefault() {
+        let obj = super::EppEditorFind::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eppclone() {
+        let obj = super::EppEditorFind::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epqdefault() {
+        let obj = super::EpqEditorFolding::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epqclone() {
+        let obj = super::EpqEditorFolding::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eprdefault() {
+        let obj = super::EprEditorWordWrap::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eprclone() {
+        let obj = super::EprEditorWordWrap::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epsdefault() {
+        let obj = super::EpsEditorMinimap::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epsclone() {
+        let obj = super::EpsEditorMinimap::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eptdefault() {
+        let obj = super::EptEditorScrollbar::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eptclone() {
+        let obj = super::EptEditorScrollbar::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
