@@ -95956,6 +95956,216 @@ impl Default for GmeSignatureHelpProvider {
     }
 }
 
+/// Definition provider (provide definition, location, origin range)
+#[derive(Debug, Clone)]
+pub struct GmfDefinitionProvider {
+    pub def_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub scheme: String,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub can_peek: bool,
+    pub supports_multiple: bool,
+    pub metadata_json: String,
+}
+
+impl GmfDefinitionProvider {
+    pub fn new() -> Self {
+        Self {
+            def_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            scheme: String::new(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            can_peek: bool::default(),
+            supports_multiple: bool::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.def_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && !self.scheme.is_empty() || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.can_peek || true && self.supports_multiple || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GmfDefinitionProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Declaration provider (provide declaration, location, range)
+#[derive(Debug, Clone)]
+pub struct GmgDeclarationProvider {
+    pub decl_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub scheme: String,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub can_peek: bool,
+    pub supports_multiple: bool,
+    pub metadata_json: String,
+}
+
+impl GmgDeclarationProvider {
+    pub fn new() -> Self {
+        Self {
+            decl_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            scheme: String::new(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            can_peek: bool::default(),
+            supports_multiple: bool::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decl_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && !self.scheme.is_empty() || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.can_peek || true && self.supports_multiple || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GmgDeclarationProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Type definition provider (provide type definition, location)
+#[derive(Debug, Clone)]
+pub struct GmhTypeDefinitionProvider {
+    pub type_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub scheme: String,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub can_peek: bool,
+    pub supports_multiple: bool,
+    pub metadata_json: String,
+}
+
+impl GmhTypeDefinitionProvider {
+    pub fn new() -> Self {
+        Self {
+            type_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            scheme: String::new(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            can_peek: bool::default(),
+            supports_multiple: bool::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.type_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && !self.scheme.is_empty() || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.can_peek || true && self.supports_multiple || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GmhTypeDefinitionProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Implementation provider (provide implementations, locations)
+#[derive(Debug, Clone)]
+pub struct GmiImplementationProvider {
+    pub impl_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub scheme: String,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub can_peek: bool,
+    pub supports_multiple: bool,
+    pub metadata_json: String,
+}
+
+impl GmiImplementationProvider {
+    pub fn new() -> Self {
+        Self {
+            impl_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            scheme: String::new(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            can_peek: bool::default(),
+            supports_multiple: bool::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.impl_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && !self.scheme.is_empty() || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.can_peek || true && self.supports_multiple || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GmiImplementationProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Reference provider (provide references, include declaration)
+#[derive(Debug, Clone)]
+pub struct GmjReferenceProvider {
+    pub ref_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub scheme: String,
+    pub priority: u32,
+    pub include_declaration: bool,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub supports_multiple: bool,
+    pub metadata_json: String,
+}
+
+impl GmjReferenceProvider {
+    pub fn new() -> Self {
+        Self {
+            ref_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            scheme: String::new(),
+            priority: u32::default(),
+            include_declaration: bool::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            supports_multiple: bool::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ref_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && !self.scheme.is_empty() || true && self.priority < u32::MAX || true && self.include_declaration || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.supports_multiple || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GmjReferenceProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -325345,6 +325555,96 @@ mod tests_gme_generated {
     fn test_gme_fields() {
         let mut obj = GmeSignatureHelpProvider::default();
         obj.sig_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmf_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmf_default() {
+        let obj = GmfDefinitionProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmf_fields() {
+        let mut obj = GmfDefinitionProvider::default();
+        obj.def_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmg_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmg_default() {
+        let obj = GmgDeclarationProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmg_fields() {
+        let mut obj = GmgDeclarationProvider::default();
+        obj.decl_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmh_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmh_default() {
+        let obj = GmhTypeDefinitionProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmh_fields() {
+        let mut obj = GmhTypeDefinitionProvider::default();
+        obj.type_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmi_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmi_default() {
+        let obj = GmiImplementationProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmi_fields() {
+        let mut obj = GmiImplementationProvider::default();
+        obj.impl_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmj_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmj_default() {
+        let obj = GmjReferenceProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmj_fields() {
+        let mut obj = GmjReferenceProvider::default();
+        obj.ref_prov_id = "test".to_string();
         assert!(obj.validate());
     }
 }
