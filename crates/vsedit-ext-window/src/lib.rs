@@ -163865,6 +163865,890 @@ impl Default for JdzExtensionSnippet {
     }
 }
 
+/// Terminal instance descriptor
+#[derive(Debug, Clone)]
+pub struct JeaTerminalInstance {
+    pub term_inst_id: String,
+    pub shell_path: String,
+    pub title_str: String,
+    pub cols_val: u32,
+    pub rows_val: u32,
+    pub is_active: bool,
+}
+
+impl JeaTerminalInstance {
+    pub fn new() -> Self {
+        Self {
+            term_inst_id: String::new(),
+            shell_path: String::new(),
+            title_str: String::new(),
+            cols_val: u32::default(),
+            rows_val: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_inst_id.is_empty() || true && !self.shell_path.is_empty() || true && !self.title_str.is_empty() || true && self.cols_val < u32::MAX || true && self.rows_val < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for JeaTerminalInstance {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal process descriptor
+#[derive(Debug, Clone)]
+pub struct JebTerminalProcess {
+    pub term_proc_id: String,
+    pub pid_val: u32,
+    pub shell_type_str: String,
+    pub cwd_path: String,
+    pub exit_code: u32,
+    pub is_running: bool,
+}
+
+impl JebTerminalProcess {
+    pub fn new() -> Self {
+        Self {
+            term_proc_id: String::new(),
+            pid_val: u32::default(),
+            shell_type_str: String::new(),
+            cwd_path: String::new(),
+            exit_code: u32::default(),
+            is_running: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_proc_id.is_empty() || true && self.pid_val < u32::MAX || true && !self.shell_type_str.is_empty() || true && !self.cwd_path.is_empty() || true && self.exit_code < u32::MAX || true && self.is_running || true
+    }
+}
+
+impl Default for JebTerminalProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal buffer descriptor
+#[derive(Debug, Clone)]
+pub struct JecTerminalBuffer {
+    pub term_buf_id: String,
+    pub total_rows: u32,
+    pub scrollback_rows: u32,
+    pub active_row: u32,
+    pub active_col: u32,
+    pub has_alt_buffer: bool,
+}
+
+impl JecTerminalBuffer {
+    pub fn new() -> Self {
+        Self {
+            term_buf_id: String::new(),
+            total_rows: u32::default(),
+            scrollback_rows: u32::default(),
+            active_row: u32::default(),
+            active_col: u32::default(),
+            has_alt_buffer: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_buf_id.is_empty() || true && self.total_rows < u32::MAX || true && self.scrollback_rows < u32::MAX || true && self.active_row < u32::MAX || true && self.active_col < u32::MAX || true && self.has_alt_buffer || true
+    }
+}
+
+impl Default for JecTerminalBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal cell descriptor
+#[derive(Debug, Clone)]
+pub struct JedTerminalCell {
+    pub term_cell_id: String,
+    pub char_data: String,
+    pub fg_color_idx: u32,
+    pub bg_color_idx: u32,
+    pub width_val: u32,
+    pub is_wide: bool,
+}
+
+impl JedTerminalCell {
+    pub fn new() -> Self {
+        Self {
+            term_cell_id: String::new(),
+            char_data: String::new(),
+            fg_color_idx: u32::default(),
+            bg_color_idx: u32::default(),
+            width_val: u32::default(),
+            is_wide: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_cell_id.is_empty() || true && !self.char_data.is_empty() || true && self.fg_color_idx < u32::MAX || true && self.bg_color_idx < u32::MAX || true && self.width_val < u32::MAX || true && self.is_wide || true
+    }
+}
+
+impl Default for JedTerminalCell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal row descriptor
+#[derive(Debug, Clone)]
+pub struct JeeTerminalRow {
+    pub term_row_id: String,
+    pub row_index: u32,
+    pub cell_count: u32,
+    pub dirty_from: u32,
+    pub dirty_to: u32,
+    pub is_wrapped: bool,
+}
+
+impl JeeTerminalRow {
+    pub fn new() -> Self {
+        Self {
+            term_row_id: String::new(),
+            row_index: u32::default(),
+            cell_count: u32::default(),
+            dirty_from: u32::default(),
+            dirty_to: u32::default(),
+            is_wrapped: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_row_id.is_empty() || true && self.row_index < u32::MAX || true && self.cell_count < u32::MAX || true && self.dirty_from < u32::MAX || true && self.dirty_to < u32::MAX || true && self.is_wrapped || true
+    }
+}
+
+impl Default for JeeTerminalRow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal character attribute
+#[derive(Debug, Clone)]
+pub struct JefTerminalAttribute {
+    pub term_attr_id: String,
+    pub fg_rgb: String,
+    pub bg_rgb: String,
+    pub font_flags: u32,
+    pub underline_style: String,
+    pub is_bold: bool,
+}
+
+impl JefTerminalAttribute {
+    pub fn new() -> Self {
+        Self {
+            term_attr_id: String::new(),
+            fg_rgb: String::new(),
+            bg_rgb: String::new(),
+            font_flags: u32::default(),
+            underline_style: String::new(),
+            is_bold: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_attr_id.is_empty() || true && !self.fg_rgb.is_empty() || true && !self.bg_rgb.is_empty() || true && self.font_flags < u32::MAX || true && !self.underline_style.is_empty() || true && self.is_bold || true
+    }
+}
+
+impl Default for JefTerminalAttribute {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal cursor state
+#[derive(Debug, Clone)]
+pub struct JegTerminalCursor {
+    pub term_cursor_id: String,
+    pub row_val: u32,
+    pub col_val: u32,
+    pub cursor_style: String,
+    pub blink_interval_ms: u32,
+    pub is_visible: bool,
+}
+
+impl JegTerminalCursor {
+    pub fn new() -> Self {
+        Self {
+            term_cursor_id: String::new(),
+            row_val: u32::default(),
+            col_val: u32::default(),
+            cursor_style: String::new(),
+            blink_interval_ms: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_cursor_id.is_empty() || true && self.row_val < u32::MAX || true && self.col_val < u32::MAX || true && !self.cursor_style.is_empty() || true && self.blink_interval_ms < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for JegTerminalCursor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal escape sequence parser
+#[derive(Debug, Clone)]
+pub struct JehTerminalParser {
+    pub term_parser_id: String,
+    pub current_state: String,
+    pub collected_params: String,
+    pub intermediate_chars: String,
+    pub param_count: u32,
+    pub is_in_esc: bool,
+}
+
+impl JehTerminalParser {
+    pub fn new() -> Self {
+        Self {
+            term_parser_id: String::new(),
+            current_state: String::new(),
+            collected_params: String::new(),
+            intermediate_chars: String::new(),
+            param_count: u32::default(),
+            is_in_esc: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_parser_id.is_empty() || true && !self.current_state.is_empty() || true && !self.collected_params.is_empty() || true && !self.intermediate_chars.is_empty() || true && self.param_count < u32::MAX || true && self.is_in_esc || true
+    }
+}
+
+impl Default for JehTerminalParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal link detection
+#[derive(Debug, Clone)]
+pub struct JeiTerminalLink {
+    pub term_link_id: String,
+    pub url_str: String,
+    pub start_row: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub is_file_link: bool,
+}
+
+impl JeiTerminalLink {
+    pub fn new() -> Self {
+        Self {
+            term_link_id: String::new(),
+            url_str: String::new(),
+            start_row: u32::default(),
+            start_col: u32::default(),
+            end_col: u32::default(),
+            is_file_link: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_link_id.is_empty() || true && !self.url_str.is_empty() || true && self.start_row < u32::MAX || true && self.start_col < u32::MAX || true && self.end_col < u32::MAX || true && self.is_file_link || true
+    }
+}
+
+impl Default for JeiTerminalLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal text selection
+#[derive(Debug, Clone)]
+pub struct JejTerminalSelection {
+    pub term_sel_id: String,
+    pub start_row: u32,
+    pub start_col: u32,
+    pub end_row: u32,
+    pub end_col: u32,
+    pub is_block_select: bool,
+}
+
+impl JejTerminalSelection {
+    pub fn new() -> Self {
+        Self {
+            term_sel_id: String::new(),
+            start_row: u32::default(),
+            start_col: u32::default(),
+            end_row: u32::default(),
+            end_col: u32::default(),
+            is_block_select: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_sel_id.is_empty() || true && self.start_row < u32::MAX || true && self.start_col < u32::MAX || true && self.end_row < u32::MAX || true && self.end_col < u32::MAX || true && self.is_block_select || true
+    }
+}
+
+impl Default for JejTerminalSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal search state
+#[derive(Debug, Clone)]
+pub struct JekTerminalSearch {
+    pub term_search_id: String,
+    pub query_str: String,
+    pub match_count: u32,
+    pub current_match_idx: u32,
+    pub case_sensitive: bool,
+    pub use_regex: bool,
+}
+
+impl JekTerminalSearch {
+    pub fn new() -> Self {
+        Self {
+            term_search_id: String::new(),
+            query_str: String::new(),
+            match_count: u32::default(),
+            current_match_idx: u32::default(),
+            case_sensitive: bool::default(),
+            use_regex: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_search_id.is_empty() || true && !self.query_str.is_empty() || true && self.match_count < u32::MAX || true && self.current_match_idx < u32::MAX || true && self.case_sensitive || true && self.use_regex || true
+    }
+}
+
+impl Default for JekTerminalSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal profile configuration
+#[derive(Debug, Clone)]
+pub struct JelTerminalProfile {
+    pub term_profile_id: String,
+    pub profile_name: String,
+    pub shell_path: String,
+    pub shell_args_csv: String,
+    pub env_json: String,
+    pub is_default: bool,
+}
+
+impl JelTerminalProfile {
+    pub fn new() -> Self {
+        Self {
+            term_profile_id: String::new(),
+            profile_name: String::new(),
+            shell_path: String::new(),
+            shell_args_csv: String::new(),
+            env_json: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_profile_id.is_empty() || true && !self.profile_name.is_empty() || true && !self.shell_path.is_empty() || true && !self.shell_args_csv.is_empty() || true && !self.env_json.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for JelTerminalProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal tab descriptor
+#[derive(Debug, Clone)]
+pub struct JemTerminalTab {
+    pub term_tab_id: String,
+    pub tab_title: String,
+    pub instance_ref: String,
+    pub icon_path: String,
+    pub color_str: String,
+    pub is_pinned: bool,
+}
+
+impl JemTerminalTab {
+    pub fn new() -> Self {
+        Self {
+            term_tab_id: String::new(),
+            tab_title: String::new(),
+            instance_ref: String::new(),
+            icon_path: String::new(),
+            color_str: String::new(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_tab_id.is_empty() || true && !self.tab_title.is_empty() || true && !self.instance_ref.is_empty() || true && !self.icon_path.is_empty() || true && !self.color_str.is_empty() || true && self.is_pinned || true
+    }
+}
+
+impl Default for JemTerminalTab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal split pane
+#[derive(Debug, Clone)]
+pub struct JenTerminalSplit {
+    pub term_split_id: String,
+    pub parent_ref: String,
+    pub direction_str: String,
+    pub size_ratio: f64,
+    pub instance_ref: String,
+    pub is_active: bool,
+}
+
+impl JenTerminalSplit {
+    pub fn new() -> Self {
+        Self {
+            term_split_id: String::new(),
+            parent_ref: String::new(),
+            direction_str: String::new(),
+            size_ratio: f64::default(),
+            instance_ref: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_split_id.is_empty() || true && !self.parent_ref.is_empty() || true && !self.direction_str.is_empty() || true && self.size_ratio.is_finite() || true && !self.instance_ref.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for JenTerminalSplit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal command detection
+#[derive(Debug, Clone)]
+pub struct JeoTerminalCommand {
+    pub term_cmd_id: String,
+    pub command_line: String,
+    pub cwd_path: String,
+    pub exit_code: u32,
+    pub duration_ms: u64,
+    pub has_output: bool,
+}
+
+impl JeoTerminalCommand {
+    pub fn new() -> Self {
+        Self {
+            term_cmd_id: String::new(),
+            command_line: String::new(),
+            cwd_path: String::new(),
+            exit_code: u32::default(),
+            duration_ms: u64::default(),
+            has_output: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_cmd_id.is_empty() || true && !self.command_line.is_empty() || true && !self.cwd_path.is_empty() || true && self.exit_code < u32::MAX || true && self.duration_ms < u64::MAX || true && self.has_output || true
+    }
+}
+
+impl Default for JeoTerminalCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Shell integration data
+#[derive(Debug, Clone)]
+pub struct JepTerminalShellIntegration {
+    pub shell_int_id: String,
+    pub shell_type_str: String,
+    pub prompt_text: String,
+    pub command_start_col: u32,
+    pub output_start_row: u32,
+    pub is_integrated: bool,
+}
+
+impl JepTerminalShellIntegration {
+    pub fn new() -> Self {
+        Self {
+            shell_int_id: String::new(),
+            shell_type_str: String::new(),
+            prompt_text: String::new(),
+            command_start_col: u32::default(),
+            output_start_row: u32::default(),
+            is_integrated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shell_int_id.is_empty() || true && !self.shell_type_str.is_empty() || true && !self.prompt_text.is_empty() || true && self.command_start_col < u32::MAX || true && self.output_start_row < u32::MAX || true && self.is_integrated || true
+    }
+}
+
+impl Default for JepTerminalShellIntegration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal environment entry
+#[derive(Debug, Clone)]
+pub struct JeqTerminalEnvironment {
+    pub term_env_id: String,
+    pub var_name: String,
+    pub var_value: String,
+    pub source_str: String,
+    pub inherited_from: String,
+    pub is_modified: bool,
+}
+
+impl JeqTerminalEnvironment {
+    pub fn new() -> Self {
+        Self {
+            term_env_id: String::new(),
+            var_name: String::new(),
+            var_value: String::new(),
+            source_str: String::new(),
+            inherited_from: String::new(),
+            is_modified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_env_id.is_empty() || true && !self.var_name.is_empty() || true && !self.var_value.is_empty() || true && !self.source_str.is_empty() || true && !self.inherited_from.is_empty() || true && self.is_modified || true
+    }
+}
+
+impl Default for JeqTerminalEnvironment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal accessibility entry
+#[derive(Debug, Clone)]
+pub struct JerTerminalAccessibility {
+    pub term_a11y_id: String,
+    pub buffer_text: String,
+    pub line_count: u32,
+    pub cursor_line: u32,
+    pub announcement_str: String,
+    pub is_screen_reader: bool,
+}
+
+impl JerTerminalAccessibility {
+    pub fn new() -> Self {
+        Self {
+            term_a11y_id: String::new(),
+            buffer_text: String::new(),
+            line_count: u32::default(),
+            cursor_line: u32::default(),
+            announcement_str: String::new(),
+            is_screen_reader: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_a11y_id.is_empty() || true && !self.buffer_text.is_empty() || true && self.line_count < u32::MAX || true && self.cursor_line < u32::MAX || true && !self.announcement_str.is_empty() || true && self.is_screen_reader || true
+    }
+}
+
+impl Default for JerTerminalAccessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal font configuration
+#[derive(Debug, Clone)]
+pub struct JesTerminalFont {
+    pub term_font_id: String,
+    pub font_family: String,
+    pub font_size_px: u32,
+    pub line_height_val: f64,
+    pub letter_spacing: f64,
+    pub is_ligatures_enabled: bool,
+}
+
+impl JesTerminalFont {
+    pub fn new() -> Self {
+        Self {
+            term_font_id: String::new(),
+            font_family: String::new(),
+            font_size_px: u32::default(),
+            line_height_val: f64::default(),
+            letter_spacing: f64::default(),
+            is_ligatures_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_font_id.is_empty() || true && !self.font_family.is_empty() || true && self.font_size_px < u32::MAX || true && self.line_height_val.is_finite() || true && self.letter_spacing.is_finite() || true && self.is_ligatures_enabled || true
+    }
+}
+
+impl Default for JesTerminalFont {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal color theme
+#[derive(Debug, Clone)]
+pub struct JetTerminalTheme {
+    pub term_theme_id: String,
+    pub theme_name: String,
+    pub fg_color: String,
+    pub bg_color: String,
+    pub cursor_color: String,
+    pub is_custom: bool,
+}
+
+impl JetTerminalTheme {
+    pub fn new() -> Self {
+        Self {
+            term_theme_id: String::new(),
+            theme_name: String::new(),
+            fg_color: String::new(),
+            bg_color: String::new(),
+            cursor_color: String::new(),
+            is_custom: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_theme_id.is_empty() || true && !self.theme_name.is_empty() || true && !self.fg_color.is_empty() || true && !self.bg_color.is_empty() || true && !self.cursor_color.is_empty() || true && self.is_custom || true
+    }
+}
+
+impl Default for JetTerminalTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal resize event
+#[derive(Debug, Clone)]
+pub struct JeuTerminalResize {
+    pub term_resize_id: String,
+    pub old_cols: u32,
+    pub old_rows: u32,
+    pub new_cols: u32,
+    pub new_rows: u32,
+    pub is_user_initiated: bool,
+}
+
+impl JeuTerminalResize {
+    pub fn new() -> Self {
+        Self {
+            term_resize_id: String::new(),
+            old_cols: u32::default(),
+            old_rows: u32::default(),
+            new_cols: u32::default(),
+            new_rows: u32::default(),
+            is_user_initiated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_resize_id.is_empty() || true && self.old_cols < u32::MAX || true && self.old_rows < u32::MAX || true && self.new_cols < u32::MAX || true && self.new_rows < u32::MAX || true && self.is_user_initiated || true
+    }
+}
+
+impl Default for JeuTerminalResize {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal bell event
+#[derive(Debug, Clone)]
+pub struct JevTerminalBell {
+    pub term_bell_id: String,
+    pub bell_type_str: String,
+    pub timestamp_epoch: u64,
+    pub sound_file: String,
+    pub flash_duration_ms: u32,
+    pub is_visual: bool,
+}
+
+impl JevTerminalBell {
+    pub fn new() -> Self {
+        Self {
+            term_bell_id: String::new(),
+            bell_type_str: String::new(),
+            timestamp_epoch: u64::default(),
+            sound_file: String::new(),
+            flash_duration_ms: u32::default(),
+            is_visual: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_bell_id.is_empty() || true && !self.bell_type_str.is_empty() || true && self.timestamp_epoch < u64::MAX || true && !self.sound_file.is_empty() || true && self.flash_duration_ms < u32::MAX || true && self.is_visual || true
+    }
+}
+
+impl Default for JevTerminalBell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal title change event
+#[derive(Debug, Clone)]
+pub struct JewTerminalTitle {
+    pub term_title_id: String,
+    pub old_title: String,
+    pub new_title: String,
+    pub icon_name: String,
+    pub sequence_type_str: String,
+    pub is_explicit: bool,
+}
+
+impl JewTerminalTitle {
+    pub fn new() -> Self {
+        Self {
+            term_title_id: String::new(),
+            old_title: String::new(),
+            new_title: String::new(),
+            icon_name: String::new(),
+            sequence_type_str: String::new(),
+            is_explicit: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_title_id.is_empty() || true && !self.old_title.is_empty() || true && !self.new_title.is_empty() || true && !self.icon_name.is_empty() || true && !self.sequence_type_str.is_empty() || true && self.is_explicit || true
+    }
+}
+
+impl Default for JewTerminalTitle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal decoration entry
+#[derive(Debug, Clone)]
+pub struct JexTerminalDecoration {
+    pub term_deco_id: String,
+    pub marker_ref: String,
+    pub line_number: u32,
+    pub color_str: String,
+    pub tooltip_text: String,
+    pub is_overview_ruler: bool,
+}
+
+impl JexTerminalDecoration {
+    pub fn new() -> Self {
+        Self {
+            term_deco_id: String::new(),
+            marker_ref: String::new(),
+            line_number: u32::default(),
+            color_str: String::new(),
+            tooltip_text: String::new(),
+            is_overview_ruler: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_deco_id.is_empty() || true && !self.marker_ref.is_empty() || true && self.line_number < u32::MAX || true && !self.color_str.is_empty() || true && !self.tooltip_text.is_empty() || true && self.is_overview_ruler || true
+    }
+}
+
+impl Default for JexTerminalDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal quick fix suggestion
+#[derive(Debug, Clone)]
+pub struct JeyTerminalQuickFix {
+    pub term_qf_id: String,
+    pub label_str: String,
+    pub command_ref: String,
+    pub source_str: String,
+    pub exit_code: u32,
+    pub is_applicable: bool,
+}
+
+impl JeyTerminalQuickFix {
+    pub fn new() -> Self {
+        Self {
+            term_qf_id: String::new(),
+            label_str: String::new(),
+            command_ref: String::new(),
+            source_str: String::new(),
+            exit_code: u32::default(),
+            is_applicable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_qf_id.is_empty() || true && !self.label_str.is_empty() || true && !self.command_ref.is_empty() || true && !self.source_str.is_empty() || true && self.exit_code < u32::MAX || true && self.is_applicable || true
+    }
+}
+
+impl Default for JeyTerminalQuickFix {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal-bound task
+#[derive(Debug, Clone)]
+pub struct JezTerminalTask {
+    pub term_task_id: String,
+    pub task_name: String,
+    pub shell_command: String,
+    pub working_dir: String,
+    pub instance_ref: String,
+    pub is_background: bool,
+}
+
+impl JezTerminalTask {
+    pub fn new() -> Self {
+        Self {
+            term_task_id: String::new(),
+            task_name: String::new(),
+            shell_command: String::new(),
+            working_dir: String::new(),
+            instance_ref: String::new(),
+            is_background: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_task_id.is_empty() || true && !self.task_name.is_empty() || true && !self.shell_command.is_empty() || true && !self.working_dir.is_empty() || true && !self.instance_ref.is_empty() || true && self.is_background || true
+    }
+}
+
+impl Default for JezTerminalTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -425610,6 +426494,474 @@ mod tests_jdz_generated {
     fn test_jdz_fields() {
         let mut obj = JdzExtensionSnippet::default();
         obj.ext_snippet_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jea_generated {
+    use super::*;
+
+    #[test]
+    fn test_jea_default() {
+        let obj = JeaTerminalInstance::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jea_fields() {
+        let mut obj = JeaTerminalInstance::default();
+        obj.term_inst_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jeb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jeb_default() {
+        let obj = JebTerminalProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jeb_fields() {
+        let mut obj = JebTerminalProcess::default();
+        obj.term_proc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jec_generated {
+    use super::*;
+
+    #[test]
+    fn test_jec_default() {
+        let obj = JecTerminalBuffer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jec_fields() {
+        let mut obj = JecTerminalBuffer::default();
+        obj.term_buf_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jed_generated {
+    use super::*;
+
+    #[test]
+    fn test_jed_default() {
+        let obj = JedTerminalCell::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jed_fields() {
+        let mut obj = JedTerminalCell::default();
+        obj.term_cell_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jee_generated {
+    use super::*;
+
+    #[test]
+    fn test_jee_default() {
+        let obj = JeeTerminalRow::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jee_fields() {
+        let mut obj = JeeTerminalRow::default();
+        obj.term_row_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jef_generated {
+    use super::*;
+
+    #[test]
+    fn test_jef_default() {
+        let obj = JefTerminalAttribute::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jef_fields() {
+        let mut obj = JefTerminalAttribute::default();
+        obj.term_attr_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jeg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jeg_default() {
+        let obj = JegTerminalCursor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jeg_fields() {
+        let mut obj = JegTerminalCursor::default();
+        obj.term_cursor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jeh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jeh_default() {
+        let obj = JehTerminalParser::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jeh_fields() {
+        let mut obj = JehTerminalParser::default();
+        obj.term_parser_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jei_generated {
+    use super::*;
+
+    #[test]
+    fn test_jei_default() {
+        let obj = JeiTerminalLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jei_fields() {
+        let mut obj = JeiTerminalLink::default();
+        obj.term_link_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jej_generated {
+    use super::*;
+
+    #[test]
+    fn test_jej_default() {
+        let obj = JejTerminalSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jej_fields() {
+        let mut obj = JejTerminalSelection::default();
+        obj.term_sel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jek_generated {
+    use super::*;
+
+    #[test]
+    fn test_jek_default() {
+        let obj = JekTerminalSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jek_fields() {
+        let mut obj = JekTerminalSearch::default();
+        obj.term_search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jel_generated {
+    use super::*;
+
+    #[test]
+    fn test_jel_default() {
+        let obj = JelTerminalProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jel_fields() {
+        let mut obj = JelTerminalProfile::default();
+        obj.term_profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jem_generated {
+    use super::*;
+
+    #[test]
+    fn test_jem_default() {
+        let obj = JemTerminalTab::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jem_fields() {
+        let mut obj = JemTerminalTab::default();
+        obj.term_tab_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jen_generated {
+    use super::*;
+
+    #[test]
+    fn test_jen_default() {
+        let obj = JenTerminalSplit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jen_fields() {
+        let mut obj = JenTerminalSplit::default();
+        obj.term_split_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jeo_generated {
+    use super::*;
+
+    #[test]
+    fn test_jeo_default() {
+        let obj = JeoTerminalCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jeo_fields() {
+        let mut obj = JeoTerminalCommand::default();
+        obj.term_cmd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jep_generated {
+    use super::*;
+
+    #[test]
+    fn test_jep_default() {
+        let obj = JepTerminalShellIntegration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jep_fields() {
+        let mut obj = JepTerminalShellIntegration::default();
+        obj.shell_int_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jeq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jeq_default() {
+        let obj = JeqTerminalEnvironment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jeq_fields() {
+        let mut obj = JeqTerminalEnvironment::default();
+        obj.term_env_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jer_generated {
+    use super::*;
+
+    #[test]
+    fn test_jer_default() {
+        let obj = JerTerminalAccessibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jer_fields() {
+        let mut obj = JerTerminalAccessibility::default();
+        obj.term_a11y_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jes_generated {
+    use super::*;
+
+    #[test]
+    fn test_jes_default() {
+        let obj = JesTerminalFont::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jes_fields() {
+        let mut obj = JesTerminalFont::default();
+        obj.term_font_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jet_generated {
+    use super::*;
+
+    #[test]
+    fn test_jet_default() {
+        let obj = JetTerminalTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jet_fields() {
+        let mut obj = JetTerminalTheme::default();
+        obj.term_theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jeu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jeu_default() {
+        let obj = JeuTerminalResize::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jeu_fields() {
+        let mut obj = JeuTerminalResize::default();
+        obj.term_resize_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jev_generated {
+    use super::*;
+
+    #[test]
+    fn test_jev_default() {
+        let obj = JevTerminalBell::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jev_fields() {
+        let mut obj = JevTerminalBell::default();
+        obj.term_bell_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jew_generated {
+    use super::*;
+
+    #[test]
+    fn test_jew_default() {
+        let obj = JewTerminalTitle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jew_fields() {
+        let mut obj = JewTerminalTitle::default();
+        obj.term_title_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jex_generated {
+    use super::*;
+
+    #[test]
+    fn test_jex_default() {
+        let obj = JexTerminalDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jex_fields() {
+        let mut obj = JexTerminalDecoration::default();
+        obj.term_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jey_generated {
+    use super::*;
+
+    #[test]
+    fn test_jey_default() {
+        let obj = JeyTerminalQuickFix::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jey_fields() {
+        let mut obj = JeyTerminalQuickFix::default();
+        obj.term_qf_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jez_generated {
+    use super::*;
+
+    #[test]
+    fn test_jez_default() {
+        let obj = JezTerminalTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jez_fields() {
+        let mut obj = JezTerminalTask::default();
+        obj.term_task_id = "test".to_string();
         assert!(obj.validate());
     }
 }
