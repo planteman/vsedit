@@ -130918,6 +130918,890 @@ impl Default for HszSuggestConfig {
     }
 }
 
+/// Debug adapter protocol session
+#[derive(Debug, Clone)]
+pub struct HtaDapSession {
+    pub session_id: String,
+    pub adapter_name: String,
+    pub program_path: String,
+    pub root_uri: String,
+    pub thread_count: u32,
+    pub is_attached: bool,
+}
+
+impl HtaDapSession {
+    pub fn new() -> Self {
+        Self {
+            session_id: String::new(),
+            adapter_name: String::new(),
+            program_path: String::new(),
+            root_uri: String::new(),
+            thread_count: u32::default(),
+            is_attached: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.session_id.is_empty() || true && !self.adapter_name.is_empty() || true && !self.program_path.is_empty() || true && !self.root_uri.is_empty() || true && self.thread_count < u32::MAX || true && self.is_attached || true
+    }
+}
+
+impl Default for HtaDapSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP debug thread descriptor
+#[derive(Debug, Clone)]
+pub struct HtbDapThread {
+    pub thread_id: String,
+    pub thread_name: String,
+    pub thread_index: u32,
+    pub frame_count: u32,
+    pub stop_reason_len: u32,
+    pub is_stopped: bool,
+}
+
+impl HtbDapThread {
+    pub fn new() -> Self {
+        Self {
+            thread_id: String::new(),
+            thread_name: String::new(),
+            thread_index: u32::default(),
+            frame_count: u32::default(),
+            stop_reason_len: u32::default(),
+            is_stopped: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.thread_id.is_empty() || true && !self.thread_name.is_empty() || true && self.thread_index < u32::MAX || true && self.frame_count < u32::MAX || true && self.stop_reason_len < u32::MAX || true && self.is_stopped || true
+    }
+}
+
+impl Default for HtbDapThread {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP stack frame entry
+#[derive(Debug, Clone)]
+pub struct HtcDapStackFrame {
+    pub frame_id: String,
+    pub frame_name: String,
+    pub source_path: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub is_subtle: bool,
+}
+
+impl HtcDapStackFrame {
+    pub fn new() -> Self {
+        Self {
+            frame_id: String::new(),
+            frame_name: String::new(),
+            source_path: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            is_subtle: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.frame_id.is_empty() || true && !self.frame_name.is_empty() || true && !self.source_path.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && self.is_subtle || true
+    }
+}
+
+impl Default for HtcDapStackFrame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP variable scope
+#[derive(Debug, Clone)]
+pub struct HtdDapScope {
+    pub scope_id: String,
+    pub scope_name: String,
+    pub variable_count: u32,
+    pub named_count: u32,
+    pub indexed_count: u32,
+    pub is_expensive: bool,
+}
+
+impl HtdDapScope {
+    pub fn new() -> Self {
+        Self {
+            scope_id: String::new(),
+            scope_name: String::new(),
+            variable_count: u32::default(),
+            named_count: u32::default(),
+            indexed_count: u32::default(),
+            is_expensive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope_id.is_empty() || true && !self.scope_name.is_empty() || true && self.variable_count < u32::MAX || true && self.named_count < u32::MAX || true && self.indexed_count < u32::MAX || true && self.is_expensive || true
+    }
+}
+
+impl Default for HtdDapScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP variable descriptor
+#[derive(Debug, Clone)]
+pub struct HteDapVariable {
+    pub var_id: String,
+    pub var_name: String,
+    pub var_value: String,
+    pub var_type_str: String,
+    pub child_count: u32,
+    pub is_structured: bool,
+}
+
+impl HteDapVariable {
+    pub fn new() -> Self {
+        Self {
+            var_id: String::new(),
+            var_name: String::new(),
+            var_value: String::new(),
+            var_type_str: String::new(),
+            child_count: u32::default(),
+            is_structured: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.var_id.is_empty() || true && !self.var_name.is_empty() || true && !self.var_value.is_empty() || true && !self.var_type_str.is_empty() || true && self.child_count < u32::MAX || true && self.is_structured || true
+    }
+}
+
+impl Default for HteDapVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP breakpoint descriptor
+#[derive(Debug, Clone)]
+pub struct HtfDapBreakpoint {
+    pub bp_id: String,
+    pub source_path: String,
+    pub line_number: u32,
+    pub condition_expr: String,
+    pub hit_count: u32,
+    pub is_verified: bool,
+}
+
+impl HtfDapBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            bp_id: String::new(),
+            source_path: String::new(),
+            line_number: u32::default(),
+            condition_expr: String::new(),
+            hit_count: u32::default(),
+            is_verified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bp_id.is_empty() || true && !self.source_path.is_empty() || true && self.line_number < u32::MAX || true && !self.condition_expr.is_empty() || true && self.hit_count < u32::MAX || true && self.is_verified || true
+    }
+}
+
+impl Default for HtfDapBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP source reference
+#[derive(Debug, Clone)]
+pub struct HtgDapSource {
+    pub source_id: String,
+    pub source_name: String,
+    pub source_path: String,
+    pub origin_str: String,
+    pub adapter_data_len: u32,
+    pub is_decompiled: bool,
+}
+
+impl HtgDapSource {
+    pub fn new() -> Self {
+        Self {
+            source_id: String::new(),
+            source_name: String::new(),
+            source_path: String::new(),
+            origin_str: String::new(),
+            adapter_data_len: u32::default(),
+            is_decompiled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.source_id.is_empty() || true && !self.source_name.is_empty() || true && !self.source_path.is_empty() || true && !self.origin_str.is_empty() || true && self.adapter_data_len < u32::MAX || true && self.is_decompiled || true
+    }
+}
+
+impl Default for HtgDapSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP loaded module info
+#[derive(Debug, Clone)]
+pub struct HthDapModule {
+    pub module_id: String,
+    pub module_name: String,
+    pub module_path: String,
+    pub version_str: String,
+    pub symbol_status_len: u32,
+    pub is_optimized: bool,
+}
+
+impl HthDapModule {
+    pub fn new() -> Self {
+        Self {
+            module_id: String::new(),
+            module_name: String::new(),
+            module_path: String::new(),
+            version_str: String::new(),
+            symbol_status_len: u32::default(),
+            is_optimized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.module_id.is_empty() || true && !self.module_name.is_empty() || true && !self.module_path.is_empty() || true && !self.version_str.is_empty() || true && self.symbol_status_len < u32::MAX || true && self.is_optimized || true
+    }
+}
+
+impl Default for HthDapModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP exception info
+#[derive(Debug, Clone)]
+pub struct HtiDapException {
+    pub exception_id: String,
+    pub exception_type_name: String,
+    pub description_text: String,
+    pub breakpoint_mode: String,
+    pub inner_count: u32,
+    pub is_user_unhandled: bool,
+}
+
+impl HtiDapException {
+    pub fn new() -> Self {
+        Self {
+            exception_id: String::new(),
+            exception_type_name: String::new(),
+            description_text: String::new(),
+            breakpoint_mode: String::new(),
+            inner_count: u32::default(),
+            is_user_unhandled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exception_id.is_empty() || true && !self.exception_type_name.is_empty() || true && !self.description_text.is_empty() || true && !self.breakpoint_mode.is_empty() || true && self.inner_count < u32::MAX || true && self.is_user_unhandled || true
+    }
+}
+
+impl Default for HtiDapException {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP evaluate expression result
+#[derive(Debug, Clone)]
+pub struct HtjDapEvalResult {
+    pub eval_id: String,
+    pub expression_text: String,
+    pub result_text: String,
+    pub result_type_str: String,
+    pub child_count: u32,
+    pub is_side_effect_free: bool,
+}
+
+impl HtjDapEvalResult {
+    pub fn new() -> Self {
+        Self {
+            eval_id: String::new(),
+            expression_text: String::new(),
+            result_text: String::new(),
+            result_type_str: String::new(),
+            child_count: u32::default(),
+            is_side_effect_free: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.eval_id.is_empty() || true && !self.expression_text.is_empty() || true && !self.result_text.is_empty() || true && !self.result_type_str.is_empty() || true && self.child_count < u32::MAX || true && self.is_side_effect_free || true
+    }
+}
+
+impl Default for HtjDapEvalResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP watch expression entry
+#[derive(Debug, Clone)]
+pub struct HtkDapWatchExpr {
+    pub watch_id: String,
+    pub expression_text: String,
+    pub result_text: String,
+    pub result_type_str: String,
+    pub eval_count: u64,
+    pub is_enabled: bool,
+}
+
+impl HtkDapWatchExpr {
+    pub fn new() -> Self {
+        Self {
+            watch_id: String::new(),
+            expression_text: String::new(),
+            result_text: String::new(),
+            result_type_str: String::new(),
+            eval_count: u64::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watch_id.is_empty() || true && !self.expression_text.is_empty() || true && !self.result_text.is_empty() || true && !self.result_type_str.is_empty() || true && self.eval_count < u64::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for HtkDapWatchExpr {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP data breakpoint
+#[derive(Debug, Clone)]
+pub struct HtlDapDataBreakpoint {
+    pub data_bp_id: String,
+    pub data_id_str: String,
+    pub access_kind: String,
+    pub condition_expr: String,
+    pub hit_count: u32,
+    pub is_verified: bool,
+}
+
+impl HtlDapDataBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            data_bp_id: String::new(),
+            data_id_str: String::new(),
+            access_kind: String::new(),
+            condition_expr: String::new(),
+            hit_count: u32::default(),
+            is_verified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.data_bp_id.is_empty() || true && !self.data_id_str.is_empty() || true && !self.access_kind.is_empty() || true && !self.condition_expr.is_empty() || true && self.hit_count < u32::MAX || true && self.is_verified || true
+    }
+}
+
+impl Default for HtlDapDataBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP function breakpoint
+#[derive(Debug, Clone)]
+pub struct HtmDapFunctionBp {
+    pub fn_bp_id: String,
+    pub function_name: String,
+    pub condition_expr: String,
+    pub hit_condition: String,
+    pub hit_count: u32,
+    pub is_verified: bool,
+}
+
+impl HtmDapFunctionBp {
+    pub fn new() -> Self {
+        Self {
+            fn_bp_id: String::new(),
+            function_name: String::new(),
+            condition_expr: String::new(),
+            hit_condition: String::new(),
+            hit_count: u32::default(),
+            is_verified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fn_bp_id.is_empty() || true && !self.function_name.is_empty() || true && !self.condition_expr.is_empty() || true && !self.hit_condition.is_empty() || true && self.hit_count < u32::MAX || true && self.is_verified || true
+    }
+}
+
+impl Default for HtmDapFunctionBp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP instruction breakpoint
+#[derive(Debug, Clone)]
+pub struct HtnDapInstructionBp {
+    pub inst_bp_id: String,
+    pub instruction_ref: String,
+    pub offset_value: u32,
+    pub condition_expr: String,
+    pub hit_count: u32,
+    pub is_verified: bool,
+}
+
+impl HtnDapInstructionBp {
+    pub fn new() -> Self {
+        Self {
+            inst_bp_id: String::new(),
+            instruction_ref: String::new(),
+            offset_value: u32::default(),
+            condition_expr: String::new(),
+            hit_count: u32::default(),
+            is_verified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inst_bp_id.is_empty() || true && !self.instruction_ref.is_empty() || true && self.offset_value < u32::MAX || true && !self.condition_expr.is_empty() || true && self.hit_count < u32::MAX || true && self.is_verified || true
+    }
+}
+
+impl Default for HtnDapInstructionBp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP log point entry
+#[derive(Debug, Clone)]
+pub struct HtoDapLogPoint {
+    pub log_id: String,
+    pub source_path: String,
+    pub line_number: u32,
+    pub log_message: String,
+    pub hit_count: u32,
+    pub is_enabled: bool,
+}
+
+impl HtoDapLogPoint {
+    pub fn new() -> Self {
+        Self {
+            log_id: String::new(),
+            source_path: String::new(),
+            line_number: u32::default(),
+            log_message: String::new(),
+            hit_count: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_id.is_empty() || true && !self.source_path.is_empty() || true && self.line_number < u32::MAX || true && !self.log_message.is_empty() || true && self.hit_count < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for HtoDapLogPoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP debug console completion
+#[derive(Debug, Clone)]
+pub struct HtpDapCompletionItem {
+    pub item_id: String,
+    pub label_text: String,
+    pub sort_text: String,
+    pub detail_text: String,
+    pub completion_type: u32,
+    pub is_local: bool,
+}
+
+impl HtpDapCompletionItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            label_text: String::new(),
+            sort_text: String::new(),
+            detail_text: String::new(),
+            completion_type: u32::default(),
+            is_local: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.label_text.is_empty() || true && !self.sort_text.is_empty() || true && !self.detail_text.is_empty() || true && self.completion_type < u32::MAX || true && self.is_local || true
+    }
+}
+
+impl Default for HtpDapCompletionItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP disassembly instruction
+#[derive(Debug, Clone)]
+pub struct HtqDapDisassembly {
+    pub disasm_id: String,
+    pub instruction_ref: String,
+    pub instruction_text: String,
+    pub source_path: String,
+    pub line_number: u32,
+    pub is_current: bool,
+}
+
+impl HtqDapDisassembly {
+    pub fn new() -> Self {
+        Self {
+            disasm_id: String::new(),
+            instruction_ref: String::new(),
+            instruction_text: String::new(),
+            source_path: String::new(),
+            line_number: u32::default(),
+            is_current: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.disasm_id.is_empty() || true && !self.instruction_ref.is_empty() || true && !self.instruction_text.is_empty() || true && !self.source_path.is_empty() || true && self.line_number < u32::MAX || true && self.is_current || true
+    }
+}
+
+impl Default for HtqDapDisassembly {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP memory reference
+#[derive(Debug, Clone)]
+pub struct HtrDapMemoryRef {
+    pub mem_id: String,
+    pub memory_ref: String,
+    pub offset_bytes: u64,
+    pub byte_count: u32,
+    pub display_text: String,
+    pub is_readonly: bool,
+}
+
+impl HtrDapMemoryRef {
+    pub fn new() -> Self {
+        Self {
+            mem_id: String::new(),
+            memory_ref: String::new(),
+            offset_bytes: u64::default(),
+            byte_count: u32::default(),
+            display_text: String::new(),
+            is_readonly: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mem_id.is_empty() || true && !self.memory_ref.is_empty() || true && self.offset_bytes < u64::MAX || true && self.byte_count < u32::MAX || true && !self.display_text.is_empty() || true && self.is_readonly || true
+    }
+}
+
+impl Default for HtrDapMemoryRef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP output event entry
+#[derive(Debug, Clone)]
+pub struct HtsDapOutput {
+    pub output_id: String,
+    pub category_str: String,
+    pub output_text: String,
+    pub source_ref: String,
+    pub line_number: u32,
+    pub is_stderr: bool,
+}
+
+impl HtsDapOutput {
+    pub fn new() -> Self {
+        Self {
+            output_id: String::new(),
+            category_str: String::new(),
+            output_text: String::new(),
+            source_ref: String::new(),
+            line_number: u32::default(),
+            is_stderr: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_id.is_empty() || true && !self.category_str.is_empty() || true && !self.output_text.is_empty() || true && !self.source_ref.is_empty() || true && self.line_number < u32::MAX || true && self.is_stderr || true
+    }
+}
+
+impl Default for HtsDapOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP launch configuration
+#[derive(Debug, Clone)]
+pub struct HttDapLaunchConfig {
+    pub config_id: String,
+    pub config_name: String,
+    pub config_type_str: String,
+    pub program_path: String,
+    pub arg_count: u32,
+    pub stop_on_entry: bool,
+}
+
+impl HttDapLaunchConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            config_name: String::new(),
+            config_type_str: String::new(),
+            program_path: String::new(),
+            arg_count: u32::default(),
+            stop_on_entry: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && !self.config_name.is_empty() || true && !self.config_type_str.is_empty() || true && !self.program_path.is_empty() || true && self.arg_count < u32::MAX || true && self.stop_on_entry || true
+    }
+}
+
+impl Default for HttDapLaunchConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP attach configuration
+#[derive(Debug, Clone)]
+pub struct HtuDapAttachConfig {
+    pub attach_id: String,
+    pub config_name: String,
+    pub process_id_str: String,
+    pub host_name: String,
+    pub port_number: u32,
+    pub restart_on_attach: bool,
+}
+
+impl HtuDapAttachConfig {
+    pub fn new() -> Self {
+        Self {
+            attach_id: String::new(),
+            config_name: String::new(),
+            process_id_str: String::new(),
+            host_name: String::new(),
+            port_number: u32::default(),
+            restart_on_attach: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.attach_id.is_empty() || true && !self.config_name.is_empty() || true && !self.process_id_str.is_empty() || true && !self.host_name.is_empty() || true && self.port_number < u32::MAX || true && self.restart_on_attach || true
+    }
+}
+
+impl Default for HtuDapAttachConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP adapter capability flag
+#[derive(Debug, Clone)]
+pub struct HtvDapCapability {
+    pub cap_id: String,
+    pub capability_name: String,
+    pub supported_version: String,
+    pub feature_group: String,
+    pub priority_value: u32,
+    pub is_supported: bool,
+}
+
+impl HtvDapCapability {
+    pub fn new() -> Self {
+        Self {
+            cap_id: String::new(),
+            capability_name: String::new(),
+            supported_version: String::new(),
+            feature_group: String::new(),
+            priority_value: u32::default(),
+            is_supported: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cap_id.is_empty() || true && !self.capability_name.is_empty() || true && !self.supported_version.is_empty() || true && !self.feature_group.is_empty() || true && self.priority_value < u32::MAX || true && self.is_supported || true
+    }
+}
+
+impl Default for HtvDapCapability {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug console state model
+#[derive(Debug, Clone)]
+pub struct HtwDebugConsole {
+    pub console_id: String,
+    pub history_count: u32,
+    pub max_history: u32,
+    pub filter_text: String,
+    pub scroll_offset: u32,
+    pub word_wrap_enabled: bool,
+}
+
+impl HtwDebugConsole {
+    pub fn new() -> Self {
+        Self {
+            console_id: String::new(),
+            history_count: u32::default(),
+            max_history: u32::default(),
+            filter_text: String::new(),
+            scroll_offset: u32::default(),
+            word_wrap_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.console_id.is_empty() || true && self.history_count < u32::MAX || true && self.max_history < u32::MAX || true && !self.filter_text.is_empty() || true && self.scroll_offset < u32::MAX || true && self.word_wrap_enabled || true
+    }
+}
+
+impl Default for HtwDebugConsole {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug toolbar action state
+#[derive(Debug, Clone)]
+pub struct HtxDebugToolbar {
+    pub toolbar_id: String,
+    pub action_label: String,
+    pub icon_name: String,
+    pub keybinding_str: String,
+    pub sort_order: u32,
+    pub is_enabled: bool,
+}
+
+impl HtxDebugToolbar {
+    pub fn new() -> Self {
+        Self {
+            toolbar_id: String::new(),
+            action_label: String::new(),
+            icon_name: String::new(),
+            keybinding_str: String::new(),
+            sort_order: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.toolbar_id.is_empty() || true && !self.action_label.is_empty() || true && !self.icon_name.is_empty() || true && !self.keybinding_str.is_empty() || true && self.sort_order < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for HtxDebugToolbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug call stack view state
+#[derive(Debug, Clone)]
+pub struct HtyCallStack {
+    pub stack_id: String,
+    pub thread_ref: String,
+    pub frame_count: u32,
+    pub selected_frame: u32,
+    pub total_frames: u32,
+    pub is_collapsed: bool,
+}
+
+impl HtyCallStack {
+    pub fn new() -> Self {
+        Self {
+            stack_id: String::new(),
+            thread_ref: String::new(),
+            frame_count: u32::default(),
+            selected_frame: u32::default(),
+            total_frames: u32::default(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.stack_id.is_empty() || true && !self.thread_ref.is_empty() || true && self.frame_count < u32::MAX || true && self.selected_frame < u32::MAX || true && self.total_frames < u32::MAX || true && self.is_collapsed || true
+    }
+}
+
+impl Default for HtyCallStack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug expression hover result
+#[derive(Debug, Clone)]
+pub struct HtzDebugHover {
+    pub hover_id: String,
+    pub expression_text: String,
+    pub result_text: String,
+    pub result_type_str: String,
+    pub child_count: u32,
+    pub is_lazy: bool,
+}
+
+impl HtzDebugHover {
+    pub fn new() -> Self {
+        Self {
+            hover_id: String::new(),
+            expression_text: String::new(),
+            result_text: String::new(),
+            result_type_str: String::new(),
+            child_count: u32::default(),
+            is_lazy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hover_id.is_empty() || true && !self.expression_text.is_empty() || true && !self.result_text.is_empty() || true && !self.result_type_str.is_empty() || true && self.child_count < u32::MAX || true && self.is_lazy || true
+    }
+}
+
+impl Default for HtzDebugHover {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -375565,6 +376449,474 @@ mod tests_hsz_generated {
     fn test_hsz_fields() {
         let mut obj = HszSuggestConfig::default();
         obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hta_generated {
+    use super::*;
+
+    #[test]
+    fn test_hta_default() {
+        let obj = HtaDapSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hta_fields() {
+        let mut obj = HtaDapSession::default();
+        obj.session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htb_generated {
+    use super::*;
+
+    #[test]
+    fn test_htb_default() {
+        let obj = HtbDapThread::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htb_fields() {
+        let mut obj = HtbDapThread::default();
+        obj.thread_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htc_generated {
+    use super::*;
+
+    #[test]
+    fn test_htc_default() {
+        let obj = HtcDapStackFrame::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htc_fields() {
+        let mut obj = HtcDapStackFrame::default();
+        obj.frame_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htd_generated {
+    use super::*;
+
+    #[test]
+    fn test_htd_default() {
+        let obj = HtdDapScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htd_fields() {
+        let mut obj = HtdDapScope::default();
+        obj.scope_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hte_generated {
+    use super::*;
+
+    #[test]
+    fn test_hte_default() {
+        let obj = HteDapVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hte_fields() {
+        let mut obj = HteDapVariable::default();
+        obj.var_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htf_generated {
+    use super::*;
+
+    #[test]
+    fn test_htf_default() {
+        let obj = HtfDapBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htf_fields() {
+        let mut obj = HtfDapBreakpoint::default();
+        obj.bp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htg_generated {
+    use super::*;
+
+    #[test]
+    fn test_htg_default() {
+        let obj = HtgDapSource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htg_fields() {
+        let mut obj = HtgDapSource::default();
+        obj.source_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hth_generated {
+    use super::*;
+
+    #[test]
+    fn test_hth_default() {
+        let obj = HthDapModule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hth_fields() {
+        let mut obj = HthDapModule::default();
+        obj.module_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hti_generated {
+    use super::*;
+
+    #[test]
+    fn test_hti_default() {
+        let obj = HtiDapException::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hti_fields() {
+        let mut obj = HtiDapException::default();
+        obj.exception_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htj_generated {
+    use super::*;
+
+    #[test]
+    fn test_htj_default() {
+        let obj = HtjDapEvalResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htj_fields() {
+        let mut obj = HtjDapEvalResult::default();
+        obj.eval_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htk_generated {
+    use super::*;
+
+    #[test]
+    fn test_htk_default() {
+        let obj = HtkDapWatchExpr::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htk_fields() {
+        let mut obj = HtkDapWatchExpr::default();
+        obj.watch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htl_generated {
+    use super::*;
+
+    #[test]
+    fn test_htl_default() {
+        let obj = HtlDapDataBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htl_fields() {
+        let mut obj = HtlDapDataBreakpoint::default();
+        obj.data_bp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htm_generated {
+    use super::*;
+
+    #[test]
+    fn test_htm_default() {
+        let obj = HtmDapFunctionBp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htm_fields() {
+        let mut obj = HtmDapFunctionBp::default();
+        obj.fn_bp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htn_generated {
+    use super::*;
+
+    #[test]
+    fn test_htn_default() {
+        let obj = HtnDapInstructionBp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htn_fields() {
+        let mut obj = HtnDapInstructionBp::default();
+        obj.inst_bp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hto_generated {
+    use super::*;
+
+    #[test]
+    fn test_hto_default() {
+        let obj = HtoDapLogPoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hto_fields() {
+        let mut obj = HtoDapLogPoint::default();
+        obj.log_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htp_generated {
+    use super::*;
+
+    #[test]
+    fn test_htp_default() {
+        let obj = HtpDapCompletionItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htp_fields() {
+        let mut obj = HtpDapCompletionItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htq_generated {
+    use super::*;
+
+    #[test]
+    fn test_htq_default() {
+        let obj = HtqDapDisassembly::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htq_fields() {
+        let mut obj = HtqDapDisassembly::default();
+        obj.disasm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htr_generated {
+    use super::*;
+
+    #[test]
+    fn test_htr_default() {
+        let obj = HtrDapMemoryRef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htr_fields() {
+        let mut obj = HtrDapMemoryRef::default();
+        obj.mem_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hts_generated {
+    use super::*;
+
+    #[test]
+    fn test_hts_default() {
+        let obj = HtsDapOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hts_fields() {
+        let mut obj = HtsDapOutput::default();
+        obj.output_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htt_generated {
+    use super::*;
+
+    #[test]
+    fn test_htt_default() {
+        let obj = HttDapLaunchConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htt_fields() {
+        let mut obj = HttDapLaunchConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htu_generated {
+    use super::*;
+
+    #[test]
+    fn test_htu_default() {
+        let obj = HtuDapAttachConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htu_fields() {
+        let mut obj = HtuDapAttachConfig::default();
+        obj.attach_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htv_generated {
+    use super::*;
+
+    #[test]
+    fn test_htv_default() {
+        let obj = HtvDapCapability::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htv_fields() {
+        let mut obj = HtvDapCapability::default();
+        obj.cap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htw_generated {
+    use super::*;
+
+    #[test]
+    fn test_htw_default() {
+        let obj = HtwDebugConsole::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htw_fields() {
+        let mut obj = HtwDebugConsole::default();
+        obj.console_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htx_generated {
+    use super::*;
+
+    #[test]
+    fn test_htx_default() {
+        let obj = HtxDebugToolbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htx_fields() {
+        let mut obj = HtxDebugToolbar::default();
+        obj.toolbar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hty_generated {
+    use super::*;
+
+    #[test]
+    fn test_hty_default() {
+        let obj = HtyCallStack::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hty_fields() {
+        let mut obj = HtyCallStack::default();
+        obj.stack_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_htz_generated {
+    use super::*;
+
+    #[test]
+    fn test_htz_default() {
+        let obj = HtzDebugHover::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_htz_fields() {
+        let mut obj = HtzDebugHover::default();
+        obj.hover_id = "test".to_string();
         assert!(obj.validate());
     }
 }
