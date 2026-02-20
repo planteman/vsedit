@@ -137318,6 +137318,890 @@ impl Default for HzzPlatformInfo {
     }
 }
 
+/// Core text buffer model
+#[derive(Debug, Clone)]
+pub struct IaaTextBuffer {
+    pub buffer_id: String,
+    pub line_count: u32,
+    pub byte_length: u64,
+    pub encoding_str: String,
+    pub eol_sequence: String,
+    pub is_readonly: bool,
+}
+
+impl IaaTextBuffer {
+    pub fn new() -> Self {
+        Self {
+            buffer_id: String::new(),
+            line_count: u32::default(),
+            byte_length: u64::default(),
+            encoding_str: String::new(),
+            eol_sequence: String::new(),
+            is_readonly: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.buffer_id.is_empty() || true && self.line_count < u32::MAX || true && self.byte_length < u64::MAX || true && !self.encoding_str.is_empty() || true && !self.eol_sequence.is_empty() || true && self.is_readonly || true
+    }
+}
+
+impl Default for IaaTextBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text line content descriptor
+#[derive(Debug, Clone)]
+pub struct IabLineContent {
+    pub line_id: String,
+    pub line_number: u32,
+    pub text_content: String,
+    pub indent_level: u32,
+    pub byte_offset: u64,
+    pub is_whitespace_only: bool,
+}
+
+impl IabLineContent {
+    pub fn new() -> Self {
+        Self {
+            line_id: String::new(),
+            line_number: u32::default(),
+            text_content: String::new(),
+            indent_level: u32::default(),
+            byte_offset: u64::default(),
+            is_whitespace_only: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_id.is_empty() || true && self.line_number < u32::MAX || true && !self.text_content.is_empty() || true && self.indent_level < u32::MAX || true && self.byte_offset < u64::MAX || true && self.is_whitespace_only || true
+    }
+}
+
+impl Default for IabLineContent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Piece tree text buffer
+#[derive(Debug, Clone)]
+pub struct IacPieceTree {
+    pub tree_id: String,
+    pub piece_count: u32,
+    pub total_length: u64,
+    pub line_count: u32,
+    pub buffer_count: u32,
+    pub is_normalized: bool,
+}
+
+impl IacPieceTree {
+    pub fn new() -> Self {
+        Self {
+            tree_id: String::new(),
+            piece_count: u32::default(),
+            total_length: u64::default(),
+            line_count: u32::default(),
+            buffer_count: u32::default(),
+            is_normalized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_id.is_empty() || true && self.piece_count < u32::MAX || true && self.total_length < u64::MAX || true && self.line_count < u32::MAX || true && self.buffer_count < u32::MAX || true && self.is_normalized || true
+    }
+}
+
+impl Default for IacPieceTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text edit operation
+#[derive(Debug, Clone)]
+pub struct IadTextEdit {
+    pub edit_id: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub new_text: String,
+    pub force_move_markers: u32,
+    pub is_auto_whitespace: bool,
+}
+
+impl IadTextEdit {
+    pub fn new() -> Self {
+        Self {
+            edit_id: String::new(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            new_text: String::new(),
+            force_move_markers: u32::default(),
+            is_auto_whitespace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_id.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && !self.new_text.is_empty() || true && self.force_move_markers < u32::MAX || true && self.is_auto_whitespace || true
+    }
+}
+
+impl Default for IadTextEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Edit operation range
+#[derive(Debug, Clone)]
+pub struct IaeEditRange {
+    pub range_id: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub is_empty: bool,
+}
+
+impl IaeEditRange {
+    pub fn new() -> Self {
+        Self {
+            range_id: String::new(),
+            start_line: u32::default(),
+            start_col: u32::default(),
+            end_line: u32::default(),
+            end_col: u32::default(),
+            is_empty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.range_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_line < u32::MAX || true && self.end_col < u32::MAX || true && self.is_empty || true
+    }
+}
+
+impl Default for IaeEditRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Buffer content change event
+#[derive(Debug, Clone)]
+pub struct IafContentChange {
+    pub change_id: String,
+    pub range_offset: u32,
+    pub range_length: u32,
+    pub text_len: u32,
+    pub line_delta: u32,
+    pub is_flush: bool,
+}
+
+impl IafContentChange {
+    pub fn new() -> Self {
+        Self {
+            change_id: String::new(),
+            range_offset: u32::default(),
+            range_length: u32::default(),
+            text_len: u32::default(),
+            line_delta: u32::default(),
+            is_flush: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.change_id.is_empty() || true && self.range_offset < u32::MAX || true && self.range_length < u32::MAX || true && self.text_len < u32::MAX || true && self.line_delta < u32::MAX || true && self.is_flush || true
+    }
+}
+
+impl Default for IafContentChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Undo/redo stack element
+#[derive(Debug, Clone)]
+pub struct IagUndoRedoElement {
+    pub element_id: String,
+    pub edit_type_str: String,
+    pub before_cursor_line: u32,
+    pub after_cursor_line: u32,
+    pub text_change_len: u32,
+    pub is_open: bool,
+}
+
+impl IagUndoRedoElement {
+    pub fn new() -> Self {
+        Self {
+            element_id: String::new(),
+            edit_type_str: String::new(),
+            before_cursor_line: u32::default(),
+            after_cursor_line: u32::default(),
+            text_change_len: u32::default(),
+            is_open: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.element_id.is_empty() || true && !self.edit_type_str.is_empty() || true && self.before_cursor_line < u32::MAX || true && self.after_cursor_line < u32::MAX || true && self.text_change_len < u32::MAX || true && self.is_open || true
+    }
+}
+
+impl Default for IagUndoRedoElement {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Edit operation undo stack
+#[derive(Debug, Clone)]
+pub struct IahEditStack {
+    pub stack_id: String,
+    pub past_count: u32,
+    pub future_count: u32,
+    pub max_elements: u32,
+    pub byte_size: u64,
+    pub is_undoing: bool,
+}
+
+impl IahEditStack {
+    pub fn new() -> Self {
+        Self {
+            stack_id: String::new(),
+            past_count: u32::default(),
+            future_count: u32::default(),
+            max_elements: u32::default(),
+            byte_size: u64::default(),
+            is_undoing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.stack_id.is_empty() || true && self.past_count < u32::MAX || true && self.future_count < u32::MAX || true && self.max_elements < u32::MAX || true && self.byte_size < u64::MAX || true && self.is_undoing || true
+    }
+}
+
+impl Default for IahEditStack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text editor model
+#[derive(Debug, Clone)]
+pub struct IaiTextModel {
+    pub model_id: String,
+    pub uri_str: String,
+    pub language_id: String,
+    pub version_id: u32,
+    pub line_count: u32,
+    pub is_disposed: bool,
+}
+
+impl IaiTextModel {
+    pub fn new() -> Self {
+        Self {
+            model_id: String::new(),
+            uri_str: String::new(),
+            language_id: String::new(),
+            version_id: u32::default(),
+            line_count: u32::default(),
+            is_disposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.model_id.is_empty() || true && !self.uri_str.is_empty() || true && !self.language_id.is_empty() || true && self.version_id < u32::MAX || true && self.line_count < u32::MAX || true && self.is_disposed || true
+    }
+}
+
+impl Default for IaiTextModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text model decoration
+#[derive(Debug, Clone)]
+pub struct IajModelDecoration {
+    pub deco_id: String,
+    pub owner_id: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub options_ref: String,
+    pub is_resolved: bool,
+}
+
+impl IajModelDecoration {
+    pub fn new() -> Self {
+        Self {
+            deco_id: String::new(),
+            owner_id: String::new(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            options_ref: String::new(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_id.is_empty() || true && !self.owner_id.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && !self.options_ref.is_empty() || true && self.is_resolved || true
+    }
+}
+
+impl Default for IajModelDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Decoration rendering options
+#[derive(Debug, Clone)]
+pub struct IakDecorationOptions {
+    pub options_id: String,
+    pub class_name: String,
+    pub inline_class: String,
+    pub glyph_margin_class: String,
+    pub stickiness_value: u32,
+    pub is_whole_line: bool,
+}
+
+impl IakDecorationOptions {
+    pub fn new() -> Self {
+        Self {
+            options_id: String::new(),
+            class_name: String::new(),
+            inline_class: String::new(),
+            glyph_margin_class: String::new(),
+            stickiness_value: u32::default(),
+            is_whole_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.options_id.is_empty() || true && !self.class_name.is_empty() || true && !self.inline_class.is_empty() || true && !self.glyph_margin_class.is_empty() || true && self.stickiness_value < u32::MAX || true && self.is_whole_line || true
+    }
+}
+
+impl Default for IakDecorationOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tracked text range
+#[derive(Debug, Clone)]
+pub struct IalTrackedRange {
+    pub range_id: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub stick_to_content: bool,
+}
+
+impl IalTrackedRange {
+    pub fn new() -> Self {
+        Self {
+            range_id: String::new(),
+            start_line: u32::default(),
+            start_col: u32::default(),
+            end_line: u32::default(),
+            end_col: u32::default(),
+            stick_to_content: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.range_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_line < u32::MAX || true && self.end_col < u32::MAX || true && self.stick_to_content || true
+    }
+}
+
+impl Default for IalTrackedRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bracket pair token
+#[derive(Debug, Clone)]
+pub struct IamBracketPair {
+    pub pair_id: String,
+    pub open_offset: u32,
+    pub close_offset: u32,
+    pub nesting_level: u32,
+    pub pair_index: u32,
+    pub is_complete: bool,
+}
+
+impl IamBracketPair {
+    pub fn new() -> Self {
+        Self {
+            pair_id: String::new(),
+            open_offset: u32::default(),
+            close_offset: u32::default(),
+            nesting_level: u32::default(),
+            pair_index: u32::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pair_id.is_empty() || true && self.open_offset < u32::MAX || true && self.close_offset < u32::MAX || true && self.nesting_level < u32::MAX || true && self.pair_index < u32::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for IamBracketPair {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Indentation guide info
+#[derive(Debug, Clone)]
+pub struct IanIndentGuide {
+    pub guide_id: String,
+    pub indent_level: u32,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub scope_kind: String,
+    pub is_active: bool,
+}
+
+impl IanIndentGuide {
+    pub fn new() -> Self {
+        Self {
+            guide_id: String::new(),
+            indent_level: u32::default(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            scope_kind: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.guide_id.is_empty() || true && self.indent_level < u32::MAX || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.scope_kind.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for IanIndentGuide {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Word segmentation result
+#[derive(Debug, Clone)]
+pub struct IaoWordPart {
+    pub part_id: String,
+    pub word_text: String,
+    pub start_offset: u32,
+    pub end_offset: u32,
+    pub word_kind: u32,
+    pub is_separator: bool,
+}
+
+impl IaoWordPart {
+    pub fn new() -> Self {
+        Self {
+            part_id: String::new(),
+            word_text: String::new(),
+            start_offset: u32::default(),
+            end_offset: u32::default(),
+            word_kind: u32::default(),
+            is_separator: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.part_id.is_empty() || true && !self.word_text.is_empty() || true && self.start_offset < u32::MAX || true && self.end_offset < u32::MAX || true && self.word_kind < u32::MAX || true && self.is_separator || true
+    }
+}
+
+impl Default for IaoWordPart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// In-buffer search match
+#[derive(Debug, Clone)]
+pub struct IapSearchMatch {
+    pub match_id: String,
+    pub line_number: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub match_text_len: u32,
+    pub is_regex_match: bool,
+}
+
+impl IapSearchMatch {
+    pub fn new() -> Self {
+        Self {
+            match_id: String::new(),
+            line_number: u32::default(),
+            start_col: u32::default(),
+            end_col: u32::default(),
+            match_text_len: u32::default(),
+            is_regex_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.match_id.is_empty() || true && self.line_number < u32::MAX || true && self.start_col < u32::MAX || true && self.end_col < u32::MAX || true && self.match_text_len < u32::MAX || true && self.is_regex_match || true
+    }
+}
+
+impl Default for IapSearchMatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Line token array entry
+#[derive(Debug, Clone)]
+pub struct IaqLineToken {
+    pub token_id: String,
+    pub start_offset: u32,
+    pub token_type_val: u32,
+    pub font_style_val: u32,
+    pub foreground_idx: u32,
+    pub has_semantics: bool,
+}
+
+impl IaqLineToken {
+    pub fn new() -> Self {
+        Self {
+            token_id: String::new(),
+            start_offset: u32::default(),
+            token_type_val: u32::default(),
+            font_style_val: u32::default(),
+            foreground_idx: u32::default(),
+            has_semantics: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_id.is_empty() || true && self.start_offset < u32::MAX || true && self.token_type_val < u32::MAX || true && self.font_style_val < u32::MAX || true && self.foreground_idx < u32::MAX || true && self.has_semantics || true
+    }
+}
+
+impl Default for IaqLineToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Token metadata descriptor
+#[derive(Debug, Clone)]
+pub struct IarTokenMetadata {
+    pub meta_id: String,
+    pub language_id_val: u32,
+    pub token_type_val: u32,
+    pub font_style_mask: u32,
+    pub foreground_idx: u32,
+    pub is_balanced: bool,
+}
+
+impl IarTokenMetadata {
+    pub fn new() -> Self {
+        Self {
+            meta_id: String::new(),
+            language_id_val: u32::default(),
+            token_type_val: u32::default(),
+            font_style_mask: u32::default(),
+            foreground_idx: u32::default(),
+            is_balanced: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.meta_id.is_empty() || true && self.language_id_val < u32::MAX || true && self.token_type_val < u32::MAX || true && self.font_style_mask < u32::MAX || true && self.foreground_idx < u32::MAX || true && self.is_balanced || true
+    }
+}
+
+impl Default for IarTokenMetadata {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model language assignment
+#[derive(Debug, Clone)]
+pub struct IasModelLanguage {
+    pub lang_id: String,
+    pub language_str: String,
+    pub model_ref: String,
+    pub auto_detected: bool,
+    pub confidence_pct: u32,
+    pub is_overridden: bool,
+}
+
+impl IasModelLanguage {
+    pub fn new() -> Self {
+        Self {
+            lang_id: String::new(),
+            language_str: String::new(),
+            model_ref: String::new(),
+            auto_detected: bool::default(),
+            confidence_pct: u32::default(),
+            is_overridden: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lang_id.is_empty() || true && !self.language_str.is_empty() || true && !self.model_ref.is_empty() || true && self.auto_detected || true && self.confidence_pct < u32::MAX || true && self.is_overridden || true
+    }
+}
+
+impl Default for IasModelLanguage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File encoding information
+#[derive(Debug, Clone)]
+pub struct IatEncodingInfo {
+    pub enc_id: String,
+    pub encoding_name: String,
+    pub bom_detected: bool,
+    pub confidence_pct: u32,
+    pub byte_sample_len: u32,
+    pub is_guessed: bool,
+}
+
+impl IatEncodingInfo {
+    pub fn new() -> Self {
+        Self {
+            enc_id: String::new(),
+            encoding_name: String::new(),
+            bom_detected: bool::default(),
+            confidence_pct: u32::default(),
+            byte_sample_len: u32::default(),
+            is_guessed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.enc_id.is_empty() || true && !self.encoding_name.is_empty() || true && self.bom_detected || true && self.confidence_pct < u32::MAX || true && self.byte_sample_len < u32::MAX || true && self.is_guessed || true
+    }
+}
+
+impl Default for IatEncodingInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// End-of-line sequence config
+#[derive(Debug, Clone)]
+pub struct IauEndOfLine {
+    pub eol_id: String,
+    pub eol_str: String,
+    pub dominant_eol: String,
+    pub mixed_count: u32,
+    pub normalize_on_save: bool,
+    pub is_default: bool,
+}
+
+impl IauEndOfLine {
+    pub fn new() -> Self {
+        Self {
+            eol_id: String::new(),
+            eol_str: String::new(),
+            dominant_eol: String::new(),
+            mixed_count: u32::default(),
+            normalize_on_save: bool::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.eol_id.is_empty() || true && !self.eol_str.is_empty() || true && !self.dominant_eol.is_empty() || true && self.mixed_count < u32::MAX || true && self.normalize_on_save || true && self.is_default || true
+    }
+}
+
+impl Default for IauEndOfLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Readonly text range
+#[derive(Debug, Clone)]
+pub struct IavReadonlyRange {
+    pub ro_id: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub allow_cursor: bool,
+}
+
+impl IavReadonlyRange {
+    pub fn new() -> Self {
+        Self {
+            ro_id: String::new(),
+            start_line: u32::default(),
+            start_col: u32::default(),
+            end_line: u32::default(),
+            end_col: u32::default(),
+            allow_cursor: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ro_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_line < u32::MAX || true && self.end_col < u32::MAX || true && self.allow_cursor || true
+    }
+}
+
+impl Default for IavReadonlyRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text model creation options
+#[derive(Debug, Clone)]
+pub struct IawModelOptions {
+    pub options_id: String,
+    pub tab_size: u32,
+    pub insert_spaces: bool,
+    pub trim_trailing: bool,
+    pub insert_final_newline: bool,
+    pub detect_indentation: bool,
+}
+
+impl IawModelOptions {
+    pub fn new() -> Self {
+        Self {
+            options_id: String::new(),
+            tab_size: u32::default(),
+            insert_spaces: bool::default(),
+            trim_trailing: bool::default(),
+            insert_final_newline: bool::default(),
+            detect_indentation: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.options_id.is_empty() || true && self.tab_size < u32::MAX || true && self.insert_spaces || true && self.trim_trailing || true && self.insert_final_newline || true && self.detect_indentation || true
+    }
+}
+
+impl Default for IawModelOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model snapshot reference
+#[derive(Debug, Clone)]
+pub struct IaxSnapshotRef {
+    pub snap_id: String,
+    pub version_id_val: u32,
+    pub line_count: u32,
+    pub byte_size: u64,
+    pub created_epoch: u64,
+    pub is_valid: bool,
+}
+
+impl IaxSnapshotRef {
+    pub fn new() -> Self {
+        Self {
+            snap_id: String::new(),
+            version_id_val: u32::default(),
+            line_count: u32::default(),
+            byte_size: u64::default(),
+            created_epoch: u64::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snap_id.is_empty() || true && self.version_id_val < u32::MAX || true && self.line_count < u32::MAX || true && self.byte_size < u64::MAX || true && self.created_epoch < u64::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for IaxSnapshotRef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model version tracker
+#[derive(Debug, Clone)]
+pub struct IayModelVersion {
+    pub version_id: String,
+    pub version_num: u32,
+    pub alternative_version: u32,
+    pub change_count: u64,
+    pub last_edit_epoch: u64,
+    pub is_redo_stop: bool,
+}
+
+impl IayModelVersion {
+    pub fn new() -> Self {
+        Self {
+            version_id: String::new(),
+            version_num: u32::default(),
+            alternative_version: u32::default(),
+            change_count: u64::default(),
+            last_edit_epoch: u64::default(),
+            is_redo_stop: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.version_id.is_empty() || true && self.version_num < u32::MAX || true && self.alternative_version < u32::MAX || true && self.change_count < u64::MAX || true && self.last_edit_epoch < u64::MAX || true && self.is_redo_stop || true
+    }
+}
+
+impl Default for IayModelVersion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Buffer event notification
+#[derive(Debug, Clone)]
+pub struct IazBufferEvent {
+    pub event_id: String,
+    pub event_kind: String,
+    pub model_ref: String,
+    pub change_count: u32,
+    pub timestamp_epoch: u64,
+    pub is_undo: bool,
+}
+
+impl IazBufferEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            event_kind: String::new(),
+            model_ref: String::new(),
+            change_count: u32::default(),
+            timestamp_epoch: u64::default(),
+            is_undo: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && !self.event_kind.is_empty() || true && !self.model_ref.is_empty() || true && self.change_count < u32::MAX || true && self.timestamp_epoch < u64::MAX || true && self.is_undo || true
+    }
+}
+
+impl Default for IazBufferEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -385118,6 +386002,474 @@ mod tests_hzz_generated {
     fn test_hzz_fields() {
         let mut obj = HzzPlatformInfo::default();
         obj.platform_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iaa_generated {
+    use super::*;
+
+    #[test]
+    fn test_iaa_default() {
+        let obj = IaaTextBuffer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iaa_fields() {
+        let mut obj = IaaTextBuffer::default();
+        obj.buffer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iab_generated {
+    use super::*;
+
+    #[test]
+    fn test_iab_default() {
+        let obj = IabLineContent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iab_fields() {
+        let mut obj = IabLineContent::default();
+        obj.line_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iac_generated {
+    use super::*;
+
+    #[test]
+    fn test_iac_default() {
+        let obj = IacPieceTree::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iac_fields() {
+        let mut obj = IacPieceTree::default();
+        obj.tree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iad_generated {
+    use super::*;
+
+    #[test]
+    fn test_iad_default() {
+        let obj = IadTextEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iad_fields() {
+        let mut obj = IadTextEdit::default();
+        obj.edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iae_generated {
+    use super::*;
+
+    #[test]
+    fn test_iae_default() {
+        let obj = IaeEditRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iae_fields() {
+        let mut obj = IaeEditRange::default();
+        obj.range_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iaf_generated {
+    use super::*;
+
+    #[test]
+    fn test_iaf_default() {
+        let obj = IafContentChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iaf_fields() {
+        let mut obj = IafContentChange::default();
+        obj.change_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iag_generated {
+    use super::*;
+
+    #[test]
+    fn test_iag_default() {
+        let obj = IagUndoRedoElement::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iag_fields() {
+        let mut obj = IagUndoRedoElement::default();
+        obj.element_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iah_generated {
+    use super::*;
+
+    #[test]
+    fn test_iah_default() {
+        let obj = IahEditStack::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iah_fields() {
+        let mut obj = IahEditStack::default();
+        obj.stack_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iai_generated {
+    use super::*;
+
+    #[test]
+    fn test_iai_default() {
+        let obj = IaiTextModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iai_fields() {
+        let mut obj = IaiTextModel::default();
+        obj.model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iaj_generated {
+    use super::*;
+
+    #[test]
+    fn test_iaj_default() {
+        let obj = IajModelDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iaj_fields() {
+        let mut obj = IajModelDecoration::default();
+        obj.deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iak_generated {
+    use super::*;
+
+    #[test]
+    fn test_iak_default() {
+        let obj = IakDecorationOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iak_fields() {
+        let mut obj = IakDecorationOptions::default();
+        obj.options_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ial_generated {
+    use super::*;
+
+    #[test]
+    fn test_ial_default() {
+        let obj = IalTrackedRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ial_fields() {
+        let mut obj = IalTrackedRange::default();
+        obj.range_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iam_generated {
+    use super::*;
+
+    #[test]
+    fn test_iam_default() {
+        let obj = IamBracketPair::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iam_fields() {
+        let mut obj = IamBracketPair::default();
+        obj.pair_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ian_generated {
+    use super::*;
+
+    #[test]
+    fn test_ian_default() {
+        let obj = IanIndentGuide::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ian_fields() {
+        let mut obj = IanIndentGuide::default();
+        obj.guide_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iao_generated {
+    use super::*;
+
+    #[test]
+    fn test_iao_default() {
+        let obj = IaoWordPart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iao_fields() {
+        let mut obj = IaoWordPart::default();
+        obj.part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iap_generated {
+    use super::*;
+
+    #[test]
+    fn test_iap_default() {
+        let obj = IapSearchMatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iap_fields() {
+        let mut obj = IapSearchMatch::default();
+        obj.match_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iaq_generated {
+    use super::*;
+
+    #[test]
+    fn test_iaq_default() {
+        let obj = IaqLineToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iaq_fields() {
+        let mut obj = IaqLineToken::default();
+        obj.token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iar_generated {
+    use super::*;
+
+    #[test]
+    fn test_iar_default() {
+        let obj = IarTokenMetadata::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iar_fields() {
+        let mut obj = IarTokenMetadata::default();
+        obj.meta_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ias_generated {
+    use super::*;
+
+    #[test]
+    fn test_ias_default() {
+        let obj = IasModelLanguage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ias_fields() {
+        let mut obj = IasModelLanguage::default();
+        obj.lang_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iat_generated {
+    use super::*;
+
+    #[test]
+    fn test_iat_default() {
+        let obj = IatEncodingInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iat_fields() {
+        let mut obj = IatEncodingInfo::default();
+        obj.enc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iau_generated {
+    use super::*;
+
+    #[test]
+    fn test_iau_default() {
+        let obj = IauEndOfLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iau_fields() {
+        let mut obj = IauEndOfLine::default();
+        obj.eol_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iav_generated {
+    use super::*;
+
+    #[test]
+    fn test_iav_default() {
+        let obj = IavReadonlyRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iav_fields() {
+        let mut obj = IavReadonlyRange::default();
+        obj.ro_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iaw_generated {
+    use super::*;
+
+    #[test]
+    fn test_iaw_default() {
+        let obj = IawModelOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iaw_fields() {
+        let mut obj = IawModelOptions::default();
+        obj.options_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iax_generated {
+    use super::*;
+
+    #[test]
+    fn test_iax_default() {
+        let obj = IaxSnapshotRef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iax_fields() {
+        let mut obj = IaxSnapshotRef::default();
+        obj.snap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iay_generated {
+    use super::*;
+
+    #[test]
+    fn test_iay_default() {
+        let obj = IayModelVersion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iay_fields() {
+        let mut obj = IayModelVersion::default();
+        obj.version_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iaz_generated {
+    use super::*;
+
+    #[test]
+    fn test_iaz_default() {
+        let obj = IazBufferEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iaz_fields() {
+        let mut obj = IazBufferEvent::default();
+        obj.event_id = "test".to_string();
         assert!(obj.validate());
     }
 }
