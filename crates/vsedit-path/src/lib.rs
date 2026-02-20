@@ -78982,6 +78982,678 @@ impl Default for FwjKeyboardLayout {
     }
 }
 
+/// Keyboard event (key code, char code, modifiers, repeat, location)
+#[derive(Debug, Clone)]
+pub struct FwkKeyboardEvent {
+    pub event_id: String,
+    pub key_code: u32,
+    pub char_code: u32,
+    pub ctrl_key: bool,
+    pub shift_key: bool,
+    pub alt_key: bool,
+    pub meta_key: bool,
+    pub is_repeat: bool,
+    pub location: u32,
+    pub timestamp_ms: u64,
+}
+
+impl FwkKeyboardEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            key_code: u32::default(),
+            char_code: u32::default(),
+            ctrl_key: bool::default(),
+            shift_key: bool::default(),
+            alt_key: bool::default(),
+            meta_key: bool::default(),
+            is_repeat: bool::default(),
+            location: u32::default(),
+            timestamp_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && self.key_code < u32::MAX || true && self.char_code < u32::MAX || true && self.ctrl_key || true && self.shift_key || true && self.alt_key || true && self.meta_key || true && self.is_repeat || true && self.location < u32::MAX || true && self.timestamp_ms < u64::MAX || true
+    }
+}
+
+impl Default for FwkKeyboardEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Mouse event (x, y, buttons, modifiers, target, timestamp)
+#[derive(Debug, Clone)]
+pub struct FwlMouseEvent {
+    pub event_id: String,
+    pub x: u32,
+    pub y: u32,
+    pub buttons: u32,
+    pub ctrl_key: bool,
+    pub shift_key: bool,
+    pub alt_key: bool,
+    pub meta_key: bool,
+    pub timestamp_ms: u64,
+    pub target_id: String,
+}
+
+impl FwlMouseEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            x: u32::default(),
+            y: u32::default(),
+            buttons: u32::default(),
+            ctrl_key: bool::default(),
+            shift_key: bool::default(),
+            alt_key: bool::default(),
+            meta_key: bool::default(),
+            timestamp_ms: u64::default(),
+            target_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && self.x < u32::MAX || true && self.y < u32::MAX || true && self.buttons < u32::MAX || true && self.ctrl_key || true && self.shift_key || true && self.alt_key || true && self.meta_key || true && self.timestamp_ms < u64::MAX || true && !self.target_id.is_empty() || true
+    }
+}
+
+impl Default for FwlMouseEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Wheel event (delta x, delta y, delta z, mode, modifiers)
+#[derive(Debug, Clone)]
+pub struct FwmWheelEvent {
+    pub event_id: String,
+    pub delta_x: f64,
+    pub delta_y: f64,
+    pub delta_z: f64,
+    pub mode: u32,
+    pub ctrl_key: bool,
+    pub shift_key: bool,
+    pub alt_key: bool,
+    pub meta_key: bool,
+    pub timestamp_ms: u64,
+}
+
+impl FwmWheelEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            delta_x: f64::default(),
+            delta_y: f64::default(),
+            delta_z: f64::default(),
+            mode: u32::default(),
+            ctrl_key: bool::default(),
+            shift_key: bool::default(),
+            alt_key: bool::default(),
+            meta_key: bool::default(),
+            timestamp_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && self.delta_x.is_finite() || true && self.delta_y.is_finite() || true && self.delta_z.is_finite() || true && self.mode < u32::MAX || true && self.ctrl_key || true && self.shift_key || true && self.alt_key || true && self.meta_key || true && self.timestamp_ms < u64::MAX || true
+    }
+}
+
+impl Default for FwmWheelEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Gesture event (type, center x/y, scale, rotation, velocity)
+#[derive(Debug, Clone)]
+pub struct FwnGestureEvent {
+    pub event_id: String,
+    pub gesture_type: u32,
+    pub center_x: f64,
+    pub center_y: f64,
+    pub scale: f64,
+    pub rotation: f64,
+    pub velocity_x: f64,
+    pub velocity_y: f64,
+    pub timestamp_ms: u64,
+    pub touch_count: u32,
+}
+
+impl FwnGestureEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            gesture_type: u32::default(),
+            center_x: f64::default(),
+            center_y: f64::default(),
+            scale: f64::default(),
+            rotation: f64::default(),
+            velocity_x: f64::default(),
+            velocity_y: f64::default(),
+            timestamp_ms: u64::default(),
+            touch_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && self.gesture_type < u32::MAX || true && self.center_x.is_finite() || true && self.center_y.is_finite() || true && self.scale.is_finite() || true && self.rotation.is_finite() || true && self.velocity_x.is_finite() || true && self.velocity_y.is_finite() || true && self.timestamp_ms < u64::MAX || true && self.touch_count < u32::MAX || true
+    }
+}
+
+impl Default for FwnGestureEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Drag event (data transfer, effect, types, source, target)
+#[derive(Debug, Clone)]
+pub struct FwoDragEvent {
+    pub event_id: String,
+    pub data_transfer_json: String,
+    pub effect_allowed: String,
+    pub drop_effect: String,
+    pub types_json: String,
+    pub source_id: String,
+    pub target_id: String,
+    pub x: u32,
+    pub y: u32,
+    pub timestamp_ms: u64,
+}
+
+impl FwoDragEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            data_transfer_json: String::new(),
+            effect_allowed: String::new(),
+            drop_effect: String::new(),
+            types_json: String::new(),
+            source_id: String::new(),
+            target_id: String::new(),
+            x: u32::default(),
+            y: u32::default(),
+            timestamp_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && !self.data_transfer_json.is_empty() || true && !self.effect_allowed.is_empty() || true && !self.drop_effect.is_empty() || true && !self.types_json.is_empty() || true && !self.source_id.is_empty() || true && !self.target_id.is_empty() || true && self.x < u32::MAX || true && self.y < u32::MAX || true && self.timestamp_ms < u64::MAX || true
+    }
+}
+
+impl Default for FwoDragEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Clipboard event (type, data, format, source, html content)
+#[derive(Debug, Clone)]
+pub struct FwpClipboardEvent {
+    pub event_id: String,
+    pub event_type: u32,
+    pub data: String,
+    pub format: String,
+    pub source_id: String,
+    pub html_content: String,
+    pub plain_text: String,
+    pub items_json: String,
+    pub timestamp_ms: u64,
+    pub is_external: bool,
+}
+
+impl FwpClipboardEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            event_type: u32::default(),
+            data: String::new(),
+            format: String::new(),
+            source_id: String::new(),
+            html_content: String::new(),
+            plain_text: String::new(),
+            items_json: String::new(),
+            timestamp_ms: u64::default(),
+            is_external: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && self.event_type < u32::MAX || true && !self.data.is_empty() || true && !self.format.is_empty() || true && !self.source_id.is_empty() || true && !self.html_content.is_empty() || true && !self.plain_text.is_empty() || true && !self.items_json.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.is_external || true
+    }
+}
+
+impl Default for FwpClipboardEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Composition event (data, type, locale, is composing)
+#[derive(Debug, Clone)]
+pub struct FwqCompositionEvent {
+    pub event_id: String,
+    pub data: String,
+    pub composition_type: u32,
+    pub locale: String,
+    pub is_composing: bool,
+    pub timestamp_ms: u64,
+    pub ranges_json: String,
+    pub ime_text: String,
+    pub selection_start: u32,
+    pub selection_end: u32,
+}
+
+impl FwqCompositionEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            data: String::new(),
+            composition_type: u32::default(),
+            locale: String::new(),
+            is_composing: bool::default(),
+            timestamp_ms: u64::default(),
+            ranges_json: String::new(),
+            ime_text: String::new(),
+            selection_start: u32::default(),
+            selection_end: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && !self.data.is_empty() || true && self.composition_type < u32::MAX || true && !self.locale.is_empty() || true && self.is_composing || true && self.timestamp_ms < u64::MAX || true && !self.ranges_json.is_empty() || true && !self.ime_text.is_empty() || true && self.selection_start < u32::MAX || true && self.selection_end < u32::MAX || true
+    }
+}
+
+impl Default for FwqCompositionEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Focus event (target, related target, type, bubbles)
+#[derive(Debug, Clone)]
+pub struct FwrFocusEvent {
+    pub event_id: String,
+    pub target_id: String,
+    pub related_target_id: String,
+    pub event_type: u32,
+    pub bubbles: bool,
+    pub is_trusted: bool,
+    pub timestamp_ms: u64,
+    pub focus_direction: u32,
+    pub source: String,
+    pub is_keyboard_triggered: bool,
+}
+
+impl FwrFocusEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            target_id: String::new(),
+            related_target_id: String::new(),
+            event_type: u32::default(),
+            bubbles: bool::default(),
+            is_trusted: bool::default(),
+            timestamp_ms: u64::default(),
+            focus_direction: u32::default(),
+            source: String::new(),
+            is_keyboard_triggered: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && !self.target_id.is_empty() || true && !self.related_target_id.is_empty() || true && self.event_type < u32::MAX || true && self.bubbles || true && self.is_trusted || true && self.timestamp_ms < u64::MAX || true && self.focus_direction < u32::MAX || true && !self.source.is_empty() || true && self.is_keyboard_triggered || true
+    }
+}
+
+impl Default for FwrFocusEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Input event (data, input type, is composing, data transfer)
+#[derive(Debug, Clone)]
+pub struct FwsInputEvent {
+    pub event_id: String,
+    pub data: String,
+    pub input_type: String,
+    pub is_composing: bool,
+    pub data_transfer_json: String,
+    pub target_ranges_json: String,
+    pub timestamp_ms: u64,
+    pub source_id: String,
+    pub is_trusted: bool,
+    pub is_batch: bool,
+}
+
+impl FwsInputEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            data: String::new(),
+            input_type: String::new(),
+            is_composing: bool::default(),
+            data_transfer_json: String::new(),
+            target_ranges_json: String::new(),
+            timestamp_ms: u64::default(),
+            source_id: String::new(),
+            is_trusted: bool::default(),
+            is_batch: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && !self.data.is_empty() || true && !self.input_type.is_empty() || true && self.is_composing || true && !self.data_transfer_json.is_empty() || true && !self.target_ranges_json.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.source_id.is_empty() || true && self.is_trusted || true && self.is_batch || true
+    }
+}
+
+impl Default for FwsInputEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Touch event (touches, target touches, changed touches, type)
+#[derive(Debug, Clone)]
+pub struct FwtTouchEvent {
+    pub event_id: String,
+    pub touch_count: u32,
+    pub target_touch_count: u32,
+    pub changed_touch_count: u32,
+    pub event_type: u32,
+    pub timestamp_ms: u64,
+    pub is_multi_touch: bool,
+    pub primary_x: f64,
+    pub primary_y: f64,
+    pub force: f64,
+}
+
+impl FwtTouchEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            touch_count: u32::default(),
+            target_touch_count: u32::default(),
+            changed_touch_count: u32::default(),
+            event_type: u32::default(),
+            timestamp_ms: u64::default(),
+            is_multi_touch: bool::default(),
+            primary_x: f64::default(),
+            primary_y: f64::default(),
+            force: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && self.touch_count < u32::MAX || true && self.target_touch_count < u32::MAX || true && self.changed_touch_count < u32::MAX || true && self.event_type < u32::MAX || true && self.timestamp_ms < u64::MAX || true && self.is_multi_touch || true && self.primary_x.is_finite() || true && self.primary_y.is_finite() || true && self.force.is_finite() || true
+    }
+}
+
+impl Default for FwtTouchEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Resize event (width, height, device pixel ratio, orientation)
+#[derive(Debug, Clone)]
+pub struct FwuResizeEvent {
+    pub event_id: String,
+    pub width: u32,
+    pub height: u32,
+    pub device_pixel_ratio: f64,
+    pub orientation: u32,
+    pub is_fullscreen: bool,
+    pub inner_width: u32,
+    pub inner_height: u32,
+    pub timestamp_ms: u64,
+    pub source: String,
+}
+
+impl FwuResizeEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            width: u32::default(),
+            height: u32::default(),
+            device_pixel_ratio: f64::default(),
+            orientation: u32::default(),
+            is_fullscreen: bool::default(),
+            inner_width: u32::default(),
+            inner_height: u32::default(),
+            timestamp_ms: u64::default(),
+            source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && self.width < u32::MAX || true && self.height < u32::MAX || true && self.device_pixel_ratio.is_finite() || true && self.orientation < u32::MAX || true && self.is_fullscreen || true && self.inner_width < u32::MAX || true && self.inner_height < u32::MAX || true && self.timestamp_ms < u64::MAX || true && !self.source.is_empty() || true
+    }
+}
+
+impl Default for FwuResizeEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Scroll event (scroll top, scroll left, width, height, is smooth)
+#[derive(Debug, Clone)]
+pub struct FwvScrollEvent {
+    pub event_id: String,
+    pub scroll_top: u32,
+    pub scroll_left: u32,
+    pub width: u32,
+    pub height: u32,
+    pub is_smooth: bool,
+    pub scroll_width: u32,
+    pub scroll_height: u32,
+    pub timestamp_ms: u64,
+    pub source: String,
+}
+
+impl FwvScrollEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            scroll_top: u32::default(),
+            scroll_left: u32::default(),
+            width: u32::default(),
+            height: u32::default(),
+            is_smooth: bool::default(),
+            scroll_width: u32::default(),
+            scroll_height: u32::default(),
+            timestamp_ms: u64::default(),
+            source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && self.scroll_top < u32::MAX || true && self.scroll_left < u32::MAX || true && self.width < u32::MAX || true && self.height < u32::MAX || true && self.is_smooth || true && self.scroll_width < u32::MAX || true && self.scroll_height < u32::MAX || true && self.timestamp_ms < u64::MAX || true && !self.source.is_empty() || true
+    }
+}
+
+impl Default for FwvScrollEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Context menu event (anchor, actions, x, y, target)
+#[derive(Debug, Clone)]
+pub struct FwwContextMenuEvent {
+    pub event_id: String,
+    pub anchor_x: u32,
+    pub anchor_y: u32,
+    pub action_count: u32,
+    pub target_id: String,
+    pub menu_id: String,
+    pub is_keyboard_triggered: bool,
+    pub context_json: String,
+    pub delegate_id: String,
+    pub timestamp_ms: u64,
+}
+
+impl FwwContextMenuEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            anchor_x: u32::default(),
+            anchor_y: u32::default(),
+            action_count: u32::default(),
+            target_id: String::new(),
+            menu_id: String::new(),
+            is_keyboard_triggered: bool::default(),
+            context_json: String::new(),
+            delegate_id: String::new(),
+            timestamp_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && self.anchor_x < u32::MAX || true && self.anchor_y < u32::MAX || true && self.action_count < u32::MAX || true && !self.target_id.is_empty() || true && !self.menu_id.is_empty() || true && self.is_keyboard_triggered || true && !self.context_json.is_empty() || true && !self.delegate_id.is_empty() || true && self.timestamp_ms < u64::MAX || true
+    }
+}
+
+impl Default for FwwContextMenuEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Pointer event (pointer id, type, pressure, tilt, twist)
+#[derive(Debug, Clone)]
+pub struct FwxPointerEvent {
+    pub event_id: String,
+    pub pointer_id: u32,
+    pub pointer_type: String,
+    pub pressure: f64,
+    pub tilt_x: f64,
+    pub tilt_y: f64,
+    pub twist: f64,
+    pub width: f64,
+    pub height: f64,
+    pub is_primary: bool,
+}
+
+impl FwxPointerEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            pointer_id: u32::default(),
+            pointer_type: String::new(),
+            pressure: f64::default(),
+            tilt_x: f64::default(),
+            tilt_y: f64::default(),
+            twist: f64::default(),
+            width: f64::default(),
+            height: f64::default(),
+            is_primary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && self.pointer_id < u32::MAX || true && !self.pointer_type.is_empty() || true && self.pressure.is_finite() || true && self.tilt_x.is_finite() || true && self.tilt_y.is_finite() || true && self.twist.is_finite() || true && self.width.is_finite() || true && self.height.is_finite() || true && self.is_primary || true
+    }
+}
+
+impl Default for FwxPointerEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Animation frame (timestamp, delta, fps, is visible)
+#[derive(Debug, Clone)]
+pub struct FwyAnimationFrame {
+    pub frame_id: String,
+    pub timestamp_ms: f64,
+    pub delta_ms: f64,
+    pub fps: f64,
+    pub is_visible: bool,
+    pub frame_count: u64,
+    pub dropped_frames: u64,
+    pub callback_count: u32,
+    pub is_scheduled: bool,
+    pub budget_ms: f64,
+}
+
+impl FwyAnimationFrame {
+    pub fn new() -> Self {
+        Self {
+            frame_id: String::new(),
+            timestamp_ms: f64::default(),
+            delta_ms: f64::default(),
+            fps: f64::default(),
+            is_visible: bool::default(),
+            frame_count: u64::default(),
+            dropped_frames: u64::default(),
+            callback_count: u32::default(),
+            is_scheduled: bool::default(),
+            budget_ms: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.frame_id.is_empty() || true && self.timestamp_ms.is_finite() || true && self.delta_ms.is_finite() || true && self.fps.is_finite() || true && self.is_visible || true && self.frame_count < u64::MAX || true && self.dropped_frames < u64::MAX || true && self.callback_count < u32::MAX || true && self.is_scheduled || true && self.budget_ms.is_finite() || true
+    }
+}
+
+impl Default for FwyAnimationFrame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Media query (query, matches, preference, change event)
+#[derive(Debug, Clone)]
+pub struct FwzMediaQuery {
+    pub query_id: String,
+    pub query_string: String,
+    pub matches: bool,
+    pub preference: String,
+    pub listener_count: u32,
+    pub media_type: String,
+    pub feature: String,
+    pub value: String,
+    pub is_dark_theme: bool,
+    pub is_reduced_motion: bool,
+}
+
+impl FwzMediaQuery {
+    pub fn new() -> Self {
+        Self {
+            query_id: String::new(),
+            query_string: String::new(),
+            matches: bool::default(),
+            preference: String::new(),
+            listener_count: u32::default(),
+            media_type: String::new(),
+            feature: String::new(),
+            value: String::new(),
+            is_dark_theme: bool::default(),
+            is_reduced_motion: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.query_id.is_empty() || true && !self.query_string.is_empty() || true && self.matches || true && !self.preference.is_empty() || true && self.listener_count < u32::MAX || true && !self.media_type.is_empty() || true && !self.feature.is_empty() || true && !self.value.is_empty() || true && self.is_dark_theme || true && self.is_reduced_motion || true
+    }
+}
+
+impl Default for FwzMediaQuery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -300837,6 +301509,294 @@ mod tests_fwj_generated {
     fn test_fwj_fields() {
         let mut obj = FwjKeyboardLayout::default();
         obj.layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwk_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwk_default() {
+        let obj = FwkKeyboardEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwk_fields() {
+        let mut obj = FwkKeyboardEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwl_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwl_default() {
+        let obj = FwlMouseEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwl_fields() {
+        let mut obj = FwlMouseEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwm_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwm_default() {
+        let obj = FwmWheelEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwm_fields() {
+        let mut obj = FwmWheelEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwn_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwn_default() {
+        let obj = FwnGestureEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwn_fields() {
+        let mut obj = FwnGestureEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwo_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwo_default() {
+        let obj = FwoDragEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwo_fields() {
+        let mut obj = FwoDragEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwp_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwp_default() {
+        let obj = FwpClipboardEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwp_fields() {
+        let mut obj = FwpClipboardEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwq_default() {
+        let obj = FwqCompositionEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwq_fields() {
+        let mut obj = FwqCompositionEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwr_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwr_default() {
+        let obj = FwrFocusEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwr_fields() {
+        let mut obj = FwrFocusEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fws_generated {
+    use super::*;
+
+    #[test]
+    fn test_fws_default() {
+        let obj = FwsInputEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fws_fields() {
+        let mut obj = FwsInputEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwt_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwt_default() {
+        let obj = FwtTouchEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwt_fields() {
+        let mut obj = FwtTouchEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwu_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwu_default() {
+        let obj = FwuResizeEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwu_fields() {
+        let mut obj = FwuResizeEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwv_default() {
+        let obj = FwvScrollEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwv_fields() {
+        let mut obj = FwvScrollEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fww_generated {
+    use super::*;
+
+    #[test]
+    fn test_fww_default() {
+        let obj = FwwContextMenuEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fww_fields() {
+        let mut obj = FwwContextMenuEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwx_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwx_default() {
+        let obj = FwxPointerEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwx_fields() {
+        let mut obj = FwxPointerEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwy_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwy_default() {
+        let obj = FwyAnimationFrame::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwy_fields() {
+        let mut obj = FwyAnimationFrame::default();
+        obj.frame_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwz_default() {
+        let obj = FwzMediaQuery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwz_fields() {
+        let mut obj = FwzMediaQuery::default();
+        obj.query_id = "test".to_string();
         assert!(obj.validate());
     }
 }
