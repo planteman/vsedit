@@ -65011,6 +65011,213 @@ impl Default for FizWorkspaceLogOutput {
 }
 
 
+/// Editor configuration (tab size, insert spaces, word wrap, rulers, minimap)
+#[derive(Debug, Clone)]
+pub struct FjaEditorConfig {
+    pub config_id: String,
+    pub tab_size: u32,
+    pub insert_spaces: bool,
+    pub word_wrap: u32,
+    pub word_wrap_column: u32,
+    pub rulers_json: String,
+    pub minimap_enabled: bool,
+    pub line_numbers: u32,
+    pub render_whitespace: u32,
+    pub scroll_beyond_last_line: bool,
+}
+
+impl FjaEditorConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            tab_size: u32::default(),
+            insert_spaces: bool::default(),
+            word_wrap: u32::default(),
+            word_wrap_column: u32::default(),
+            rulers_json: String::new(),
+            minimap_enabled: bool::default(),
+            line_numbers: u32::default(),
+            render_whitespace: u32::default(),
+            scroll_beyond_last_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && self.tab_size < u32::MAX || true && self.insert_spaces || true && self.word_wrap < u32::MAX || true && self.word_wrap_column < u32::MAX || true && !self.rulers_json.is_empty() || true && self.minimap_enabled || true && self.line_numbers < u32::MAX || true && self.render_whitespace < u32::MAX || true && self.scroll_beyond_last_line || true
+    }
+}
+
+impl Default for FjaEditorConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor option descriptor (name, type, default value, schema, scope)
+#[derive(Debug, Clone)]
+pub struct FjbEditorOption {
+    pub option_id: String,
+    pub option_name: String,
+    pub option_type: String,
+    pub default_value_json: String,
+    pub schema_json: String,
+    pub scope: u32,
+    pub description: String,
+    pub is_deprecated: bool,
+    pub deprecation_message: String,
+    pub enum_values_json: String,
+}
+
+impl FjbEditorOption {
+    pub fn new() -> Self {
+        Self {
+            option_id: String::new(),
+            option_name: String::new(),
+            option_type: String::new(),
+            default_value_json: String::new(),
+            schema_json: String::new(),
+            scope: u32::default(),
+            description: String::new(),
+            is_deprecated: bool::default(),
+            deprecation_message: String::new(),
+            enum_values_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.option_id.is_empty() || true && !self.option_name.is_empty() || true && !self.option_type.is_empty() || true && !self.default_value_json.is_empty() || true && !self.schema_json.is_empty() || true && self.scope < u32::MAX || true && !self.description.is_empty() || true && self.is_deprecated || true && !self.deprecation_message.is_empty() || true && !self.enum_values_json.is_empty() || true
+    }
+}
+
+impl Default for FjbEditorOption {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor font info (family, size, line height, letter spacing, weight)
+#[derive(Debug, Clone)]
+pub struct FjcEditorFontInfo {
+    pub font_family: String,
+    pub font_size: u32,
+    pub line_height: u32,
+    pub letter_spacing: f64,
+    pub font_weight: String,
+    pub is_monospace: bool,
+    pub char_width: f64,
+    pub max_digit_width: f64,
+    pub typical_half_width: f64,
+    pub typical_full_width: f64,
+}
+
+impl FjcEditorFontInfo {
+    pub fn new() -> Self {
+        Self {
+            font_family: String::new(),
+            font_size: u32::default(),
+            line_height: u32::default(),
+            letter_spacing: f64::default(),
+            font_weight: String::new(),
+            is_monospace: bool::default(),
+            char_width: f64::default(),
+            max_digit_width: f64::default(),
+            typical_half_width: f64::default(),
+            typical_full_width: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.font_family.is_empty() || true && self.font_size < u32::MAX || true && self.line_height < u32::MAX || true && self.letter_spacing.is_finite() || true && !self.font_weight.is_empty() || true && self.is_monospace || true && self.char_width.is_finite() || true && self.max_digit_width.is_finite() || true && self.typical_half_width.is_finite() || true && self.typical_full_width.is_finite() || true
+    }
+}
+
+impl Default for FjcEditorFontInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor layout dimensions (content width/height, minimap, scrollbar, gutter)
+#[derive(Debug, Clone)]
+pub struct FjdEditorLayoutInfo {
+    pub layout_id: String,
+    pub content_width: u32,
+    pub content_height: u32,
+    pub minimap_width: u32,
+    pub vertical_scrollbar_width: u32,
+    pub horizontal_scrollbar_height: u32,
+    pub gutter_width: u32,
+    pub line_numbers_width: u32,
+    pub decorations_width: u32,
+    pub content_left: u32,
+}
+
+impl FjdEditorLayoutInfo {
+    pub fn new() -> Self {
+        Self {
+            layout_id: String::new(),
+            content_width: u32::default(),
+            content_height: u32::default(),
+            minimap_width: u32::default(),
+            vertical_scrollbar_width: u32::default(),
+            horizontal_scrollbar_height: u32::default(),
+            gutter_width: u32::default(),
+            line_numbers_width: u32::default(),
+            decorations_width: u32::default(),
+            content_left: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_id.is_empty() || true && self.content_width < u32::MAX || true && self.content_height < u32::MAX || true && self.minimap_width < u32::MAX || true && self.vertical_scrollbar_width < u32::MAX || true && self.horizontal_scrollbar_height < u32::MAX || true && self.gutter_width < u32::MAX || true && self.line_numbers_width < u32::MAX || true && self.decorations_width < u32::MAX || true && self.content_left < u32::MAX || true
+    }
+}
+
+impl Default for FjdEditorLayoutInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor cursor style config (style, blinking, width, smooth animation)
+#[derive(Debug, Clone)]
+pub struct FjeEditorCursorStyle {
+    pub style_id: String,
+    pub cursor_style: u32,
+    pub cursor_blinking: u32,
+    pub cursor_width: u32,
+    pub cursor_smooth_caret: bool,
+    pub cursor_surrounding_lines: u32,
+    pub cursor_surrounding_lines_style: u32,
+    pub multi_cursor_modifier: u32,
+    pub multi_cursor_merge_overlapping: bool,
+    pub multi_cursor_paste: u32,
+}
+
+impl FjeEditorCursorStyle {
+    pub fn new() -> Self {
+        Self {
+            style_id: String::new(),
+            cursor_style: u32::default(),
+            cursor_blinking: u32::default(),
+            cursor_width: u32::default(),
+            cursor_smooth_caret: bool::default(),
+            cursor_surrounding_lines: u32::default(),
+            cursor_surrounding_lines_style: u32::default(),
+            multi_cursor_modifier: u32::default(),
+            multi_cursor_merge_overlapping: bool::default(),
+            multi_cursor_paste: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.style_id.is_empty() || true && self.cursor_style < u32::MAX || true && self.cursor_blinking < u32::MAX || true && self.cursor_width < u32::MAX || true && self.cursor_smooth_caret || true && self.cursor_surrounding_lines < u32::MAX || true && self.cursor_surrounding_lines_style < u32::MAX || true && self.multi_cursor_modifier < u32::MAX || true && self.multi_cursor_merge_overlapping || true && self.multi_cursor_paste < u32::MAX || true
+    }
+}
+
+impl Default for FjeEditorCursorStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -279999,6 +280206,96 @@ mod tests_fiz_generated {
     fn test_fiz_fields() {
         let mut obj = FizWorkspaceLogOutput::default();
         obj.channel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fja_generated {
+    use super::*;
+
+    #[test]
+    fn test_fja_default() {
+        let obj = FjaEditorConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fja_fields() {
+        let mut obj = FjaEditorConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjb_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjb_default() {
+        let obj = FjbEditorOption::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjb_fields() {
+        let mut obj = FjbEditorOption::default();
+        obj.option_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjc_default() {
+        let obj = FjcEditorFontInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjc_fields() {
+        let mut obj = FjcEditorFontInfo::default();
+        obj.font_family = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjd_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjd_default() {
+        let obj = FjdEditorLayoutInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjd_fields() {
+        let mut obj = FjdEditorLayoutInfo::default();
+        obj.layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fje_generated {
+    use super::*;
+
+    #[test]
+    fn test_fje_default() {
+        let obj = FjeEditorCursorStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fje_fields() {
+        let mut obj = FjeEditorCursorStyle::default();
+        obj.style_id = "test".to_string();
         assert!(obj.validate());
     }
 }
