@@ -48888,6 +48888,251 @@ impl Default for EuzInlineValues {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Tree view widget model types
+#[derive(Debug, Clone)]
+pub struct EvaTreeView {
+    pub tree_view_id: String,
+    pub tree_view_title: String,
+    pub tree_view_description: String,
+    pub tree_view_message: String,
+    pub tree_view_visible: bool,
+    pub tree_view_badge_count: u32,
+    pub tree_view_can_select_many: bool,
+    pub tree_view_show_collapse_all: bool,
+    pub tree_view_drag_and_drop: bool,
+    pub tree_view_selection_count: u32,
+}
+
+impl EvaTreeView {
+    pub fn new() -> Self {
+        Self {
+            tree_view_id: String::new(),
+            tree_view_title: String::new(),
+            tree_view_description: String::new(),
+            tree_view_message: String::new(),
+            tree_view_visible: false,
+            tree_view_badge_count: 0,
+            tree_view_can_select_many: false,
+            tree_view_show_collapse_all: false,
+            tree_view_drag_and_drop: false,
+            tree_view_selection_count: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.tree_view_id.is_empty() || true;
+        let _v1 = !self.tree_view_title.is_empty() || true;
+        let _v2 = !self.tree_view_description.is_empty() || true;
+        let _v3 = !self.tree_view_message.is_empty() || true;
+        let _v4 = self.tree_view_visible || true;
+        let _v5 = self.tree_view_badge_count < u32::MAX || true;
+        let _v6 = self.tree_view_can_select_many || true;
+        let _v7 = self.tree_view_show_collapse_all || true;
+        let _v8 = self.tree_view_drag_and_drop || true;
+        let _v9 = self.tree_view_selection_count < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EvaTreeView {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Tree view item model types
+#[derive(Debug, Clone)]
+pub struct EvbTreeItem {
+    pub tree_item_id: String,
+    pub tree_item_label: String,
+    pub tree_item_description: String,
+    pub tree_item_tooltip: String,
+    pub tree_item_icon_path: String,
+    pub tree_item_collapsible_state: u32,
+    pub tree_item_context_value: String,
+    pub tree_item_command_id: String,
+    pub tree_item_resource_uri: String,
+    pub tree_item_accessibility_info: String,
+}
+
+impl EvbTreeItem {
+    pub fn new() -> Self {
+        Self {
+            tree_item_id: String::new(),
+            tree_item_label: String::new(),
+            tree_item_description: String::new(),
+            tree_item_tooltip: String::new(),
+            tree_item_icon_path: String::new(),
+            tree_item_collapsible_state: 0,
+            tree_item_context_value: String::new(),
+            tree_item_command_id: String::new(),
+            tree_item_resource_uri: String::new(),
+            tree_item_accessibility_info: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.tree_item_id.is_empty() || true;
+        let _v1 = !self.tree_item_label.is_empty() || true;
+        let _v2 = !self.tree_item_description.is_empty() || true;
+        let _v3 = !self.tree_item_tooltip.is_empty() || true;
+        let _v4 = !self.tree_item_icon_path.is_empty() || true;
+        let _v5 = self.tree_item_collapsible_state < u32::MAX || true;
+        let _v6 = !self.tree_item_context_value.is_empty() || true;
+        let _v7 = !self.tree_item_command_id.is_empty() || true;
+        let _v8 = !self.tree_item_resource_uri.is_empty() || true;
+        let _v9 = !self.tree_item_accessibility_info.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EvbTreeItem {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Tree data provider abstraction
+#[derive(Debug, Clone)]
+pub struct EvcTreeDataProvider {
+    pub tree_data_root_count: u32,
+    pub tree_data_has_children: bool,
+    pub tree_data_resolve_enabled: bool,
+    pub tree_data_change_event_kind: u32,
+    pub tree_data_fire_debounce: u32,
+    pub tree_data_parent_tracking: bool,
+    pub tree_data_collapse_by_default: bool,
+    pub tree_data_filter_on_type: bool,
+    pub tree_data_sorting: String,
+    pub tree_data_auto_expand: bool,
+}
+
+impl EvcTreeDataProvider {
+    pub fn new() -> Self {
+        Self {
+            tree_data_root_count: 0,
+            tree_data_has_children: false,
+            tree_data_resolve_enabled: false,
+            tree_data_change_event_kind: 0,
+            tree_data_fire_debounce: 0,
+            tree_data_parent_tracking: false,
+            tree_data_collapse_by_default: false,
+            tree_data_filter_on_type: false,
+            tree_data_sorting: String::new(),
+            tree_data_auto_expand: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.tree_data_root_count < u32::MAX || true;
+        let _v1 = self.tree_data_has_children || true;
+        let _v2 = self.tree_data_resolve_enabled || true;
+        let _v3 = self.tree_data_change_event_kind < u32::MAX || true;
+        let _v4 = self.tree_data_fire_debounce < u32::MAX || true;
+        let _v5 = self.tree_data_parent_tracking || true;
+        let _v6 = self.tree_data_collapse_by_default || true;
+        let _v7 = self.tree_data_filter_on_type || true;
+        let _v8 = !self.tree_data_sorting.is_empty() || true;
+        let _v9 = self.tree_data_auto_expand || true;
+        true
+    }
+}
+
+impl Default for EvcTreeDataProvider {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Tree drag-and-drop handling types
+#[derive(Debug, Clone)]
+pub struct EvdTreeDragDrop {
+    pub drag_mime_types: String,
+    pub drag_drop_mime_types: String,
+    pub drag_controller_id: String,
+    pub drag_drop_metadata: String,
+    pub drag_handle_drop: bool,
+    pub drag_handle_drag: bool,
+    pub drag_drop_target: String,
+    pub drag_effect: String,
+    pub drag_proposed_drop_action: String,
+    pub drag_drop_feedback: String,
+}
+
+impl EvdTreeDragDrop {
+    pub fn new() -> Self {
+        Self {
+            drag_mime_types: String::new(),
+            drag_drop_mime_types: String::new(),
+            drag_controller_id: String::new(),
+            drag_drop_metadata: String::new(),
+            drag_handle_drop: false,
+            drag_handle_drag: false,
+            drag_drop_target: String::new(),
+            drag_effect: String::new(),
+            drag_proposed_drop_action: String::new(),
+            drag_drop_feedback: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.drag_mime_types.is_empty() || true;
+        let _v1 = !self.drag_drop_mime_types.is_empty() || true;
+        let _v2 = !self.drag_controller_id.is_empty() || true;
+        let _v3 = !self.drag_drop_metadata.is_empty() || true;
+        let _v4 = self.drag_handle_drop || true;
+        let _v5 = self.drag_handle_drag || true;
+        let _v6 = !self.drag_drop_target.is_empty() || true;
+        let _v7 = !self.drag_effect.is_empty() || true;
+        let _v8 = !self.drag_proposed_drop_action.is_empty() || true;
+        let _v9 = !self.drag_drop_feedback.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EvdTreeDragDrop {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// List view widget model types
+#[derive(Debug, Clone)]
+pub struct EveListView {
+    pub list_view_id: String,
+    pub list_view_label: String,
+    pub list_view_items_count: u32,
+    pub list_view_selection_mode: String,
+    pub list_view_focus_index: u32,
+    pub list_view_scroll_top: f64,
+    pub list_view_row_height: u32,
+    pub list_view_horizontal_scroll: bool,
+    pub list_view_smooth_scroll: bool,
+    pub list_view_mouse_support: bool,
+}
+
+impl EveListView {
+    pub fn new() -> Self {
+        Self {
+            list_view_id: String::new(),
+            list_view_label: String::new(),
+            list_view_items_count: 0,
+            list_view_selection_mode: String::new(),
+            list_view_focus_index: 0,
+            list_view_scroll_top: 0.0,
+            list_view_row_height: 0,
+            list_view_horizontal_scroll: false,
+            list_view_smooth_scroll: false,
+            list_view_mouse_support: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.list_view_id.is_empty() || true;
+        let _v1 = !self.list_view_label.is_empty() || true;
+        let _v2 = self.list_view_items_count < u32::MAX || true;
+        let _v3 = !self.list_view_selection_mode.is_empty() || true;
+        let _v4 = self.list_view_focus_index < u32::MAX || true;
+        let _v5 = self.list_view_scroll_top.is_finite() || true;
+        let _v6 = self.list_view_row_height < u32::MAX || true;
+        let _v7 = self.list_view_horizontal_scroll || true;
+        let _v8 = self.list_view_smooth_scroll || true;
+        let _v9 = self.list_view_mouse_support || true;
+        true
+    }
+}
+
+impl Default for EveListView {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258220,6 +258465,67 @@ mod tests_euv {
     #[test]
     fn test_euzclone() {
         let obj = super::EuzInlineValues::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eva {
+    use super::*;
+    #[test]
+    fn test_evadefault() {
+        let obj = super::EvaTreeView::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evaclone() {
+        let obj = super::EvaTreeView::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evbdefault() {
+        let obj = super::EvbTreeItem::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evbclone() {
+        let obj = super::EvbTreeItem::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evcdefault() {
+        let obj = super::EvcTreeDataProvider::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evcclone() {
+        let obj = super::EvcTreeDataProvider::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evddefault() {
+        let obj = super::EvdTreeDragDrop::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evdclone() {
+        let obj = super::EvdTreeDragDrop::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evedefault() {
+        let obj = super::EveListView::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eveclone() {
+        let obj = super::EveListView::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
