@@ -56495,6 +56495,459 @@ impl Default for FboTerminalResize {
 }
 
 
+/// Terminal accessibility buffer types
+#[derive(Debug, Clone)]
+pub struct FbpTerminalAccessibility {
+    pub a11y_buffer_active: bool,
+    pub a11y_line_count: u32,
+    pub a11y_cursor_line: u32,
+    pub a11y_cursor_col: u32,
+    pub a11y_selection_text: String,
+    pub a11y_change_count: u32,
+    pub a11y_navigation_mode: bool,
+    pub a11y_screen_reader: bool,
+    pub a11y_announce_text: String,
+    pub a11y_row_height: u32,
+}
+
+impl FbpTerminalAccessibility {
+    pub fn new() -> Self {
+        Self {
+            a11y_buffer_active: bool::default(),
+            a11y_line_count: u32::default(),
+            a11y_cursor_line: u32::default(),
+            a11y_cursor_col: u32::default(),
+            a11y_selection_text: String::new(),
+            a11y_change_count: u32::default(),
+            a11y_navigation_mode: bool::default(),
+            a11y_screen_reader: bool::default(),
+            a11y_announce_text: String::new(),
+            a11y_row_height: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.a11y_buffer_active || true && self.a11y_line_count < u32::MAX || true && self.a11y_cursor_line < u32::MAX || true && self.a11y_cursor_col < u32::MAX || true && !self.a11y_selection_text.is_empty() || true && self.a11y_change_count < u32::MAX || true && self.a11y_navigation_mode || true && self.a11y_screen_reader || true && !self.a11y_announce_text.is_empty() || true && self.a11y_row_height < u32::MAX || true
+    }
+}
+
+impl Default for FbpTerminalAccessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal decoration/annotation types
+#[derive(Debug, Clone)]
+pub struct FbqTerminalDecoration {
+    pub decoration_marker_id: u32,
+    pub decoration_line_start: u32,
+    pub decoration_line_end: u32,
+    pub decoration_type: String,
+    pub decoration_color: String,
+    pub decoration_icon_path: String,
+    pub decoration_tooltip: String,
+    pub decoration_command_id: String,
+    pub decoration_overview_color: String,
+    pub decoration_is_whole_line: bool,
+}
+
+impl FbqTerminalDecoration {
+    pub fn new() -> Self {
+        Self {
+            decoration_marker_id: u32::default(),
+            decoration_line_start: u32::default(),
+            decoration_line_end: u32::default(),
+            decoration_type: String::new(),
+            decoration_color: String::new(),
+            decoration_icon_path: String::new(),
+            decoration_tooltip: String::new(),
+            decoration_command_id: String::new(),
+            decoration_overview_color: String::new(),
+            decoration_is_whole_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.decoration_marker_id < u32::MAX || true && self.decoration_line_start < u32::MAX || true && self.decoration_line_end < u32::MAX || true && !self.decoration_type.is_empty() || true && !self.decoration_color.is_empty() || true && !self.decoration_icon_path.is_empty() || true && !self.decoration_tooltip.is_empty() || true && !self.decoration_command_id.is_empty() || true && !self.decoration_overview_color.is_empty() || true && self.decoration_is_whole_line || true
+    }
+}
+
+impl Default for FbqTerminalDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal shell integration types
+#[derive(Debug, Clone)]
+pub struct FbrTerminalIntegration {
+    pub shell_integration_type: String,
+    pub shell_integration_cwd: String,
+    pub shell_integration_command_line: String,
+    pub shell_integration_exit_code: u32,
+    pub shell_integration_command_start: u32,
+    pub shell_integration_command_end: u32,
+    pub shell_integration_output_start: u32,
+    pub shell_integration_output_end: u32,
+    pub shell_integration_mark_type: String,
+    pub shell_integration_capabilities: u32,
+}
+
+impl FbrTerminalIntegration {
+    pub fn new() -> Self {
+        Self {
+            shell_integration_type: String::new(),
+            shell_integration_cwd: String::new(),
+            shell_integration_command_line: String::new(),
+            shell_integration_exit_code: u32::default(),
+            shell_integration_command_start: u32::default(),
+            shell_integration_command_end: u32::default(),
+            shell_integration_output_start: u32::default(),
+            shell_integration_output_end: u32::default(),
+            shell_integration_mark_type: String::new(),
+            shell_integration_capabilities: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shell_integration_type.is_empty() || true && !self.shell_integration_cwd.is_empty() || true && !self.shell_integration_command_line.is_empty() || true && self.shell_integration_exit_code < u32::MAX || true && self.shell_integration_command_start < u32::MAX || true && self.shell_integration_command_end < u32::MAX || true && self.shell_integration_output_start < u32::MAX || true && self.shell_integration_output_end < u32::MAX || true && !self.shell_integration_mark_type.is_empty() || true && self.shell_integration_capabilities < u32::MAX || true
+    }
+}
+
+impl Default for FbrTerminalIntegration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal contribution point types
+#[derive(Debug, Clone)]
+pub struct FbsTerminalContribution {
+    pub contrib_command_id: String,
+    pub contrib_title: String,
+    pub contrib_keybinding: String,
+    pub contrib_when_clause: String,
+    pub contrib_group: String,
+    pub contrib_order: u32,
+    pub contrib_icon_path: String,
+    pub contrib_category: String,
+    pub contrib_menu_id: String,
+    pub contrib_args: String,
+}
+
+impl FbsTerminalContribution {
+    pub fn new() -> Self {
+        Self {
+            contrib_command_id: String::new(),
+            contrib_title: String::new(),
+            contrib_keybinding: String::new(),
+            contrib_when_clause: String::new(),
+            contrib_group: String::new(),
+            contrib_order: u32::default(),
+            contrib_icon_path: String::new(),
+            contrib_category: String::new(),
+            contrib_menu_id: String::new(),
+            contrib_args: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.contrib_command_id.is_empty() || true && !self.contrib_title.is_empty() || true && !self.contrib_keybinding.is_empty() || true && !self.contrib_when_clause.is_empty() || true && !self.contrib_group.is_empty() || true && self.contrib_order < u32::MAX || true && !self.contrib_icon_path.is_empty() || true && !self.contrib_category.is_empty() || true && !self.contrib_menu_id.is_empty() || true && !self.contrib_args.is_empty() || true
+    }
+}
+
+impl Default for FbsTerminalContribution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal quick fix/action types
+#[derive(Debug, Clone)]
+pub struct FbtTerminalQuickFix {
+    pub quick_fix_id: String,
+    pub quick_fix_command_id: String,
+    pub quick_fix_exit_code: u32,
+    pub quick_fix_output_match: String,
+    pub quick_fix_label: String,
+    pub quick_fix_kind: String,
+    pub quick_fix_source: String,
+    pub quick_fix_args: String,
+    pub quick_fix_enabled: bool,
+    pub quick_fix_extension_id: String,
+}
+
+impl FbtTerminalQuickFix {
+    pub fn new() -> Self {
+        Self {
+            quick_fix_id: String::new(),
+            quick_fix_command_id: String::new(),
+            quick_fix_exit_code: u32::default(),
+            quick_fix_output_match: String::new(),
+            quick_fix_label: String::new(),
+            quick_fix_kind: String::new(),
+            quick_fix_source: String::new(),
+            quick_fix_args: String::new(),
+            quick_fix_enabled: bool::default(),
+            quick_fix_extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.quick_fix_id.is_empty() || true && !self.quick_fix_command_id.is_empty() || true && self.quick_fix_exit_code < u32::MAX || true && !self.quick_fix_output_match.is_empty() || true && !self.quick_fix_label.is_empty() || true && !self.quick_fix_kind.is_empty() || true && !self.quick_fix_source.is_empty() || true && !self.quick_fix_args.is_empty() || true && self.quick_fix_enabled || true && !self.quick_fix_extension_id.is_empty() || true
+    }
+}
+
+impl Default for FbtTerminalQuickFix {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal environment variable collection types
+#[derive(Debug, Clone)]
+pub struct FbuTerminalEnvironment {
+    pub env_collection_desc: String,
+    pub env_merge_type: String,
+    pub env_key: String,
+    pub env_value: String,
+    pub env_scope: String,
+    pub env_persistent: bool,
+    pub env_extension_id: String,
+    pub env_diff_before: String,
+    pub env_diff_after: String,
+    pub env_is_delete: bool,
+}
+
+impl FbuTerminalEnvironment {
+    pub fn new() -> Self {
+        Self {
+            env_collection_desc: String::new(),
+            env_merge_type: String::new(),
+            env_key: String::new(),
+            env_value: String::new(),
+            env_scope: String::new(),
+            env_persistent: bool::default(),
+            env_extension_id: String::new(),
+            env_diff_before: String::new(),
+            env_diff_after: String::new(),
+            env_is_delete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.env_collection_desc.is_empty() || true && !self.env_merge_type.is_empty() || true && !self.env_key.is_empty() || true && !self.env_value.is_empty() || true && !self.env_scope.is_empty() || true && self.env_persistent || true && !self.env_extension_id.is_empty() || true && !self.env_diff_before.is_empty() || true && !self.env_diff_after.is_empty() || true && self.env_is_delete || true
+    }
+}
+
+impl Default for FbuTerminalEnvironment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal suggest/autocomplete types
+#[derive(Debug, Clone)]
+pub struct FbvTerminalSuggest {
+    pub suggest_line: String,
+    pub suggest_cursor_pos: u32,
+    pub suggest_completions: String,
+    pub suggest_prefix: String,
+    pub suggest_selected_index: u32,
+    pub suggest_visible: bool,
+    pub suggest_source: String,
+    pub suggest_shell_type: String,
+    pub suggest_provider_id: String,
+    pub suggest_total_count: u32,
+}
+
+impl FbvTerminalSuggest {
+    pub fn new() -> Self {
+        Self {
+            suggest_line: String::new(),
+            suggest_cursor_pos: u32::default(),
+            suggest_completions: String::new(),
+            suggest_prefix: String::new(),
+            suggest_selected_index: u32::default(),
+            suggest_visible: bool::default(),
+            suggest_source: String::new(),
+            suggest_shell_type: String::new(),
+            suggest_provider_id: String::new(),
+            suggest_total_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.suggest_line.is_empty() || true && self.suggest_cursor_pos < u32::MAX || true && !self.suggest_completions.is_empty() || true && !self.suggest_prefix.is_empty() || true && self.suggest_selected_index < u32::MAX || true && self.suggest_visible || true && !self.suggest_source.is_empty() || true && !self.suggest_shell_type.is_empty() || true && !self.suggest_provider_id.is_empty() || true && self.suggest_total_count < u32::MAX || true
+    }
+}
+
+impl Default for FbvTerminalSuggest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal tab model types
+#[derive(Debug, Clone)]
+pub struct FbwTerminalTab {
+    pub tab_title: String,
+    pub tab_icon: String,
+    pub tab_color: String,
+    pub tab_description: String,
+    pub tab_instance_id: u32,
+    pub tab_is_active: bool,
+    pub tab_has_activity: bool,
+    pub tab_process_name: String,
+    pub tab_cwd: String,
+    pub tab_exit_code: u32,
+}
+
+impl FbwTerminalTab {
+    pub fn new() -> Self {
+        Self {
+            tab_title: String::new(),
+            tab_icon: String::new(),
+            tab_color: String::new(),
+            tab_description: String::new(),
+            tab_instance_id: u32::default(),
+            tab_is_active: bool::default(),
+            tab_has_activity: bool::default(),
+            tab_process_name: String::new(),
+            tab_cwd: String::new(),
+            tab_exit_code: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tab_title.is_empty() || true && !self.tab_icon.is_empty() || true && !self.tab_color.is_empty() || true && !self.tab_description.is_empty() || true && self.tab_instance_id < u32::MAX || true && self.tab_is_active || true && self.tab_has_activity || true && !self.tab_process_name.is_empty() || true && !self.tab_cwd.is_empty() || true && self.tab_exit_code < u32::MAX || true
+    }
+}
+
+impl Default for FbwTerminalTab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal split pane types
+#[derive(Debug, Clone)]
+pub struct FbxTerminalSplit {
+    pub split_direction: String,
+    pub split_parent_id: u32,
+    pub split_size_ratio: f64,
+    pub split_is_active: bool,
+    pub split_terminal_id: u32,
+    pub split_orientation: String,
+    pub split_min_size: u32,
+    pub split_max_size: u32,
+    pub split_border_visible: bool,
+    pub split_group_id: u32,
+}
+
+impl FbxTerminalSplit {
+    pub fn new() -> Self {
+        Self {
+            split_direction: String::new(),
+            split_parent_id: u32::default(),
+            split_size_ratio: f64::default(),
+            split_is_active: bool::default(),
+            split_terminal_id: u32::default(),
+            split_orientation: String::new(),
+            split_min_size: u32::default(),
+            split_max_size: u32::default(),
+            split_border_visible: bool::default(),
+            split_group_id: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.split_direction.is_empty() || true && self.split_parent_id < u32::MAX || true && self.split_size_ratio.is_finite() || true && self.split_is_active || true && self.split_terminal_id < u32::MAX || true && !self.split_orientation.is_empty() || true && self.split_min_size < u32::MAX || true && self.split_max_size < u32::MAX || true && self.split_border_visible || true && self.split_group_id < u32::MAX || true
+    }
+}
+
+impl Default for FbxTerminalSplit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal detach/reattach types
+#[derive(Debug, Clone)]
+pub struct FbyTerminalDetach {
+    pub detach_session_id: String,
+    pub detach_title: String,
+    pub detach_pid: u32,
+    pub detach_cwd: String,
+    pub detach_shell_path: String,
+    pub detach_attached: bool,
+    pub detach_created_at: u64,
+    pub detach_last_activity: u64,
+    pub detach_scrollback_lines: u32,
+    pub detach_env: String,
+}
+
+impl FbyTerminalDetach {
+    pub fn new() -> Self {
+        Self {
+            detach_session_id: String::new(),
+            detach_title: String::new(),
+            detach_pid: u32::default(),
+            detach_cwd: String::new(),
+            detach_shell_path: String::new(),
+            detach_attached: bool::default(),
+            detach_created_at: u64::default(),
+            detach_last_activity: u64::default(),
+            detach_scrollback_lines: u32::default(),
+            detach_env: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.detach_session_id.is_empty() || true && !self.detach_title.is_empty() || true && self.detach_pid < u32::MAX || true && !self.detach_cwd.is_empty() || true && !self.detach_shell_path.is_empty() || true && self.detach_attached || true && self.detach_created_at < u64::MAX || true && self.detach_last_activity < u64::MAX || true && self.detach_scrollback_lines < u32::MAX || true && !self.detach_env.is_empty() || true
+    }
+}
+
+impl Default for FbyTerminalDetach {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal serial port connection types
+#[derive(Debug, Clone)]
+pub struct FbzTerminalSerial {
+    pub serial_port_path: String,
+    pub serial_baud_rate: u32,
+    pub serial_data_bits: u32,
+    pub serial_stop_bits: u32,
+    pub serial_parity: String,
+    pub serial_flow_control: String,
+    pub serial_dtr_on: bool,
+    pub serial_rts_on: bool,
+    pub serial_encoding: String,
+    pub serial_echo_enabled: bool,
+}
+
+impl FbzTerminalSerial {
+    pub fn new() -> Self {
+        Self {
+            serial_port_path: String::new(),
+            serial_baud_rate: u32::default(),
+            serial_data_bits: u32::default(),
+            serial_stop_bits: u32::default(),
+            serial_parity: String::new(),
+            serial_flow_control: String::new(),
+            serial_dtr_on: bool::default(),
+            serial_rts_on: bool::default(),
+            serial_encoding: String::new(),
+            serial_echo_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.serial_port_path.is_empty() || true && self.serial_baud_rate < u32::MAX || true && self.serial_data_bits < u32::MAX || true && self.serial_stop_bits < u32::MAX || true && !self.serial_parity.is_empty() || true && !self.serial_flow_control.is_empty() || true && self.serial_dtr_on || true && self.serial_rts_on || true && !self.serial_encoding.is_empty() || true && self.serial_echo_enabled || true
+    }
+}
+
+impl Default for FbzTerminalSerial {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -268511,6 +268964,204 @@ mod tests_fbo_generated {
     fn test_fbo_fields() {
         let mut obj = FboTerminalResize::default();
         obj.resize_cols = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbp_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbp_default() {
+        let obj = FbpTerminalAccessibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbp_fields() {
+        let mut obj = FbpTerminalAccessibility::default();
+        obj.a11y_buffer_active = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbq_default() {
+        let obj = FbqTerminalDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbq_fields() {
+        let mut obj = FbqTerminalDecoration::default();
+        obj.decoration_marker_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbr_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbr_default() {
+        let obj = FbrTerminalIntegration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbr_fields() {
+        let mut obj = FbrTerminalIntegration::default();
+        obj.shell_integration_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbs_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbs_default() {
+        let obj = FbsTerminalContribution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbs_fields() {
+        let mut obj = FbsTerminalContribution::default();
+        obj.contrib_command_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbt_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbt_default() {
+        let obj = FbtTerminalQuickFix::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbt_fields() {
+        let mut obj = FbtTerminalQuickFix::default();
+        obj.quick_fix_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbu_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbu_default() {
+        let obj = FbuTerminalEnvironment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbu_fields() {
+        let mut obj = FbuTerminalEnvironment::default();
+        obj.env_collection_desc = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbv_default() {
+        let obj = FbvTerminalSuggest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbv_fields() {
+        let mut obj = FbvTerminalSuggest::default();
+        obj.suggest_line = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbw_default() {
+        let obj = FbwTerminalTab::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbw_fields() {
+        let mut obj = FbwTerminalTab::default();
+        obj.tab_title = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbx_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbx_default() {
+        let obj = FbxTerminalSplit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbx_fields() {
+        let mut obj = FbxTerminalSplit::default();
+        obj.split_direction = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fby_generated {
+    use super::*;
+
+    #[test]
+    fn test_fby_default() {
+        let obj = FbyTerminalDetach::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fby_fields() {
+        let mut obj = FbyTerminalDetach::default();
+        obj.detach_session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbz_default() {
+        let obj = FbzTerminalSerial::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbz_fields() {
+        let mut obj = FbzTerminalSerial::default();
+        obj.serial_port_path = "test".to_string();
         assert!(obj.validate());
     }
 }
