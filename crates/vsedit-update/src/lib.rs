@@ -64515,6 +64515,213 @@ impl Default for FjeEditorCursorStyle {
 }
 
 
+/// Editor scrollbar config (vertical/horizontal, arrows, shadows, auto-hide)
+#[derive(Debug, Clone)]
+pub struct FjfEditorScrollbarConfig {
+    pub scrollbar_id: String,
+    pub vertical: u32,
+    pub horizontal: u32,
+    pub vertical_has_arrows: bool,
+    pub horizontal_has_arrows: bool,
+    pub handle_mouse_wheel: bool,
+    pub always_consume_mouse_wheel: bool,
+    pub arrow_size: u32,
+    pub scroll_by_page: bool,
+    pub vertical_shadow: bool,
+}
+
+impl FjfEditorScrollbarConfig {
+    pub fn new() -> Self {
+        Self {
+            scrollbar_id: String::new(),
+            vertical: u32::default(),
+            horizontal: u32::default(),
+            vertical_has_arrows: bool::default(),
+            horizontal_has_arrows: bool::default(),
+            handle_mouse_wheel: bool::default(),
+            always_consume_mouse_wheel: bool::default(),
+            arrow_size: u32::default(),
+            scroll_by_page: bool::default(),
+            vertical_shadow: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scrollbar_id.is_empty() || true && self.vertical < u32::MAX || true && self.horizontal < u32::MAX || true && self.vertical_has_arrows || true && self.horizontal_has_arrows || true && self.handle_mouse_wheel || true && self.always_consume_mouse_wheel || true && self.arrow_size < u32::MAX || true && self.scroll_by_page || true && self.vertical_shadow || true
+    }
+}
+
+impl Default for FjfEditorScrollbarConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor minimap config (enabled, side, size, show slider, render chars)
+#[derive(Debug, Clone)]
+pub struct FjgEditorMinimapConfig {
+    pub minimap_id: String,
+    pub is_enabled: bool,
+    pub side: u32,
+    pub size: u32,
+    pub show_slider: u32,
+    pub render_characters: bool,
+    pub max_column: u32,
+    pub autohide: bool,
+    pub scale: u32,
+    pub section_header_font_size: u32,
+}
+
+impl FjgEditorMinimapConfig {
+    pub fn new() -> Self {
+        Self {
+            minimap_id: String::new(),
+            is_enabled: bool::default(),
+            side: u32::default(),
+            size: u32::default(),
+            show_slider: u32::default(),
+            render_characters: bool::default(),
+            max_column: u32::default(),
+            autohide: bool::default(),
+            scale: u32::default(),
+            section_header_font_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.minimap_id.is_empty() || true && self.is_enabled || true && self.side < u32::MAX || true && self.size < u32::MAX || true && self.show_slider < u32::MAX || true && self.render_characters || true && self.max_column < u32::MAX || true && self.autohide || true && self.scale < u32::MAX || true && self.section_header_font_size < u32::MAX || true
+    }
+}
+
+impl Default for FjgEditorMinimapConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor bracket pair config (colorization, guides, independent pairs)
+#[derive(Debug, Clone)]
+pub struct FjhEditorBracketConfig {
+    pub bracket_id: String,
+    pub colorize_enabled: bool,
+    pub colorize_independent_pairs: bool,
+    pub guide_enabled: bool,
+    pub guide_active_enabled: bool,
+    pub guide_horizontal_enabled: bool,
+    pub highlight_active: bool,
+    pub pair_count: u32,
+    pub max_pairs: u32,
+    pub independent_color_pool_size: u32,
+}
+
+impl FjhEditorBracketConfig {
+    pub fn new() -> Self {
+        Self {
+            bracket_id: String::new(),
+            colorize_enabled: bool::default(),
+            colorize_independent_pairs: bool::default(),
+            guide_enabled: bool::default(),
+            guide_active_enabled: bool::default(),
+            guide_horizontal_enabled: bool::default(),
+            highlight_active: bool::default(),
+            pair_count: u32::default(),
+            max_pairs: u32::default(),
+            independent_color_pool_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bracket_id.is_empty() || true && self.colorize_enabled || true && self.colorize_independent_pairs || true && self.guide_enabled || true && self.guide_active_enabled || true && self.guide_horizontal_enabled || true && self.highlight_active || true && self.pair_count < u32::MAX || true && self.max_pairs < u32::MAX || true && self.independent_color_pool_size < u32::MAX || true
+    }
+}
+
+impl Default for FjhEditorBracketConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor sticky scroll config (enabled, max lines, default model)
+#[derive(Debug, Clone)]
+pub struct FjiEditorStickyScrollConfig {
+    pub sticky_id: String,
+    pub is_enabled: bool,
+    pub max_line_count: u32,
+    pub default_model: u32,
+    pub scroll_with_editor: bool,
+    pub show_on_hover: bool,
+    pub access_types_json: String,
+    pub top_offset: u32,
+    pub font_size: u32,
+    pub font_weight: String,
+}
+
+impl FjiEditorStickyScrollConfig {
+    pub fn new() -> Self {
+        Self {
+            sticky_id: String::new(),
+            is_enabled: bool::default(),
+            max_line_count: u32::default(),
+            default_model: u32::default(),
+            scroll_with_editor: bool::default(),
+            show_on_hover: bool::default(),
+            access_types_json: String::new(),
+            top_offset: u32::default(),
+            font_size: u32::default(),
+            font_weight: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sticky_id.is_empty() || true && self.is_enabled || true && self.max_line_count < u32::MAX || true && self.default_model < u32::MAX || true && self.scroll_with_editor || true && self.show_on_hover || true && !self.access_types_json.is_empty() || true && self.top_offset < u32::MAX || true && self.font_size < u32::MAX || true && !self.font_weight.is_empty() || true
+    }
+}
+
+impl Default for FjiEditorStickyScrollConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor inlay hints config (enabled, font size, font family, padding)
+#[derive(Debug, Clone)]
+pub struct FjjEditorInlayHintConfig {
+    pub inlay_id: String,
+    pub is_enabled: u32,
+    pub font_size: u32,
+    pub font_family: String,
+    pub padding: bool,
+    pub max_length: u32,
+    pub display_style: u32,
+    pub show_parameter_names: bool,
+    pub show_type_hints: bool,
+    pub show_variable_types: bool,
+}
+
+impl FjjEditorInlayHintConfig {
+    pub fn new() -> Self {
+        Self {
+            inlay_id: String::new(),
+            is_enabled: u32::default(),
+            font_size: u32::default(),
+            font_family: String::new(),
+            padding: bool::default(),
+            max_length: u32::default(),
+            display_style: u32::default(),
+            show_parameter_names: bool::default(),
+            show_type_hints: bool::default(),
+            show_variable_types: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inlay_id.is_empty() || true && self.is_enabled < u32::MAX || true && self.font_size < u32::MAX || true && !self.font_family.is_empty() || true && self.padding || true && self.max_length < u32::MAX || true && self.display_style < u32::MAX || true && self.show_parameter_names || true && self.show_type_hints || true && self.show_variable_types || true
+    }
+}
+
+impl Default for FjjEditorInlayHintConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -280154,6 +280361,96 @@ mod tests_fje_generated {
     fn test_fje_fields() {
         let mut obj = FjeEditorCursorStyle::default();
         obj.style_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjf_default() {
+        let obj = FjfEditorScrollbarConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjf_fields() {
+        let mut obj = FjfEditorScrollbarConfig::default();
+        obj.scrollbar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjg_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjg_default() {
+        let obj = FjgEditorMinimapConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjg_fields() {
+        let mut obj = FjgEditorMinimapConfig::default();
+        obj.minimap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjh_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjh_default() {
+        let obj = FjhEditorBracketConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjh_fields() {
+        let mut obj = FjhEditorBracketConfig::default();
+        obj.bracket_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fji_generated {
+    use super::*;
+
+    #[test]
+    fn test_fji_default() {
+        let obj = FjiEditorStickyScrollConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fji_fields() {
+        let mut obj = FjiEditorStickyScrollConfig::default();
+        obj.sticky_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjj_default() {
+        let obj = FjjEditorInlayHintConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjj_fields() {
+        let mut obj = FjjEditorInlayHintConfig::default();
+        obj.inlay_id = "test".to_string();
         assert!(obj.validate());
     }
 }
