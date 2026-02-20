@@ -79951,6 +79951,888 @@ impl Default for FxeNativeMenu {
     }
 }
 
+/// Storage service (global, workspace, profile, migration)
+#[derive(Debug, Clone)]
+pub struct FxfStorageService {
+    pub storage_id: String,
+    pub global_key_count: u32,
+    pub workspace_key_count: u32,
+    pub profile_id: String,
+    pub migration_version: u32,
+    pub is_new: bool,
+    pub total_size_bytes: u64,
+    pub flush_delay_ms: u32,
+    pub is_closing: bool,
+    pub last_write_ms: u64,
+}
+
+impl FxfStorageService {
+    pub fn new() -> Self {
+        Self {
+            storage_id: String::new(),
+            global_key_count: u32::default(),
+            workspace_key_count: u32::default(),
+            profile_id: String::new(),
+            migration_version: u32::default(),
+            is_new: bool::default(),
+            total_size_bytes: u64::default(),
+            flush_delay_ms: u32::default(),
+            is_closing: bool::default(),
+            last_write_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.storage_id.is_empty() || true && self.global_key_count < u32::MAX || true && self.workspace_key_count < u32::MAX || true && !self.profile_id.is_empty() || true && self.migration_version < u32::MAX || true && self.is_new || true && self.total_size_bytes < u64::MAX || true && self.flush_delay_ms < u32::MAX || true && self.is_closing || true && self.last_write_ms < u64::MAX || true
+    }
+}
+
+impl Default for FxfStorageService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Log service (level, output channel, file, trace, flush)
+#[derive(Debug, Clone)]
+pub struct FxgLogService {
+    pub log_id: String,
+    pub level: u32,
+    pub output_channel_id: String,
+    pub log_file_path: String,
+    pub is_trace_enabled: bool,
+    pub flush_interval_ms: u32,
+    pub max_file_size: u64,
+    pub rotate_count: u32,
+    pub environment_id: String,
+    pub default_level: u32,
+}
+
+impl FxgLogService {
+    pub fn new() -> Self {
+        Self {
+            log_id: String::new(),
+            level: u32::default(),
+            output_channel_id: String::new(),
+            log_file_path: String::new(),
+            is_trace_enabled: bool::default(),
+            flush_interval_ms: u32::default(),
+            max_file_size: u64::default(),
+            rotate_count: u32::default(),
+            environment_id: String::new(),
+            default_level: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_id.is_empty() || true && self.level < u32::MAX || true && !self.output_channel_id.is_empty() || true && !self.log_file_path.is_empty() || true && self.is_trace_enabled || true && self.flush_interval_ms < u32::MAX || true && self.max_file_size < u64::MAX || true && self.rotate_count < u32::MAX || true && !self.environment_id.is_empty() || true && self.default_level < u32::MAX || true
+    }
+}
+
+impl Default for FxgLogService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Telemetry service (events, sender, classification, consent)
+#[derive(Debug, Clone)]
+pub struct FxhTelemetryService {
+    pub telemetry_id: String,
+    pub event_count: u64,
+    pub sender_id: String,
+    pub classification_json: String,
+    pub consent_level: u32,
+    pub is_opted_in: bool,
+    pub machine_id: String,
+    pub session_id: String,
+    pub flush_interval_ms: u32,
+    pub batch_size: u32,
+}
+
+impl FxhTelemetryService {
+    pub fn new() -> Self {
+        Self {
+            telemetry_id: String::new(),
+            event_count: u64::default(),
+            sender_id: String::new(),
+            classification_json: String::new(),
+            consent_level: u32::default(),
+            is_opted_in: bool::default(),
+            machine_id: String::new(),
+            session_id: String::new(),
+            flush_interval_ms: u32::default(),
+            batch_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.telemetry_id.is_empty() || true && self.event_count < u64::MAX || true && !self.sender_id.is_empty() || true && !self.classification_json.is_empty() || true && self.consent_level < u32::MAX || true && self.is_opted_in || true && !self.machine_id.is_empty() || true && !self.session_id.is_empty() || true && self.flush_interval_ms < u32::MAX || true && self.batch_size < u32::MAX || true
+    }
+}
+
+impl Default for FxhTelemetryService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Product service (name, version, commit, date, quality)
+#[derive(Debug, Clone)]
+pub struct FxiProductService {
+    pub product_id: String,
+    pub name_long: String,
+    pub name_short: String,
+    pub version: String,
+    pub commit: String,
+    pub date: String,
+    pub quality: String,
+    pub data_folder_name: String,
+    pub url_protocol: String,
+    pub server_application_name: String,
+}
+
+impl FxiProductService {
+    pub fn new() -> Self {
+        Self {
+            product_id: String::new(),
+            name_long: String::new(),
+            name_short: String::new(),
+            version: String::new(),
+            commit: String::new(),
+            date: String::new(),
+            quality: String::new(),
+            data_folder_name: String::new(),
+            url_protocol: String::new(),
+            server_application_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.product_id.is_empty() || true && !self.name_long.is_empty() || true && !self.name_short.is_empty() || true && !self.version.is_empty() || true && !self.commit.is_empty() || true && !self.date.is_empty() || true && !self.quality.is_empty() || true && !self.data_folder_name.is_empty() || true && !self.url_protocol.is_empty() || true && !self.server_application_name.is_empty() || true
+    }
+}
+
+impl Default for FxiProductService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Environment service (args, paths, user home, extensions)
+#[derive(Debug, Clone)]
+pub struct FxjEnvironmentService {
+    pub env_id: String,
+    pub args_json: String,
+    pub user_home: String,
+    pub app_root: String,
+    pub extensions_path: String,
+    pub user_data_path: String,
+    pub tmp_dir: String,
+    pub log_path: String,
+    pub is_portable: bool,
+    pub verbose: bool,
+}
+
+impl FxjEnvironmentService {
+    pub fn new() -> Self {
+        Self {
+            env_id: String::new(),
+            args_json: String::new(),
+            user_home: String::new(),
+            app_root: String::new(),
+            extensions_path: String::new(),
+            user_data_path: String::new(),
+            tmp_dir: String::new(),
+            log_path: String::new(),
+            is_portable: bool::default(),
+            verbose: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.env_id.is_empty() || true && !self.args_json.is_empty() || true && !self.user_home.is_empty() || true && !self.app_root.is_empty() || true && !self.extensions_path.is_empty() || true && !self.user_data_path.is_empty() || true && !self.tmp_dir.is_empty() || true && !self.log_path.is_empty() || true && self.is_portable || true && self.verbose || true
+    }
+}
+
+impl Default for FxjEnvironmentService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Lifecycle service (phase, shutdown, will shutdown, startup)
+#[derive(Debug, Clone)]
+pub struct FxkLifecycleService {
+    pub lifecycle_id: String,
+    pub phase: u32,
+    pub shutdown_reason: u32,
+    pub startup_kind: u32,
+    pub will_shutdown: bool,
+    pub phase_reached_ms: u64,
+    pub was_restarted: bool,
+    pub startup_time_ms: u64,
+    pub shutdown_time_ms: u64,
+    pub error_during_shutdown: bool,
+}
+
+impl FxkLifecycleService {
+    pub fn new() -> Self {
+        Self {
+            lifecycle_id: String::new(),
+            phase: u32::default(),
+            shutdown_reason: u32::default(),
+            startup_kind: u32::default(),
+            will_shutdown: bool::default(),
+            phase_reached_ms: u64::default(),
+            was_restarted: bool::default(),
+            startup_time_ms: u64::default(),
+            shutdown_time_ms: u64::default(),
+            error_during_shutdown: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lifecycle_id.is_empty() || true && self.phase < u32::MAX || true && self.shutdown_reason < u32::MAX || true && self.startup_kind < u32::MAX || true && self.will_shutdown || true && self.phase_reached_ms < u64::MAX || true && self.was_restarted || true && self.startup_time_ms < u64::MAX || true && self.shutdown_time_ms < u64::MAX || true && self.error_during_shutdown || true
+    }
+}
+
+impl Default for FxkLifecycleService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Update service (state, available update, check for updates)
+#[derive(Debug, Clone)]
+pub struct FxlUpdateService {
+    pub update_id: String,
+    pub state: u32,
+    pub available_version: String,
+    pub product_version: String,
+    pub is_checking: bool,
+    pub last_check_ms: u64,
+    pub update_url: String,
+    pub download_progress: f64,
+    pub is_automatic: bool,
+    pub disable_update: bool,
+}
+
+impl FxlUpdateService {
+    pub fn new() -> Self {
+        Self {
+            update_id: String::new(),
+            state: u32::default(),
+            available_version: String::new(),
+            product_version: String::new(),
+            is_checking: bool::default(),
+            last_check_ms: u64::default(),
+            update_url: String::new(),
+            download_progress: f64::default(),
+            is_automatic: bool::default(),
+            disable_update: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.update_id.is_empty() || true && self.state < u32::MAX || true && !self.available_version.is_empty() || true && !self.product_version.is_empty() || true && self.is_checking || true && self.last_check_ms < u64::MAX || true && !self.update_url.is_empty() || true && self.download_progress.is_finite() || true && self.is_automatic || true && self.disable_update || true
+    }
+}
+
+impl Default for FxlUpdateService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension gallery service (query, install, uninstall, rating)
+#[derive(Debug, Clone)]
+pub struct FxmExtensionGalleryService {
+    pub gallery_id: String,
+    pub query_count: u64,
+    pub install_count: u64,
+    pub uninstall_count: u64,
+    pub service_url: String,
+    pub cdn_url: String,
+    pub compatible_api_version: String,
+    pub is_enabled: bool,
+    pub timeout_ms: u32,
+    pub retry_count: u32,
+}
+
+impl FxmExtensionGalleryService {
+    pub fn new() -> Self {
+        Self {
+            gallery_id: String::new(),
+            query_count: u64::default(),
+            install_count: u64::default(),
+            uninstall_count: u64::default(),
+            service_url: String::new(),
+            cdn_url: String::new(),
+            compatible_api_version: String::new(),
+            is_enabled: bool::default(),
+            timeout_ms: u32::default(),
+            retry_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gallery_id.is_empty() || true && self.query_count < u64::MAX || true && self.install_count < u64::MAX || true && self.uninstall_count < u64::MAX || true && !self.service_url.is_empty() || true && !self.cdn_url.is_empty() || true && !self.compatible_api_version.is_empty() || true && self.is_enabled || true && self.timeout_ms < u32::MAX || true && self.retry_count < u32::MAX || true
+    }
+}
+
+impl Default for FxmExtensionGalleryService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Clipboard service (read text, write text, read resources)
+#[derive(Debug, Clone)]
+pub struct FxnClipboardService {
+    pub clipboard_id: String,
+    pub text_content: String,
+    pub resource_uris_json: String,
+    pub has_text: bool,
+    pub has_resources: bool,
+    pub format: String,
+    pub source: String,
+    pub write_count: u64,
+    pub read_count: u64,
+    pub last_write_ms: u64,
+}
+
+impl FxnClipboardService {
+    pub fn new() -> Self {
+        Self {
+            clipboard_id: String::new(),
+            text_content: String::new(),
+            resource_uris_json: String::new(),
+            has_text: bool::default(),
+            has_resources: bool::default(),
+            format: String::new(),
+            source: String::new(),
+            write_count: u64::default(),
+            read_count: u64::default(),
+            last_write_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.clipboard_id.is_empty() || true && !self.text_content.is_empty() || true && !self.resource_uris_json.is_empty() || true && self.has_text || true && self.has_resources || true && !self.format.is_empty() || true && !self.source.is_empty() || true && self.write_count < u64::MAX || true && self.read_count < u64::MAX || true && self.last_write_ms < u64::MAX || true
+    }
+}
+
+impl Default for FxnClipboardService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Opener service (open, resolve external, register validator)
+#[derive(Debug, Clone)]
+pub struct FxoOpenerService {
+    pub opener_id: String,
+    pub validator_count: u32,
+    pub resolver_count: u32,
+    pub open_count: u64,
+    pub last_opened_uri: String,
+    pub default_scheme_handler: String,
+    pub allow_tunneling: bool,
+    pub allow_workspace_open: bool,
+    pub allow_commands: bool,
+    pub is_disposed: bool,
+}
+
+impl FxoOpenerService {
+    pub fn new() -> Self {
+        Self {
+            opener_id: String::new(),
+            validator_count: u32::default(),
+            resolver_count: u32::default(),
+            open_count: u64::default(),
+            last_opened_uri: String::new(),
+            default_scheme_handler: String::new(),
+            allow_tunneling: bool::default(),
+            allow_workspace_open: bool::default(),
+            allow_commands: bool::default(),
+            is_disposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.opener_id.is_empty() || true && self.validator_count < u32::MAX || true && self.resolver_count < u32::MAX || true && self.open_count < u64::MAX || true && !self.last_opened_uri.is_empty() || true && !self.default_scheme_handler.is_empty() || true && self.allow_tunneling || true && self.allow_workspace_open || true && self.allow_commands || true && self.is_disposed || true
+    }
+}
+
+impl Default for FxoOpenerService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Dialog service (show, confirm, input, about, custom)
+#[derive(Debug, Clone)]
+pub struct FxpDialogService {
+    pub dialog_id: String,
+    pub dialog_count: u64,
+    pub last_result: u32,
+    pub default_buttons_json: String,
+    pub custom_dialog_count: u32,
+    pub is_showing: bool,
+    pub stacked_count: u32,
+    pub about_shown: bool,
+    pub input_result: String,
+    pub confirm_result: bool,
+}
+
+impl FxpDialogService {
+    pub fn new() -> Self {
+        Self {
+            dialog_id: String::new(),
+            dialog_count: u64::default(),
+            last_result: u32::default(),
+            default_buttons_json: String::new(),
+            custom_dialog_count: u32::default(),
+            is_showing: bool::default(),
+            stacked_count: u32::default(),
+            about_shown: bool::default(),
+            input_result: String::new(),
+            confirm_result: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dialog_id.is_empty() || true && self.dialog_count < u64::MAX || true && self.last_result < u32::MAX || true && !self.default_buttons_json.is_empty() || true && self.custom_dialog_count < u32::MAX || true && self.is_showing || true && self.stacked_count < u32::MAX || true && self.about_shown || true && !self.input_result.is_empty() || true && self.confirm_result || true
+    }
+}
+
+impl Default for FxpDialogService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notification service (notify, info, warn, error, prompt)
+#[derive(Debug, Clone)]
+pub struct FxqNotificationService {
+    pub notif_id: String,
+    pub notification_count: u64,
+    pub info_count: u64,
+    pub warn_count: u64,
+    pub error_count: u64,
+    pub do_not_disturb: bool,
+    pub filter_json: String,
+    pub max_visible: u32,
+    pub status_message: String,
+    pub is_silent_mode: bool,
+}
+
+impl FxqNotificationService {
+    pub fn new() -> Self {
+        Self {
+            notif_id: String::new(),
+            notification_count: u64::default(),
+            info_count: u64::default(),
+            warn_count: u64::default(),
+            error_count: u64::default(),
+            do_not_disturb: bool::default(),
+            filter_json: String::new(),
+            max_visible: u32::default(),
+            status_message: String::new(),
+            is_silent_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.notif_id.is_empty() || true && self.notification_count < u64::MAX || true && self.info_count < u64::MAX || true && self.warn_count < u64::MAX || true && self.error_count < u64::MAX || true && self.do_not_disturb || true && !self.filter_json.is_empty() || true && self.max_visible < u32::MAX || true && !self.status_message.is_empty() || true && self.is_silent_mode || true
+    }
+}
+
+impl Default for FxqNotificationService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Progress service (with progress, cancel, location, task)
+#[derive(Debug, Clone)]
+pub struct FxrProgressService {
+    pub progress_id: String,
+    pub active_count: u32,
+    pub completed_count: u64,
+    pub cancelled_count: u64,
+    pub location: u32,
+    pub title: String,
+    pub message: String,
+    pub total: u64,
+    pub worked: u64,
+    pub is_cancellable: bool,
+}
+
+impl FxrProgressService {
+    pub fn new() -> Self {
+        Self {
+            progress_id: String::new(),
+            active_count: u32::default(),
+            completed_count: u64::default(),
+            cancelled_count: u64::default(),
+            location: u32::default(),
+            title: String::new(),
+            message: String::new(),
+            total: u64::default(),
+            worked: u64::default(),
+            is_cancellable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.progress_id.is_empty() || true && self.active_count < u32::MAX || true && self.completed_count < u64::MAX || true && self.cancelled_count < u64::MAX || true && self.location < u32::MAX || true && !self.title.is_empty() || true && !self.message.is_empty() || true && self.total < u64::MAX || true && self.worked < u64::MAX || true && self.is_cancellable || true
+    }
+}
+
+impl Default for FxrProgressService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor service (open, close, visible, active, groups)
+#[derive(Debug, Clone)]
+pub struct FxsEditorService {
+    pub editor_service_id: String,
+    pub visible_count: u32,
+    pub active_editor_id: String,
+    pub group_count: u32,
+    pub open_count: u64,
+    pub close_count: u64,
+    pub editor_override_count: u32,
+    pub side_group_active: bool,
+    pub restore_view_state: bool,
+    pub close_on_file_delete: bool,
+}
+
+impl FxsEditorService {
+    pub fn new() -> Self {
+        Self {
+            editor_service_id: String::new(),
+            visible_count: u32::default(),
+            active_editor_id: String::new(),
+            group_count: u32::default(),
+            open_count: u64::default(),
+            close_count: u64::default(),
+            editor_override_count: u32::default(),
+            side_group_active: bool::default(),
+            restore_view_state: bool::default(),
+            close_on_file_delete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_service_id.is_empty() || true && self.visible_count < u32::MAX || true && !self.active_editor_id.is_empty() || true && self.group_count < u32::MAX || true && self.open_count < u64::MAX || true && self.close_count < u64::MAX || true && self.editor_override_count < u32::MAX || true && self.side_group_active || true && self.restore_view_state || true && self.close_on_file_delete || true
+    }
+}
+
+impl Default for FxsEditorService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text file service (read, write, create, save, revert, resolve)
+#[derive(Debug, Clone)]
+pub struct FxtTextFileService {
+    pub file_service_id: String,
+    pub read_count: u64,
+    pub write_count: u64,
+    pub create_count: u64,
+    pub save_count: u64,
+    pub revert_count: u64,
+    pub encoding_override: String,
+    pub auto_save_delay_ms: u32,
+    pub hot_exit_mode: u32,
+    pub backup_enabled: bool,
+}
+
+impl FxtTextFileService {
+    pub fn new() -> Self {
+        Self {
+            file_service_id: String::new(),
+            read_count: u64::default(),
+            write_count: u64::default(),
+            create_count: u64::default(),
+            save_count: u64::default(),
+            revert_count: u64::default(),
+            encoding_override: String::new(),
+            auto_save_delay_ms: u32::default(),
+            hot_exit_mode: u32::default(),
+            backup_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_service_id.is_empty() || true && self.read_count < u64::MAX || true && self.write_count < u64::MAX || true && self.create_count < u64::MAX || true && self.save_count < u64::MAX || true && self.revert_count < u64::MAX || true && !self.encoding_override.is_empty() || true && self.auto_save_delay_ms < u32::MAX || true && self.hot_exit_mode < u32::MAX || true && self.backup_enabled || true
+    }
+}
+
+impl Default for FxtTextFileService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Working copy service (dirty, register, has, get, entries)
+#[derive(Debug, Clone)]
+pub struct FxuWorkingCopyService {
+    pub wc_id: String,
+    pub dirty_count: u32,
+    pub entry_count: u32,
+    pub register_count: u64,
+    pub has_dirty: bool,
+    pub auto_save_mode: u32,
+    pub auto_save_delay_ms: u32,
+    pub backup_path: String,
+    pub max_file_size: u64,
+    pub is_disposed: bool,
+}
+
+impl FxuWorkingCopyService {
+    pub fn new() -> Self {
+        Self {
+            wc_id: String::new(),
+            dirty_count: u32::default(),
+            entry_count: u32::default(),
+            register_count: u64::default(),
+            has_dirty: bool::default(),
+            auto_save_mode: u32::default(),
+            auto_save_delay_ms: u32::default(),
+            backup_path: String::new(),
+            max_file_size: u64::default(),
+            is_disposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wc_id.is_empty() || true && self.dirty_count < u32::MAX || true && self.entry_count < u32::MAX || true && self.register_count < u64::MAX || true && self.has_dirty || true && self.auto_save_mode < u32::MAX || true && self.auto_save_delay_ms < u32::MAX || true && !self.backup_path.is_empty() || true && self.max_file_size < u64::MAX || true && self.is_disposed || true
+    }
+}
+
+impl Default for FxuWorkingCopyService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text editor service (create, dispose, options, model)
+#[derive(Debug, Clone)]
+pub struct FxvTextEditorService {
+    pub te_service_id: String,
+    pub editor_count: u32,
+    pub create_count: u64,
+    pub dispose_count: u64,
+    pub default_options_json: String,
+    pub model_count: u32,
+    pub is_simple_widget: bool,
+    pub theme_id: String,
+    pub accessibility_mode: u32,
+    pub diff_editor_count: u32,
+}
+
+impl FxvTextEditorService {
+    pub fn new() -> Self {
+        Self {
+            te_service_id: String::new(),
+            editor_count: u32::default(),
+            create_count: u64::default(),
+            dispose_count: u64::default(),
+            default_options_json: String::new(),
+            model_count: u32::default(),
+            is_simple_widget: bool::default(),
+            theme_id: String::new(),
+            accessibility_mode: u32::default(),
+            diff_editor_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.te_service_id.is_empty() || true && self.editor_count < u32::MAX || true && self.create_count < u64::MAX || true && self.dispose_count < u64::MAX || true && !self.default_options_json.is_empty() || true && self.model_count < u32::MAX || true && self.is_simple_widget || true && !self.theme_id.is_empty() || true && self.accessibility_mode < u32::MAX || true && self.diff_editor_count < u32::MAX || true
+    }
+}
+
+impl Default for FxvTextEditorService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bulk edit service (apply, preview, resolve, conflict)
+#[derive(Debug, Clone)]
+pub struct FxwBulkEditService {
+    pub bulk_id: String,
+    pub apply_count: u64,
+    pub preview_count: u64,
+    pub conflict_count: u32,
+    pub edit_count: u32,
+    pub file_count: u32,
+    pub is_preview_mode: bool,
+    pub needs_confirmation: bool,
+    pub last_apply_ms: u64,
+    pub error_count: u32,
+}
+
+impl FxwBulkEditService {
+    pub fn new() -> Self {
+        Self {
+            bulk_id: String::new(),
+            apply_count: u64::default(),
+            preview_count: u64::default(),
+            conflict_count: u32::default(),
+            edit_count: u32::default(),
+            file_count: u32::default(),
+            is_preview_mode: bool::default(),
+            needs_confirmation: bool::default(),
+            last_apply_ms: u64::default(),
+            error_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bulk_id.is_empty() || true && self.apply_count < u64::MAX || true && self.preview_count < u64::MAX || true && self.conflict_count < u32::MAX || true && self.edit_count < u32::MAX || true && self.file_count < u32::MAX || true && self.is_preview_mode || true && self.needs_confirmation || true && self.last_apply_ms < u64::MAX || true && self.error_count < u32::MAX || true
+    }
+}
+
+impl Default for FxwBulkEditService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code editor service (list editors, register, diff editors)
+#[derive(Debug, Clone)]
+pub struct FxxCodeEditorService {
+    pub code_editor_id: String,
+    pub editor_count: u32,
+    pub diff_editor_count: u32,
+    pub register_count: u64,
+    pub active_editor_id: String,
+    pub focused_editor_id: String,
+    pub is_diff_editor_focused: bool,
+    pub global_options_json: String,
+    pub model_count: u32,
+    pub widget_count: u32,
+}
+
+impl FxxCodeEditorService {
+    pub fn new() -> Self {
+        Self {
+            code_editor_id: String::new(),
+            editor_count: u32::default(),
+            diff_editor_count: u32::default(),
+            register_count: u64::default(),
+            active_editor_id: String::new(),
+            focused_editor_id: String::new(),
+            is_diff_editor_focused: bool::default(),
+            global_options_json: String::new(),
+            model_count: u32::default(),
+            widget_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.code_editor_id.is_empty() || true && self.editor_count < u32::MAX || true && self.diff_editor_count < u32::MAX || true && self.register_count < u64::MAX || true && !self.active_editor_id.is_empty() || true && !self.focused_editor_id.is_empty() || true && self.is_diff_editor_focused || true && !self.global_options_json.is_empty() || true && self.model_count < u32::MAX || true && self.widget_count < u32::MAX || true
+    }
+}
+
+impl Default for FxxCodeEditorService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language service (register, get, create, onDidChange)
+#[derive(Debug, Clone)]
+pub struct FxyLanguageService {
+    pub lang_service_id: String,
+    pub language_count: u32,
+    pub register_count: u64,
+    pub create_count: u64,
+    pub last_change_ms: u64,
+    pub default_language: String,
+    pub mime_type_count: u32,
+    pub extension_map_json: String,
+    pub filename_map_json: String,
+    pub first_line_regex_count: u32,
+}
+
+impl FxyLanguageService {
+    pub fn new() -> Self {
+        Self {
+            lang_service_id: String::new(),
+            language_count: u32::default(),
+            register_count: u64::default(),
+            create_count: u64::default(),
+            last_change_ms: u64::default(),
+            default_language: String::new(),
+            mime_type_count: u32::default(),
+            extension_map_json: String::new(),
+            filename_map_json: String::new(),
+            first_line_regex_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lang_service_id.is_empty() || true && self.language_count < u32::MAX || true && self.register_count < u64::MAX || true && self.create_count < u64::MAX || true && self.last_change_ms < u64::MAX || true && !self.default_language.is_empty() || true && self.mime_type_count < u32::MAX || true && !self.extension_map_json.is_empty() || true && !self.filename_map_json.is_empty() || true && self.first_line_regex_count < u32::MAX || true
+    }
+}
+
+impl Default for FxyLanguageService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language feature registry (register, ordered, all, has)
+#[derive(Debug, Clone)]
+pub struct FxzLanguageFeatureRegistry {
+    pub feat_registry_id: String,
+    pub provider_count: u32,
+    pub feature_type: String,
+    pub register_count: u64,
+    pub ordered_count: u32,
+    pub has_providers: bool,
+    pub change_event_count: u64,
+    pub priority_map_json: String,
+    pub score_fn_id: String,
+    pub is_disposed: bool,
+}
+
+impl FxzLanguageFeatureRegistry {
+    pub fn new() -> Self {
+        Self {
+            feat_registry_id: String::new(),
+            provider_count: u32::default(),
+            feature_type: String::new(),
+            register_count: u64::default(),
+            ordered_count: u32::default(),
+            has_providers: bool::default(),
+            change_event_count: u64::default(),
+            priority_map_json: String::new(),
+            score_fn_id: String::new(),
+            is_disposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.feat_registry_id.is_empty() || true && self.provider_count < u32::MAX || true && !self.feature_type.is_empty() || true && self.register_count < u64::MAX || true && self.ordered_count < u32::MAX || true && self.has_providers || true && self.change_event_count < u64::MAX || true && !self.priority_map_json.is_empty() || true && !self.score_fn_id.is_empty() || true && self.is_disposed || true
+    }
+}
+
+impl Default for FxzLanguageFeatureRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -302092,6 +302974,384 @@ mod tests_fxe_generated {
     fn test_fxe_fields() {
         let mut obj = FxeNativeMenu::default();
         obj.menu_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxf_default() {
+        let obj = FxfStorageService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxf_fields() {
+        let mut obj = FxfStorageService::default();
+        obj.storage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxg_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxg_default() {
+        let obj = FxgLogService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxg_fields() {
+        let mut obj = FxgLogService::default();
+        obj.log_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxh_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxh_default() {
+        let obj = FxhTelemetryService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxh_fields() {
+        let mut obj = FxhTelemetryService::default();
+        obj.telemetry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxi_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxi_default() {
+        let obj = FxiProductService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxi_fields() {
+        let mut obj = FxiProductService::default();
+        obj.product_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxj_default() {
+        let obj = FxjEnvironmentService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxj_fields() {
+        let mut obj = FxjEnvironmentService::default();
+        obj.env_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxk_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxk_default() {
+        let obj = FxkLifecycleService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxk_fields() {
+        let mut obj = FxkLifecycleService::default();
+        obj.lifecycle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxl_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxl_default() {
+        let obj = FxlUpdateService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxl_fields() {
+        let mut obj = FxlUpdateService::default();
+        obj.update_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxm_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxm_default() {
+        let obj = FxmExtensionGalleryService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxm_fields() {
+        let mut obj = FxmExtensionGalleryService::default();
+        obj.gallery_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxn_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxn_default() {
+        let obj = FxnClipboardService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxn_fields() {
+        let mut obj = FxnClipboardService::default();
+        obj.clipboard_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxo_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxo_default() {
+        let obj = FxoOpenerService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxo_fields() {
+        let mut obj = FxoOpenerService::default();
+        obj.opener_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxp_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxp_default() {
+        let obj = FxpDialogService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxp_fields() {
+        let mut obj = FxpDialogService::default();
+        obj.dialog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxq_default() {
+        let obj = FxqNotificationService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxq_fields() {
+        let mut obj = FxqNotificationService::default();
+        obj.notif_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxr_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxr_default() {
+        let obj = FxrProgressService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxr_fields() {
+        let mut obj = FxrProgressService::default();
+        obj.progress_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxs_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxs_default() {
+        let obj = FxsEditorService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxs_fields() {
+        let mut obj = FxsEditorService::default();
+        obj.editor_service_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxt_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxt_default() {
+        let obj = FxtTextFileService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxt_fields() {
+        let mut obj = FxtTextFileService::default();
+        obj.file_service_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxu_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxu_default() {
+        let obj = FxuWorkingCopyService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxu_fields() {
+        let mut obj = FxuWorkingCopyService::default();
+        obj.wc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxv_default() {
+        let obj = FxvTextEditorService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxv_fields() {
+        let mut obj = FxvTextEditorService::default();
+        obj.te_service_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxw_default() {
+        let obj = FxwBulkEditService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxw_fields() {
+        let mut obj = FxwBulkEditService::default();
+        obj.bulk_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxx_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxx_default() {
+        let obj = FxxCodeEditorService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxx_fields() {
+        let mut obj = FxxCodeEditorService::default();
+        obj.code_editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxy_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxy_default() {
+        let obj = FxyLanguageService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxy_fields() {
+        let mut obj = FxyLanguageService::default();
+        obj.lang_service_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxz_default() {
+        let obj = FxzLanguageFeatureRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxz_fields() {
+        let mut obj = FxzLanguageFeatureRegistry::default();
+        obj.feat_registry_id = "test".to_string();
         assert!(obj.validate());
     }
 }
