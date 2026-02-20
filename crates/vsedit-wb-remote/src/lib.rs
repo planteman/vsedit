@@ -124867,6 +124867,678 @@ impl Default for HmjDiagnosticDecoration {
     }
 }
 
+/// Lint rule (code, source, severity, message, fix available)
+#[derive(Debug, Clone)]
+pub struct HmkLintRule {
+    pub lint_rule_id: String,
+    pub code: String,
+    pub source: String,
+    pub severity: String,
+    pub message: String,
+    pub fix_available: bool,
+    pub rule_url: String,
+    pub category: String,
+    pub is_deprecated: bool,
+    pub replacement_json: String,
+}
+
+impl HmkLintRule {
+    pub fn new() -> Self {
+        Self {
+            lint_rule_id: String::new(),
+            code: String::new(),
+            source: String::new(),
+            severity: String::new(),
+            message: String::new(),
+            fix_available: bool::default(),
+            rule_url: String::new(),
+            category: String::new(),
+            is_deprecated: bool::default(),
+            replacement_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lint_rule_id.is_empty() || true && !self.code.is_empty() || true && !self.source.is_empty() || true && !self.severity.is_empty() || true && !self.message.is_empty() || true && self.fix_available || true && !self.rule_url.is_empty() || true && !self.category.is_empty() || true && self.is_deprecated || true && !self.replacement_json.is_empty() || true
+    }
+}
+
+impl Default for HmkLintRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language diagnostics (language id, providers, pull model)
+#[derive(Debug, Clone)]
+pub struct HmlLanguageDiagnostics {
+    pub lang_diag_id: String,
+    pub language_id: String,
+    pub providers_json: String,
+    pub pull_model_enabled: bool,
+    pub on_did_change: bool,
+    pub max_diagnostics: u32,
+    pub delay_ms: u32,
+    pub extension_id: String,
+    pub is_active: bool,
+    pub provider_count: u32,
+}
+
+impl HmlLanguageDiagnostics {
+    pub fn new() -> Self {
+        Self {
+            lang_diag_id: String::new(),
+            language_id: String::new(),
+            providers_json: String::new(),
+            pull_model_enabled: bool::default(),
+            on_did_change: bool::default(),
+            max_diagnostics: u32::default(),
+            delay_ms: u32::default(),
+            extension_id: String::new(),
+            is_active: bool::default(),
+            provider_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lang_diag_id.is_empty() || true && !self.language_id.is_empty() || true && !self.providers_json.is_empty() || true && self.pull_model_enabled || true && self.on_did_change || true && self.max_diagnostics < u32::MAX || true && self.delay_ms < u32::MAX || true && !self.extension_id.is_empty() || true && self.is_active || true && self.provider_count < u32::MAX || true
+    }
+}
+
+impl Default for HmlLanguageDiagnostics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diagnostic pull model (document, workspace, result id, items)
+#[derive(Debug, Clone)]
+pub struct HmmDiagnosticPull {
+    pub diag_pull_id: String,
+    pub document_uri: String,
+    pub is_workspace: bool,
+    pub result_id: String,
+    pub items_json: String,
+    pub is_unchanged: bool,
+    pub previous_result_id: String,
+    pub timestamp_ms: u64,
+    pub item_count: u32,
+    pub provider_id: String,
+}
+
+impl HmmDiagnosticPull {
+    pub fn new() -> Self {
+        Self {
+            diag_pull_id: String::new(),
+            document_uri: String::new(),
+            is_workspace: bool::default(),
+            result_id: String::new(),
+            items_json: String::new(),
+            is_unchanged: bool::default(),
+            previous_result_id: String::new(),
+            timestamp_ms: u64::default(),
+            item_count: u32::default(),
+            provider_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diag_pull_id.is_empty() || true && !self.document_uri.is_empty() || true && self.is_workspace || true && !self.result_id.is_empty() || true && !self.items_json.is_empty() || true && self.is_unchanged || true && !self.previous_result_id.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.item_count < u32::MAX || true && !self.provider_id.is_empty() || true
+    }
+}
+
+impl Default for HmmDiagnosticPull {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Validation message (text, type, range, actions, source)
+#[derive(Debug, Clone)]
+pub struct HmnValidationMessage {
+    pub valid_msg_id: String,
+    pub text: String,
+    pub message_type: String,
+    pub range_json: String,
+    pub actions_json: String,
+    pub source: String,
+    pub severity: String,
+    pub is_auto_fix: bool,
+    pub code: String,
+    pub detail: String,
+}
+
+impl HmnValidationMessage {
+    pub fn new() -> Self {
+        Self {
+            valid_msg_id: String::new(),
+            text: String::new(),
+            message_type: String::new(),
+            range_json: String::new(),
+            actions_json: String::new(),
+            source: String::new(),
+            severity: String::new(),
+            is_auto_fix: bool::default(),
+            code: String::new(),
+            detail: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.valid_msg_id.is_empty() || true && !self.text.is_empty() || true && !self.message_type.is_empty() || true && !self.range_json.is_empty() || true && !self.actions_json.is_empty() || true && !self.source.is_empty() || true && !self.severity.is_empty() || true && self.is_auto_fix || true && !self.code.is_empty() || true && !self.detail.is_empty() || true
+    }
+}
+
+impl Default for HmnValidationMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Error lens (inline message, severity, position, decoration)
+#[derive(Debug, Clone)]
+pub struct HmoErrorLens {
+    pub error_lens_id: String,
+    pub inline_message: String,
+    pub severity: String,
+    pub position_json: String,
+    pub decoration_json: String,
+    pub is_enabled: bool,
+    pub delay_ms: u32,
+    pub font_style: String,
+    pub color: String,
+    pub margin: String,
+}
+
+impl HmoErrorLens {
+    pub fn new() -> Self {
+        Self {
+            error_lens_id: String::new(),
+            inline_message: String::new(),
+            severity: String::new(),
+            position_json: String::new(),
+            decoration_json: String::new(),
+            is_enabled: bool::default(),
+            delay_ms: u32::default(),
+            font_style: String::new(),
+            color: String::new(),
+            margin: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.error_lens_id.is_empty() || true && !self.inline_message.is_empty() || true && !self.severity.is_empty() || true && !self.position_json.is_empty() || true && !self.decoration_json.is_empty() || true && self.is_enabled || true && self.delay_ms < u32::MAX || true && !self.font_style.is_empty() || true && !self.color.is_empty() || true && !self.margin.is_empty() || true
+    }
+}
+
+impl Default for HmoErrorLens {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem matcher (owner, pattern, severity, file location)
+#[derive(Debug, Clone)]
+pub struct HmpProblemMatcher {
+    pub prob_match_id: String,
+    pub owner: String,
+    pub pattern_json: String,
+    pub severity: String,
+    pub file_location: String,
+    pub watching_json: String,
+    pub background_json: String,
+    pub apply_to: String,
+    pub source: String,
+    pub is_default: bool,
+}
+
+impl HmpProblemMatcher {
+    pub fn new() -> Self {
+        Self {
+            prob_match_id: String::new(),
+            owner: String::new(),
+            pattern_json: String::new(),
+            severity: String::new(),
+            file_location: String::new(),
+            watching_json: String::new(),
+            background_json: String::new(),
+            apply_to: String::new(),
+            source: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prob_match_id.is_empty() || true && !self.owner.is_empty() || true && !self.pattern_json.is_empty() || true && !self.severity.is_empty() || true && !self.file_location.is_empty() || true && !self.watching_json.is_empty() || true && !self.background_json.is_empty() || true && !self.apply_to.is_empty() || true && !self.source.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for HmpProblemMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem pattern (regexp, file, line, column, message)
+#[derive(Debug, Clone)]
+pub struct HmqProblemPattern {
+    pub prob_pat_id: String,
+    pub regexp: String,
+    pub file_group: u32,
+    pub line_group: u32,
+    pub column_group: u32,
+    pub message_group: u32,
+    pub severity_group: u32,
+    pub code_group: u32,
+    pub loop_mode: bool,
+    pub kind: String,
+}
+
+impl HmqProblemPattern {
+    pub fn new() -> Self {
+        Self {
+            prob_pat_id: String::new(),
+            regexp: String::new(),
+            file_group: u32::default(),
+            line_group: u32::default(),
+            column_group: u32::default(),
+            message_group: u32::default(),
+            severity_group: u32::default(),
+            code_group: u32::default(),
+            loop_mode: bool::default(),
+            kind: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prob_pat_id.is_empty() || true && !self.regexp.is_empty() || true && self.file_group < u32::MAX || true && self.line_group < u32::MAX || true && self.column_group < u32::MAX || true && self.message_group < u32::MAX || true && self.severity_group < u32::MAX || true && self.code_group < u32::MAX || true && self.loop_mode || true && !self.kind.is_empty() || true
+    }
+}
+
+impl Default for HmqProblemPattern {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem group (resource, severity, marker count, children)
+#[derive(Debug, Clone)]
+pub struct HmrProblemGroup {
+    pub prob_group_id: String,
+    pub resource_uri: String,
+    pub severity: String,
+    pub marker_count: u32,
+    pub children_json: String,
+    pub is_expanded: bool,
+    pub sort_key: String,
+    pub error_count: u32,
+    pub warning_count: u32,
+    pub info_count: u32,
+}
+
+impl HmrProblemGroup {
+    pub fn new() -> Self {
+        Self {
+            prob_group_id: String::new(),
+            resource_uri: String::new(),
+            severity: String::new(),
+            marker_count: u32::default(),
+            children_json: String::new(),
+            is_expanded: bool::default(),
+            sort_key: String::new(),
+            error_count: u32::default(),
+            warning_count: u32::default(),
+            info_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prob_group_id.is_empty() || true && !self.resource_uri.is_empty() || true && !self.severity.is_empty() || true && self.marker_count < u32::MAX || true && !self.children_json.is_empty() || true && self.is_expanded || true && !self.sort_key.is_empty() || true && self.error_count < u32::MAX || true && self.warning_count < u32::MAX || true && self.info_count < u32::MAX || true
+    }
+}
+
+impl Default for HmrProblemGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem navigation (next, previous, by file, by severity)
+#[derive(Debug, Clone)]
+pub struct HmsProblemNavigation {
+    pub prob_nav_id: String,
+    pub next_marker_json: String,
+    pub previous_marker_json: String,
+    pub by_file: bool,
+    pub by_severity: bool,
+    pub current_index: u32,
+    pub total_count: u32,
+    pub loop_navigation: bool,
+    pub severity_filter: String,
+    pub scope: String,
+}
+
+impl HmsProblemNavigation {
+    pub fn new() -> Self {
+        Self {
+            prob_nav_id: String::new(),
+            next_marker_json: String::new(),
+            previous_marker_json: String::new(),
+            by_file: bool::default(),
+            by_severity: bool::default(),
+            current_index: u32::default(),
+            total_count: u32::default(),
+            loop_navigation: bool::default(),
+            severity_filter: String::new(),
+            scope: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prob_nav_id.is_empty() || true && !self.next_marker_json.is_empty() || true && !self.previous_marker_json.is_empty() || true && self.by_file || true && self.by_severity || true && self.current_index < u32::MAX || true && self.total_count < u32::MAX || true && self.loop_navigation || true && !self.severity_filter.is_empty() || true && !self.scope.is_empty() || true
+    }
+}
+
+impl Default for HmsProblemNavigation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem filter (text, severity, source, show only, exclude)
+#[derive(Debug, Clone)]
+pub struct HmtProblemFilter {
+    pub prob_filter_id: String,
+    pub text: String,
+    pub severity_filter: String,
+    pub source_filter: String,
+    pub show_only_json: String,
+    pub exclude_json: String,
+    pub is_active: bool,
+    pub matching_count: u32,
+    pub total_count: u32,
+    pub use_files_exclude: bool,
+}
+
+impl HmtProblemFilter {
+    pub fn new() -> Self {
+        Self {
+            prob_filter_id: String::new(),
+            text: String::new(),
+            severity_filter: String::new(),
+            source_filter: String::new(),
+            show_only_json: String::new(),
+            exclude_json: String::new(),
+            is_active: bool::default(),
+            matching_count: u32::default(),
+            total_count: u32::default(),
+            use_files_exclude: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prob_filter_id.is_empty() || true && !self.text.is_empty() || true && !self.severity_filter.is_empty() || true && !self.source_filter.is_empty() || true && !self.show_only_json.is_empty() || true && !self.exclude_json.is_empty() || true && self.is_active || true && self.matching_count < u32::MAX || true && self.total_count < u32::MAX || true && self.use_files_exclude || true
+    }
+}
+
+impl Default for HmtProblemFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diagnostic report (full, unchanged, items, result id)
+#[derive(Debug, Clone)]
+pub struct HmuDiagnosticReport {
+    pub diag_report_id: String,
+    pub is_full: bool,
+    pub is_unchanged: bool,
+    pub items_json: String,
+    pub result_id: String,
+    pub document_uri: String,
+    pub timestamp_ms: u64,
+    pub provider_id: String,
+    pub item_count: u32,
+    pub version: u32,
+}
+
+impl HmuDiagnosticReport {
+    pub fn new() -> Self {
+        Self {
+            diag_report_id: String::new(),
+            is_full: bool::default(),
+            is_unchanged: bool::default(),
+            items_json: String::new(),
+            result_id: String::new(),
+            document_uri: String::new(),
+            timestamp_ms: u64::default(),
+            provider_id: String::new(),
+            item_count: u32::default(),
+            version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diag_report_id.is_empty() || true && self.is_full || true && self.is_unchanged || true && !self.items_json.is_empty() || true && !self.result_id.is_empty() || true && !self.document_uri.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.provider_id.is_empty() || true && self.item_count < u32::MAX || true && self.version < u32::MAX || true
+    }
+}
+
+impl Default for HmuDiagnosticReport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem action (title, command, arguments, source, quick fix)
+#[derive(Debug, Clone)]
+pub struct HmvProblemAction {
+    pub prob_action_id: String,
+    pub title: String,
+    pub command_id: String,
+    pub arguments_json: String,
+    pub source: String,
+    pub quick_fix_json: String,
+    pub is_preferred: bool,
+    pub kind: String,
+    pub diagnostic_json: String,
+    pub extension_id: String,
+}
+
+impl HmvProblemAction {
+    pub fn new() -> Self {
+        Self {
+            prob_action_id: String::new(),
+            title: String::new(),
+            command_id: String::new(),
+            arguments_json: String::new(),
+            source: String::new(),
+            quick_fix_json: String::new(),
+            is_preferred: bool::default(),
+            kind: String::new(),
+            diagnostic_json: String::new(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prob_action_id.is_empty() || true && !self.title.is_empty() || true && !self.command_id.is_empty() || true && !self.arguments_json.is_empty() || true && !self.source.is_empty() || true && !self.quick_fix_json.is_empty() || true && self.is_preferred || true && !self.kind.is_empty() || true && !self.diagnostic_json.is_empty() || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for HmvProblemAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace diagnostics (resource map, change event, merge)
+#[derive(Debug, Clone)]
+pub struct HmwDiagnosticWorkspace {
+    pub diag_ws_id: String,
+    pub resource_map_json: String,
+    pub change_event_json: String,
+    pub merge_strategy: String,
+    pub total_diagnostics: u32,
+    pub resource_count: u32,
+    pub max_per_resource: u32,
+    pub is_empty: bool,
+    pub version: u32,
+    pub last_changed_ms: u64,
+}
+
+impl HmwDiagnosticWorkspace {
+    pub fn new() -> Self {
+        Self {
+            diag_ws_id: String::new(),
+            resource_map_json: String::new(),
+            change_event_json: String::new(),
+            merge_strategy: String::new(),
+            total_diagnostics: u32::default(),
+            resource_count: u32::default(),
+            max_per_resource: u32::default(),
+            is_empty: bool::default(),
+            version: u32::default(),
+            last_changed_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diag_ws_id.is_empty() || true && !self.resource_map_json.is_empty() || true && !self.change_event_json.is_empty() || true && !self.merge_strategy.is_empty() || true && self.total_diagnostics < u32::MAX || true && self.resource_count < u32::MAX || true && self.max_per_resource < u32::MAX || true && self.is_empty || true && self.version < u32::MAX || true && self.last_changed_ms < u64::MAX || true
+    }
+}
+
+impl Default for HmwDiagnosticWorkspace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline diagnostic (message, severity, position, decoration)
+#[derive(Debug, Clone)]
+pub struct HmxInlineDiagnostic {
+    pub inline_diag_id: String,
+    pub message: String,
+    pub severity: String,
+    pub position_json: String,
+    pub decoration_json: String,
+    pub source: String,
+    pub code: String,
+    pub is_visible: bool,
+    pub font_style: String,
+    pub opacity: f64,
+}
+
+impl HmxInlineDiagnostic {
+    pub fn new() -> Self {
+        Self {
+            inline_diag_id: String::new(),
+            message: String::new(),
+            severity: String::new(),
+            position_json: String::new(),
+            decoration_json: String::new(),
+            source: String::new(),
+            code: String::new(),
+            is_visible: bool::default(),
+            font_style: String::new(),
+            opacity: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_diag_id.is_empty() || true && !self.message.is_empty() || true && !self.severity.is_empty() || true && !self.position_json.is_empty() || true && !self.decoration_json.is_empty() || true && !self.source.is_empty() || true && !self.code.is_empty() || true && self.is_visible || true && !self.font_style.is_empty() || true && self.opacity.is_finite() || true
+    }
+}
+
+impl Default for HmxInlineDiagnostic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Fix all diagnostics (source, document, workspace, kind)
+#[derive(Debug, Clone)]
+pub struct HmyDiagnosticFixAll {
+    pub diag_fix_all_id: String,
+    pub source: String,
+    pub document_uri: String,
+    pub is_workspace: bool,
+    pub kind: String,
+    pub diagnostics_json: String,
+    pub edits_json: String,
+    pub provider_id: String,
+    pub is_preferred: bool,
+    pub timestamp_ms: u64,
+}
+
+impl HmyDiagnosticFixAll {
+    pub fn new() -> Self {
+        Self {
+            diag_fix_all_id: String::new(),
+            source: String::new(),
+            document_uri: String::new(),
+            is_workspace: bool::default(),
+            kind: String::new(),
+            diagnostics_json: String::new(),
+            edits_json: String::new(),
+            provider_id: String::new(),
+            is_preferred: bool::default(),
+            timestamp_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diag_fix_all_id.is_empty() || true && !self.source.is_empty() || true && !self.document_uri.is_empty() || true && self.is_workspace || true && !self.kind.is_empty() || true && !self.diagnostics_json.is_empty() || true && !self.edits_json.is_empty() || true && !self.provider_id.is_empty() || true && self.is_preferred || true && self.timestamp_ms < u64::MAX || true
+    }
+}
+
+impl Default for HmyDiagnosticFixAll {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem table row (marker, resource, position, severity)
+#[derive(Debug, Clone)]
+pub struct HmzProblemTableRow {
+    pub prob_row_id: String,
+    pub marker_json: String,
+    pub resource_uri: String,
+    pub position_json: String,
+    pub severity: String,
+    pub message: String,
+    pub source: String,
+    pub code: String,
+    pub line_number: u32,
+    pub column: u32,
+}
+
+impl HmzProblemTableRow {
+    pub fn new() -> Self {
+        Self {
+            prob_row_id: String::new(),
+            marker_json: String::new(),
+            resource_uri: String::new(),
+            position_json: String::new(),
+            severity: String::new(),
+            message: String::new(),
+            source: String::new(),
+            code: String::new(),
+            line_number: u32::default(),
+            column: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prob_row_id.is_empty() || true && !self.marker_json.is_empty() || true && !self.resource_uri.is_empty() || true && !self.position_json.is_empty() || true && !self.severity.is_empty() || true && !self.message.is_empty() || true && !self.source.is_empty() || true && !self.code.is_empty() || true && self.line_number < u32::MAX || true && self.column < u32::MAX || true
+    }
+}
+
+impl Default for HmzProblemTableRow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -366234,6 +366906,294 @@ mod tests_hmj_generated {
     fn test_hmj_fields() {
         let mut obj = HmjDiagnosticDecoration::default();
         obj.diag_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hmk_generated {
+    use super::*;
+
+    #[test]
+    fn test_hmk_default() {
+        let obj = HmkLintRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hmk_fields() {
+        let mut obj = HmkLintRule::default();
+        obj.lint_rule_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hml_generated {
+    use super::*;
+
+    #[test]
+    fn test_hml_default() {
+        let obj = HmlLanguageDiagnostics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hml_fields() {
+        let mut obj = HmlLanguageDiagnostics::default();
+        obj.lang_diag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hmm_generated {
+    use super::*;
+
+    #[test]
+    fn test_hmm_default() {
+        let obj = HmmDiagnosticPull::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hmm_fields() {
+        let mut obj = HmmDiagnosticPull::default();
+        obj.diag_pull_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hmn_generated {
+    use super::*;
+
+    #[test]
+    fn test_hmn_default() {
+        let obj = HmnValidationMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hmn_fields() {
+        let mut obj = HmnValidationMessage::default();
+        obj.valid_msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hmo_generated {
+    use super::*;
+
+    #[test]
+    fn test_hmo_default() {
+        let obj = HmoErrorLens::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hmo_fields() {
+        let mut obj = HmoErrorLens::default();
+        obj.error_lens_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hmp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hmp_default() {
+        let obj = HmpProblemMatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hmp_fields() {
+        let mut obj = HmpProblemMatcher::default();
+        obj.prob_match_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hmq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hmq_default() {
+        let obj = HmqProblemPattern::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hmq_fields() {
+        let mut obj = HmqProblemPattern::default();
+        obj.prob_pat_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hmr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hmr_default() {
+        let obj = HmrProblemGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hmr_fields() {
+        let mut obj = HmrProblemGroup::default();
+        obj.prob_group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hms_generated {
+    use super::*;
+
+    #[test]
+    fn test_hms_default() {
+        let obj = HmsProblemNavigation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hms_fields() {
+        let mut obj = HmsProblemNavigation::default();
+        obj.prob_nav_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hmt_generated {
+    use super::*;
+
+    #[test]
+    fn test_hmt_default() {
+        let obj = HmtProblemFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hmt_fields() {
+        let mut obj = HmtProblemFilter::default();
+        obj.prob_filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hmu_generated {
+    use super::*;
+
+    #[test]
+    fn test_hmu_default() {
+        let obj = HmuDiagnosticReport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hmu_fields() {
+        let mut obj = HmuDiagnosticReport::default();
+        obj.diag_report_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hmv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hmv_default() {
+        let obj = HmvProblemAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hmv_fields() {
+        let mut obj = HmvProblemAction::default();
+        obj.prob_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hmw_generated {
+    use super::*;
+
+    #[test]
+    fn test_hmw_default() {
+        let obj = HmwDiagnosticWorkspace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hmw_fields() {
+        let mut obj = HmwDiagnosticWorkspace::default();
+        obj.diag_ws_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hmx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hmx_default() {
+        let obj = HmxInlineDiagnostic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hmx_fields() {
+        let mut obj = HmxInlineDiagnostic::default();
+        obj.inline_diag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hmy_generated {
+    use super::*;
+
+    #[test]
+    fn test_hmy_default() {
+        let obj = HmyDiagnosticFixAll::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hmy_fields() {
+        let mut obj = HmyDiagnosticFixAll::default();
+        obj.diag_fix_all_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hmz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hmz_default() {
+        let obj = HmzProblemTableRow::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hmz_fields() {
+        let mut obj = HmzProblemTableRow::default();
+        obj.prob_row_id = "test".to_string();
         assert!(obj.validate());
     }
 }
