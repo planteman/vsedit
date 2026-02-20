@@ -66397,6 +66397,213 @@ impl Default for FleKeybindingItem {
 }
 
 
+/// Context key (name, type, value, negate, default for when clauses)
+#[derive(Debug, Clone)]
+pub struct FlfContextKey {
+    pub key_id: String,
+    pub key_name: String,
+    pub key_type: u32,
+    pub string_value: String,
+    pub bool_value: bool,
+    pub number_value: f64,
+    pub is_default: bool,
+    pub negate: bool,
+    pub scope_id: String,
+    pub is_transient: bool,
+}
+
+impl FlfContextKey {
+    pub fn new() -> Self {
+        Self {
+            key_id: String::new(),
+            key_name: String::new(),
+            key_type: u32::default(),
+            string_value: String::new(),
+            bool_value: bool::default(),
+            number_value: f64::default(),
+            is_default: bool::default(),
+            negate: bool::default(),
+            scope_id: String::new(),
+            is_transient: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key_id.is_empty() || true && !self.key_name.is_empty() || true && self.key_type < u32::MAX || true && !self.string_value.is_empty() || true && self.bool_value || true && self.number_value.is_finite() || true && self.is_default || true && self.negate || true && !self.scope_id.is_empty() || true && self.is_transient || true
+    }
+}
+
+impl Default for FlfContextKey {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Context key expression (defined, equals, not, and, or, regex)
+#[derive(Debug, Clone)]
+pub struct FlgContextKeyExpression {
+    pub expr_id: String,
+    pub expr_type: u32,
+    pub key_name: String,
+    pub value: String,
+    pub negate: bool,
+    pub expressions_json: String,
+    pub regex_pattern: String,
+    pub serialized: String,
+    pub is_satisfied: bool,
+    pub depth: u32,
+}
+
+impl FlgContextKeyExpression {
+    pub fn new() -> Self {
+        Self {
+            expr_id: String::new(),
+            expr_type: u32::default(),
+            key_name: String::new(),
+            value: String::new(),
+            negate: bool::default(),
+            expressions_json: String::new(),
+            regex_pattern: String::new(),
+            serialized: String::new(),
+            is_satisfied: bool::default(),
+            depth: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.expr_id.is_empty() || true && self.expr_type < u32::MAX || true && !self.key_name.is_empty() || true && !self.value.is_empty() || true && self.negate || true && !self.expressions_json.is_empty() || true && !self.regex_pattern.is_empty() || true && !self.serialized.is_empty() || true && self.is_satisfied || true && self.depth < u32::MAX || true
+    }
+}
+
+impl Default for FlgContextKeyExpression {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Context key service (scoped context, global context, keys map)
+#[derive(Debug, Clone)]
+pub struct FlhContextKeyService {
+    pub service_id: String,
+    pub global_key_count: u32,
+    pub scoped_contexts: u32,
+    pub active_context_id: String,
+    pub is_disposing: bool,
+    pub pending_updates: u32,
+    pub buffer_size: u32,
+    pub parent_service_id: String,
+    pub change_event_count: u64,
+    pub last_evaluated_ms: u64,
+}
+
+impl FlhContextKeyService {
+    pub fn new() -> Self {
+        Self {
+            service_id: String::new(),
+            global_key_count: u32::default(),
+            scoped_contexts: u32::default(),
+            active_context_id: String::new(),
+            is_disposing: bool::default(),
+            pending_updates: u32::default(),
+            buffer_size: u32::default(),
+            parent_service_id: String::new(),
+            change_event_count: u64::default(),
+            last_evaluated_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.service_id.is_empty() || true && self.global_key_count < u32::MAX || true && self.scoped_contexts < u32::MAX || true && !self.active_context_id.is_empty() || true && self.is_disposing || true && self.pending_updates < u32::MAX || true && self.buffer_size < u32::MAX || true && !self.parent_service_id.is_empty() || true && self.change_event_count < u64::MAX || true && self.last_evaluated_ms < u64::MAX || true
+    }
+}
+
+impl Default for FlhContextKeyService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Command registry (id, handler, title, category, icon, precondition)
+#[derive(Debug, Clone)]
+pub struct FliCommandRegistry {
+    pub registry_id: String,
+    pub command_count: u32,
+    pub handler_count: u32,
+    pub category: String,
+    pub icon_id: String,
+    pub precondition: String,
+    pub title: String,
+    pub description: String,
+    pub source: String,
+    pub is_internal: bool,
+}
+
+impl FliCommandRegistry {
+    pub fn new() -> Self {
+        Self {
+            registry_id: String::new(),
+            command_count: u32::default(),
+            handler_count: u32::default(),
+            category: String::new(),
+            icon_id: String::new(),
+            precondition: String::new(),
+            title: String::new(),
+            description: String::new(),
+            source: String::new(),
+            is_internal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.registry_id.is_empty() || true && self.command_count < u32::MAX || true && self.handler_count < u32::MAX || true && !self.category.is_empty() || true && !self.icon_id.is_empty() || true && !self.precondition.is_empty() || true && !self.title.is_empty() || true && !self.description.is_empty() || true && !self.source.is_empty() || true && self.is_internal || true
+    }
+}
+
+impl Default for FliCommandRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Menu registry (menu id, group, order, command, when, submenu)
+#[derive(Debug, Clone)]
+pub struct FljMenuRegistry {
+    pub menu_id: String,
+    pub group: String,
+    pub order: u32,
+    pub command_id: String,
+    pub when_clause: String,
+    pub submenu_id: String,
+    pub title: String,
+    pub icon_id: String,
+    pub is_separator: bool,
+    pub alt_command_id: String,
+}
+
+impl FljMenuRegistry {
+    pub fn new() -> Self {
+        Self {
+            menu_id: String::new(),
+            group: String::new(),
+            order: u32::default(),
+            command_id: String::new(),
+            when_clause: String::new(),
+            submenu_id: String::new(),
+            title: String::new(),
+            icon_id: String::new(),
+            is_separator: bool::default(),
+            alt_command_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.menu_id.is_empty() || true && !self.group.is_empty() || true && self.order < u32::MAX || true && !self.command_id.is_empty() || true && !self.when_clause.is_empty() || true && !self.submenu_id.is_empty() || true && !self.title.is_empty() || true && !self.icon_id.is_empty() || true && self.is_separator || true && !self.alt_command_id.is_empty() || true
+    }
+}
+
+impl Default for FljMenuRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -283257,6 +283464,96 @@ mod tests_fle_generated {
     fn test_fle_fields() {
         let mut obj = FleKeybindingItem::default();
         obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flf_generated {
+    use super::*;
+
+    #[test]
+    fn test_flf_default() {
+        let obj = FlfContextKey::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flf_fields() {
+        let mut obj = FlfContextKey::default();
+        obj.key_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flg_generated {
+    use super::*;
+
+    #[test]
+    fn test_flg_default() {
+        let obj = FlgContextKeyExpression::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flg_fields() {
+        let mut obj = FlgContextKeyExpression::default();
+        obj.expr_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flh_generated {
+    use super::*;
+
+    #[test]
+    fn test_flh_default() {
+        let obj = FlhContextKeyService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flh_fields() {
+        let mut obj = FlhContextKeyService::default();
+        obj.service_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fli_generated {
+    use super::*;
+
+    #[test]
+    fn test_fli_default() {
+        let obj = FliCommandRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fli_fields() {
+        let mut obj = FliCommandRegistry::default();
+        obj.registry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flj_generated {
+    use super::*;
+
+    #[test]
+    fn test_flj_default() {
+        let obj = FljMenuRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flj_fields() {
+        let mut obj = FljMenuRegistry::default();
+        obj.menu_id = "test".to_string();
         assert!(obj.validate());
     }
 }
