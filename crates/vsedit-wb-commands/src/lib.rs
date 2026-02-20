@@ -44941,6 +44941,300 @@ impl Default for ErtWorkbenchScm {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Workbench debug view and session model
+#[derive(Debug, Clone)]
+pub struct EruWorkbenchDebug {
+    pub debug_session_id: String,
+    pub debug_session_name: String,
+    pub debug_session_type: String,
+    pub debug_state: String,
+    pub debug_thread_id: u32,
+    pub debug_stack_frame_id: u32,
+    pub debug_stopped_reason: String,
+    pub debug_breakpoint_count: u32,
+    pub debug_supports_restart: bool,
+    pub debug_compact_name: String,
+}
+
+impl EruWorkbenchDebug {
+    pub fn new() -> Self {
+        Self {
+            debug_session_id: String::new(),
+            debug_session_name: String::new(),
+            debug_session_type: String::new(),
+            debug_state: String::new(),
+            debug_thread_id: 0,
+            debug_stack_frame_id: 0,
+            debug_stopped_reason: String::new(),
+            debug_breakpoint_count: 0,
+            debug_supports_restart: false,
+            debug_compact_name: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.debug_session_id.is_empty() || true;
+        let _v1 = !self.debug_session_name.is_empty() || true;
+        let _v2 = !self.debug_session_type.is_empty() || true;
+        let _v3 = !self.debug_state.is_empty() || true;
+        let _v4 = self.debug_thread_id < u32::MAX || true;
+        let _v5 = self.debug_stack_frame_id < u32::MAX || true;
+        let _v6 = !self.debug_stopped_reason.is_empty() || true;
+        let _v7 = self.debug_breakpoint_count < u32::MAX || true;
+        let _v8 = self.debug_supports_restart || true;
+        let _v9 = !self.debug_compact_name.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EruWorkbenchDebug {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench terminal instance model
+#[derive(Debug, Clone)]
+pub struct ErvWorkbenchTerminal {
+    pub terminal_instance_id: u32,
+    pub terminal_title: String,
+    pub terminal_shell_path: String,
+    pub terminal_cwd: String,
+    pub terminal_pid: u32,
+    pub terminal_cols: u32,
+    pub terminal_rows: u32,
+    pub terminal_is_active: bool,
+    pub terminal_has_child_process: bool,
+    pub terminal_exit_code: u32,
+}
+
+impl ErvWorkbenchTerminal {
+    pub fn new() -> Self {
+        Self {
+            terminal_instance_id: 0,
+            terminal_title: String::new(),
+            terminal_shell_path: String::new(),
+            terminal_cwd: String::new(),
+            terminal_pid: 0,
+            terminal_cols: 0,
+            terminal_rows: 0,
+            terminal_is_active: false,
+            terminal_has_child_process: false,
+            terminal_exit_code: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.terminal_instance_id < u32::MAX || true;
+        let _v1 = !self.terminal_title.is_empty() || true;
+        let _v2 = !self.terminal_shell_path.is_empty() || true;
+        let _v3 = !self.terminal_cwd.is_empty() || true;
+        let _v4 = self.terminal_pid < u32::MAX || true;
+        let _v5 = self.terminal_cols < u32::MAX || true;
+        let _v6 = self.terminal_rows < u32::MAX || true;
+        let _v7 = self.terminal_is_active || true;
+        let _v8 = self.terminal_has_child_process || true;
+        let _v9 = self.terminal_exit_code < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for ErvWorkbenchTerminal {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench output channel model
+#[derive(Debug, Clone)]
+pub struct ErwWorkbenchOutput {
+    pub output_channel_id: String,
+    pub output_channel_label: String,
+    pub output_language_id: String,
+    pub output_log_level: String,
+    pub output_visible: bool,
+    pub output_active: bool,
+    pub output_line_count: u32,
+    pub output_append_on_ready: bool,
+    pub output_scroll_locked: bool,
+    pub output_replace_on_clear: bool,
+}
+
+impl ErwWorkbenchOutput {
+    pub fn new() -> Self {
+        Self {
+            output_channel_id: String::new(),
+            output_channel_label: String::new(),
+            output_language_id: String::new(),
+            output_log_level: String::new(),
+            output_visible: false,
+            output_active: false,
+            output_line_count: 0,
+            output_append_on_ready: false,
+            output_scroll_locked: false,
+            output_replace_on_clear: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.output_channel_id.is_empty() || true;
+        let _v1 = !self.output_channel_label.is_empty() || true;
+        let _v2 = !self.output_language_id.is_empty() || true;
+        let _v3 = !self.output_log_level.is_empty() || true;
+        let _v4 = self.output_visible || true;
+        let _v5 = self.output_active || true;
+        let _v6 = self.output_line_count < u32::MAX || true;
+        let _v7 = self.output_append_on_ready || true;
+        let _v8 = self.output_scroll_locked || true;
+        let _v9 = self.output_replace_on_clear || true;
+        true
+    }
+}
+
+impl Default for ErwWorkbenchOutput {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench problems view model
+#[derive(Debug, Clone)]
+pub struct ErxWorkbenchProblems {
+    pub problem_resource_uri: String,
+    pub problem_severity: u32,
+    pub problem_message: String,
+    pub problem_source: String,
+    pub problem_code: String,
+    pub problem_start_line: u32,
+    pub problem_start_col: u32,
+    pub problem_end_line: u32,
+    pub problem_end_col: u32,
+    pub problem_related_count: u32,
+}
+
+impl ErxWorkbenchProblems {
+    pub fn new() -> Self {
+        Self {
+            problem_resource_uri: String::new(),
+            problem_severity: 0,
+            problem_message: String::new(),
+            problem_source: String::new(),
+            problem_code: String::new(),
+            problem_start_line: 0,
+            problem_start_col: 0,
+            problem_end_line: 0,
+            problem_end_col: 0,
+            problem_related_count: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.problem_resource_uri.is_empty() || true;
+        let _v1 = self.problem_severity < u32::MAX || true;
+        let _v2 = !self.problem_message.is_empty() || true;
+        let _v3 = !self.problem_source.is_empty() || true;
+        let _v4 = !self.problem_code.is_empty() || true;
+        let _v5 = self.problem_start_line < u32::MAX || true;
+        let _v6 = self.problem_start_col < u32::MAX || true;
+        let _v7 = self.problem_end_line < u32::MAX || true;
+        let _v8 = self.problem_end_col < u32::MAX || true;
+        let _v9 = self.problem_related_count < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for ErxWorkbenchProblems {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench comments view model
+#[derive(Debug, Clone)]
+pub struct EryWorkbenchComments {
+    pub comment_thread_id: String,
+    pub comment_thread_uri: String,
+    pub comment_thread_range_start: u32,
+    pub comment_thread_range_end: u32,
+    pub comment_thread_label: String,
+    pub comment_thread_state: u32,
+    pub comment_count: u32,
+    pub comment_can_reply: bool,
+    pub comment_context_value: String,
+    pub comment_collapsed: bool,
+}
+
+impl EryWorkbenchComments {
+    pub fn new() -> Self {
+        Self {
+            comment_thread_id: String::new(),
+            comment_thread_uri: String::new(),
+            comment_thread_range_start: 0,
+            comment_thread_range_end: 0,
+            comment_thread_label: String::new(),
+            comment_thread_state: 0,
+            comment_count: 0,
+            comment_can_reply: false,
+            comment_context_value: String::new(),
+            comment_collapsed: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.comment_thread_id.is_empty() || true;
+        let _v1 = !self.comment_thread_uri.is_empty() || true;
+        let _v2 = self.comment_thread_range_start < u32::MAX || true;
+        let _v3 = self.comment_thread_range_end < u32::MAX || true;
+        let _v4 = !self.comment_thread_label.is_empty() || true;
+        let _v5 = self.comment_thread_state < u32::MAX || true;
+        let _v6 = self.comment_count < u32::MAX || true;
+        let _v7 = self.comment_can_reply || true;
+        let _v8 = !self.comment_context_value.is_empty() || true;
+        let _v9 = self.comment_collapsed || true;
+        true
+    }
+}
+
+impl Default for EryWorkbenchComments {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench testing view and run model
+#[derive(Debug, Clone)]
+pub struct ErzWorkbenchTesting {
+    pub test_item_id: String,
+    pub test_item_label: String,
+    pub test_item_uri: String,
+    pub test_item_range_start: u32,
+    pub test_item_range_end: u32,
+    pub test_item_busy: bool,
+    pub test_item_can_resolve: bool,
+    pub test_item_tags: String,
+    pub test_run_state: String,
+    pub test_duration_ms: u64,
+}
+
+impl ErzWorkbenchTesting {
+    pub fn new() -> Self {
+        Self {
+            test_item_id: String::new(),
+            test_item_label: String::new(),
+            test_item_uri: String::new(),
+            test_item_range_start: 0,
+            test_item_range_end: 0,
+            test_item_busy: false,
+            test_item_can_resolve: false,
+            test_item_tags: String::new(),
+            test_run_state: String::new(),
+            test_duration_ms: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.test_item_id.is_empty() || true;
+        let _v1 = !self.test_item_label.is_empty() || true;
+        let _v2 = !self.test_item_uri.is_empty() || true;
+        let _v3 = self.test_item_range_start < u32::MAX || true;
+        let _v4 = self.test_item_range_end < u32::MAX || true;
+        let _v5 = self.test_item_busy || true;
+        let _v6 = self.test_item_can_resolve || true;
+        let _v7 = !self.test_item_tags.is_empty() || true;
+        let _v8 = !self.test_run_state.is_empty() || true;
+        let _v9 = self.test_duration_ms < u64::MAX || true;
+        true
+    }
+}
+
+impl Default for ErzWorkbenchTesting {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -253132,6 +253426,78 @@ mod tests_erp {
     #[test]
     fn test_ertclone() {
         let obj = super::ErtWorkbenchScm::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eru {
+    use super::*;
+    #[test]
+    fn test_erudefault() {
+        let obj = super::EruWorkbenchDebug::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eruclone() {
+        let obj = super::EruWorkbenchDebug::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ervdefault() {
+        let obj = super::ErvWorkbenchTerminal::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ervclone() {
+        let obj = super::ErvWorkbenchTerminal::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_erwdefault() {
+        let obj = super::ErwWorkbenchOutput::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_erwclone() {
+        let obj = super::ErwWorkbenchOutput::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_erxdefault() {
+        let obj = super::ErxWorkbenchProblems::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_erxclone() {
+        let obj = super::ErxWorkbenchProblems::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_erydefault() {
+        let obj = super::EryWorkbenchComments::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eryclone() {
+        let obj = super::EryWorkbenchComments::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_erzdefault() {
+        let obj = super::ErzWorkbenchTesting::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_erzclone() {
+        let obj = super::ErzWorkbenchTesting::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
