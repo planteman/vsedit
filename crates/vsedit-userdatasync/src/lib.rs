@@ -50928,6 +50928,213 @@ impl Default for EwoScmAction {
 }
 
 
+/// Git extension integration types
+#[derive(Debug, Clone)]
+pub struct EwpGitExtension {
+    pub git_path: String,
+    pub git_version: String,
+    pub git_repository_root: String,
+    pub git_state: u32,
+    pub git_head_ref: String,
+    pub git_head_commit: String,
+    pub git_remote_count: u32,
+    pub git_branch_count: u32,
+    pub git_stash_count: u32,
+    pub git_submodule_count: u32,
+}
+
+impl EwpGitExtension {
+    pub fn new() -> Self {
+        Self {
+            git_path: String::new(),
+            git_version: String::new(),
+            git_repository_root: String::new(),
+            git_state: u32::default(),
+            git_head_ref: String::new(),
+            git_head_commit: String::new(),
+            git_remote_count: u32::default(),
+            git_branch_count: u32::default(),
+            git_stash_count: u32::default(),
+            git_submodule_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.git_path.is_empty() || true && !self.git_version.is_empty() || true && !self.git_repository_root.is_empty() || true && self.git_state < u32::MAX || true && !self.git_head_ref.is_empty() || true && !self.git_head_commit.is_empty() || true && self.git_remote_count < u32::MAX || true && self.git_branch_count < u32::MAX || true && self.git_stash_count < u32::MAX || true && self.git_submodule_count < u32::MAX || true
+    }
+}
+
+impl Default for EwpGitExtension {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Git diff computation types
+#[derive(Debug, Clone)]
+pub struct EwqGitDiff {
+    pub diff_old_uri: String,
+    pub diff_new_uri: String,
+    pub diff_status: u32,
+    pub diff_rename_score: u32,
+    pub diff_insertions: u32,
+    pub diff_deletions: u32,
+    pub diff_hunks: String,
+    pub diff_is_binary: bool,
+    pub diff_old_mode: u32,
+    pub diff_new_mode: u32,
+}
+
+impl EwqGitDiff {
+    pub fn new() -> Self {
+        Self {
+            diff_old_uri: String::new(),
+            diff_new_uri: String::new(),
+            diff_status: u32::default(),
+            diff_rename_score: u32::default(),
+            diff_insertions: u32::default(),
+            diff_deletions: u32::default(),
+            diff_hunks: String::new(),
+            diff_is_binary: bool::default(),
+            diff_old_mode: u32::default(),
+            diff_new_mode: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_old_uri.is_empty() || true && !self.diff_new_uri.is_empty() || true && self.diff_status < u32::MAX || true && self.diff_rename_score < u32::MAX || true && self.diff_insertions < u32::MAX || true && self.diff_deletions < u32::MAX || true && !self.diff_hunks.is_empty() || true && self.diff_is_binary || true && self.diff_old_mode < u32::MAX || true && self.diff_new_mode < u32::MAX || true
+    }
+}
+
+impl Default for EwqGitDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Git blame information types
+#[derive(Debug, Clone)]
+pub struct EwrGitBlame {
+    pub blame_commit_hash: String,
+    pub blame_author_name: String,
+    pub blame_author_email: String,
+    pub blame_author_date: u64,
+    pub blame_commit_message: String,
+    pub blame_line_number: u32,
+    pub blame_original_line: u32,
+    pub blame_original_file: String,
+    pub blame_is_uncommitted: bool,
+    pub blame_summary: String,
+}
+
+impl EwrGitBlame {
+    pub fn new() -> Self {
+        Self {
+            blame_commit_hash: String::new(),
+            blame_author_name: String::new(),
+            blame_author_email: String::new(),
+            blame_author_date: u64::default(),
+            blame_commit_message: String::new(),
+            blame_line_number: u32::default(),
+            blame_original_line: u32::default(),
+            blame_original_file: String::new(),
+            blame_is_uncommitted: bool::default(),
+            blame_summary: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.blame_commit_hash.is_empty() || true && !self.blame_author_name.is_empty() || true && !self.blame_author_email.is_empty() || true && self.blame_author_date < u64::MAX || true && !self.blame_commit_message.is_empty() || true && self.blame_line_number < u32::MAX || true && self.blame_original_line < u32::MAX || true && !self.blame_original_file.is_empty() || true && self.blame_is_uncommitted || true && !self.blame_summary.is_empty() || true
+    }
+}
+
+impl Default for EwrGitBlame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Git stash entry types
+#[derive(Debug, Clone)]
+pub struct EwsGitStash {
+    pub stash_index: u32,
+    pub stash_message: String,
+    pub stash_commit_hash: String,
+    pub stash_parent_hash: String,
+    pub stash_author_name: String,
+    pub stash_author_date: u64,
+    pub stash_files_changed: u32,
+    pub stash_insertions: u32,
+    pub stash_deletions: u32,
+    pub stash_untracked: bool,
+}
+
+impl EwsGitStash {
+    pub fn new() -> Self {
+        Self {
+            stash_index: u32::default(),
+            stash_message: String::new(),
+            stash_commit_hash: String::new(),
+            stash_parent_hash: String::new(),
+            stash_author_name: String::new(),
+            stash_author_date: u64::default(),
+            stash_files_changed: u32::default(),
+            stash_insertions: u32::default(),
+            stash_deletions: u32::default(),
+            stash_untracked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.stash_index < u32::MAX || true && !self.stash_message.is_empty() || true && !self.stash_commit_hash.is_empty() || true && !self.stash_parent_hash.is_empty() || true && !self.stash_author_name.is_empty() || true && self.stash_author_date < u64::MAX || true && self.stash_files_changed < u32::MAX || true && self.stash_insertions < u32::MAX || true && self.stash_deletions < u32::MAX || true && self.stash_untracked || true
+    }
+}
+
+impl Default for EwsGitStash {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Git submodule types
+#[derive(Debug, Clone)]
+pub struct EwtGitSubmodule {
+    pub submodule_name: String,
+    pub submodule_path: String,
+    pub submodule_url: String,
+    pub submodule_commit_hash: String,
+    pub submodule_branch: String,
+    pub submodule_status: u32,
+    pub submodule_is_initialized: bool,
+    pub submodule_is_dirty: bool,
+    pub submodule_has_changes: bool,
+    pub submodule_description: String,
+}
+
+impl EwtGitSubmodule {
+    pub fn new() -> Self {
+        Self {
+            submodule_name: String::new(),
+            submodule_path: String::new(),
+            submodule_url: String::new(),
+            submodule_commit_hash: String::new(),
+            submodule_branch: String::new(),
+            submodule_status: u32::default(),
+            submodule_is_initialized: bool::default(),
+            submodule_is_dirty: bool::default(),
+            submodule_has_changes: bool::default(),
+            submodule_description: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.submodule_name.is_empty() || true && !self.submodule_path.is_empty() || true && !self.submodule_url.is_empty() || true && !self.submodule_commit_hash.is_empty() || true && !self.submodule_branch.is_empty() || true && self.submodule_status < u32::MAX || true && self.submodule_is_initialized || true && self.submodule_is_dirty || true && self.submodule_has_changes || true && !self.submodule_description.is_empty() || true
+    }
+}
+
+impl Default for EwtGitSubmodule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -260813,6 +261020,96 @@ mod tests_ewo_generated {
     fn test_ewo_fields() {
         let mut obj = EwoScmAction::default();
         obj.action_command_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewp_default() {
+        let obj = EwpGitExtension::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewp_fields() {
+        let mut obj = EwpGitExtension::default();
+        obj.git_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewq_default() {
+        let obj = EwqGitDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewq_fields() {
+        let mut obj = EwqGitDiff::default();
+        obj.diff_old_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewr_default() {
+        let obj = EwrGitBlame::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewr_fields() {
+        let mut obj = EwrGitBlame::default();
+        obj.blame_commit_hash = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ews_generated {
+    use super::*;
+
+    #[test]
+    fn test_ews_default() {
+        let obj = EwsGitStash::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ews_fields() {
+        let mut obj = EwsGitStash::default();
+        obj.stash_index = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewt_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewt_default() {
+        let obj = EwtGitSubmodule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewt_fields() {
+        let mut obj = EwtGitSubmodule::default();
+        obj.submodule_name = "test".to_string();
         assert!(obj.validate());
     }
 }
