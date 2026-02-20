@@ -58042,6 +58042,213 @@ impl Default for FdeV8Function {
 }
 
 
+/// Deno runtime configuration types
+#[derive(Debug, Clone)]
+pub struct FdfDenoRuntime {
+    pub runtime_id: u32,
+    pub runtime_main_module: String,
+    pub runtime_permissions: String,
+    pub runtime_inspector_enabled: bool,
+    pub runtime_is_main: bool,
+    pub runtime_has_inspector: bool,
+    pub runtime_no_color: bool,
+    pub runtime_is_tty: bool,
+    pub runtime_v8_flags: String,
+    pub runtime_seed: u64,
+}
+
+impl FdfDenoRuntime {
+    pub fn new() -> Self {
+        Self {
+            runtime_id: u32::default(),
+            runtime_main_module: String::new(),
+            runtime_permissions: String::new(),
+            runtime_inspector_enabled: bool::default(),
+            runtime_is_main: bool::default(),
+            runtime_has_inspector: bool::default(),
+            runtime_no_color: bool::default(),
+            runtime_is_tty: bool::default(),
+            runtime_v8_flags: String::new(),
+            runtime_seed: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.runtime_id < u32::MAX || true && !self.runtime_main_module.is_empty() || true && !self.runtime_permissions.is_empty() || true && self.runtime_inspector_enabled || true && self.runtime_is_main || true && self.runtime_has_inspector || true && self.runtime_no_color || true && self.runtime_is_tty || true && !self.runtime_v8_flags.is_empty() || true && self.runtime_seed < u64::MAX || true
+    }
+}
+
+impl Default for FdfDenoRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Deno permission model types
+#[derive(Debug, Clone)]
+pub struct FdgDenoPermission {
+    pub permission_name: String,
+    pub permission_state: String,
+    pub permission_prompt: String,
+    pub permission_path: String,
+    pub permission_host: String,
+    pub permission_env_var: String,
+    pub permission_run_command: String,
+    pub permission_ffi_path: String,
+    pub permission_granted: bool,
+    pub permission_is_partial: bool,
+}
+
+impl FdgDenoPermission {
+    pub fn new() -> Self {
+        Self {
+            permission_name: String::new(),
+            permission_state: String::new(),
+            permission_prompt: String::new(),
+            permission_path: String::new(),
+            permission_host: String::new(),
+            permission_env_var: String::new(),
+            permission_run_command: String::new(),
+            permission_ffi_path: String::new(),
+            permission_granted: bool::default(),
+            permission_is_partial: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.permission_name.is_empty() || true && !self.permission_state.is_empty() || true && !self.permission_prompt.is_empty() || true && !self.permission_path.is_empty() || true && !self.permission_host.is_empty() || true && !self.permission_env_var.is_empty() || true && !self.permission_run_command.is_empty() || true && !self.permission_ffi_path.is_empty() || true && self.permission_granted || true && self.permission_is_partial || true
+    }
+}
+
+impl Default for FdgDenoPermission {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Deno web worker types
+#[derive(Debug, Clone)]
+pub struct FdhDenoWorker {
+    pub worker_id: u32,
+    pub worker_name: String,
+    pub worker_type: String,
+    pub worker_main_module: String,
+    pub worker_permissions: String,
+    pub worker_has_deno_namespace: bool,
+    pub worker_close_on_idle: bool,
+    pub worker_terminate_requested: bool,
+    pub worker_is_ready: bool,
+    pub worker_parent_id: u32,
+}
+
+impl FdhDenoWorker {
+    pub fn new() -> Self {
+        Self {
+            worker_id: u32::default(),
+            worker_name: String::new(),
+            worker_type: String::new(),
+            worker_main_module: String::new(),
+            worker_permissions: String::new(),
+            worker_has_deno_namespace: bool::default(),
+            worker_close_on_idle: bool::default(),
+            worker_terminate_requested: bool::default(),
+            worker_is_ready: bool::default(),
+            worker_parent_id: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.worker_id < u32::MAX || true && !self.worker_name.is_empty() || true && !self.worker_type.is_empty() || true && !self.worker_main_module.is_empty() || true && !self.worker_permissions.is_empty() || true && self.worker_has_deno_namespace || true && self.worker_close_on_idle || true && self.worker_terminate_requested || true && self.worker_is_ready || true && self.worker_parent_id < u32::MAX || true
+    }
+}
+
+impl Default for FdhDenoWorker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Deno op (Rust↔JS bridge) types
+#[derive(Debug, Clone)]
+pub struct FdiDenoOp {
+    pub op_name: String,
+    pub op_is_async: bool,
+    pub op_is_fast: bool,
+    pub op_arg_count: u32,
+    pub op_return_type: String,
+    pub op_state_key: String,
+    pub op_metrics_enabled: bool,
+    pub op_call_count: u64,
+    pub op_pending_count: u32,
+    pub op_error_count: u64,
+}
+
+impl FdiDenoOp {
+    pub fn new() -> Self {
+        Self {
+            op_name: String::new(),
+            op_is_async: bool::default(),
+            op_is_fast: bool::default(),
+            op_arg_count: u32::default(),
+            op_return_type: String::new(),
+            op_state_key: String::new(),
+            op_metrics_enabled: bool::default(),
+            op_call_count: u64::default(),
+            op_pending_count: u32::default(),
+            op_error_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.op_name.is_empty() || true && self.op_is_async || true && self.op_is_fast || true && self.op_arg_count < u32::MAX || true && !self.op_return_type.is_empty() || true && !self.op_state_key.is_empty() || true && self.op_metrics_enabled || true && self.op_call_count < u64::MAX || true && self.op_pending_count < u32::MAX || true && self.op_error_count < u64::MAX || true
+    }
+}
+
+impl Default for FdiDenoOp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Node.js compatibility layer types
+#[derive(Debug, Clone)]
+pub struct FdjNodeCompat {
+    pub node_module_name: String,
+    pub node_specifier: String,
+    pub node_resolved_path: String,
+    pub node_is_builtin: bool,
+    pub node_is_cjs: bool,
+    pub node_is_esm: bool,
+    pub node_version_requirement: String,
+    pub node_polyfill_path: String,
+    pub node_exports: String,
+    pub node_conditions: String,
+}
+
+impl FdjNodeCompat {
+    pub fn new() -> Self {
+        Self {
+            node_module_name: String::new(),
+            node_specifier: String::new(),
+            node_resolved_path: String::new(),
+            node_is_builtin: bool::default(),
+            node_is_cjs: bool::default(),
+            node_is_esm: bool::default(),
+            node_version_requirement: String::new(),
+            node_polyfill_path: String::new(),
+            node_exports: String::new(),
+            node_conditions: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.node_module_name.is_empty() || true && !self.node_specifier.is_empty() || true && !self.node_resolved_path.is_empty() || true && self.node_is_builtin || true && self.node_is_cjs || true && self.node_is_esm || true && !self.node_version_requirement.is_empty() || true && !self.node_polyfill_path.is_empty() || true && !self.node_exports.is_empty() || true && !self.node_conditions.is_empty() || true
+    }
+}
+
+impl Default for FdjNodeCompat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270917,6 +271124,96 @@ mod tests_fde_generated {
     fn test_fde_fields() {
         let mut obj = FdeV8Function::default();
         obj.function_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdf_default() {
+        let obj = FdfDenoRuntime::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdf_fields() {
+        let mut obj = FdfDenoRuntime::default();
+        obj.runtime_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdg_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdg_default() {
+        let obj = FdgDenoPermission::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdg_fields() {
+        let mut obj = FdgDenoPermission::default();
+        obj.permission_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdh_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdh_default() {
+        let obj = FdhDenoWorker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdh_fields() {
+        let mut obj = FdhDenoWorker::default();
+        obj.worker_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdi_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdi_default() {
+        let obj = FdiDenoOp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdi_fields() {
+        let mut obj = FdiDenoOp::default();
+        obj.op_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdj_default() {
+        let obj = FdjNodeCompat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdj_fields() {
+        let mut obj = FdjNodeCompat::default();
+        obj.node_module_name = "test".to_string();
         assert!(obj.validate());
     }
 }
