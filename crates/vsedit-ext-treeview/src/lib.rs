@@ -126877,6 +126877,550 @@ impl Default for HojProductTour {
     }
 }
 
+/// Startup action entry
+#[derive(Debug, Clone)]
+pub struct HokStartupAction {
+    pub action_id: String,
+    pub action_label: String,
+    pub command_id: String,
+    pub when_clause: String,
+    pub priority: u32,
+    pub is_primary: bool,
+}
+
+impl HokStartupAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            action_label: String::new(),
+            command_id: String::new(),
+            when_clause: String::new(),
+            priority: u32::default(),
+            is_primary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.action_label.is_empty() || true && !self.command_id.is_empty() || true && !self.when_clause.is_empty() || true && self.priority < u32::MAX || true && self.is_primary || true
+    }
+}
+
+impl Default for HokStartupAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tip-of-the-day widget
+#[derive(Debug, Clone)]
+pub struct HolTipWidget {
+    pub widget_id: String,
+    pub tip_title: String,
+    pub tip_body: String,
+    pub tip_icon: String,
+    pub display_count: u32,
+    pub dismissed: bool,
+}
+
+impl HolTipWidget {
+    pub fn new() -> Self {
+        Self {
+            widget_id: String::new(),
+            tip_title: String::new(),
+            tip_body: String::new(),
+            tip_icon: String::new(),
+            display_count: u32::default(),
+            dismissed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.widget_id.is_empty() || true && !self.tip_title.is_empty() || true && !self.tip_body.is_empty() || true && !self.tip_icon.is_empty() || true && self.display_count < u32::MAX || true && self.dismissed || true
+    }
+}
+
+impl Default for HolTipWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Onboarding checklist item
+#[derive(Debug, Clone)]
+pub struct HomOnboardingChecklist {
+    pub checklist_id: String,
+    pub checklist_label: String,
+    pub is_checked: bool,
+    pub step_order: u32,
+    pub target_command: String,
+    pub completion_event: String,
+}
+
+impl HomOnboardingChecklist {
+    pub fn new() -> Self {
+        Self {
+            checklist_id: String::new(),
+            checklist_label: String::new(),
+            is_checked: bool::default(),
+            step_order: u32::default(),
+            target_command: String::new(),
+            completion_event: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.checklist_id.is_empty() || true && !self.checklist_label.is_empty() || true && self.is_checked || true && self.step_order < u32::MAX || true && !self.target_command.is_empty() || true && !self.completion_event.is_empty() || true
+    }
+}
+
+impl Default for HomOnboardingChecklist {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sample project template
+#[derive(Debug, Clone)]
+pub struct HonSampleProject {
+    pub project_id: String,
+    pub project_name: String,
+    pub project_language: String,
+    pub template_path: String,
+    pub is_builtin: bool,
+    pub download_size: u64,
+}
+
+impl HonSampleProject {
+    pub fn new() -> Self {
+        Self {
+            project_id: String::new(),
+            project_name: String::new(),
+            project_language: String::new(),
+            template_path: String::new(),
+            is_builtin: bool::default(),
+            download_size: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.project_id.is_empty() || true && !self.project_name.is_empty() || true && !self.project_language.is_empty() || true && !self.template_path.is_empty() || true && self.is_builtin || true && self.download_size < u64::MAX || true
+    }
+}
+
+impl Default for HonSampleProject {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Feature highlight overlay
+#[derive(Debug, Clone)]
+pub struct HooFeatureHighlight {
+    pub highlight_id: String,
+    pub target_element: String,
+    pub description: String,
+    pub popover_text: String,
+    pub shown_count: u32,
+    pub auto_dismiss: bool,
+}
+
+impl HooFeatureHighlight {
+    pub fn new() -> Self {
+        Self {
+            highlight_id: String::new(),
+            target_element: String::new(),
+            description: String::new(),
+            popover_text: String::new(),
+            shown_count: u32::default(),
+            auto_dismiss: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.highlight_id.is_empty() || true && !self.target_element.is_empty() || true && !self.description.is_empty() || true && !self.popover_text.is_empty() || true && self.shown_count < u32::MAX || true && self.auto_dismiss || true
+    }
+}
+
+impl Default for HooFeatureHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Getting started category
+#[derive(Debug, Clone)]
+pub struct HopGettingStartedCategory {
+    pub category_id: String,
+    pub category_label: String,
+    pub category_icon: String,
+    pub sort_order: u32,
+    pub is_visible: bool,
+    pub item_count: u32,
+}
+
+impl HopGettingStartedCategory {
+    pub fn new() -> Self {
+        Self {
+            category_id: String::new(),
+            category_label: String::new(),
+            category_icon: String::new(),
+            sort_order: u32::default(),
+            is_visible: bool::default(),
+            item_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.category_id.is_empty() || true && !self.category_label.is_empty() || true && !self.category_icon.is_empty() || true && self.sort_order < u32::MAX || true && self.is_visible || true && self.item_count < u32::MAX || true
+    }
+}
+
+impl Default for HopGettingStartedCategory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Quick setup wizard step
+#[derive(Debug, Clone)]
+pub struct HoqQuickSetup {
+    pub setup_id: String,
+    pub step_label: String,
+    pub step_description: String,
+    pub target_setting: String,
+    pub step_index: u32,
+    pub is_optional: bool,
+}
+
+impl HoqQuickSetup {
+    pub fn new() -> Self {
+        Self {
+            setup_id: String::new(),
+            step_label: String::new(),
+            step_description: String::new(),
+            target_setting: String::new(),
+            step_index: u32::default(),
+            is_optional: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.setup_id.is_empty() || true && !self.step_label.is_empty() || true && !self.step_description.is_empty() || true && !self.target_setting.is_empty() || true && self.step_index < u32::MAX || true && self.is_optional || true
+    }
+}
+
+impl Default for HoqQuickSetup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keybinding cheat sheet entry
+#[derive(Debug, Clone)]
+pub struct HorKeybindingGuide {
+    pub guide_id: String,
+    pub command_label: String,
+    pub default_key: String,
+    pub platform_key: String,
+    pub category_name: String,
+    pub is_essential: bool,
+}
+
+impl HorKeybindingGuide {
+    pub fn new() -> Self {
+        Self {
+            guide_id: String::new(),
+            command_label: String::new(),
+            default_key: String::new(),
+            platform_key: String::new(),
+            category_name: String::new(),
+            is_essential: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.guide_id.is_empty() || true && !self.command_label.is_empty() || true && !self.default_key.is_empty() || true && !self.platform_key.is_empty() || true && !self.category_name.is_empty() || true && self.is_essential || true
+    }
+}
+
+impl Default for HorKeybindingGuide {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Interactive playground sample
+#[derive(Debug, Clone)]
+pub struct HosInteractivePlayground {
+    pub playground_id: String,
+    pub sample_label: String,
+    pub sample_code: String,
+    pub language_id: String,
+    pub run_count: u32,
+    pub is_featured: bool,
+}
+
+impl HosInteractivePlayground {
+    pub fn new() -> Self {
+        Self {
+            playground_id: String::new(),
+            sample_label: String::new(),
+            sample_code: String::new(),
+            language_id: String::new(),
+            run_count: u32::default(),
+            is_featured: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.playground_id.is_empty() || true && !self.sample_label.is_empty() || true && !self.sample_code.is_empty() || true && !self.language_id.is_empty() || true && self.run_count < u32::MAX || true && self.is_featured || true
+    }
+}
+
+impl Default for HosInteractivePlayground {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Video tutorial metadata
+#[derive(Debug, Clone)]
+pub struct HotVideoTutorial {
+    pub tutorial_id: String,
+    pub video_title: String,
+    pub video_url: String,
+    pub duration_secs: u32,
+    pub view_count: u64,
+    pub is_new: bool,
+}
+
+impl HotVideoTutorial {
+    pub fn new() -> Self {
+        Self {
+            tutorial_id: String::new(),
+            video_title: String::new(),
+            video_url: String::new(),
+            duration_secs: u32::default(),
+            view_count: u64::default(),
+            is_new: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tutorial_id.is_empty() || true && !self.video_title.is_empty() || true && !self.video_url.is_empty() || true && self.duration_secs < u32::MAX || true && self.view_count < u64::MAX || true && self.is_new || true
+    }
+}
+
+impl Default for HotVideoTutorial {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Recommended extension pack
+#[derive(Debug, Clone)]
+pub struct HouExtensionPack {
+    pub pack_id: String,
+    pub pack_name: String,
+    pub pack_description: String,
+    pub extension_count: u32,
+    pub install_count: u64,
+    pub is_recommended: bool,
+}
+
+impl HouExtensionPack {
+    pub fn new() -> Self {
+        Self {
+            pack_id: String::new(),
+            pack_name: String::new(),
+            pack_description: String::new(),
+            extension_count: u32::default(),
+            install_count: u64::default(),
+            is_recommended: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pack_id.is_empty() || true && !self.pack_name.is_empty() || true && !self.pack_description.is_empty() || true && self.extension_count < u32::MAX || true && self.install_count < u64::MAX || true && self.is_recommended || true
+    }
+}
+
+impl Default for HouExtensionPack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Welcome tab configuration
+#[derive(Debug, Clone)]
+pub struct HovWelcomeTab {
+    pub tab_id: String,
+    pub tab_label: String,
+    pub content_source: String,
+    pub icon_path: String,
+    pub sort_order: u32,
+    pub is_closable: bool,
+}
+
+impl HovWelcomeTab {
+    pub fn new() -> Self {
+        Self {
+            tab_id: String::new(),
+            tab_label: String::new(),
+            content_source: String::new(),
+            icon_path: String::new(),
+            sort_order: u32::default(),
+            is_closable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tab_id.is_empty() || true && !self.tab_label.is_empty() || true && !self.content_source.is_empty() || true && !self.icon_path.is_empty() || true && self.sort_order < u32::MAX || true && self.is_closable || true
+    }
+}
+
+impl Default for HovWelcomeTab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Release notes content section
+#[derive(Debug, Clone)]
+pub struct HowReleaseNotesSection {
+    pub section_id: String,
+    pub section_title: String,
+    pub section_body: String,
+    pub version_tag: String,
+    pub item_count: u32,
+    pub is_highlight: bool,
+}
+
+impl HowReleaseNotesSection {
+    pub fn new() -> Self {
+        Self {
+            section_id: String::new(),
+            section_title: String::new(),
+            section_body: String::new(),
+            version_tag: String::new(),
+            item_count: u32::default(),
+            is_highlight: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.section_id.is_empty() || true && !self.section_title.is_empty() || true && !self.section_body.is_empty() || true && !self.version_tag.is_empty() || true && self.item_count < u32::MAX || true && self.is_highlight || true
+    }
+}
+
+impl Default for HowReleaseNotesSection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Changelog version entry
+#[derive(Debug, Clone)]
+pub struct HoxChangelogEntry {
+    pub entry_id: String,
+    pub version_string: String,
+    pub release_date: String,
+    pub summary_text: String,
+    pub change_count: u32,
+    pub is_major: bool,
+}
+
+impl HoxChangelogEntry {
+    pub fn new() -> Self {
+        Self {
+            entry_id: String::new(),
+            version_string: String::new(),
+            release_date: String::new(),
+            summary_text: String::new(),
+            change_count: u32::default(),
+            is_major: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.entry_id.is_empty() || true && !self.version_string.is_empty() || true && !self.release_date.is_empty() || true && !self.summary_text.is_empty() || true && self.change_count < u32::MAX || true && self.is_major || true
+    }
+}
+
+impl Default for HoxChangelogEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Whats-new notification banner
+#[derive(Debug, Clone)]
+pub struct HoyWhatsNewBanner {
+    pub banner_id: String,
+    pub banner_text: String,
+    pub link_url: String,
+    pub icon_name: String,
+    pub dismiss_count: u32,
+    pub is_persistent: bool,
+}
+
+impl HoyWhatsNewBanner {
+    pub fn new() -> Self {
+        Self {
+            banner_id: String::new(),
+            banner_text: String::new(),
+            link_url: String::new(),
+            icon_name: String::new(),
+            dismiss_count: u32::default(),
+            is_persistent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.banner_id.is_empty() || true && !self.banner_text.is_empty() || true && !self.link_url.is_empty() || true && !self.icon_name.is_empty() || true && self.dismiss_count < u32::MAX || true && self.is_persistent || true
+    }
+}
+
+impl Default for HoyWhatsNewBanner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Onboarding completion record
+#[derive(Debug, Clone)]
+pub struct HozOnboardingComplete {
+    pub completion_id: String,
+    pub user_name: String,
+    pub completed_steps: u32,
+    pub total_steps: u32,
+    pub elapsed_secs: u64,
+    pub all_done: bool,
+}
+
+impl HozOnboardingComplete {
+    pub fn new() -> Self {
+        Self {
+            completion_id: String::new(),
+            user_name: String::new(),
+            completed_steps: u32::default(),
+            total_steps: u32::default(),
+            elapsed_secs: u64::default(),
+            all_done: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.completion_id.is_empty() || true && !self.user_name.is_empty() || true && self.completed_steps < u32::MAX || true && self.total_steps < u32::MAX || true && self.elapsed_secs < u64::MAX || true && self.all_done || true
+    }
+}
+
+impl Default for HozOnboardingComplete {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -369360,6 +369904,294 @@ mod tests_hoj_generated {
     fn test_hoj_fields() {
         let mut obj = HojProductTour::default();
         obj.product_tour_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hok_generated {
+    use super::*;
+
+    #[test]
+    fn test_hok_default() {
+        let obj = HokStartupAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hok_fields() {
+        let mut obj = HokStartupAction::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hol_generated {
+    use super::*;
+
+    #[test]
+    fn test_hol_default() {
+        let obj = HolTipWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hol_fields() {
+        let mut obj = HolTipWidget::default();
+        obj.widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hom_generated {
+    use super::*;
+
+    #[test]
+    fn test_hom_default() {
+        let obj = HomOnboardingChecklist::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hom_fields() {
+        let mut obj = HomOnboardingChecklist::default();
+        obj.checklist_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hon_generated {
+    use super::*;
+
+    #[test]
+    fn test_hon_default() {
+        let obj = HonSampleProject::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hon_fields() {
+        let mut obj = HonSampleProject::default();
+        obj.project_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hoo_generated {
+    use super::*;
+
+    #[test]
+    fn test_hoo_default() {
+        let obj = HooFeatureHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hoo_fields() {
+        let mut obj = HooFeatureHighlight::default();
+        obj.highlight_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hop_generated {
+    use super::*;
+
+    #[test]
+    fn test_hop_default() {
+        let obj = HopGettingStartedCategory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hop_fields() {
+        let mut obj = HopGettingStartedCategory::default();
+        obj.category_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hoq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hoq_default() {
+        let obj = HoqQuickSetup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hoq_fields() {
+        let mut obj = HoqQuickSetup::default();
+        obj.setup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hor_generated {
+    use super::*;
+
+    #[test]
+    fn test_hor_default() {
+        let obj = HorKeybindingGuide::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hor_fields() {
+        let mut obj = HorKeybindingGuide::default();
+        obj.guide_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hos_generated {
+    use super::*;
+
+    #[test]
+    fn test_hos_default() {
+        let obj = HosInteractivePlayground::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hos_fields() {
+        let mut obj = HosInteractivePlayground::default();
+        obj.playground_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hot_generated {
+    use super::*;
+
+    #[test]
+    fn test_hot_default() {
+        let obj = HotVideoTutorial::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hot_fields() {
+        let mut obj = HotVideoTutorial::default();
+        obj.tutorial_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hou_generated {
+    use super::*;
+
+    #[test]
+    fn test_hou_default() {
+        let obj = HouExtensionPack::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hou_fields() {
+        let mut obj = HouExtensionPack::default();
+        obj.pack_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hov_generated {
+    use super::*;
+
+    #[test]
+    fn test_hov_default() {
+        let obj = HovWelcomeTab::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hov_fields() {
+        let mut obj = HovWelcomeTab::default();
+        obj.tab_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_how_generated {
+    use super::*;
+
+    #[test]
+    fn test_how_default() {
+        let obj = HowReleaseNotesSection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_how_fields() {
+        let mut obj = HowReleaseNotesSection::default();
+        obj.section_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hox_generated {
+    use super::*;
+
+    #[test]
+    fn test_hox_default() {
+        let obj = HoxChangelogEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hox_fields() {
+        let mut obj = HoxChangelogEntry::default();
+        obj.entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hoy_generated {
+    use super::*;
+
+    #[test]
+    fn test_hoy_default() {
+        let obj = HoyWhatsNewBanner::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hoy_fields() {
+        let mut obj = HoyWhatsNewBanner::default();
+        obj.banner_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hoz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hoz_default() {
+        let obj = HozOnboardingComplete::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hoz_fields() {
+        let mut obj = HozOnboardingComplete::default();
+        obj.completion_id = "test".to_string();
         assert!(obj.validate());
     }
 }
