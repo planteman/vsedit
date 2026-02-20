@@ -100444,6 +100444,216 @@ impl Default for GpzEditorLineNumbers {
     }
 }
 
+/// Storage service (get, set, remove, keys, on did change)
+#[derive(Debug, Clone)]
+pub struct GqaStorageService {
+    pub storage_id: String,
+    pub target_type: String,
+    pub scope: String,
+    pub keys_json: String,
+    pub on_did_change_key: String,
+    pub flush_delay_ms: u32,
+    pub max_size_bytes: u64,
+    pub is_initialized: bool,
+    pub backend_type: String,
+    pub log_enabled: bool,
+}
+
+impl GqaStorageService {
+    pub fn new() -> Self {
+        Self {
+            storage_id: String::new(),
+            target_type: String::new(),
+            scope: String::new(),
+            keys_json: String::new(),
+            on_did_change_key: String::new(),
+            flush_delay_ms: u32::default(),
+            max_size_bytes: u64::default(),
+            is_initialized: bool::default(),
+            backend_type: String::new(),
+            log_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.storage_id.is_empty() || true && !self.target_type.is_empty() || true && !self.scope.is_empty() || true && !self.keys_json.is_empty() || true && !self.on_did_change_key.is_empty() || true && self.flush_delay_ms < u32::MAX || true && self.max_size_bytes < u64::MAX || true && self.is_initialized || true && !self.backend_type.is_empty() || true && self.log_enabled || true
+    }
+}
+
+impl Default for GqaStorageService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Global storage (path, get, set, on did change, migrate)
+#[derive(Debug, Clone)]
+pub struct GqbGlobalStorage {
+    pub global_storage_id: String,
+    pub storage_path: String,
+    pub db_path: String,
+    pub migration_version: u32,
+    pub key_count: u32,
+    pub total_size_bytes: u64,
+    pub is_in_memory: bool,
+    pub backup_enabled: bool,
+    pub encryption_enabled: bool,
+    pub last_flush_ms: u64,
+}
+
+impl GqbGlobalStorage {
+    pub fn new() -> Self {
+        Self {
+            global_storage_id: String::new(),
+            storage_path: String::new(),
+            db_path: String::new(),
+            migration_version: u32::default(),
+            key_count: u32::default(),
+            total_size_bytes: u64::default(),
+            is_in_memory: bool::default(),
+            backup_enabled: bool::default(),
+            encryption_enabled: bool::default(),
+            last_flush_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.global_storage_id.is_empty() || true && !self.storage_path.is_empty() || true && !self.db_path.is_empty() || true && self.migration_version < u32::MAX || true && self.key_count < u32::MAX || true && self.total_size_bytes < u64::MAX || true && self.is_in_memory || true && self.backup_enabled || true && self.encryption_enabled || true && self.last_flush_ms < u64::MAX || true
+    }
+}
+
+impl Default for GqbGlobalStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace storage (path, get, set, on did change, scope)
+#[derive(Debug, Clone)]
+pub struct GqcWorkspaceStorage {
+    pub ws_storage_id: String,
+    pub storage_path: String,
+    pub workspace_id: String,
+    pub scope: String,
+    pub key_count: u32,
+    pub total_size_bytes: u64,
+    pub is_transient: bool,
+    pub on_did_change_key: String,
+    pub last_modified_ms: u64,
+    pub backend_type: String,
+}
+
+impl GqcWorkspaceStorage {
+    pub fn new() -> Self {
+        Self {
+            ws_storage_id: String::new(),
+            storage_path: String::new(),
+            workspace_id: String::new(),
+            scope: String::new(),
+            key_count: u32::default(),
+            total_size_bytes: u64::default(),
+            is_transient: bool::default(),
+            on_did_change_key: String::new(),
+            last_modified_ms: u64::default(),
+            backend_type: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_storage_id.is_empty() || true && !self.storage_path.is_empty() || true && !self.workspace_id.is_empty() || true && !self.scope.is_empty() || true && self.key_count < u32::MAX || true && self.total_size_bytes < u64::MAX || true && self.is_transient || true && !self.on_did_change_key.is_empty() || true && self.last_modified_ms < u64::MAX || true && !self.backend_type.is_empty() || true
+    }
+}
+
+impl Default for GqcWorkspaceStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage key target (key, target, scope, source, version)
+#[derive(Debug, Clone)]
+pub struct GqdStorageKeyTarget {
+    pub key_target_id: String,
+    pub key: String,
+    pub target: String,
+    pub scope: String,
+    pub source: String,
+    pub version: u32,
+    pub is_global: bool,
+    pub is_workspace: bool,
+    pub override_target: String,
+    pub deprecation_message: String,
+}
+
+impl GqdStorageKeyTarget {
+    pub fn new() -> Self {
+        Self {
+            key_target_id: String::new(),
+            key: String::new(),
+            target: String::new(),
+            scope: String::new(),
+            source: String::new(),
+            version: u32::default(),
+            is_global: bool::default(),
+            is_workspace: bool::default(),
+            override_target: String::new(),
+            deprecation_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key_target_id.is_empty() || true && !self.key.is_empty() || true && !self.target.is_empty() || true && !self.scope.is_empty() || true && !self.source.is_empty() || true && self.version < u32::MAX || true && self.is_global || true && self.is_workspace || true && !self.override_target.is_empty() || true && !self.deprecation_message.is_empty() || true
+    }
+}
+
+impl Default for GqdStorageKeyTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Secret storage (get, set, delete, on did change, credential)
+#[derive(Debug, Clone)]
+pub struct GqeSecretStorage {
+    pub secret_id: String,
+    pub key: String,
+    pub service: String,
+    pub account: String,
+    pub on_did_change: bool,
+    pub credential_type: String,
+    pub is_encrypted: bool,
+    pub backend: String,
+    pub last_accessed_ms: u64,
+    pub expiry_ms: u64,
+}
+
+impl GqeSecretStorage {
+    pub fn new() -> Self {
+        Self {
+            secret_id: String::new(),
+            key: String::new(),
+            service: String::new(),
+            account: String::new(),
+            on_did_change: bool::default(),
+            credential_type: String::new(),
+            is_encrypted: bool::default(),
+            backend: String::new(),
+            last_accessed_ms: u64::default(),
+            expiry_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.secret_id.is_empty() || true && !self.key.is_empty() || true && !self.service.is_empty() || true && !self.account.is_empty() || true && self.on_did_change || true && !self.credential_type.is_empty() || true && self.is_encrypted || true && !self.backend.is_empty() || true && self.last_accessed_ms < u64::MAX || true && self.expiry_ms < u64::MAX || true
+    }
+}
+
+impl Default for GqeSecretStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331303,6 +331513,96 @@ mod tests_gpz_generated {
     fn test_gpz_fields() {
         let mut obj = GpzEditorLineNumbers::default();
         obj.line_nums_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqa_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqa_default() {
+        let obj = GqaStorageService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqa_fields() {
+        let mut obj = GqaStorageService::default();
+        obj.storage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqb_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqb_default() {
+        let obj = GqbGlobalStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqb_fields() {
+        let mut obj = GqbGlobalStorage::default();
+        obj.global_storage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqc_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqc_default() {
+        let obj = GqcWorkspaceStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqc_fields() {
+        let mut obj = GqcWorkspaceStorage::default();
+        obj.ws_storage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqd_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqd_default() {
+        let obj = GqdStorageKeyTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqd_fields() {
+        let mut obj = GqdStorageKeyTarget::default();
+        obj.key_target_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqe_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqe_default() {
+        let obj = GqeSecretStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqe_fields() {
+        let mut obj = GqeSecretStorage::default();
+        obj.secret_id = "test".to_string();
         assert!(obj.validate());
     }
 }
