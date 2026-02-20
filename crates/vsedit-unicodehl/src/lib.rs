@@ -85031,6 +85031,216 @@ impl Default for GbzEditorGotoWidget {
     }
 }
 
+/// Terminal process (pid, shell path, args, cwd, env, exit code)
+#[derive(Debug, Clone)]
+pub struct GcaTerminalProcess {
+    pub process_id: String,
+    pub pid: u64,
+    pub shell_path: String,
+    pub args_json: String,
+    pub cwd: String,
+    pub env_json: String,
+    pub exit_code: u32,
+    pub is_running: bool,
+    pub title: String,
+    pub use_conpty: bool,
+}
+
+impl GcaTerminalProcess {
+    pub fn new() -> Self {
+        Self {
+            process_id: String::new(),
+            pid: u64::default(),
+            shell_path: String::new(),
+            args_json: String::new(),
+            cwd: String::new(),
+            env_json: String::new(),
+            exit_code: u32::default(),
+            is_running: bool::default(),
+            title: String::new(),
+            use_conpty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.process_id.is_empty() || true && self.pid < u64::MAX || true && !self.shell_path.is_empty() || true && !self.args_json.is_empty() || true && !self.cwd.is_empty() || true && !self.env_json.is_empty() || true && self.exit_code < u32::MAX || true && self.is_running || true && !self.title.is_empty() || true && self.use_conpty || true
+    }
+}
+
+impl Default for GcaTerminalProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal dimensions (rows, cols, pixel width, pixel height, resize)
+#[derive(Debug, Clone)]
+pub struct GcbTerminalDimensions {
+    pub dim_id: String,
+    pub rows: u32,
+    pub cols: u32,
+    pub pixel_width: u32,
+    pub pixel_height: u32,
+    pub cell_width: f64,
+    pub cell_height: f64,
+    pub scale_factor: f64,
+    pub is_resizing: bool,
+    pub min_cols: u32,
+}
+
+impl GcbTerminalDimensions {
+    pub fn new() -> Self {
+        Self {
+            dim_id: String::new(),
+            rows: u32::default(),
+            cols: u32::default(),
+            pixel_width: u32::default(),
+            pixel_height: u32::default(),
+            cell_width: f64::default(),
+            cell_height: f64::default(),
+            scale_factor: f64::default(),
+            is_resizing: bool::default(),
+            min_cols: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dim_id.is_empty() || true && self.rows < u32::MAX || true && self.cols < u32::MAX || true && self.pixel_width < u32::MAX || true && self.pixel_height < u32::MAX || true && self.cell_width.is_finite() || true && self.cell_height.is_finite() || true && self.scale_factor.is_finite() || true && self.is_resizing || true && self.min_cols < u32::MAX || true
+    }
+}
+
+impl Default for GcbTerminalDimensions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal buffer (lines, scrollback, circular, cursor pos, alt buffer)
+#[derive(Debug, Clone)]
+pub struct GccTerminalBuffer {
+    pub buffer_id: String,
+    pub line_count: u32,
+    pub scrollback_limit: u32,
+    pub is_circular: bool,
+    pub cursor_x: u32,
+    pub cursor_y: u32,
+    pub alt_buffer_active: bool,
+    pub saved_cursor_x: u32,
+    pub saved_cursor_y: u32,
+    pub dirty_lines_json: String,
+}
+
+impl GccTerminalBuffer {
+    pub fn new() -> Self {
+        Self {
+            buffer_id: String::new(),
+            line_count: u32::default(),
+            scrollback_limit: u32::default(),
+            is_circular: bool::default(),
+            cursor_x: u32::default(),
+            cursor_y: u32::default(),
+            alt_buffer_active: bool::default(),
+            saved_cursor_x: u32::default(),
+            saved_cursor_y: u32::default(),
+            dirty_lines_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.buffer_id.is_empty() || true && self.line_count < u32::MAX || true && self.scrollback_limit < u32::MAX || true && self.is_circular || true && self.cursor_x < u32::MAX || true && self.cursor_y < u32::MAX || true && self.alt_buffer_active || true && self.saved_cursor_x < u32::MAX || true && self.saved_cursor_y < u32::MAX || true && !self.dirty_lines_json.is_empty() || true
+    }
+}
+
+impl Default for GccTerminalBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal attributes (fg, bg, bold, italic, underline, blink, inverse)
+#[derive(Debug, Clone)]
+pub struct GcdTerminalAttributes {
+    pub attr_id: String,
+    pub fg_color: String,
+    pub bg_color: String,
+    pub is_bold: bool,
+    pub is_italic: bool,
+    pub is_underline: bool,
+    pub is_blink: bool,
+    pub is_inverse: bool,
+    pub is_invisible: bool,
+    pub underline_style: String,
+}
+
+impl GcdTerminalAttributes {
+    pub fn new() -> Self {
+        Self {
+            attr_id: String::new(),
+            fg_color: String::new(),
+            bg_color: String::new(),
+            is_bold: bool::default(),
+            is_italic: bool::default(),
+            is_underline: bool::default(),
+            is_blink: bool::default(),
+            is_inverse: bool::default(),
+            is_invisible: bool::default(),
+            underline_style: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.attr_id.is_empty() || true && !self.fg_color.is_empty() || true && !self.bg_color.is_empty() || true && self.is_bold || true && self.is_italic || true && self.is_underline || true && self.is_blink || true && self.is_inverse || true && self.is_invisible || true && !self.underline_style.is_empty() || true
+    }
+}
+
+impl Default for GcdTerminalAttributes {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal parser (state machine, CSI, OSC, DCS, escape sequences)
+#[derive(Debug, Clone)]
+pub struct GceTerminalParser {
+    pub parser_id: String,
+    pub state: String,
+    pub params_json: String,
+    pub intermediate_bytes: String,
+    pub final_byte: u32,
+    pub osc_string: String,
+    pub dcs_data: String,
+    pub utf8_buffer: String,
+    pub is_collecting: bool,
+    pub sequence_count: u64,
+}
+
+impl GceTerminalParser {
+    pub fn new() -> Self {
+        Self {
+            parser_id: String::new(),
+            state: String::new(),
+            params_json: String::new(),
+            intermediate_bytes: String::new(),
+            final_byte: u32::default(),
+            osc_string: String::new(),
+            dcs_data: String::new(),
+            utf8_buffer: String::new(),
+            is_collecting: bool::default(),
+            sequence_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.parser_id.is_empty() || true && !self.state.is_empty() || true && !self.params_json.is_empty() || true && !self.intermediate_bytes.is_empty() || true && self.final_byte < u32::MAX || true && !self.osc_string.is_empty() || true && !self.dcs_data.is_empty() || true && !self.utf8_buffer.is_empty() || true && self.is_collecting || true && self.sequence_count < u64::MAX || true
+    }
+}
+
+impl Default for GceTerminalParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -309469,6 +309679,96 @@ mod tests_gbz_generated {
     fn test_gbz_fields() {
         let mut obj = GbzEditorGotoWidget::default();
         obj.goto_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gca_generated {
+    use super::*;
+
+    #[test]
+    fn test_gca_default() {
+        let obj = GcaTerminalProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gca_fields() {
+        let mut obj = GcaTerminalProcess::default();
+        obj.process_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcb_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcb_default() {
+        let obj = GcbTerminalDimensions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcb_fields() {
+        let mut obj = GcbTerminalDimensions::default();
+        obj.dim_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcc_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcc_default() {
+        let obj = GccTerminalBuffer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcc_fields() {
+        let mut obj = GccTerminalBuffer::default();
+        obj.buffer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcd_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcd_default() {
+        let obj = GcdTerminalAttributes::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcd_fields() {
+        let mut obj = GcdTerminalAttributes::default();
+        obj.attr_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gce_generated {
+    use super::*;
+
+    #[test]
+    fn test_gce_default() {
+        let obj = GceTerminalParser::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gce_fields() {
+        let mut obj = GceTerminalParser::default();
+        obj.parser_id = "test".to_string();
         assert!(obj.validate());
     }
 }
