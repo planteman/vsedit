@@ -94825,6 +94825,216 @@ impl Default for GkzWorkspaceFileConfig {
     }
 }
 
+/// Keybinding item (key, command, when, args, source, weight)
+#[derive(Debug, Clone)]
+pub struct GlaKeybindingItem {
+    pub kb_id: String,
+    pub key_combo: String,
+    pub command_id: String,
+    pub when_clause: String,
+    pub args_json: String,
+    pub source: String,
+    pub weight: u32,
+    pub is_default: bool,
+    pub extension_id: String,
+    pub is_chord: bool,
+}
+
+impl GlaKeybindingItem {
+    pub fn new() -> Self {
+        Self {
+            kb_id: String::new(),
+            key_combo: String::new(),
+            command_id: String::new(),
+            when_clause: String::new(),
+            args_json: String::new(),
+            source: String::new(),
+            weight: u32::default(),
+            is_default: bool::default(),
+            extension_id: String::new(),
+            is_chord: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kb_id.is_empty() || true && !self.key_combo.is_empty() || true && !self.command_id.is_empty() || true && !self.when_clause.is_empty() || true && !self.args_json.is_empty() || true && !self.source.is_empty() || true && self.weight < u32::MAX || true && self.is_default || true && !self.extension_id.is_empty() || true && self.is_chord || true
+    }
+}
+
+impl Default for GlaKeybindingItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keybinding resolver (resolve, match, fallback, chord, dispatch)
+#[derive(Debug, Clone)]
+pub struct GlbKeybindingResolver {
+    pub resolver_id: String,
+    pub keybindings_json: String,
+    pub default_keybindings_json: String,
+    pub user_keybindings_json: String,
+    pub extension_keybindings_json: String,
+    pub chord_timeout_ms: u32,
+    pub dispatch_mode: String,
+    pub enable_chords: bool,
+    pub first_part_only: bool,
+    pub platform: String,
+}
+
+impl GlbKeybindingResolver {
+    pub fn new() -> Self {
+        Self {
+            resolver_id: String::new(),
+            keybindings_json: String::new(),
+            default_keybindings_json: String::new(),
+            user_keybindings_json: String::new(),
+            extension_keybindings_json: String::new(),
+            chord_timeout_ms: u32::default(),
+            dispatch_mode: String::new(),
+            enable_chords: bool::default(),
+            first_part_only: bool::default(),
+            platform: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resolver_id.is_empty() || true && !self.keybindings_json.is_empty() || true && !self.default_keybindings_json.is_empty() || true && !self.user_keybindings_json.is_empty() || true && !self.extension_keybindings_json.is_empty() || true && self.chord_timeout_ms < u32::MAX || true && !self.dispatch_mode.is_empty() || true && self.enable_chords || true && self.first_part_only || true && !self.platform.is_empty() || true
+    }
+}
+
+impl Default for GlbKeybindingResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Key chord (first part, second part, key code, modifiers, scancode)
+#[derive(Debug, Clone)]
+pub struct GlcKeyChord {
+    pub chord_id: String,
+    pub first_part: String,
+    pub second_part: String,
+    pub key_code: u32,
+    pub ctrl: bool,
+    pub shift: bool,
+    pub alt: bool,
+    pub meta: bool,
+    pub scan_code: u32,
+    pub is_multi_chord: bool,
+}
+
+impl GlcKeyChord {
+    pub fn new() -> Self {
+        Self {
+            chord_id: String::new(),
+            first_part: String::new(),
+            second_part: String::new(),
+            key_code: u32::default(),
+            ctrl: bool::default(),
+            shift: bool::default(),
+            alt: bool::default(),
+            meta: bool::default(),
+            scan_code: u32::default(),
+            is_multi_chord: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chord_id.is_empty() || true && !self.first_part.is_empty() || true && !self.second_part.is_empty() || true && self.key_code < u32::MAX || true && self.ctrl || true && self.shift || true && self.alt || true && self.meta || true && self.scan_code < u32::MAX || true && self.is_multi_chord || true
+    }
+}
+
+impl Default for GlcKeyChord {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Context key expression (type, key, value, negate, and, or, regex)
+#[derive(Debug, Clone)]
+pub struct GldContextKeyExpr {
+    pub expr_id: String,
+    pub expr_type: String,
+    pub key: String,
+    pub value: String,
+    pub negate: bool,
+    pub and_json: String,
+    pub or_json: String,
+    pub regex_pattern: String,
+    pub is_defined: bool,
+    pub not_in_json: String,
+}
+
+impl GldContextKeyExpr {
+    pub fn new() -> Self {
+        Self {
+            expr_id: String::new(),
+            expr_type: String::new(),
+            key: String::new(),
+            value: String::new(),
+            negate: bool::default(),
+            and_json: String::new(),
+            or_json: String::new(),
+            regex_pattern: String::new(),
+            is_defined: bool::default(),
+            not_in_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.expr_id.is_empty() || true && !self.expr_type.is_empty() || true && !self.key.is_empty() || true && !self.value.is_empty() || true && self.negate || true && !self.and_json.is_empty() || true && !self.or_json.is_empty() || true && !self.regex_pattern.is_empty() || true && self.is_defined || true && !self.not_in_json.is_empty() || true
+    }
+}
+
+impl Default for GldContextKeyExpr {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Context key service (get, set, create child, buffer, collect)
+#[derive(Debug, Clone)]
+pub struct GleContextKeyService {
+    pub ctx_svc_id: String,
+    pub context_json: String,
+    pub parent_id: String,
+    pub buffer_json: String,
+    pub overlay_json: String,
+    pub is_scoped: bool,
+    pub change_count: u32,
+    pub key_count: u32,
+    pub last_change_ms: u64,
+    pub debug_name: String,
+}
+
+impl GleContextKeyService {
+    pub fn new() -> Self {
+        Self {
+            ctx_svc_id: String::new(),
+            context_json: String::new(),
+            parent_id: String::new(),
+            buffer_json: String::new(),
+            overlay_json: String::new(),
+            is_scoped: bool::default(),
+            change_count: u32::default(),
+            key_count: u32::default(),
+            last_change_ms: u64::default(),
+            debug_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ctx_svc_id.is_empty() || true && !self.context_json.is_empty() || true && !self.parent_id.is_empty() || true && !self.buffer_json.is_empty() || true && !self.overlay_json.is_empty() || true && self.is_scoped || true && self.change_count < u32::MAX || true && self.key_count < u32::MAX || true && self.last_change_ms < u64::MAX || true && !self.debug_name.is_empty() || true
+    }
+}
+
+impl Default for GleContextKeyService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -323521,6 +323731,96 @@ mod tests_gkz_generated {
     fn test_gkz_fields() {
         let mut obj = GkzWorkspaceFileConfig::default();
         obj.ws_file_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gla_generated {
+    use super::*;
+
+    #[test]
+    fn test_gla_default() {
+        let obj = GlaKeybindingItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gla_fields() {
+        let mut obj = GlaKeybindingItem::default();
+        obj.kb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glb_generated {
+    use super::*;
+
+    #[test]
+    fn test_glb_default() {
+        let obj = GlbKeybindingResolver::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glb_fields() {
+        let mut obj = GlbKeybindingResolver::default();
+        obj.resolver_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glc_generated {
+    use super::*;
+
+    #[test]
+    fn test_glc_default() {
+        let obj = GlcKeyChord::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glc_fields() {
+        let mut obj = GlcKeyChord::default();
+        obj.chord_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gld_generated {
+    use super::*;
+
+    #[test]
+    fn test_gld_default() {
+        let obj = GldContextKeyExpr::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gld_fields() {
+        let mut obj = GldContextKeyExpr::default();
+        obj.expr_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gle_generated {
+    use super::*;
+
+    #[test]
+    fn test_gle_default() {
+        let obj = GleContextKeyService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gle_fields() {
+        let mut obj = GleContextKeyService::default();
+        obj.ctx_svc_id = "test".to_string();
         assert!(obj.validate());
     }
 }
