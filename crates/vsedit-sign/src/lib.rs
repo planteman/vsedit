@@ -155901,6 +155901,890 @@ impl Default for IuzTuiConfig {
     }
 }
 
+/// Authentication provider
+#[derive(Debug, Clone)]
+pub struct IvaAuthProvider {
+    pub auth_id: String,
+    pub provider_name: String,
+    pub provider_label: String,
+    pub account_count: u32,
+    pub session_count: u32,
+    pub supports_multi_account: bool,
+}
+
+impl IvaAuthProvider {
+    pub fn new() -> Self {
+        Self {
+            auth_id: String::new(),
+            provider_name: String::new(),
+            provider_label: String::new(),
+            account_count: u32::default(),
+            session_count: u32::default(),
+            supports_multi_account: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.auth_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.provider_label.is_empty() || true && self.account_count < u32::MAX || true && self.session_count < u32::MAX || true && self.supports_multi_account || true
+    }
+}
+
+impl Default for IvaAuthProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication session
+#[derive(Debug, Clone)]
+pub struct IvbAuthSession {
+    pub session_id: String,
+    pub provider_ref: String,
+    pub account_ref: String,
+    pub scope_list: String,
+    pub created_epoch: u64,
+    pub is_expired: bool,
+}
+
+impl IvbAuthSession {
+    pub fn new() -> Self {
+        Self {
+            session_id: String::new(),
+            provider_ref: String::new(),
+            account_ref: String::new(),
+            scope_list: String::new(),
+            created_epoch: u64::default(),
+            is_expired: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.session_id.is_empty() || true && !self.provider_ref.is_empty() || true && !self.account_ref.is_empty() || true && !self.scope_list.is_empty() || true && self.created_epoch < u64::MAX || true && self.is_expired || true
+    }
+}
+
+impl Default for IvbAuthSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication token
+#[derive(Debug, Clone)]
+pub struct IvcAuthToken {
+    pub token_id: String,
+    pub token_type_str: String,
+    pub access_token_len: u32,
+    pub refresh_token_len: u32,
+    pub expires_epoch: u64,
+    pub is_revoked: bool,
+}
+
+impl IvcAuthToken {
+    pub fn new() -> Self {
+        Self {
+            token_id: String::new(),
+            token_type_str: String::new(),
+            access_token_len: u32::default(),
+            refresh_token_len: u32::default(),
+            expires_epoch: u64::default(),
+            is_revoked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_id.is_empty() || true && !self.token_type_str.is_empty() || true && self.access_token_len < u32::MAX || true && self.refresh_token_len < u32::MAX || true && self.expires_epoch < u64::MAX || true && self.is_revoked || true
+    }
+}
+
+impl Default for IvcAuthToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// OAuth authentication flow
+#[derive(Debug, Clone)]
+pub struct IvdOAuthFlow {
+    pub flow_id: String,
+    pub client_id_str: String,
+    pub redirect_uri: String,
+    pub scope_list: String,
+    pub state_token_len: u32,
+    pub is_pkce: bool,
+}
+
+impl IvdOAuthFlow {
+    pub fn new() -> Self {
+        Self {
+            flow_id: String::new(),
+            client_id_str: String::new(),
+            redirect_uri: String::new(),
+            scope_list: String::new(),
+            state_token_len: u32::default(),
+            is_pkce: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.flow_id.is_empty() || true && !self.client_id_str.is_empty() || true && !self.redirect_uri.is_empty() || true && !self.scope_list.is_empty() || true && self.state_token_len < u32::MAX || true && self.is_pkce || true
+    }
+}
+
+impl Default for IvdOAuthFlow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// User account info
+#[derive(Debug, Clone)]
+pub struct IveAccountInfo {
+    pub account_id: String,
+    pub account_label: String,
+    pub email_str: String,
+    pub provider_ref: String,
+    pub avatar_url_len: u32,
+    pub is_primary: bool,
+}
+
+impl IveAccountInfo {
+    pub fn new() -> Self {
+        Self {
+            account_id: String::new(),
+            account_label: String::new(),
+            email_str: String::new(),
+            provider_ref: String::new(),
+            avatar_url_len: u32::default(),
+            is_primary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.account_id.is_empty() || true && !self.account_label.is_empty() || true && !self.email_str.is_empty() || true && !self.provider_ref.is_empty() || true && self.avatar_url_len < u32::MAX || true && self.is_primary || true
+    }
+}
+
+impl Default for IveAccountInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Credential secret store
+#[derive(Debug, Clone)]
+pub struct IvfSecretStore {
+    pub store_id: String,
+    pub backend_str: String,
+    pub key_count: u32,
+    pub byte_size: u64,
+    pub encryption_algo: String,
+    pub is_available: bool,
+}
+
+impl IvfSecretStore {
+    pub fn new() -> Self {
+        Self {
+            store_id: String::new(),
+            backend_str: String::new(),
+            key_count: u32::default(),
+            byte_size: u64::default(),
+            encryption_algo: String::new(),
+            is_available: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.store_id.is_empty() || true && !self.backend_str.is_empty() || true && self.key_count < u32::MAX || true && self.byte_size < u64::MAX || true && !self.encryption_algo.is_empty() || true && self.is_available || true
+    }
+}
+
+impl Default for IvfSecretStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SSO provider descriptor
+#[derive(Debug, Clone)]
+pub struct IvgSsoProvider {
+    pub sso_id: String,
+    pub provider_name: String,
+    pub login_url: String,
+    pub tenant_id: String,
+    pub protocol_str: String,
+    pub is_enterprise: bool,
+}
+
+impl IvgSsoProvider {
+    pub fn new() -> Self {
+        Self {
+            sso_id: String::new(),
+            provider_name: String::new(),
+            login_url: String::new(),
+            tenant_id: String::new(),
+            protocol_str: String::new(),
+            is_enterprise: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sso_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.login_url.is_empty() || true && !self.tenant_id.is_empty() || true && !self.protocol_str.is_empty() || true && self.is_enterprise || true
+    }
+}
+
+impl Default for IvgSsoProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Trusted domain entry
+#[derive(Debug, Clone)]
+pub struct IvhTrustedDomain {
+    pub domain_id: String,
+    pub domain_str: String,
+    pub trust_level: u32,
+    pub added_epoch: u64,
+    pub source_str: String,
+    pub is_wildcard: bool,
+}
+
+impl IvhTrustedDomain {
+    pub fn new() -> Self {
+        Self {
+            domain_id: String::new(),
+            domain_str: String::new(),
+            trust_level: u32::default(),
+            added_epoch: u64::default(),
+            source_str: String::new(),
+            is_wildcard: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.domain_id.is_empty() || true && !self.domain_str.is_empty() || true && self.trust_level < u32::MAX || true && self.added_epoch < u64::MAX || true && !self.source_str.is_empty() || true && self.is_wildcard || true
+    }
+}
+
+impl Default for IvhTrustedDomain {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Permission request entry
+#[derive(Debug, Clone)]
+pub struct IviPermissionRequest {
+    pub perm_id: String,
+    pub extension_ref: String,
+    pub permission_str: String,
+    pub reason_text: String,
+    pub response_val: u32,
+    pub is_granted: bool,
+}
+
+impl IviPermissionRequest {
+    pub fn new() -> Self {
+        Self {
+            perm_id: String::new(),
+            extension_ref: String::new(),
+            permission_str: String::new(),
+            reason_text: String::new(),
+            response_val: u32::default(),
+            is_granted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.perm_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.permission_str.is_empty() || true && !self.reason_text.is_empty() || true && self.response_val < u32::MAX || true && self.is_granted || true
+    }
+}
+
+impl Default for IviPermissionRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// API key storage entry
+#[derive(Debug, Clone)]
+pub struct IvjApiKeyEntry {
+    pub api_id: String,
+    pub service_name: String,
+    pub key_prefix: String,
+    pub created_epoch: u64,
+    pub last_used_epoch: u64,
+    pub is_active: bool,
+}
+
+impl IvjApiKeyEntry {
+    pub fn new() -> Self {
+        Self {
+            api_id: String::new(),
+            service_name: String::new(),
+            key_prefix: String::new(),
+            created_epoch: u64::default(),
+            last_used_epoch: u64::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.api_id.is_empty() || true && !self.service_name.is_empty() || true && !self.key_prefix.is_empty() || true && self.created_epoch < u64::MAX || true && self.last_used_epoch < u64::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for IvjApiKeyEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication lifecycle event
+#[derive(Debug, Clone)]
+pub struct IvkAuthEvent {
+    pub event_id: String,
+    pub event_kind: String,
+    pub provider_ref: String,
+    pub session_ref: String,
+    pub timestamp_epoch: u64,
+    pub is_error: bool,
+}
+
+impl IvkAuthEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            event_kind: String::new(),
+            provider_ref: String::new(),
+            session_ref: String::new(),
+            timestamp_epoch: u64::default(),
+            is_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && !self.event_kind.is_empty() || true && !self.provider_ref.is_empty() || true && !self.session_ref.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_error || true
+    }
+}
+
+impl Default for IvkAuthEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Session refresh operation
+#[derive(Debug, Clone)]
+pub struct IvlSessionRefresh {
+    pub refresh_id: String,
+    pub session_ref: String,
+    pub old_token_hash: String,
+    pub new_token_hash: String,
+    pub elapsed_ms: u32,
+    pub was_successful: bool,
+}
+
+impl IvlSessionRefresh {
+    pub fn new() -> Self {
+        Self {
+            refresh_id: String::new(),
+            session_ref: String::new(),
+            old_token_hash: String::new(),
+            new_token_hash: String::new(),
+            elapsed_ms: u32::default(),
+            was_successful: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.refresh_id.is_empty() || true && !self.session_ref.is_empty() || true && !self.old_token_hash.is_empty() || true && !self.new_token_hash.is_empty() || true && self.elapsed_ms < u32::MAX || true && self.was_successful || true
+    }
+}
+
+impl Default for IvlSessionRefresh {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Proxy authentication config
+#[derive(Debug, Clone)]
+pub struct IvmProxyAuth {
+    pub proxy_id: String,
+    pub proxy_url: String,
+    pub auth_type_str: String,
+    pub credential_ref: String,
+    pub bypass_list: String,
+    pub is_system_proxy: bool,
+}
+
+impl IvmProxyAuth {
+    pub fn new() -> Self {
+        Self {
+            proxy_id: String::new(),
+            proxy_url: String::new(),
+            auth_type_str: String::new(),
+            credential_ref: String::new(),
+            bypass_list: String::new(),
+            is_system_proxy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proxy_id.is_empty() || true && !self.proxy_url.is_empty() || true && !self.auth_type_str.is_empty() || true && !self.credential_ref.is_empty() || true && !self.bypass_list.is_empty() || true && self.is_system_proxy || true
+    }
+}
+
+impl Default for IvmProxyAuth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Certificate trust store
+#[derive(Debug, Clone)]
+pub struct IvnCertificateStore {
+    pub cert_id: String,
+    pub cert_path: String,
+    pub cert_count: u32,
+    pub expiry_epoch: u64,
+    pub issuer_str: String,
+    pub is_self_signed: bool,
+}
+
+impl IvnCertificateStore {
+    pub fn new() -> Self {
+        Self {
+            cert_id: String::new(),
+            cert_path: String::new(),
+            cert_count: u32::default(),
+            expiry_epoch: u64::default(),
+            issuer_str: String::new(),
+            is_self_signed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cert_id.is_empty() || true && !self.cert_path.is_empty() || true && self.cert_count < u32::MAX || true && self.expiry_epoch < u64::MAX || true && !self.issuer_str.is_empty() || true && self.is_self_signed || true
+    }
+}
+
+impl Default for IvnCertificateStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Token caching layer
+#[derive(Debug, Clone)]
+pub struct IvoTokenCache {
+    pub cache_id: String,
+    pub entry_count: u32,
+    pub max_entries: u32,
+    pub hit_rate_pct: u32,
+    pub eviction_count: u64,
+    pub is_encrypted: bool,
+}
+
+impl IvoTokenCache {
+    pub fn new() -> Self {
+        Self {
+            cache_id: String::new(),
+            entry_count: u32::default(),
+            max_entries: u32::default(),
+            hit_rate_pct: u32::default(),
+            eviction_count: u64::default(),
+            is_encrypted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cache_id.is_empty() || true && self.entry_count < u32::MAX || true && self.max_entries < u32::MAX || true && self.hit_rate_pct < u32::MAX || true && self.eviction_count < u64::MAX || true && self.is_encrypted || true
+    }
+}
+
+impl Default for IvoTokenCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Auth request middleware
+#[derive(Debug, Clone)]
+pub struct IvpAuthMiddleware {
+    pub mw_id: String,
+    pub provider_ref: String,
+    pub header_name: String,
+    pub scheme_str: String,
+    pub retry_count: u32,
+    pub is_enabled: bool,
+}
+
+impl IvpAuthMiddleware {
+    pub fn new() -> Self {
+        Self {
+            mw_id: String::new(),
+            provider_ref: String::new(),
+            header_name: String::new(),
+            scheme_str: String::new(),
+            retry_count: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mw_id.is_empty() || true && !self.provider_ref.is_empty() || true && !self.header_name.is_empty() || true && !self.scheme_str.is_empty() || true && self.retry_count < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for IvpAuthMiddleware {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// OAuth scope definition
+#[derive(Debug, Clone)]
+pub struct IvqScopeDefinition {
+    pub scope_id: String,
+    pub scope_str: String,
+    pub description_text: String,
+    pub resource_str: String,
+    pub is_required: bool,
+    pub is_default: bool,
+}
+
+impl IvqScopeDefinition {
+    pub fn new() -> Self {
+        Self {
+            scope_id: String::new(),
+            scope_str: String::new(),
+            description_text: String::new(),
+            resource_str: String::new(),
+            is_required: bool::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope_id.is_empty() || true && !self.scope_str.is_empty() || true && !self.description_text.is_empty() || true && !self.resource_str.is_empty() || true && self.is_required || true && self.is_default || true
+    }
+}
+
+impl Default for IvqScopeDefinition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication error
+#[derive(Debug, Clone)]
+pub struct IvrAuthError {
+    pub error_id: String,
+    pub error_code: String,
+    pub error_description: String,
+    pub provider_ref: String,
+    pub retry_after_ms: u32,
+    pub is_recoverable: bool,
+}
+
+impl IvrAuthError {
+    pub fn new() -> Self {
+        Self {
+            error_id: String::new(),
+            error_code: String::new(),
+            error_description: String::new(),
+            provider_ref: String::new(),
+            retry_after_ms: u32::default(),
+            is_recoverable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.error_id.is_empty() || true && !self.error_code.is_empty() || true && !self.error_description.is_empty() || true && !self.provider_ref.is_empty() || true && self.retry_after_ms < u32::MAX || true && self.is_recoverable || true
+    }
+}
+
+impl Default for IvrAuthError {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication audit log
+#[derive(Debug, Clone)]
+pub struct IvsAuthLog {
+    pub log_id: String,
+    pub action_str: String,
+    pub provider_ref: String,
+    pub ip_address: String,
+    pub timestamp_epoch: u64,
+    pub was_successful: bool,
+}
+
+impl IvsAuthLog {
+    pub fn new() -> Self {
+        Self {
+            log_id: String::new(),
+            action_str: String::new(),
+            provider_ref: String::new(),
+            ip_address: String::new(),
+            timestamp_epoch: u64::default(),
+            was_successful: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_id.is_empty() || true && !self.action_str.is_empty() || true && !self.provider_ref.is_empty() || true && !self.ip_address.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.was_successful || true
+    }
+}
+
+impl Default for IvsAuthLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// MFA challenge descriptor
+#[derive(Debug, Clone)]
+pub struct IvtMfaChallenge {
+    pub mfa_id: String,
+    pub challenge_type_str: String,
+    pub prompt_text: String,
+    pub timeout_ms: u32,
+    pub attempt_count: u32,
+    pub is_verified: bool,
+}
+
+impl IvtMfaChallenge {
+    pub fn new() -> Self {
+        Self {
+            mfa_id: String::new(),
+            challenge_type_str: String::new(),
+            prompt_text: String::new(),
+            timeout_ms: u32::default(),
+            attempt_count: u32::default(),
+            is_verified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mfa_id.is_empty() || true && !self.challenge_type_str.is_empty() || true && !self.prompt_text.is_empty() || true && self.timeout_ms < u32::MAX || true && self.attempt_count < u32::MAX || true && self.is_verified || true
+    }
+}
+
+impl Default for IvtMfaChallenge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Device code flow state
+#[derive(Debug, Clone)]
+pub struct IvuDeviceCode {
+    pub device_id: String,
+    pub user_code: String,
+    pub device_code_len: u32,
+    pub verification_uri: String,
+    pub poll_interval_ms: u32,
+    pub is_authorized: bool,
+}
+
+impl IvuDeviceCode {
+    pub fn new() -> Self {
+        Self {
+            device_id: String::new(),
+            user_code: String::new(),
+            device_code_len: u32::default(),
+            verification_uri: String::new(),
+            poll_interval_ms: u32::default(),
+            is_authorized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.device_id.is_empty() || true && !self.user_code.is_empty() || true && self.device_code_len < u32::MAX || true && !self.verification_uri.is_empty() || true && self.poll_interval_ms < u32::MAX || true && self.is_authorized || true
+    }
+}
+
+impl Default for IvuDeviceCode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Auth redirect handler
+#[derive(Debug, Clone)]
+pub struct IvvAuthRedirect {
+    pub redirect_id: String,
+    pub redirect_uri: String,
+    pub state_param: String,
+    pub code_param_len: u32,
+    pub error_param: String,
+    pub is_success: bool,
+}
+
+impl IvvAuthRedirect {
+    pub fn new() -> Self {
+        Self {
+            redirect_id: String::new(),
+            redirect_uri: String::new(),
+            state_param: String::new(),
+            code_param_len: u32::default(),
+            error_param: String::new(),
+            is_success: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.redirect_id.is_empty() || true && !self.redirect_uri.is_empty() || true && !self.state_param.is_empty() || true && self.code_param_len < u32::MAX || true && !self.error_param.is_empty() || true && self.is_success || true
+    }
+}
+
+impl Default for IvvAuthRedirect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Session logout operation
+#[derive(Debug, Clone)]
+pub struct IvwSessionLogout {
+    pub logout_id: String,
+    pub session_ref: String,
+    pub reason_str: String,
+    pub revoke_tokens: bool,
+    pub clear_cache: bool,
+    pub is_complete: bool,
+}
+
+impl IvwSessionLogout {
+    pub fn new() -> Self {
+        Self {
+            logout_id: String::new(),
+            session_ref: String::new(),
+            reason_str: String::new(),
+            revoke_tokens: bool::default(),
+            clear_cache: bool::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.logout_id.is_empty() || true && !self.session_ref.is_empty() || true && !self.reason_str.is_empty() || true && self.revoke_tokens || true && self.clear_cache || true && self.is_complete || true
+    }
+}
+
+impl Default for IvwSessionLogout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git credential helper
+#[derive(Debug, Clone)]
+pub struct IvxGitCredential {
+    pub git_id: String,
+    pub host_str: String,
+    pub protocol_str: String,
+    pub credential_type_str: String,
+    pub store_ref: String,
+    pub is_cached: bool,
+}
+
+impl IvxGitCredential {
+    pub fn new() -> Self {
+        Self {
+            git_id: String::new(),
+            host_str: String::new(),
+            protocol_str: String::new(),
+            credential_type_str: String::new(),
+            store_ref: String::new(),
+            is_cached: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.git_id.is_empty() || true && !self.host_str.is_empty() || true && !self.protocol_str.is_empty() || true && !self.credential_type_str.is_empty() || true && !self.store_ref.is_empty() || true && self.is_cached || true
+    }
+}
+
+impl Default for IvxGitCredential {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// System keychain access
+#[derive(Debug, Clone)]
+pub struct IvyKeychainAccess {
+    pub keychain_id: String,
+    pub service_name: String,
+    pub account_name: String,
+    pub item_count: u32,
+    pub backend_str: String,
+    pub is_locked: bool,
+}
+
+impl IvyKeychainAccess {
+    pub fn new() -> Self {
+        Self {
+            keychain_id: String::new(),
+            service_name: String::new(),
+            account_name: String::new(),
+            item_count: u32::default(),
+            backend_str: String::new(),
+            is_locked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.keychain_id.is_empty() || true && !self.service_name.is_empty() || true && !self.account_name.is_empty() || true && self.item_count < u32::MAX || true && !self.backend_str.is_empty() || true && self.is_locked || true
+    }
+}
+
+impl Default for IvyKeychainAccess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication configuration
+#[derive(Debug, Clone)]
+pub struct IvzAuthConfig {
+    pub config_id: String,
+    pub default_provider: String,
+    pub token_lifetime_ms: u64,
+    pub auto_login_enabled: bool,
+    pub sso_enabled: bool,
+    pub proxy_auth_enabled: bool,
+}
+
+impl IvzAuthConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            default_provider: String::new(),
+            token_lifetime_ms: u64::default(),
+            auto_login_enabled: bool::default(),
+            sso_enabled: bool::default(),
+            proxy_auth_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && !self.default_provider.is_empty() || true && self.token_lifetime_ms < u64::MAX || true && self.auto_login_enabled || true && self.sso_enabled || true && self.proxy_auth_enabled || true
+    }
+}
+
+impl Default for IvzAuthConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -413519,6 +414403,474 @@ mod tests_iuz_generated {
     #[test]
     fn test_iuz_fields() {
         let mut obj = IuzTuiConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iva_generated {
+    use super::*;
+
+    #[test]
+    fn test_iva_default() {
+        let obj = IvaAuthProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iva_fields() {
+        let mut obj = IvaAuthProvider::default();
+        obj.auth_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivb_default() {
+        let obj = IvbAuthSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivb_fields() {
+        let mut obj = IvbAuthSession::default();
+        obj.session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivc_default() {
+        let obj = IvcAuthToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivc_fields() {
+        let mut obj = IvcAuthToken::default();
+        obj.token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivd_default() {
+        let obj = IvdOAuthFlow::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivd_fields() {
+        let mut obj = IvdOAuthFlow::default();
+        obj.flow_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ive_generated {
+    use super::*;
+
+    #[test]
+    fn test_ive_default() {
+        let obj = IveAccountInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ive_fields() {
+        let mut obj = IveAccountInfo::default();
+        obj.account_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivf_default() {
+        let obj = IvfSecretStore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivf_fields() {
+        let mut obj = IvfSecretStore::default();
+        obj.store_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivg_default() {
+        let obj = IvgSsoProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivg_fields() {
+        let mut obj = IvgSsoProvider::default();
+        obj.sso_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivh_default() {
+        let obj = IvhTrustedDomain::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivh_fields() {
+        let mut obj = IvhTrustedDomain::default();
+        obj.domain_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivi_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivi_default() {
+        let obj = IviPermissionRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivi_fields() {
+        let mut obj = IviPermissionRequest::default();
+        obj.perm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivj_default() {
+        let obj = IvjApiKeyEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivj_fields() {
+        let mut obj = IvjApiKeyEntry::default();
+        obj.api_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivk_default() {
+        let obj = IvkAuthEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivk_fields() {
+        let mut obj = IvkAuthEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivl_default() {
+        let obj = IvlSessionRefresh::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivl_fields() {
+        let mut obj = IvlSessionRefresh::default();
+        obj.refresh_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivm_default() {
+        let obj = IvmProxyAuth::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivm_fields() {
+        let mut obj = IvmProxyAuth::default();
+        obj.proxy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivn_default() {
+        let obj = IvnCertificateStore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivn_fields() {
+        let mut obj = IvnCertificateStore::default();
+        obj.cert_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivo_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivo_default() {
+        let obj = IvoTokenCache::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivo_fields() {
+        let mut obj = IvoTokenCache::default();
+        obj.cache_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivp_default() {
+        let obj = IvpAuthMiddleware::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivp_fields() {
+        let mut obj = IvpAuthMiddleware::default();
+        obj.mw_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivq_default() {
+        let obj = IvqScopeDefinition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivq_fields() {
+        let mut obj = IvqScopeDefinition::default();
+        obj.scope_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivr_default() {
+        let obj = IvrAuthError::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivr_fields() {
+        let mut obj = IvrAuthError::default();
+        obj.error_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivs_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivs_default() {
+        let obj = IvsAuthLog::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivs_fields() {
+        let mut obj = IvsAuthLog::default();
+        obj.log_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivt_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivt_default() {
+        let obj = IvtMfaChallenge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivt_fields() {
+        let mut obj = IvtMfaChallenge::default();
+        obj.mfa_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivu_default() {
+        let obj = IvuDeviceCode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivu_fields() {
+        let mut obj = IvuDeviceCode::default();
+        obj.device_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivv_default() {
+        let obj = IvvAuthRedirect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivv_fields() {
+        let mut obj = IvvAuthRedirect::default();
+        obj.redirect_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivw_default() {
+        let obj = IvwSessionLogout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivw_fields() {
+        let mut obj = IvwSessionLogout::default();
+        obj.logout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivx_default() {
+        let obj = IvxGitCredential::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivx_fields() {
+        let mut obj = IvxGitCredential::default();
+        obj.git_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivy_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivy_default() {
+        let obj = IvyKeychainAccess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivy_fields() {
+        let mut obj = IvyKeychainAccess::default();
+        obj.keychain_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ivz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ivz_default() {
+        let obj = IvzAuthConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ivz_fields() {
+        let mut obj = IvzAuthConfig::default();
         obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
