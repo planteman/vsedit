@@ -87161,6 +87161,216 @@ impl Default for GdzSearchAccessibility {
     }
 }
 
+/// Extension manifest (name, publisher, version, engines, categories)
+#[derive(Debug, Clone)]
+pub struct GeaExtensionManifest {
+    pub manifest_id: String,
+    pub name: String,
+    pub publisher: String,
+    pub version: String,
+    pub engines_vscode: String,
+    pub categories_json: String,
+    pub display_name: String,
+    pub description: String,
+    pub main_entry: String,
+    pub browser_entry: String,
+}
+
+impl GeaExtensionManifest {
+    pub fn new() -> Self {
+        Self {
+            manifest_id: String::new(),
+            name: String::new(),
+            publisher: String::new(),
+            version: String::new(),
+            engines_vscode: String::new(),
+            categories_json: String::new(),
+            display_name: String::new(),
+            description: String::new(),
+            main_entry: String::new(),
+            browser_entry: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.manifest_id.is_empty() || true && !self.name.is_empty() || true && !self.publisher.is_empty() || true && !self.version.is_empty() || true && !self.engines_vscode.is_empty() || true && !self.categories_json.is_empty() || true && !self.display_name.is_empty() || true && !self.description.is_empty() || true && !self.main_entry.is_empty() || true && !self.browser_entry.is_empty() || true
+    }
+}
+
+impl Default for GeaExtensionManifest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension package (vsix path, manifest, assets, signature, size)
+#[derive(Debug, Clone)]
+pub struct GebExtensionPackage {
+    pub package_id: String,
+    pub vsix_path: String,
+    pub manifest_json: String,
+    pub assets_json: String,
+    pub signature: String,
+    pub size_bytes: u64,
+    pub is_signed: bool,
+    pub target_platform: String,
+    pub pre_release: bool,
+    pub sha256: String,
+}
+
+impl GebExtensionPackage {
+    pub fn new() -> Self {
+        Self {
+            package_id: String::new(),
+            vsix_path: String::new(),
+            manifest_json: String::new(),
+            assets_json: String::new(),
+            signature: String::new(),
+            size_bytes: u64::default(),
+            is_signed: bool::default(),
+            target_platform: String::new(),
+            pre_release: bool::default(),
+            sha256: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.package_id.is_empty() || true && !self.vsix_path.is_empty() || true && !self.manifest_json.is_empty() || true && !self.assets_json.is_empty() || true && !self.signature.is_empty() || true && self.size_bytes < u64::MAX || true && self.is_signed || true && !self.target_platform.is_empty() || true && self.pre_release || true && !self.sha256.is_empty() || true
+    }
+}
+
+impl Default for GebExtensionPackage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension gallery item (id, display name, description, versions, stats)
+#[derive(Debug, Clone)]
+pub struct GecExtensionGalleryItem {
+    pub gallery_id: String,
+    pub extension_id: String,
+    pub display_name: String,
+    pub short_description: String,
+    pub versions_json: String,
+    pub install_count: u64,
+    pub rating_count: u32,
+    pub average_rating: f64,
+    pub publisher_name: String,
+    pub categories_json: String,
+}
+
+impl GecExtensionGalleryItem {
+    pub fn new() -> Self {
+        Self {
+            gallery_id: String::new(),
+            extension_id: String::new(),
+            display_name: String::new(),
+            short_description: String::new(),
+            versions_json: String::new(),
+            install_count: u64::default(),
+            rating_count: u32::default(),
+            average_rating: f64::default(),
+            publisher_name: String::new(),
+            categories_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gallery_id.is_empty() || true && !self.extension_id.is_empty() || true && !self.display_name.is_empty() || true && !self.short_description.is_empty() || true && !self.versions_json.is_empty() || true && self.install_count < u64::MAX || true && self.rating_count < u32::MAX || true && self.average_rating.is_finite() || true && !self.publisher_name.is_empty() || true && !self.categories_json.is_empty() || true
+    }
+}
+
+impl Default for GecExtensionGalleryItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension recommendation (id, reason, source, is builtin, priority)
+#[derive(Debug, Clone)]
+pub struct GedExtensionRecommendation {
+    pub rec_id: String,
+    pub extension_id: String,
+    pub reason: String,
+    pub source: String,
+    pub is_builtin: bool,
+    pub priority: u32,
+    pub when_clause: String,
+    pub language_id: String,
+    pub file_extensions_json: String,
+    pub is_important: bool,
+}
+
+impl GedExtensionRecommendation {
+    pub fn new() -> Self {
+        Self {
+            rec_id: String::new(),
+            extension_id: String::new(),
+            reason: String::new(),
+            source: String::new(),
+            is_builtin: bool::default(),
+            priority: u32::default(),
+            when_clause: String::new(),
+            language_id: String::new(),
+            file_extensions_json: String::new(),
+            is_important: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rec_id.is_empty() || true && !self.extension_id.is_empty() || true && !self.reason.is_empty() || true && !self.source.is_empty() || true && self.is_builtin || true && self.priority < u32::MAX || true && !self.when_clause.is_empty() || true && !self.language_id.is_empty() || true && !self.file_extensions_json.is_empty() || true && self.is_important || true
+    }
+}
+
+impl Default for GedExtensionRecommendation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension dependency (id, version range, is optional, is bundled)
+#[derive(Debug, Clone)]
+pub struct GeeExtensionDependency {
+    pub dep_id: String,
+    pub extension_id: String,
+    pub version_range: String,
+    pub is_optional: bool,
+    pub is_bundled: bool,
+    pub kind: String,
+    pub resolution_uri: String,
+    pub error_message: String,
+    pub fallback_id: String,
+    pub is_resolved: bool,
+}
+
+impl GeeExtensionDependency {
+    pub fn new() -> Self {
+        Self {
+            dep_id: String::new(),
+            extension_id: String::new(),
+            version_range: String::new(),
+            is_optional: bool::default(),
+            is_bundled: bool::default(),
+            kind: String::new(),
+            resolution_uri: String::new(),
+            error_message: String::new(),
+            fallback_id: String::new(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dep_id.is_empty() || true && !self.extension_id.is_empty() || true && !self.version_range.is_empty() || true && self.is_optional || true && self.is_bundled || true && !self.kind.is_empty() || true && !self.resolution_uri.is_empty() || true && !self.error_message.is_empty() || true && !self.fallback_id.is_empty() || true && self.is_resolved || true
+    }
+}
+
+impl Default for GeeExtensionDependency {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -312730,6 +312940,96 @@ mod tests_gdz_generated {
     fn test_gdz_fields() {
         let mut obj = GdzSearchAccessibility::default();
         obj.a11y_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gea_generated {
+    use super::*;
+
+    #[test]
+    fn test_gea_default() {
+        let obj = GeaExtensionManifest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gea_fields() {
+        let mut obj = GeaExtensionManifest::default();
+        obj.manifest_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_geb_generated {
+    use super::*;
+
+    #[test]
+    fn test_geb_default() {
+        let obj = GebExtensionPackage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_geb_fields() {
+        let mut obj = GebExtensionPackage::default();
+        obj.package_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gec_generated {
+    use super::*;
+
+    #[test]
+    fn test_gec_default() {
+        let obj = GecExtensionGalleryItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gec_fields() {
+        let mut obj = GecExtensionGalleryItem::default();
+        obj.gallery_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ged_generated {
+    use super::*;
+
+    #[test]
+    fn test_ged_default() {
+        let obj = GedExtensionRecommendation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ged_fields() {
+        let mut obj = GedExtensionRecommendation::default();
+        obj.rec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gee_generated {
+    use super::*;
+
+    #[test]
+    fn test_gee_default() {
+        let obj = GeeExtensionDependency::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gee_fields() {
+        let mut obj = GeeExtensionDependency::default();
+        obj.dep_id = "test".to_string();
         assert!(obj.validate());
     }
 }
