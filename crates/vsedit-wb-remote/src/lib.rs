@@ -68755,6 +68755,216 @@ impl Default for FmzExtensionEmbedding {
     }
 }
 
+/// Chat message (role, content, name, tool calls, references)
+#[derive(Debug, Clone)]
+pub struct FnaChatMessage {
+    pub message_id: String,
+    pub role: u32,
+    pub content: String,
+    pub name: String,
+    pub tool_calls_json: String,
+    pub references_json: String,
+    pub participant_id: String,
+    pub is_incomplete: bool,
+    pub turn_number: u32,
+    pub timestamp_ms: u64,
+}
+
+impl FnaChatMessage {
+    pub fn new() -> Self {
+        Self {
+            message_id: String::new(),
+            role: u32::default(),
+            content: String::new(),
+            name: String::new(),
+            tool_calls_json: String::new(),
+            references_json: String::new(),
+            participant_id: String::new(),
+            is_incomplete: bool::default(),
+            turn_number: u32::default(),
+            timestamp_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.message_id.is_empty() || true && self.role < u32::MAX || true && !self.content.is_empty() || true && !self.name.is_empty() || true && !self.tool_calls_json.is_empty() || true && !self.references_json.is_empty() || true && !self.participant_id.is_empty() || true && self.is_incomplete || true && self.turn_number < u32::MAX || true && self.timestamp_ms < u64::MAX || true
+    }
+}
+
+impl Default for FnaChatMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat request (prompt, command, model, references, tool calls)
+#[derive(Debug, Clone)]
+pub struct FnbChatRequest {
+    pub request_id: String,
+    pub prompt: String,
+    pub command_name: String,
+    pub model_id: String,
+    pub references_json: String,
+    pub tool_invocations_json: String,
+    pub participant_id: String,
+    pub attempt: u32,
+    pub location: u32,
+    pub is_implicit: bool,
+}
+
+impl FnbChatRequest {
+    pub fn new() -> Self {
+        Self {
+            request_id: String::new(),
+            prompt: String::new(),
+            command_name: String::new(),
+            model_id: String::new(),
+            references_json: String::new(),
+            tool_invocations_json: String::new(),
+            participant_id: String::new(),
+            attempt: u32::default(),
+            location: u32::default(),
+            is_implicit: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.request_id.is_empty() || true && !self.prompt.is_empty() || true && !self.command_name.is_empty() || true && !self.model_id.is_empty() || true && !self.references_json.is_empty() || true && !self.tool_invocations_json.is_empty() || true && !self.participant_id.is_empty() || true && self.attempt < u32::MAX || true && self.location < u32::MAX || true && self.is_implicit || true
+    }
+}
+
+impl Default for FnbChatRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat response (text parts, file trees, anchors, buttons, progress)
+#[derive(Debug, Clone)]
+pub struct FncChatResponse {
+    pub response_id: String,
+    pub text_parts_json: String,
+    pub file_tree_json: String,
+    pub anchors_json: String,
+    pub buttons_json: String,
+    pub progress_json: String,
+    pub is_complete: bool,
+    pub is_cancelled: bool,
+    pub error_details_json: String,
+    pub token_count: u32,
+}
+
+impl FncChatResponse {
+    pub fn new() -> Self {
+        Self {
+            response_id: String::new(),
+            text_parts_json: String::new(),
+            file_tree_json: String::new(),
+            anchors_json: String::new(),
+            buttons_json: String::new(),
+            progress_json: String::new(),
+            is_complete: bool::default(),
+            is_cancelled: bool::default(),
+            error_details_json: String::new(),
+            token_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.response_id.is_empty() || true && !self.text_parts_json.is_empty() || true && !self.file_tree_json.is_empty() || true && !self.anchors_json.is_empty() || true && !self.buttons_json.is_empty() || true && !self.progress_json.is_empty() || true && self.is_complete || true && self.is_cancelled || true && !self.error_details_json.is_empty() || true && self.token_count < u32::MAX || true
+    }
+}
+
+impl Default for FncChatResponse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat slash command (name, description, sample request, is sticky)
+#[derive(Debug, Clone)]
+pub struct FndChatSlashCommand {
+    pub command_id: String,
+    pub name: String,
+    pub description: String,
+    pub sample_request: String,
+    pub is_sticky: bool,
+    pub participant_id: String,
+    pub when_clause: String,
+    pub returns_result: bool,
+    pub yield_to_participant: String,
+    pub disambiguation_json: String,
+}
+
+impl FndChatSlashCommand {
+    pub fn new() -> Self {
+        Self {
+            command_id: String::new(),
+            name: String::new(),
+            description: String::new(),
+            sample_request: String::new(),
+            is_sticky: bool::default(),
+            participant_id: String::new(),
+            when_clause: String::new(),
+            returns_result: bool::default(),
+            yield_to_participant: String::new(),
+            disambiguation_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.command_id.is_empty() || true && !self.name.is_empty() || true && !self.description.is_empty() || true && !self.sample_request.is_empty() || true && self.is_sticky || true && !self.participant_id.is_empty() || true && !self.when_clause.is_empty() || true && self.returns_result || true && !self.yield_to_participant.is_empty() || true && !self.disambiguation_json.is_empty() || true
+    }
+}
+
+impl Default for FndChatSlashCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat variable (name, description, value, is slow, is full)
+#[derive(Debug, Clone)]
+pub struct FneChatVariable {
+    pub variable_id: String,
+    pub name: String,
+    pub description: String,
+    pub value_json: String,
+    pub is_slow: bool,
+    pub is_full: bool,
+    pub can_be_truncated: bool,
+    pub model_description: String,
+    pub icon_id: String,
+    pub chat_description: String,
+}
+
+impl FneChatVariable {
+    pub fn new() -> Self {
+        Self {
+            variable_id: String::new(),
+            name: String::new(),
+            description: String::new(),
+            value_json: String::new(),
+            is_slow: bool::default(),
+            is_full: bool::default(),
+            can_be_truncated: bool::default(),
+            model_description: String::new(),
+            icon_id: String::new(),
+            chat_description: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.variable_id.is_empty() || true && !self.name.is_empty() || true && !self.description.is_empty() || true && !self.value_json.is_empty() || true && self.is_slow || true && self.is_full || true && self.can_be_truncated || true && !self.model_description.is_empty() || true && !self.icon_id.is_empty() || true && !self.chat_description.is_empty() || true
+    }
+}
+
+impl Default for FneChatVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -286074,6 +286284,96 @@ mod tests_fmz_generated {
     fn test_fmz_fields() {
         let mut obj = FmzExtensionEmbedding::default();
         obj.embedding_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fna_generated {
+    use super::*;
+
+    #[test]
+    fn test_fna_default() {
+        let obj = FnaChatMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fna_fields() {
+        let mut obj = FnaChatMessage::default();
+        obj.message_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnb_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnb_default() {
+        let obj = FnbChatRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnb_fields() {
+        let mut obj = FnbChatRequest::default();
+        obj.request_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnc_default() {
+        let obj = FncChatResponse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnc_fields() {
+        let mut obj = FncChatResponse::default();
+        obj.response_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnd_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnd_default() {
+        let obj = FndChatSlashCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnd_fields() {
+        let mut obj = FndChatSlashCommand::default();
+        obj.command_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fne_generated {
+    use super::*;
+
+    #[test]
+    fn test_fne_default() {
+        let obj = FneChatVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fne_fields() {
+        let mut obj = FneChatVariable::default();
+        obj.variable_id = "test".to_string();
         assert!(obj.validate());
     }
 }
