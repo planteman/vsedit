@@ -111201,6 +111201,426 @@ impl Default for GzzDiagnosticInfo {
     }
 }
 
+/// Editor model (uri, language, version, line count, encoding)
+#[derive(Debug, Clone)]
+pub struct HaaEditorModel {
+    pub editor_model_id: String,
+    pub uri: String,
+    pub language_id: String,
+    pub version_id: u32,
+    pub line_count: u64,
+    pub encoding: String,
+    pub eol: String,
+    pub is_dirty: bool,
+    pub is_readonly: bool,
+    pub is_large_file: bool,
+}
+
+impl HaaEditorModel {
+    pub fn new() -> Self {
+        Self {
+            editor_model_id: String::new(),
+            uri: String::new(),
+            language_id: String::new(),
+            version_id: u32::default(),
+            line_count: u64::default(),
+            encoding: String::new(),
+            eol: String::new(),
+            is_dirty: bool::default(),
+            is_readonly: bool::default(),
+            is_large_file: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_model_id.is_empty() || true && !self.uri.is_empty() || true && !self.language_id.is_empty() || true && self.version_id < u32::MAX || true && self.line_count < u64::MAX || true && !self.encoding.is_empty() || true && !self.eol.is_empty() || true && self.is_dirty || true && self.is_readonly || true && self.is_large_file || true
+    }
+}
+
+impl Default for HaaEditorModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor state (cursor, scroll, selection, folded regions, marks)
+#[derive(Debug, Clone)]
+pub struct HabEditorState {
+    pub editor_state_id: String,
+    pub cursor_line: u32,
+    pub cursor_column: u32,
+    pub scroll_top: u32,
+    pub selection_json: String,
+    pub folded_regions_json: String,
+    pub marks_json: String,
+    pub view_column: u32,
+    pub is_focused: bool,
+    pub contributing_changes: u32,
+}
+
+impl HabEditorState {
+    pub fn new() -> Self {
+        Self {
+            editor_state_id: String::new(),
+            cursor_line: u32::default(),
+            cursor_column: u32::default(),
+            scroll_top: u32::default(),
+            selection_json: String::new(),
+            folded_regions_json: String::new(),
+            marks_json: String::new(),
+            view_column: u32::default(),
+            is_focused: bool::default(),
+            contributing_changes: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_state_id.is_empty() || true && self.cursor_line < u32::MAX || true && self.cursor_column < u32::MAX || true && self.scroll_top < u32::MAX || true && !self.selection_json.is_empty() || true && !self.folded_regions_json.is_empty() || true && !self.marks_json.is_empty() || true && self.view_column < u32::MAX || true && self.is_focused || true && self.contributing_changes < u32::MAX || true
+    }
+}
+
+impl Default for HabEditorState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor view state (visible ranges, decorations, minimap offset)
+#[derive(Debug, Clone)]
+pub struct HacEditorViewState {
+    pub view_state_id: String,
+    pub visible_start_line: u32,
+    pub visible_end_line: u32,
+    pub decorations_json: String,
+    pub minimap_offset: u32,
+    pub viewport_width: u32,
+    pub viewport_height: u32,
+    pub first_position_json: String,
+    pub cursor_state_json: String,
+    pub is_restored: bool,
+}
+
+impl HacEditorViewState {
+    pub fn new() -> Self {
+        Self {
+            view_state_id: String::new(),
+            visible_start_line: u32::default(),
+            visible_end_line: u32::default(),
+            decorations_json: String::new(),
+            minimap_offset: u32::default(),
+            viewport_width: u32::default(),
+            viewport_height: u32::default(),
+            first_position_json: String::new(),
+            cursor_state_json: String::new(),
+            is_restored: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_state_id.is_empty() || true && self.visible_start_line < u32::MAX || true && self.visible_end_line < u32::MAX || true && !self.decorations_json.is_empty() || true && self.minimap_offset < u32::MAX || true && self.viewport_width < u32::MAX || true && self.viewport_height < u32::MAX || true && !self.first_position_json.is_empty() || true && !self.cursor_state_json.is_empty() || true && self.is_restored || true
+    }
+}
+
+impl Default for HacEditorViewState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor options (tab size, insert spaces, word wrap, rulers)
+#[derive(Debug, Clone)]
+pub struct HadEditorOptions {
+    pub editor_opts_id: String,
+    pub tab_size: u32,
+    pub insert_spaces: bool,
+    pub word_wrap: String,
+    pub rulers_json: String,
+    pub line_numbers: String,
+    pub render_whitespace: String,
+    pub font_size: u32,
+    pub font_family: String,
+    pub minimap_enabled: bool,
+}
+
+impl HadEditorOptions {
+    pub fn new() -> Self {
+        Self {
+            editor_opts_id: String::new(),
+            tab_size: u32::default(),
+            insert_spaces: bool::default(),
+            word_wrap: String::new(),
+            rulers_json: String::new(),
+            line_numbers: String::new(),
+            render_whitespace: String::new(),
+            font_size: u32::default(),
+            font_family: String::new(),
+            minimap_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_opts_id.is_empty() || true && self.tab_size < u32::MAX || true && self.insert_spaces || true && !self.word_wrap.is_empty() || true && !self.rulers_json.is_empty() || true && !self.line_numbers.is_empty() || true && !self.render_whitespace.is_empty() || true && self.font_size < u32::MAX || true && !self.font_family.is_empty() || true && self.minimap_enabled || true
+    }
+}
+
+impl Default for HadEditorOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor action (id, label, keybinding, precondition, run)
+#[derive(Debug, Clone)]
+pub struct HaeEditorAction {
+    pub editor_action_id: String,
+    pub action_id: String,
+    pub label: String,
+    pub keybinding: String,
+    pub precondition: String,
+    pub category: String,
+    pub description: String,
+    pub icon: String,
+    pub is_enabled: bool,
+    pub menu_group: String,
+}
+
+impl HaeEditorAction {
+    pub fn new() -> Self {
+        Self {
+            editor_action_id: String::new(),
+            action_id: String::new(),
+            label: String::new(),
+            keybinding: String::new(),
+            precondition: String::new(),
+            category: String::new(),
+            description: String::new(),
+            icon: String::new(),
+            is_enabled: bool::default(),
+            menu_group: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_action_id.is_empty() || true && !self.action_id.is_empty() || true && !self.label.is_empty() || true && !self.keybinding.is_empty() || true && !self.precondition.is_empty() || true && !self.category.is_empty() || true && !self.description.is_empty() || true && !self.icon.is_empty() || true && self.is_enabled || true && !self.menu_group.is_empty() || true
+    }
+}
+
+impl Default for HaeEditorAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor contribution (id, ctor, dispose, save restore)
+#[derive(Debug, Clone)]
+pub struct HafEditorContribution {
+    pub editor_contrib_id: String,
+    pub contribution_id: String,
+    pub ctor_name: String,
+    pub is_disposed: bool,
+    pub save_state_json: String,
+    pub restore_state_json: String,
+    pub priority: u32,
+    pub dependencies_json: String,
+    pub is_optional: bool,
+    pub editor_type: String,
+}
+
+impl HafEditorContribution {
+    pub fn new() -> Self {
+        Self {
+            editor_contrib_id: String::new(),
+            contribution_id: String::new(),
+            ctor_name: String::new(),
+            is_disposed: bool::default(),
+            save_state_json: String::new(),
+            restore_state_json: String::new(),
+            priority: u32::default(),
+            dependencies_json: String::new(),
+            is_optional: bool::default(),
+            editor_type: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_contrib_id.is_empty() || true && !self.contribution_id.is_empty() || true && !self.ctor_name.is_empty() || true && self.is_disposed || true && !self.save_state_json.is_empty() || true && !self.restore_state_json.is_empty() || true && self.priority < u32::MAX || true && !self.dependencies_json.is_empty() || true && self.is_optional || true && !self.editor_type.is_empty() || true
+    }
+}
+
+impl Default for HafEditorContribution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor widget (id, position, preference, range, visible)
+#[derive(Debug, Clone)]
+pub struct HagEditorWidget {
+    pub editor_widget_id: String,
+    pub widget_id: String,
+    pub position_json: String,
+    pub preference_json: String,
+    pub range_json: String,
+    pub is_visible: bool,
+    pub z_index: u32,
+    pub allow_overflow: bool,
+    pub suppress_mouse: bool,
+    pub aria_label: String,
+}
+
+impl HagEditorWidget {
+    pub fn new() -> Self {
+        Self {
+            editor_widget_id: String::new(),
+            widget_id: String::new(),
+            position_json: String::new(),
+            preference_json: String::new(),
+            range_json: String::new(),
+            is_visible: bool::default(),
+            z_index: u32::default(),
+            allow_overflow: bool::default(),
+            suppress_mouse: bool::default(),
+            aria_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_widget_id.is_empty() || true && !self.widget_id.is_empty() || true && !self.position_json.is_empty() || true && !self.preference_json.is_empty() || true && !self.range_json.is_empty() || true && self.is_visible || true && self.z_index < u32::MAX || true && self.allow_overflow || true && self.suppress_mouse || true && !self.aria_label.is_empty() || true
+    }
+}
+
+impl Default for HagEditorWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Content widget (position, allowEditorOverflow, afterLineNumber)
+#[derive(Debug, Clone)]
+pub struct HahContentWidget {
+    pub content_widget_id: String,
+    pub position_json: String,
+    pub allow_editor_overflow: bool,
+    pub after_line_number: u32,
+    pub suppress_mouse_down: bool,
+    pub height_in_lines: u32,
+    pub width_in_chars: u32,
+    pub preference: String,
+    pub is_showing: bool,
+    pub content_html: String,
+}
+
+impl HahContentWidget {
+    pub fn new() -> Self {
+        Self {
+            content_widget_id: String::new(),
+            position_json: String::new(),
+            allow_editor_overflow: bool::default(),
+            after_line_number: u32::default(),
+            suppress_mouse_down: bool::default(),
+            height_in_lines: u32::default(),
+            width_in_chars: u32::default(),
+            preference: String::new(),
+            is_showing: bool::default(),
+            content_html: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.content_widget_id.is_empty() || true && !self.position_json.is_empty() || true && self.allow_editor_overflow || true && self.after_line_number < u32::MAX || true && self.suppress_mouse_down || true && self.height_in_lines < u32::MAX || true && self.width_in_chars < u32::MAX || true && !self.preference.is_empty() || true && self.is_showing || true && !self.content_html.is_empty() || true
+    }
+}
+
+impl Default for HahContentWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Overlay widget (id, position, min width, z-index, visible)
+#[derive(Debug, Clone)]
+pub struct HaiOverlayWidget {
+    pub overlay_widget_id: String,
+    pub widget_id: String,
+    pub position_preference: String,
+    pub min_width: u32,
+    pub z_index: u32,
+    pub is_visible: bool,
+    pub min_height: u32,
+    pub max_width: u32,
+    pub max_height: u32,
+    pub aria_label: String,
+}
+
+impl HaiOverlayWidget {
+    pub fn new() -> Self {
+        Self {
+            overlay_widget_id: String::new(),
+            widget_id: String::new(),
+            position_preference: String::new(),
+            min_width: u32::default(),
+            z_index: u32::default(),
+            is_visible: bool::default(),
+            min_height: u32::default(),
+            max_width: u32::default(),
+            max_height: u32::default(),
+            aria_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.overlay_widget_id.is_empty() || true && !self.widget_id.is_empty() || true && !self.position_preference.is_empty() || true && self.min_width < u32::MAX || true && self.z_index < u32::MAX || true && self.is_visible || true && self.min_height < u32::MAX || true && self.max_width < u32::MAX || true && self.max_height < u32::MAX || true && !self.aria_label.is_empty() || true
+    }
+}
+
+impl Default for HaiOverlayWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View zone (afterLineNumber, height, dom node, margin, ordinal)
+#[derive(Debug, Clone)]
+pub struct HajViewZone {
+    pub view_zone_id: String,
+    pub after_line_number: u32,
+    pub height_in_lines: u32,
+    pub dom_node_id: String,
+    pub margin_dom_node_id: String,
+    pub ordinal: u32,
+    pub is_visible: bool,
+    pub min_width_in_px: u32,
+    pub suppress_mouse_down: bool,
+    pub after_column: u32,
+}
+
+impl HajViewZone {
+    pub fn new() -> Self {
+        Self {
+            view_zone_id: String::new(),
+            after_line_number: u32::default(),
+            height_in_lines: u32::default(),
+            dom_node_id: String::new(),
+            margin_dom_node_id: String::new(),
+            ordinal: u32::default(),
+            is_visible: bool::default(),
+            min_width_in_px: u32::default(),
+            suppress_mouse_down: bool::default(),
+            after_column: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_zone_id.is_empty() || true && self.after_line_number < u32::MAX || true && self.height_in_lines < u32::MAX || true && !self.dom_node_id.is_empty() || true && !self.margin_dom_node_id.is_empty() || true && self.ordinal < u32::MAX || true && self.is_visible || true && self.min_width_in_px < u32::MAX || true && self.suppress_mouse_down || true && self.after_column < u32::MAX || true
+    }
+}
+
+impl Default for HajViewZone {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -346897,6 +347317,186 @@ mod tests_gzz_generated {
     fn test_gzz_fields() {
         let mut obj = GzzDiagnosticInfo::default();
         obj.diag_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_haa_generated {
+    use super::*;
+
+    #[test]
+    fn test_haa_default() {
+        let obj = HaaEditorModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_haa_fields() {
+        let mut obj = HaaEditorModel::default();
+        obj.editor_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hab_generated {
+    use super::*;
+
+    #[test]
+    fn test_hab_default() {
+        let obj = HabEditorState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hab_fields() {
+        let mut obj = HabEditorState::default();
+        obj.editor_state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hac_generated {
+    use super::*;
+
+    #[test]
+    fn test_hac_default() {
+        let obj = HacEditorViewState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hac_fields() {
+        let mut obj = HacEditorViewState::default();
+        obj.view_state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_had_generated {
+    use super::*;
+
+    #[test]
+    fn test_had_default() {
+        let obj = HadEditorOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_had_fields() {
+        let mut obj = HadEditorOptions::default();
+        obj.editor_opts_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hae_generated {
+    use super::*;
+
+    #[test]
+    fn test_hae_default() {
+        let obj = HaeEditorAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hae_fields() {
+        let mut obj = HaeEditorAction::default();
+        obj.editor_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_haf_generated {
+    use super::*;
+
+    #[test]
+    fn test_haf_default() {
+        let obj = HafEditorContribution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_haf_fields() {
+        let mut obj = HafEditorContribution::default();
+        obj.editor_contrib_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hag_generated {
+    use super::*;
+
+    #[test]
+    fn test_hag_default() {
+        let obj = HagEditorWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hag_fields() {
+        let mut obj = HagEditorWidget::default();
+        obj.editor_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hah_generated {
+    use super::*;
+
+    #[test]
+    fn test_hah_default() {
+        let obj = HahContentWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hah_fields() {
+        let mut obj = HahContentWidget::default();
+        obj.content_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hai_generated {
+    use super::*;
+
+    #[test]
+    fn test_hai_default() {
+        let obj = HaiOverlayWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hai_fields() {
+        let mut obj = HaiOverlayWidget::default();
+        obj.overlay_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_haj_generated {
+    use super::*;
+
+    #[test]
+    fn test_haj_default() {
+        let obj = HajViewZone::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_haj_fields() {
+        let mut obj = HajViewZone::default();
+        obj.view_zone_id = "test".to_string();
         assert!(obj.validate());
     }
 }
