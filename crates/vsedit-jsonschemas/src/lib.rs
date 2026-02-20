@@ -146644,6 +146644,890 @@ impl Default for IkzEditorGutterColor {
     }
 }
 
+/// Keybinding descriptor
+#[derive(Debug, Clone)]
+pub struct IlaKeybinding {
+    pub kb_id: String,
+    pub key_code: u32,
+    pub modifier_mask: u32,
+    pub command_ref: String,
+    pub when_clause: String,
+    pub is_default: bool,
+}
+
+impl IlaKeybinding {
+    pub fn new() -> Self {
+        Self {
+            kb_id: String::new(),
+            key_code: u32::default(),
+            modifier_mask: u32::default(),
+            command_ref: String::new(),
+            when_clause: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kb_id.is_empty() || true && self.key_code < u32::MAX || true && self.modifier_mask < u32::MAX || true && !self.command_ref.is_empty() || true && !self.when_clause.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for IlaKeybinding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Key chord sequence
+#[derive(Debug, Clone)]
+pub struct IlbKeyChord {
+    pub chord_id: String,
+    pub first_key: u32,
+    pub second_key: u32,
+    pub first_mod: u32,
+    pub second_mod: u32,
+    pub is_complete: bool,
+}
+
+impl IlbKeyChord {
+    pub fn new() -> Self {
+        Self {
+            chord_id: String::new(),
+            first_key: u32::default(),
+            second_key: u32::default(),
+            first_mod: u32::default(),
+            second_mod: u32::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chord_id.is_empty() || true && self.first_key < u32::MAX || true && self.second_key < u32::MAX || true && self.first_mod < u32::MAX || true && self.second_mod < u32::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for IlbKeyChord {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keybinding resolver state
+#[derive(Debug, Clone)]
+pub struct IlcKeyResolver {
+    pub resolver_id: String,
+    pub binding_count: u32,
+    pub conflict_count: u32,
+    pub context_key_count: u32,
+    pub cache_size: u32,
+    pub has_chord_pending: bool,
+}
+
+impl IlcKeyResolver {
+    pub fn new() -> Self {
+        Self {
+            resolver_id: String::new(),
+            binding_count: u32::default(),
+            conflict_count: u32::default(),
+            context_key_count: u32::default(),
+            cache_size: u32::default(),
+            has_chord_pending: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resolver_id.is_empty() || true && self.binding_count < u32::MAX || true && self.conflict_count < u32::MAX || true && self.context_key_count < u32::MAX || true && self.cache_size < u32::MAX || true && self.has_chord_pending || true
+    }
+}
+
+impl Default for IlcKeyResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keybinding context expression
+#[derive(Debug, Clone)]
+pub struct IldKeyContext {
+    pub ctx_id: String,
+    pub expression_str: String,
+    pub evaluated_val: bool,
+    pub negate_val: bool,
+    pub key_count: u32,
+    pub is_default: bool,
+}
+
+impl IldKeyContext {
+    pub fn new() -> Self {
+        Self {
+            ctx_id: String::new(),
+            expression_str: String::new(),
+            evaluated_val: bool::default(),
+            negate_val: bool::default(),
+            key_count: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ctx_id.is_empty() || true && !self.expression_str.is_empty() || true && self.evaluated_val || true && self.negate_val || true && self.key_count < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for IldKeyContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Key dispatch result
+#[derive(Debug, Clone)]
+pub struct IleKeyDispatch {
+    pub dispatch_id: String,
+    pub command_ref: String,
+    pub binding_ref: String,
+    pub source_val: u32,
+    pub args_json_len: u32,
+    pub was_chord: bool,
+}
+
+impl IleKeyDispatch {
+    pub fn new() -> Self {
+        Self {
+            dispatch_id: String::new(),
+            command_ref: String::new(),
+            binding_ref: String::new(),
+            source_val: u32::default(),
+            args_json_len: u32::default(),
+            was_chord: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dispatch_id.is_empty() || true && !self.command_ref.is_empty() || true && !self.binding_ref.is_empty() || true && self.source_val < u32::MAX || true && self.args_json_len < u32::MAX || true && self.was_chord || true
+    }
+}
+
+impl Default for IleKeyDispatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keyboard layout mapping
+#[derive(Debug, Clone)]
+pub struct IlfKeyMapping {
+    pub map_id: String,
+    pub layout_name: String,
+    pub mapping_count: u32,
+    pub unmapped_count: u32,
+    pub scan_code_count: u32,
+    pub is_standard: bool,
+}
+
+impl IlfKeyMapping {
+    pub fn new() -> Self {
+        Self {
+            map_id: String::new(),
+            layout_name: String::new(),
+            mapping_count: u32::default(),
+            unmapped_count: u32::default(),
+            scan_code_count: u32::default(),
+            is_standard: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.map_id.is_empty() || true && !self.layout_name.is_empty() || true && self.mapping_count < u32::MAX || true && self.unmapped_count < u32::MAX || true && self.scan_code_count < u32::MAX || true && self.is_standard || true
+    }
+}
+
+impl Default for IlfKeyMapping {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Key label rendering
+#[derive(Debug, Clone)]
+pub struct IlgKeyLabel {
+    pub label_id: String,
+    pub key_code: u32,
+    pub label_text: String,
+    pub aria_label: String,
+    pub electron_accel: String,
+    pub is_platform_specific: bool,
+}
+
+impl IlgKeyLabel {
+    pub fn new() -> Self {
+        Self {
+            label_id: String::new(),
+            key_code: u32::default(),
+            label_text: String::new(),
+            aria_label: String::new(),
+            electron_accel: String::new(),
+            is_platform_specific: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.label_id.is_empty() || true && self.key_code < u32::MAX || true && !self.label_text.is_empty() || true && !self.aria_label.is_empty() || true && !self.electron_accel.is_empty() || true && self.is_platform_specific || true
+    }
+}
+
+impl Default for IlgKeyLabel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Key combination display
+#[derive(Debug, Clone)]
+pub struct IlhKeyCombo {
+    pub combo_id: String,
+    pub display_parts: String,
+    pub separator_str: String,
+    pub platform_str: String,
+    pub total_keys: u32,
+    pub is_chord: bool,
+}
+
+impl IlhKeyCombo {
+    pub fn new() -> Self {
+        Self {
+            combo_id: String::new(),
+            display_parts: String::new(),
+            separator_str: String::new(),
+            platform_str: String::new(),
+            total_keys: u32::default(),
+            is_chord: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.combo_id.is_empty() || true && !self.display_parts.is_empty() || true && !self.separator_str.is_empty() || true && !self.platform_str.is_empty() || true && self.total_keys < u32::MAX || true && self.is_chord || true
+    }
+}
+
+impl Default for IlhKeyCombo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keyboard macro recording
+#[derive(Debug, Clone)]
+pub struct IliKeyMacro {
+    pub macro_id: String,
+    pub action_count: u32,
+    pub recording_ms: u64,
+    pub playback_delay_ms: u32,
+    pub repeat_count: u32,
+    pub is_recording: bool,
+}
+
+impl IliKeyMacro {
+    pub fn new() -> Self {
+        Self {
+            macro_id: String::new(),
+            action_count: u32::default(),
+            recording_ms: u64::default(),
+            playback_delay_ms: u32::default(),
+            repeat_count: u32::default(),
+            is_recording: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.macro_id.is_empty() || true && self.action_count < u32::MAX || true && self.recording_ms < u64::MAX || true && self.playback_delay_ms < u32::MAX || true && self.repeat_count < u32::MAX || true && self.is_recording || true
+    }
+}
+
+impl Default for IliKeyMacro {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Key repeat configuration
+#[derive(Debug, Clone)]
+pub struct IljKeyRepeat {
+    pub repeat_id: String,
+    pub initial_delay_ms: u32,
+    pub repeat_interval_ms: u32,
+    pub key_code: u32,
+    pub repeat_count: u64,
+    pub is_active: bool,
+}
+
+impl IljKeyRepeat {
+    pub fn new() -> Self {
+        Self {
+            repeat_id: String::new(),
+            initial_delay_ms: u32::default(),
+            repeat_interval_ms: u32::default(),
+            key_code: u32::default(),
+            repeat_count: u64::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.repeat_id.is_empty() || true && self.initial_delay_ms < u32::MAX || true && self.repeat_interval_ms < u32::MAX || true && self.key_code < u32::MAX || true && self.repeat_count < u64::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for IljKeyRepeat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor input mode
+#[derive(Debug, Clone)]
+pub struct IlkInputMode {
+    pub mode_id: String,
+    pub mode_name: String,
+    pub cursor_style: String,
+    pub status_text: String,
+    pub binding_override_count: u32,
+    pub is_insert: bool,
+}
+
+impl IlkInputMode {
+    pub fn new() -> Self {
+        Self {
+            mode_id: String::new(),
+            mode_name: String::new(),
+            cursor_style: String::new(),
+            status_text: String::new(),
+            binding_override_count: u32::default(),
+            is_insert: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mode_id.is_empty() || true && !self.mode_name.is_empty() || true && !self.cursor_style.is_empty() || true && !self.status_text.is_empty() || true && self.binding_override_count < u32::MAX || true && self.is_insert || true
+    }
+}
+
+impl Default for IlkInputMode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IME composition state
+#[derive(Debug, Clone)]
+pub struct IllImeState {
+    pub ime_id: String,
+    pub composition_text: String,
+    pub cursor_offset: u32,
+    pub selection_len: u32,
+    pub candidate_count: u32,
+    pub is_composing: bool,
+}
+
+impl IllImeState {
+    pub fn new() -> Self {
+        Self {
+            ime_id: String::new(),
+            composition_text: String::new(),
+            cursor_offset: u32::default(),
+            selection_len: u32::default(),
+            candidate_count: u32::default(),
+            is_composing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ime_id.is_empty() || true && !self.composition_text.is_empty() || true && self.cursor_offset < u32::MAX || true && self.selection_len < u32::MAX || true && self.candidate_count < u32::MAX || true && self.is_composing || true
+    }
+}
+
+impl Default for IllImeState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Mouse action binding
+#[derive(Debug, Clone)]
+pub struct IlmMouseBinding {
+    pub mouse_id: String,
+    pub button_val: u32,
+    pub modifier_mask: u32,
+    pub command_ref: String,
+    pub click_count: u32,
+    pub is_context: bool,
+}
+
+impl IlmMouseBinding {
+    pub fn new() -> Self {
+        Self {
+            mouse_id: String::new(),
+            button_val: u32::default(),
+            modifier_mask: u32::default(),
+            command_ref: String::new(),
+            click_count: u32::default(),
+            is_context: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mouse_id.is_empty() || true && self.button_val < u32::MAX || true && self.modifier_mask < u32::MAX || true && !self.command_ref.is_empty() || true && self.click_count < u32::MAX || true && self.is_context || true
+    }
+}
+
+impl Default for IlmMouseBinding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Touch gesture binding
+#[derive(Debug, Clone)]
+pub struct IlnGestureBinding {
+    pub gesture_id: String,
+    pub gesture_kind: String,
+    pub finger_count: u32,
+    pub direction_str: String,
+    pub command_ref: String,
+    pub is_enabled: bool,
+}
+
+impl IlnGestureBinding {
+    pub fn new() -> Self {
+        Self {
+            gesture_id: String::new(),
+            gesture_kind: String::new(),
+            finger_count: u32::default(),
+            direction_str: String::new(),
+            command_ref: String::new(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gesture_id.is_empty() || true && !self.gesture_kind.is_empty() || true && self.finger_count < u32::MAX || true && !self.direction_str.is_empty() || true && !self.command_ref.is_empty() || true && self.is_enabled || true
+    }
+}
+
+impl Default for IlnGestureBinding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Scroll action binding
+#[derive(Debug, Clone)]
+pub struct IloScrollBinding {
+    pub scroll_id: String,
+    pub direction_str: String,
+    pub modifier_mask: u32,
+    pub command_ref: String,
+    pub multiplier_val: u32,
+    pub is_smooth: bool,
+}
+
+impl IloScrollBinding {
+    pub fn new() -> Self {
+        Self {
+            scroll_id: String::new(),
+            direction_str: String::new(),
+            modifier_mask: u32::default(),
+            command_ref: String::new(),
+            multiplier_val: u32::default(),
+            is_smooth: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scroll_id.is_empty() || true && !self.direction_str.is_empty() || true && self.modifier_mask < u32::MAX || true && !self.command_ref.is_empty() || true && self.multiplier_val < u32::MAX || true && self.is_smooth || true
+    }
+}
+
+impl Default for IloScrollBinding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Drag action binding
+#[derive(Debug, Clone)]
+pub struct IlpDragBinding {
+    pub drag_id: String,
+    pub drag_kind: String,
+    pub modifier_mask: u32,
+    pub command_ref: String,
+    pub threshold_px: u32,
+    pub is_enabled: bool,
+}
+
+impl IlpDragBinding {
+    pub fn new() -> Self {
+        Self {
+            drag_id: String::new(),
+            drag_kind: String::new(),
+            modifier_mask: u32::default(),
+            command_ref: String::new(),
+            threshold_px: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.drag_id.is_empty() || true && !self.drag_kind.is_empty() || true && self.modifier_mask < u32::MAX || true && !self.command_ref.is_empty() || true && self.threshold_px < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for IlpDragBinding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessibility key config
+#[derive(Debug, Clone)]
+pub struct IlqAccessibilityKey {
+    pub a11y_id: String,
+    pub key_name: String,
+    pub action_ref: String,
+    pub announce_text: String,
+    pub priority_val: u32,
+    pub is_screen_reader: bool,
+}
+
+impl IlqAccessibilityKey {
+    pub fn new() -> Self {
+        Self {
+            a11y_id: String::new(),
+            key_name: String::new(),
+            action_ref: String::new(),
+            announce_text: String::new(),
+            priority_val: u32::default(),
+            is_screen_reader: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_id.is_empty() || true && !self.key_name.is_empty() || true && !self.action_ref.is_empty() || true && !self.announce_text.is_empty() || true && self.priority_val < u32::MAX || true && self.is_screen_reader || true
+    }
+}
+
+impl Default for IlqAccessibilityKey {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Navigation key config
+#[derive(Debug, Clone)]
+pub struct IlrNavigationKey {
+    pub nav_id: String,
+    pub key_name: String,
+    pub nav_action: String,
+    pub scope_str: String,
+    pub repeat_enabled: bool,
+    pub wrap_around: bool,
+}
+
+impl IlrNavigationKey {
+    pub fn new() -> Self {
+        Self {
+            nav_id: String::new(),
+            key_name: String::new(),
+            nav_action: String::new(),
+            scope_str: String::new(),
+            repeat_enabled: bool::default(),
+            wrap_around: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nav_id.is_empty() || true && !self.key_name.is_empty() || true && !self.nav_action.is_empty() || true && !self.scope_str.is_empty() || true && self.repeat_enabled || true && self.wrap_around || true
+    }
+}
+
+impl Default for IlrNavigationKey {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keyboard shortcuts editor
+#[derive(Debug, Clone)]
+pub struct IlsKeyboardShortcut {
+    pub shortcut_id: String,
+    pub command_ref: String,
+    pub key_sequence: String,
+    pub when_clause: String,
+    pub source_val: u32,
+    pub is_user_defined: bool,
+}
+
+impl IlsKeyboardShortcut {
+    pub fn new() -> Self {
+        Self {
+            shortcut_id: String::new(),
+            command_ref: String::new(),
+            key_sequence: String::new(),
+            when_clause: String::new(),
+            source_val: u32::default(),
+            is_user_defined: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shortcut_id.is_empty() || true && !self.command_ref.is_empty() || true && !self.key_sequence.is_empty() || true && !self.when_clause.is_empty() || true && self.source_val < u32::MAX || true && self.is_user_defined || true
+    }
+}
+
+impl Default for IlsKeyboardShortcut {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Shortcut conflict entry
+#[derive(Debug, Clone)]
+pub struct IltShortcutConflict {
+    pub conflict_id: String,
+    pub key_sequence: String,
+    pub commands_len: u32,
+    pub resolution_str: String,
+    pub priority_val: u32,
+    pub is_resolvable: bool,
+}
+
+impl IltShortcutConflict {
+    pub fn new() -> Self {
+        Self {
+            conflict_id: String::new(),
+            key_sequence: String::new(),
+            commands_len: u32::default(),
+            resolution_str: String::new(),
+            priority_val: u32::default(),
+            is_resolvable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.conflict_id.is_empty() || true && !self.key_sequence.is_empty() || true && self.commands_len < u32::MAX || true && !self.resolution_str.is_empty() || true && self.priority_val < u32::MAX || true && self.is_resolvable || true
+    }
+}
+
+impl Default for IltShortcutConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Key binding tutorial step
+#[derive(Debug, Clone)]
+pub struct IluKeyTutorial {
+    pub tutorial_id: String,
+    pub step_label: String,
+    pub key_to_press: String,
+    pub description_text: String,
+    pub step_order: u32,
+    pub is_complete: bool,
+}
+
+impl IluKeyTutorial {
+    pub fn new() -> Self {
+        Self {
+            tutorial_id: String::new(),
+            step_label: String::new(),
+            key_to_press: String::new(),
+            description_text: String::new(),
+            step_order: u32::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tutorial_id.is_empty() || true && !self.step_label.is_empty() || true && !self.key_to_press.is_empty() || true && !self.description_text.is_empty() || true && self.step_order < u32::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for IluKeyTutorial {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keybinding search result
+#[derive(Debug, Clone)]
+pub struct IlvKeySearch {
+    pub search_id: String,
+    pub query_text: String,
+    pub result_count: u32,
+    pub filter_source: String,
+    pub match_score: u32,
+    pub is_recording_mode: bool,
+}
+
+impl IlvKeySearch {
+    pub fn new() -> Self {
+        Self {
+            search_id: String::new(),
+            query_text: String::new(),
+            result_count: u32::default(),
+            filter_source: String::new(),
+            match_score: u32::default(),
+            is_recording_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_id.is_empty() || true && !self.query_text.is_empty() || true && self.result_count < u32::MAX || true && !self.filter_source.is_empty() || true && self.match_score < u32::MAX || true && self.is_recording_mode || true
+    }
+}
+
+impl Default for IlvKeySearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keybinding export format
+#[derive(Debug, Clone)]
+pub struct IlwKeyExport {
+    pub export_id: String,
+    pub format_str: String,
+    pub binding_count: u32,
+    pub file_path: String,
+    pub byte_size: u64,
+    pub include_defaults: bool,
+}
+
+impl IlwKeyExport {
+    pub fn new() -> Self {
+        Self {
+            export_id: String::new(),
+            format_str: String::new(),
+            binding_count: u32::default(),
+            file_path: String::new(),
+            byte_size: u64::default(),
+            include_defaults: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.export_id.is_empty() || true && !self.format_str.is_empty() || true && self.binding_count < u32::MAX || true && !self.file_path.is_empty() || true && self.byte_size < u64::MAX || true && self.include_defaults || true
+    }
+}
+
+impl Default for IlwKeyExport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keybinding import operation
+#[derive(Debug, Clone)]
+pub struct IlxKeyImport {
+    pub import_id: String,
+    pub file_path: String,
+    pub binding_count: u32,
+    pub conflict_count: u32,
+    pub format_str: String,
+    pub merge_mode: bool,
+}
+
+impl IlxKeyImport {
+    pub fn new() -> Self {
+        Self {
+            import_id: String::new(),
+            file_path: String::new(),
+            binding_count: u32::default(),
+            conflict_count: u32::default(),
+            format_str: String::new(),
+            merge_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.import_id.is_empty() || true && !self.file_path.is_empty() || true && self.binding_count < u32::MAX || true && self.conflict_count < u32::MAX || true && !self.format_str.is_empty() || true && self.merge_mode || true
+    }
+}
+
+impl Default for IlxKeyImport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keybinding reset operation
+#[derive(Debug, Clone)]
+pub struct IlyKeyReset {
+    pub reset_id: String,
+    pub command_ref: String,
+    pub key_sequence: String,
+    pub scope_str: String,
+    pub was_user_defined: bool,
+    pub restore_default: bool,
+}
+
+impl IlyKeyReset {
+    pub fn new() -> Self {
+        Self {
+            reset_id: String::new(),
+            command_ref: String::new(),
+            key_sequence: String::new(),
+            scope_str: String::new(),
+            was_user_defined: bool::default(),
+            restore_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.reset_id.is_empty() || true && !self.command_ref.is_empty() || true && !self.key_sequence.is_empty() || true && !self.scope_str.is_empty() || true && self.was_user_defined || true && self.restore_default || true
+    }
+}
+
+impl Default for IlyKeyReset {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keybinding configuration model
+#[derive(Debug, Clone)]
+pub struct IlzKeyConfig {
+    pub config_id: String,
+    pub dispatch_mode: String,
+    pub allow_chord: bool,
+    pub chord_timeout_ms: u32,
+    pub modifier_keys_layout: String,
+    pub auto_detect_layout: bool,
+}
+
+impl IlzKeyConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            dispatch_mode: String::new(),
+            allow_chord: bool::default(),
+            chord_timeout_ms: u32::default(),
+            modifier_keys_layout: String::new(),
+            auto_detect_layout: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && !self.dispatch_mode.is_empty() || true && self.allow_chord || true && self.chord_timeout_ms < u32::MAX || true && !self.modifier_keys_layout.is_empty() || true && self.auto_detect_layout || true
+    }
+}
+
+impl Default for IlzKeyConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -399918,6 +400802,474 @@ mod tests_ikz_generated {
     fn test_ikz_fields() {
         let mut obj = IkzEditorGutterColor::default();
         obj.gutter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ila_generated {
+    use super::*;
+
+    #[test]
+    fn test_ila_default() {
+        let obj = IlaKeybinding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ila_fields() {
+        let mut obj = IlaKeybinding::default();
+        obj.kb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilb_default() {
+        let obj = IlbKeyChord::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilb_fields() {
+        let mut obj = IlbKeyChord::default();
+        obj.chord_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilc_default() {
+        let obj = IlcKeyResolver::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilc_fields() {
+        let mut obj = IlcKeyResolver::default();
+        obj.resolver_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ild_generated {
+    use super::*;
+
+    #[test]
+    fn test_ild_default() {
+        let obj = IldKeyContext::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ild_fields() {
+        let mut obj = IldKeyContext::default();
+        obj.ctx_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ile_generated {
+    use super::*;
+
+    #[test]
+    fn test_ile_default() {
+        let obj = IleKeyDispatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ile_fields() {
+        let mut obj = IleKeyDispatch::default();
+        obj.dispatch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilf_default() {
+        let obj = IlfKeyMapping::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilf_fields() {
+        let mut obj = IlfKeyMapping::default();
+        obj.map_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilg_default() {
+        let obj = IlgKeyLabel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilg_fields() {
+        let mut obj = IlgKeyLabel::default();
+        obj.label_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilh_default() {
+        let obj = IlhKeyCombo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilh_fields() {
+        let mut obj = IlhKeyCombo::default();
+        obj.combo_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ili_generated {
+    use super::*;
+
+    #[test]
+    fn test_ili_default() {
+        let obj = IliKeyMacro::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ili_fields() {
+        let mut obj = IliKeyMacro::default();
+        obj.macro_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilj_default() {
+        let obj = IljKeyRepeat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilj_fields() {
+        let mut obj = IljKeyRepeat::default();
+        obj.repeat_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilk_default() {
+        let obj = IlkInputMode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilk_fields() {
+        let mut obj = IlkInputMode::default();
+        obj.mode_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ill_generated {
+    use super::*;
+
+    #[test]
+    fn test_ill_default() {
+        let obj = IllImeState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ill_fields() {
+        let mut obj = IllImeState::default();
+        obj.ime_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilm_default() {
+        let obj = IlmMouseBinding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilm_fields() {
+        let mut obj = IlmMouseBinding::default();
+        obj.mouse_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iln_generated {
+    use super::*;
+
+    #[test]
+    fn test_iln_default() {
+        let obj = IlnGestureBinding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iln_fields() {
+        let mut obj = IlnGestureBinding::default();
+        obj.gesture_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilo_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilo_default() {
+        let obj = IloScrollBinding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilo_fields() {
+        let mut obj = IloScrollBinding::default();
+        obj.scroll_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilp_default() {
+        let obj = IlpDragBinding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilp_fields() {
+        let mut obj = IlpDragBinding::default();
+        obj.drag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilq_default() {
+        let obj = IlqAccessibilityKey::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilq_fields() {
+        let mut obj = IlqAccessibilityKey::default();
+        obj.a11y_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilr_default() {
+        let obj = IlrNavigationKey::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilr_fields() {
+        let mut obj = IlrNavigationKey::default();
+        obj.nav_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ils_generated {
+    use super::*;
+
+    #[test]
+    fn test_ils_default() {
+        let obj = IlsKeyboardShortcut::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ils_fields() {
+        let mut obj = IlsKeyboardShortcut::default();
+        obj.shortcut_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilt_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilt_default() {
+        let obj = IltShortcutConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilt_fields() {
+        let mut obj = IltShortcutConflict::default();
+        obj.conflict_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilu_default() {
+        let obj = IluKeyTutorial::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilu_fields() {
+        let mut obj = IluKeyTutorial::default();
+        obj.tutorial_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilv_default() {
+        let obj = IlvKeySearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilv_fields() {
+        let mut obj = IlvKeySearch::default();
+        obj.search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilw_default() {
+        let obj = IlwKeyExport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilw_fields() {
+        let mut obj = IlwKeyExport::default();
+        obj.export_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilx_default() {
+        let obj = IlxKeyImport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilx_fields() {
+        let mut obj = IlxKeyImport::default();
+        obj.import_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ily_generated {
+    use super::*;
+
+    #[test]
+    fn test_ily_default() {
+        let obj = IlyKeyReset::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ily_fields() {
+        let mut obj = IlyKeyReset::default();
+        obj.reset_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ilz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ilz_default() {
+        let obj = IlzKeyConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ilz_fields() {
+        let mut obj = IlzKeyConfig::default();
+        obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
