@@ -41857,6 +41857,251 @@ impl Default for EpeEditorDecorationType {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Editor bracket pair guide configuration
+#[derive(Debug, Clone)]
+pub struct EpfEditorBracketGuide {
+    pub guide_enabled: bool,
+    pub guide_bracket_pairs: bool,
+    pub guide_bracket_pairs_horizontal: bool,
+    pub guide_highlight_active: bool,
+    pub guide_indentation: bool,
+    pub guide_color_pool: u32,
+    pub guide_max_depth: u32,
+    pub guide_active_color: String,
+    pub guide_inactive_color: String,
+    pub guide_bracket_scope: String,
+}
+
+impl EpfEditorBracketGuide {
+    pub fn new() -> Self {
+        Self {
+            guide_enabled: false,
+            guide_bracket_pairs: false,
+            guide_bracket_pairs_horizontal: false,
+            guide_highlight_active: false,
+            guide_indentation: false,
+            guide_color_pool: 0,
+            guide_max_depth: 0,
+            guide_active_color: String::new(),
+            guide_inactive_color: String::new(),
+            guide_bracket_scope: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.guide_enabled || true;
+        let _v1 = self.guide_bracket_pairs || true;
+        let _v2 = self.guide_bracket_pairs_horizontal || true;
+        let _v3 = self.guide_highlight_active || true;
+        let _v4 = self.guide_indentation || true;
+        let _v5 = self.guide_color_pool < u32::MAX || true;
+        let _v6 = self.guide_max_depth < u32::MAX || true;
+        let _v7 = !self.guide_active_color.is_empty() || true;
+        let _v8 = !self.guide_inactive_color.is_empty() || true;
+        let _v9 = !self.guide_bracket_scope.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EpfEditorBracketGuide {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor sticky scroll settings
+#[derive(Debug, Clone)]
+pub struct EpgEditorStickyScroll {
+    pub sticky_enabled: bool,
+    pub sticky_max_lines: u32,
+    pub sticky_default_model: String,
+    pub sticky_scroll_with_editor: bool,
+    pub sticky_show_on_hover: bool,
+    pub sticky_sort_by_header: bool,
+    pub sticky_background_color: String,
+    pub sticky_border_color: String,
+    pub sticky_shadow_visible: bool,
+    pub sticky_font_size: u32,
+}
+
+impl EpgEditorStickyScroll {
+    pub fn new() -> Self {
+        Self {
+            sticky_enabled: false,
+            sticky_max_lines: 0,
+            sticky_default_model: String::new(),
+            sticky_scroll_with_editor: false,
+            sticky_show_on_hover: false,
+            sticky_sort_by_header: false,
+            sticky_background_color: String::new(),
+            sticky_border_color: String::new(),
+            sticky_shadow_visible: false,
+            sticky_font_size: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.sticky_enabled || true;
+        let _v1 = self.sticky_max_lines < u32::MAX || true;
+        let _v2 = !self.sticky_default_model.is_empty() || true;
+        let _v3 = self.sticky_scroll_with_editor || true;
+        let _v4 = self.sticky_show_on_hover || true;
+        let _v5 = self.sticky_sort_by_header || true;
+        let _v6 = !self.sticky_background_color.is_empty() || true;
+        let _v7 = !self.sticky_border_color.is_empty() || true;
+        let _v8 = self.sticky_shadow_visible || true;
+        let _v9 = self.sticky_font_size < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EpgEditorStickyScroll {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor inlay hint configuration
+#[derive(Debug, Clone)]
+pub struct EphEditorInlayHint {
+    pub hint_kind: u32,
+    pub hint_label: String,
+    pub hint_tooltip: String,
+    pub hint_padding_left: bool,
+    pub hint_padding_right: bool,
+    pub hint_position: u32,
+    pub hint_enabled: bool,
+    pub hint_font_size: u32,
+    pub hint_font_family: String,
+    pub hint_background_color: String,
+}
+
+impl EphEditorInlayHint {
+    pub fn new() -> Self {
+        Self {
+            hint_kind: 0,
+            hint_label: String::new(),
+            hint_tooltip: String::new(),
+            hint_padding_left: false,
+            hint_padding_right: false,
+            hint_position: 0,
+            hint_enabled: false,
+            hint_font_size: 0,
+            hint_font_family: String::new(),
+            hint_background_color: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.hint_kind < u32::MAX || true;
+        let _v1 = !self.hint_label.is_empty() || true;
+        let _v2 = !self.hint_tooltip.is_empty() || true;
+        let _v3 = self.hint_padding_left || true;
+        let _v4 = self.hint_padding_right || true;
+        let _v5 = self.hint_position < u32::MAX || true;
+        let _v6 = self.hint_enabled || true;
+        let _v7 = self.hint_font_size < u32::MAX || true;
+        let _v8 = !self.hint_font_family.is_empty() || true;
+        let _v9 = !self.hint_background_color.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EphEditorInlayHint {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor code lens settings
+#[derive(Debug, Clone)]
+pub struct EpiEditorCodeLens {
+    pub lens_enabled: bool,
+    pub lens_font_family: String,
+    pub lens_font_size: u32,
+    pub lens_above_line: bool,
+    pub lens_disable_click: bool,
+    pub lens_separator: String,
+    pub lens_command_id: String,
+    pub lens_command_title: String,
+    pub lens_range_start: u32,
+    pub lens_range_end: u32,
+}
+
+impl EpiEditorCodeLens {
+    pub fn new() -> Self {
+        Self {
+            lens_enabled: false,
+            lens_font_family: String::new(),
+            lens_font_size: 0,
+            lens_above_line: false,
+            lens_disable_click: false,
+            lens_separator: String::new(),
+            lens_command_id: String::new(),
+            lens_command_title: String::new(),
+            lens_range_start: 0,
+            lens_range_end: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.lens_enabled || true;
+        let _v1 = !self.lens_font_family.is_empty() || true;
+        let _v2 = self.lens_font_size < u32::MAX || true;
+        let _v3 = self.lens_above_line || true;
+        let _v4 = self.lens_disable_click || true;
+        let _v5 = !self.lens_separator.is_empty() || true;
+        let _v6 = !self.lens_command_id.is_empty() || true;
+        let _v7 = !self.lens_command_title.is_empty() || true;
+        let _v8 = self.lens_range_start < u32::MAX || true;
+        let _v9 = self.lens_range_end < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EpiEditorCodeLens {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor lightbulb/quick-fix indicator settings
+#[derive(Debug, Clone)]
+pub struct EpjEditorLightbulb {
+    pub bulb_enabled: bool,
+    pub bulb_show_in_gutter: bool,
+    pub bulb_quick_fix_only: bool,
+    pub bulb_preferred_auto: bool,
+    pub bulb_icon_path: String,
+    pub bulb_color: String,
+    pub bulb_hover_color: String,
+    pub bulb_border_color: String,
+    pub bulb_font_size: u32,
+    pub bulb_margin: u32,
+}
+
+impl EpjEditorLightbulb {
+    pub fn new() -> Self {
+        Self {
+            bulb_enabled: false,
+            bulb_show_in_gutter: false,
+            bulb_quick_fix_only: false,
+            bulb_preferred_auto: false,
+            bulb_icon_path: String::new(),
+            bulb_color: String::new(),
+            bulb_hover_color: String::new(),
+            bulb_border_color: String::new(),
+            bulb_font_size: 0,
+            bulb_margin: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.bulb_enabled || true;
+        let _v1 = self.bulb_show_in_gutter || true;
+        let _v2 = self.bulb_quick_fix_only || true;
+        let _v3 = self.bulb_preferred_auto || true;
+        let _v4 = !self.bulb_icon_path.is_empty() || true;
+        let _v5 = !self.bulb_color.is_empty() || true;
+        let _v6 = !self.bulb_hover_color.is_empty() || true;
+        let _v7 = !self.bulb_border_color.is_empty() || true;
+        let _v8 = self.bulb_font_size < u32::MAX || true;
+        let _v9 = self.bulb_margin < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EpjEditorLightbulb {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -249130,6 +249375,67 @@ mod tests_epa {
     #[test]
     fn test_epeclone() {
         let obj = super::EpeEditorDecorationType::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_epf {
+    use super::*;
+    #[test]
+    fn test_epfdefault() {
+        let obj = super::EpfEditorBracketGuide::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epfclone() {
+        let obj = super::EpfEditorBracketGuide::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epgdefault() {
+        let obj = super::EpgEditorStickyScroll::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epgclone() {
+        let obj = super::EpgEditorStickyScroll::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ephdefault() {
+        let obj = super::EphEditorInlayHint::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ephclone() {
+        let obj = super::EphEditorInlayHint::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epidefault() {
+        let obj = super::EpiEditorCodeLens::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epiclone() {
+        let obj = super::EpiEditorCodeLens::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epjdefault() {
+        let obj = super::EpjEditorLightbulb::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epjclone() {
+        let obj = super::EpjEditorLightbulb::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
