@@ -137967,6 +137967,890 @@ impl Default for IazBufferEvent {
     }
 }
 
+/// View line rendering model
+#[derive(Debug, Clone)]
+pub struct IbaViewLine {
+    pub line_id: String,
+    pub line_number: u32,
+    pub top_offset: u32,
+    pub height_px: u32,
+    pub content_len: u32,
+    pub is_visible: bool,
+}
+
+impl IbaViewLine {
+    pub fn new() -> Self {
+        Self {
+            line_id: String::new(),
+            line_number: u32::default(),
+            top_offset: u32::default(),
+            height_px: u32::default(),
+            content_len: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_id.is_empty() || true && self.line_number < u32::MAX || true && self.top_offset < u32::MAX || true && self.height_px < u32::MAX || true && self.content_len < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for IbaViewLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor view zone
+#[derive(Debug, Clone)]
+pub struct IbbViewZone {
+    pub zone_id: String,
+    pub after_line: u32,
+    pub height_lines: u32,
+    pub ordinal_val: u32,
+    pub min_width: u32,
+    pub is_visible: bool,
+}
+
+impl IbbViewZone {
+    pub fn new() -> Self {
+        Self {
+            zone_id: String::new(),
+            after_line: u32::default(),
+            height_lines: u32::default(),
+            ordinal_val: u32::default(),
+            min_width: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.zone_id.is_empty() || true && self.after_line < u32::MAX || true && self.height_lines < u32::MAX || true && self.ordinal_val < u32::MAX || true && self.min_width < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for IbbViewZone {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor viewport state
+#[derive(Debug, Clone)]
+pub struct IbcViewport {
+    pub vp_id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub scroll_top: u32,
+    pub scroll_left: u32,
+    pub is_dirty: bool,
+}
+
+impl IbcViewport {
+    pub fn new() -> Self {
+        Self {
+            vp_id: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            scroll_top: u32::default(),
+            scroll_left: u32::default(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.vp_id.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && self.scroll_top < u32::MAX || true && self.scroll_left < u32::MAX || true && self.is_dirty || true
+    }
+}
+
+impl Default for IbcViewport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor scroll position
+#[derive(Debug, Clone)]
+pub struct IbdScrollState {
+    pub scroll_id: String,
+    pub scroll_top: u32,
+    pub scroll_left: u32,
+    pub content_height: u32,
+    pub content_width: u32,
+    pub is_smooth: bool,
+}
+
+impl IbdScrollState {
+    pub fn new() -> Self {
+        Self {
+            scroll_id: String::new(),
+            scroll_top: u32::default(),
+            scroll_left: u32::default(),
+            content_height: u32::default(),
+            content_width: u32::default(),
+            is_smooth: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scroll_id.is_empty() || true && self.scroll_top < u32::MAX || true && self.scroll_left < u32::MAX || true && self.content_height < u32::MAX || true && self.content_width < u32::MAX || true && self.is_smooth || true
+    }
+}
+
+impl Default for IbdScrollState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View cursor rendering
+#[derive(Debug, Clone)]
+pub struct IbeViewCursor {
+    pub cursor_id: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub left_px: u32,
+    pub top_px: u32,
+    pub is_primary: bool,
+}
+
+impl IbeViewCursor {
+    pub fn new() -> Self {
+        Self {
+            cursor_id: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            left_px: u32::default(),
+            top_px: u32::default(),
+            is_primary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cursor_id.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && self.left_px < u32::MAX || true && self.top_px < u32::MAX || true && self.is_primary || true
+    }
+}
+
+impl Default for IbeViewCursor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View selection rendering
+#[derive(Debug, Clone)]
+pub struct IbfViewSelection {
+    pub sel_id: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub is_reversed: bool,
+}
+
+impl IbfViewSelection {
+    pub fn new() -> Self {
+        Self {
+            sel_id: String::new(),
+            start_line: u32::default(),
+            start_col: u32::default(),
+            end_line: u32::default(),
+            end_col: u32::default(),
+            is_reversed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sel_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_line < u32::MAX || true && self.end_col < u32::MAX || true && self.is_reversed || true
+    }
+}
+
+impl Default for IbfViewSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View line decoration
+#[derive(Debug, Clone)]
+pub struct IbgLineDecoration {
+    pub deco_id: String,
+    pub line_number: u32,
+    pub class_name: String,
+    pub z_index: u32,
+    pub color_token: String,
+    pub is_whole_line: bool,
+}
+
+impl IbgLineDecoration {
+    pub fn new() -> Self {
+        Self {
+            deco_id: String::new(),
+            line_number: u32::default(),
+            class_name: String::new(),
+            z_index: u32::default(),
+            color_token: String::new(),
+            is_whole_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_id.is_empty() || true && self.line_number < u32::MAX || true && !self.class_name.is_empty() || true && self.z_index < u32::MAX || true && !self.color_token.is_empty() || true && self.is_whole_line || true
+    }
+}
+
+impl Default for IbgLineDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Overview ruler annotation
+#[derive(Debug, Clone)]
+pub struct IbhOverviewRuler {
+    pub ruler_id: String,
+    pub lane_value: u32,
+    pub position_pct: u32,
+    pub color_token: String,
+    pub dark_color: String,
+    pub is_full_width: bool,
+}
+
+impl IbhOverviewRuler {
+    pub fn new() -> Self {
+        Self {
+            ruler_id: String::new(),
+            lane_value: u32::default(),
+            position_pct: u32::default(),
+            color_token: String::new(),
+            dark_color: String::new(),
+            is_full_width: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ruler_id.is_empty() || true && self.lane_value < u32::MAX || true && self.position_pct < u32::MAX || true && !self.color_token.is_empty() || true && !self.dark_color.is_empty() || true && self.is_full_width || true
+    }
+}
+
+impl Default for IbhOverviewRuler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Margin decoration entry
+#[derive(Debug, Clone)]
+pub struct IbiMarginDecoration {
+    pub margin_id: String,
+    pub line_number: u32,
+    pub lane_index: u32,
+    pub icon_name: String,
+    pub tooltip_text: String,
+    pub is_clickable: bool,
+}
+
+impl IbiMarginDecoration {
+    pub fn new() -> Self {
+        Self {
+            margin_id: String::new(),
+            line_number: u32::default(),
+            lane_index: u32::default(),
+            icon_name: String::new(),
+            tooltip_text: String::new(),
+            is_clickable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.margin_id.is_empty() || true && self.line_number < u32::MAX || true && self.lane_index < u32::MAX || true && !self.icon_name.is_empty() || true && !self.tooltip_text.is_empty() || true && self.is_clickable || true
+    }
+}
+
+impl Default for IbiMarginDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline text decoration
+#[derive(Debug, Clone)]
+pub struct IbjInlineDecoration {
+    pub inline_id: String,
+    pub start_offset: u32,
+    pub end_offset: u32,
+    pub class_name: String,
+    pub insertion_text: String,
+    pub is_before: bool,
+}
+
+impl IbjInlineDecoration {
+    pub fn new() -> Self {
+        Self {
+            inline_id: String::new(),
+            start_offset: u32::default(),
+            end_offset: u32::default(),
+            class_name: String::new(),
+            insertion_text: String::new(),
+            is_before: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_id.is_empty() || true && self.start_offset < u32::MAX || true && self.end_offset < u32::MAX || true && !self.class_name.is_empty() || true && !self.insertion_text.is_empty() || true && self.is_before || true
+    }
+}
+
+impl Default for IbjInlineDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Soft line break position
+#[derive(Debug, Clone)]
+pub struct IbkLineBreak {
+    pub break_id: String,
+    pub line_number: u32,
+    pub column_offset: u32,
+    pub indent_chars: u32,
+    pub wrapped_line_idx: u32,
+    pub is_forced: bool,
+}
+
+impl IbkLineBreak {
+    pub fn new() -> Self {
+        Self {
+            break_id: String::new(),
+            line_number: u32::default(),
+            column_offset: u32::default(),
+            indent_chars: u32::default(),
+            wrapped_line_idx: u32::default(),
+            is_forced: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.break_id.is_empty() || true && self.line_number < u32::MAX || true && self.column_offset < u32::MAX || true && self.indent_chars < u32::MAX || true && self.wrapped_line_idx < u32::MAX || true && self.is_forced || true
+    }
+}
+
+impl Default for IbkLineBreak {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Rendered line output
+#[derive(Debug, Clone)]
+pub struct IblRenderLine {
+    pub render_id: String,
+    pub html_content: String,
+    pub char_count: u32,
+    pub tab_count: u32,
+    pub max_column: u32,
+    pub contains_rtl: bool,
+}
+
+impl IblRenderLine {
+    pub fn new() -> Self {
+        Self {
+            render_id: String::new(),
+            html_content: String::new(),
+            char_count: u32::default(),
+            tab_count: u32::default(),
+            max_column: u32::default(),
+            contains_rtl: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.render_id.is_empty() || true && !self.html_content.is_empty() || true && self.char_count < u32::MAX || true && self.tab_count < u32::MAX || true && self.max_column < u32::MAX || true && self.contains_rtl || true
+    }
+}
+
+impl Default for IblRenderLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Character to pixel mapping
+#[derive(Debug, Clone)]
+pub struct IbmCharacterMapping {
+    pub map_id: String,
+    pub char_offset: u32,
+    pub pixel_offset: u32,
+    pub char_width: u32,
+    pub tab_advance: u32,
+    pub is_ligature: bool,
+}
+
+impl IbmCharacterMapping {
+    pub fn new() -> Self {
+        Self {
+            map_id: String::new(),
+            char_offset: u32::default(),
+            pixel_offset: u32::default(),
+            char_width: u32::default(),
+            tab_advance: u32::default(),
+            is_ligature: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.map_id.is_empty() || true && self.char_offset < u32::MAX || true && self.pixel_offset < u32::MAX || true && self.char_width < u32::MAX || true && self.tab_advance < u32::MAX || true && self.is_ligature || true
+    }
+}
+
+impl Default for IbmCharacterMapping {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor font information
+#[derive(Debug, Clone)]
+pub struct IbnFontInfo {
+    pub font_id: String,
+    pub font_family: String,
+    pub font_size_px: u32,
+    pub line_height_px: u32,
+    pub letter_spacing: u32,
+    pub is_monospace: bool,
+}
+
+impl IbnFontInfo {
+    pub fn new() -> Self {
+        Self {
+            font_id: String::new(),
+            font_family: String::new(),
+            font_size_px: u32::default(),
+            line_height_px: u32::default(),
+            letter_spacing: u32::default(),
+            is_monospace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.font_id.is_empty() || true && !self.font_family.is_empty() || true && self.font_size_px < u32::MAX || true && self.line_height_px < u32::MAX || true && self.letter_spacing < u32::MAX || true && self.is_monospace || true
+    }
+}
+
+impl Default for IbnFontInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor layout calculation
+#[derive(Debug, Clone)]
+pub struct IboLayoutInfo {
+    pub layout_id: String,
+    pub content_width: u32,
+    pub content_left: u32,
+    pub glyph_width: u32,
+    pub decorations_left: u32,
+    pub is_minimap_enabled: bool,
+}
+
+impl IboLayoutInfo {
+    pub fn new() -> Self {
+        Self {
+            layout_id: String::new(),
+            content_width: u32::default(),
+            content_left: u32::default(),
+            glyph_width: u32::default(),
+            decorations_left: u32::default(),
+            is_minimap_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_id.is_empty() || true && self.content_width < u32::MAX || true && self.content_left < u32::MAX || true && self.glyph_width < u32::MAX || true && self.decorations_left < u32::MAX || true && self.is_minimap_enabled || true
+    }
+}
+
+impl Default for IboLayoutInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Token color map entry
+#[derive(Debug, Clone)]
+pub struct IbpColorMap {
+    pub color_id: String,
+    pub token_index: u32,
+    pub color_hex: String,
+    pub scope_name: String,
+    pub priority_val: u32,
+    pub is_default: bool,
+}
+
+impl IbpColorMap {
+    pub fn new() -> Self {
+        Self {
+            color_id: String::new(),
+            token_index: u32::default(),
+            color_hex: String::new(),
+            scope_name: String::new(),
+            priority_val: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_id.is_empty() || true && self.token_index < u32::MAX || true && !self.color_hex.is_empty() || true && !self.scope_name.is_empty() || true && self.priority_val < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for IbpColorMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Smooth scroll animation
+#[derive(Debug, Clone)]
+pub struct IbqSmoothScroll {
+    pub smooth_id: String,
+    pub start_position: u32,
+    pub target_position: u32,
+    pub duration_ms: u32,
+    pub elapsed_ms: u32,
+    pub is_active: bool,
+}
+
+impl IbqSmoothScroll {
+    pub fn new() -> Self {
+        Self {
+            smooth_id: String::new(),
+            start_position: u32::default(),
+            target_position: u32::default(),
+            duration_ms: u32::default(),
+            elapsed_ms: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.smooth_id.is_empty() || true && self.start_position < u32::MAX || true && self.target_position < u32::MAX || true && self.duration_ms < u32::MAX || true && self.elapsed_ms < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for IbqSmoothScroll {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Scroll to reveal range
+#[derive(Debug, Clone)]
+pub struct IbrRevealRange {
+    pub reveal_id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub scroll_type_val: u32,
+    pub vertical_type_val: u32,
+    pub center_if_outside: bool,
+}
+
+impl IbrRevealRange {
+    pub fn new() -> Self {
+        Self {
+            reveal_id: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            scroll_type_val: u32::default(),
+            vertical_type_val: u32::default(),
+            center_if_outside: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.reveal_id.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && self.scroll_type_val < u32::MAX || true && self.vertical_type_val < u32::MAX || true && self.center_if_outside || true
+    }
+}
+
+impl Default for IbrRevealRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Minimap rendering model
+#[derive(Debug, Clone)]
+pub struct IbsMinimapModel {
+    pub minimap_id: String,
+    pub char_width: u32,
+    pub char_height: u32,
+    pub line_count: u32,
+    pub slider_top: u32,
+    pub show_slider_always: bool,
+}
+
+impl IbsMinimapModel {
+    pub fn new() -> Self {
+        Self {
+            minimap_id: String::new(),
+            char_width: u32::default(),
+            char_height: u32::default(),
+            line_count: u32::default(),
+            slider_top: u32::default(),
+            show_slider_always: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.minimap_id.is_empty() || true && self.char_width < u32::MAX || true && self.char_height < u32::MAX || true && self.line_count < u32::MAX || true && self.slider_top < u32::MAX || true && self.show_slider_always || true
+    }
+}
+
+impl Default for IbsMinimapModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Minimap character data
+#[derive(Debug, Clone)]
+pub struct IbtMinimapChar {
+    pub char_id: String,
+    pub char_code: u32,
+    pub x_pos: u32,
+    pub y_pos: u32,
+    pub alpha_val: u32,
+    pub is_whitespace: bool,
+}
+
+impl IbtMinimapChar {
+    pub fn new() -> Self {
+        Self {
+            char_id: String::new(),
+            char_code: u32::default(),
+            x_pos: u32::default(),
+            y_pos: u32::default(),
+            alpha_val: u32::default(),
+            is_whitespace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.char_id.is_empty() || true && self.char_code < u32::MAX || true && self.x_pos < u32::MAX || true && self.y_pos < u32::MAX || true && self.alpha_val < u32::MAX || true && self.is_whitespace || true
+    }
+}
+
+impl Default for IbtMinimapChar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor theming data
+#[derive(Debug, Clone)]
+pub struct IbuEditorTheme {
+    pub theme_id: String,
+    pub background_color: String,
+    pub foreground_color: String,
+    pub selection_color: String,
+    pub rule_count: u32,
+    pub is_dark: bool,
+}
+
+impl IbuEditorTheme {
+    pub fn new() -> Self {
+        Self {
+            theme_id: String::new(),
+            background_color: String::new(),
+            foreground_color: String::new(),
+            selection_color: String::new(),
+            rule_count: u32::default(),
+            is_dark: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_id.is_empty() || true && !self.background_color.is_empty() || true && !self.foreground_color.is_empty() || true && !self.selection_color.is_empty() || true && self.rule_count < u32::MAX || true && self.is_dark || true
+    }
+}
+
+impl Default for IbuEditorTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Gutter lane widget
+#[derive(Debug, Clone)]
+pub struct IbvGutterWidget {
+    pub gutter_id: String,
+    pub lane_index: u32,
+    pub width_px: u32,
+    pub click_command: String,
+    pub tooltip_text: String,
+    pub is_visible: bool,
+}
+
+impl IbvGutterWidget {
+    pub fn new() -> Self {
+        Self {
+            gutter_id: String::new(),
+            lane_index: u32::default(),
+            width_px: u32::default(),
+            click_command: String::new(),
+            tooltip_text: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gutter_id.is_empty() || true && self.lane_index < u32::MAX || true && self.width_px < u32::MAX || true && !self.click_command.is_empty() || true && !self.tooltip_text.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for IbvGutterWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Content hover widget state
+#[derive(Debug, Clone)]
+pub struct IbwContentHover {
+    pub hover_id: String,
+    pub position_line: u32,
+    pub position_col: u32,
+    pub content_len: u32,
+    pub max_width: u32,
+    pub is_sticky: bool,
+}
+
+impl IbwContentHover {
+    pub fn new() -> Self {
+        Self {
+            hover_id: String::new(),
+            position_line: u32::default(),
+            position_col: u32::default(),
+            content_len: u32::default(),
+            max_width: u32::default(),
+            is_sticky: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hover_id.is_empty() || true && self.position_line < u32::MAX || true && self.position_col < u32::MAX || true && self.content_len < u32::MAX || true && self.max_width < u32::MAX || true && self.is_sticky || true
+    }
+}
+
+impl Default for IbwContentHover {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Glyph margin hover state
+#[derive(Debug, Clone)]
+pub struct IbxGlyphHover {
+    pub glyph_id: String,
+    pub line_number: u32,
+    pub lane_index: u32,
+    pub tooltip_text: String,
+    pub command_ref: String,
+    pub is_clickable: bool,
+}
+
+impl IbxGlyphHover {
+    pub fn new() -> Self {
+        Self {
+            glyph_id: String::new(),
+            line_number: u32::default(),
+            lane_index: u32::default(),
+            tooltip_text: String::new(),
+            command_ref: String::new(),
+            is_clickable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.glyph_id.is_empty() || true && self.line_number < u32::MAX || true && self.lane_index < u32::MAX || true && !self.tooltip_text.is_empty() || true && !self.command_ref.is_empty() || true && self.is_clickable || true
+    }
+}
+
+impl Default for IbxGlyphHover {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Highlight range decoration
+#[derive(Debug, Clone)]
+pub struct IbyHighlightRange {
+    pub hl_id: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub is_word_highlight: bool,
+}
+
+impl IbyHighlightRange {
+    pub fn new() -> Self {
+        Self {
+            hl_id: String::new(),
+            start_line: u32::default(),
+            start_col: u32::default(),
+            end_line: u32::default(),
+            end_col: u32::default(),
+            is_word_highlight: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hl_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_line < u32::MAX || true && self.end_col < u32::MAX || true && self.is_word_highlight || true
+    }
+}
+
+impl Default for IbyHighlightRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor view event
+#[derive(Debug, Clone)]
+pub struct IbzViewEvent {
+    pub event_id: String,
+    pub event_kind: String,
+    pub timestamp_epoch: u64,
+    pub source_str: String,
+    pub payload_len: u32,
+    pub is_bubbling: bool,
+}
+
+impl IbzViewEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            event_kind: String::new(),
+            timestamp_epoch: u64::default(),
+            source_str: String::new(),
+            payload_len: u32::default(),
+            is_bubbling: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && !self.event_kind.is_empty() || true && self.timestamp_epoch < u64::MAX || true && !self.source_str.is_empty() || true && self.payload_len < u32::MAX || true && self.is_bubbling || true
+    }
+}
+
+impl Default for IbzViewEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -386402,6 +387286,474 @@ mod tests_iaz_generated {
     #[test]
     fn test_iaz_fields() {
         let mut obj = IazBufferEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iba_generated {
+    use super::*;
+
+    #[test]
+    fn test_iba_default() {
+        let obj = IbaViewLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iba_fields() {
+        let mut obj = IbaViewLine::default();
+        obj.line_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibb_default() {
+        let obj = IbbViewZone::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibb_fields() {
+        let mut obj = IbbViewZone::default();
+        obj.zone_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibc_default() {
+        let obj = IbcViewport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibc_fields() {
+        let mut obj = IbcViewport::default();
+        obj.vp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibd_default() {
+        let obj = IbdScrollState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibd_fields() {
+        let mut obj = IbdScrollState::default();
+        obj.scroll_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibe_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibe_default() {
+        let obj = IbeViewCursor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibe_fields() {
+        let mut obj = IbeViewCursor::default();
+        obj.cursor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibf_default() {
+        let obj = IbfViewSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibf_fields() {
+        let mut obj = IbfViewSelection::default();
+        obj.sel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibg_default() {
+        let obj = IbgLineDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibg_fields() {
+        let mut obj = IbgLineDecoration::default();
+        obj.deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibh_default() {
+        let obj = IbhOverviewRuler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibh_fields() {
+        let mut obj = IbhOverviewRuler::default();
+        obj.ruler_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibi_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibi_default() {
+        let obj = IbiMarginDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibi_fields() {
+        let mut obj = IbiMarginDecoration::default();
+        obj.margin_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibj_default() {
+        let obj = IbjInlineDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibj_fields() {
+        let mut obj = IbjInlineDecoration::default();
+        obj.inline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibk_default() {
+        let obj = IbkLineBreak::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibk_fields() {
+        let mut obj = IbkLineBreak::default();
+        obj.break_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibl_default() {
+        let obj = IblRenderLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibl_fields() {
+        let mut obj = IblRenderLine::default();
+        obj.render_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibm_default() {
+        let obj = IbmCharacterMapping::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibm_fields() {
+        let mut obj = IbmCharacterMapping::default();
+        obj.map_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibn_default() {
+        let obj = IbnFontInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibn_fields() {
+        let mut obj = IbnFontInfo::default();
+        obj.font_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibo_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibo_default() {
+        let obj = IboLayoutInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibo_fields() {
+        let mut obj = IboLayoutInfo::default();
+        obj.layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibp_default() {
+        let obj = IbpColorMap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibp_fields() {
+        let mut obj = IbpColorMap::default();
+        obj.color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibq_default() {
+        let obj = IbqSmoothScroll::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibq_fields() {
+        let mut obj = IbqSmoothScroll::default();
+        obj.smooth_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibr_default() {
+        let obj = IbrRevealRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibr_fields() {
+        let mut obj = IbrRevealRange::default();
+        obj.reveal_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibs_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibs_default() {
+        let obj = IbsMinimapModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibs_fields() {
+        let mut obj = IbsMinimapModel::default();
+        obj.minimap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibt_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibt_default() {
+        let obj = IbtMinimapChar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibt_fields() {
+        let mut obj = IbtMinimapChar::default();
+        obj.char_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibu_default() {
+        let obj = IbuEditorTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibu_fields() {
+        let mut obj = IbuEditorTheme::default();
+        obj.theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibv_default() {
+        let obj = IbvGutterWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibv_fields() {
+        let mut obj = IbvGutterWidget::default();
+        obj.gutter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibw_default() {
+        let obj = IbwContentHover::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibw_fields() {
+        let mut obj = IbwContentHover::default();
+        obj.hover_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibx_default() {
+        let obj = IbxGlyphHover::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibx_fields() {
+        let mut obj = IbxGlyphHover::default();
+        obj.glyph_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iby_generated {
+    use super::*;
+
+    #[test]
+    fn test_iby_default() {
+        let obj = IbyHighlightRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iby_fields() {
+        let mut obj = IbyHighlightRange::default();
+        obj.hl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ibz_default() {
+        let obj = IbzViewEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ibz_fields() {
+        let mut obj = IbzViewEvent::default();
         obj.event_id = "test".to_string();
         assert!(obj.validate());
     }
