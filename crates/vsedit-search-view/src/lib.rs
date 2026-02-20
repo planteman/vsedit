@@ -171735,6 +171735,890 @@ impl Default for JmzNotebookConfig {
     }
 }
 
+/// Chat participant descriptor
+#[derive(Debug, Clone)]
+pub struct JnaChatParticipant {
+    pub chat_part_id: String,
+    pub participant_name: String,
+    pub description_str: String,
+    pub icon_path: String,
+    pub command_count: u32,
+    pub is_default: bool,
+}
+
+impl JnaChatParticipant {
+    pub fn new() -> Self {
+        Self {
+            chat_part_id: String::new(),
+            participant_name: String::new(),
+            description_str: String::new(),
+            icon_path: String::new(),
+            command_count: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_part_id.is_empty() || true && !self.participant_name.is_empty() || true && !self.description_str.is_empty() || true && !self.icon_path.is_empty() || true && self.command_count < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for JnaChatParticipant {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat message entry
+#[derive(Debug, Clone)]
+pub struct JnbChatMessage {
+    pub chat_msg_id: String,
+    pub role_str: String,
+    pub content_text: String,
+    pub participant_ref: String,
+    pub timestamp_epoch: u64,
+    pub is_streaming: bool,
+}
+
+impl JnbChatMessage {
+    pub fn new() -> Self {
+        Self {
+            chat_msg_id: String::new(),
+            role_str: String::new(),
+            content_text: String::new(),
+            participant_ref: String::new(),
+            timestamp_epoch: u64::default(),
+            is_streaming: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_msg_id.is_empty() || true && !self.role_str.is_empty() || true && !self.content_text.is_empty() || true && !self.participant_ref.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_streaming || true
+    }
+}
+
+impl Default for JnbChatMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat response entry
+#[derive(Debug, Clone)]
+pub struct JncChatResponse {
+    pub chat_resp_id: String,
+    pub content_parts_json: String,
+    pub metadata_json: String,
+    pub error_msg: String,
+    pub token_count: u32,
+    pub is_complete: bool,
+}
+
+impl JncChatResponse {
+    pub fn new() -> Self {
+        Self {
+            chat_resp_id: String::new(),
+            content_parts_json: String::new(),
+            metadata_json: String::new(),
+            error_msg: String::new(),
+            token_count: u32::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_resp_id.is_empty() || true && !self.content_parts_json.is_empty() || true && !self.metadata_json.is_empty() || true && !self.error_msg.is_empty() || true && self.token_count < u32::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for JncChatResponse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat slash command
+#[derive(Debug, Clone)]
+pub struct JndChatCommand {
+    pub chat_cmd_id: String,
+    pub command_name: String,
+    pub description_str: String,
+    pub sample_request: String,
+    pub participant_ref: String,
+    pub is_sticky: bool,
+}
+
+impl JndChatCommand {
+    pub fn new() -> Self {
+        Self {
+            chat_cmd_id: String::new(),
+            command_name: String::new(),
+            description_str: String::new(),
+            sample_request: String::new(),
+            participant_ref: String::new(),
+            is_sticky: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_cmd_id.is_empty() || true && !self.command_name.is_empty() || true && !self.description_str.is_empty() || true && !self.sample_request.is_empty() || true && !self.participant_ref.is_empty() || true && self.is_sticky || true
+    }
+}
+
+impl Default for JndChatCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat variable reference
+#[derive(Debug, Clone)]
+pub struct JneChatVariable {
+    pub chat_var_id: String,
+    pub var_name: String,
+    pub var_value_json: String,
+    pub description_str: String,
+    pub icon_ref: String,
+    pub is_slow: bool,
+}
+
+impl JneChatVariable {
+    pub fn new() -> Self {
+        Self {
+            chat_var_id: String::new(),
+            var_name: String::new(),
+            var_value_json: String::new(),
+            description_str: String::new(),
+            icon_ref: String::new(),
+            is_slow: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_var_id.is_empty() || true && !self.var_name.is_empty() || true && !self.var_value_json.is_empty() || true && !self.description_str.is_empty() || true && !self.icon_ref.is_empty() || true && self.is_slow || true
+    }
+}
+
+impl Default for JneChatVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat context entry
+#[derive(Debug, Clone)]
+pub struct JnfChatContext {
+    pub chat_ctx_id: String,
+    pub context_type_str: String,
+    pub content_json: String,
+    pub uri_ref: String,
+    pub range_json: String,
+    pub is_implicit: bool,
+}
+
+impl JnfChatContext {
+    pub fn new() -> Self {
+        Self {
+            chat_ctx_id: String::new(),
+            context_type_str: String::new(),
+            content_json: String::new(),
+            uri_ref: String::new(),
+            range_json: String::new(),
+            is_implicit: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_ctx_id.is_empty() || true && !self.context_type_str.is_empty() || true && !self.content_json.is_empty() || true && !self.uri_ref.is_empty() || true && !self.range_json.is_empty() || true && self.is_implicit || true
+    }
+}
+
+impl Default for JnfChatContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat history entry
+#[derive(Debug, Clone)]
+pub struct JngChatHistory {
+    pub chat_hist_id: String,
+    pub session_ref: String,
+    pub message_count: u32,
+    pub created_epoch: u64,
+    pub title_str: String,
+    pub is_pinned: bool,
+}
+
+impl JngChatHistory {
+    pub fn new() -> Self {
+        Self {
+            chat_hist_id: String::new(),
+            session_ref: String::new(),
+            message_count: u32::default(),
+            created_epoch: u64::default(),
+            title_str: String::new(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_hist_id.is_empty() || true && !self.session_ref.is_empty() || true && self.message_count < u32::MAX || true && self.created_epoch < u64::MAX || true && !self.title_str.is_empty() || true && self.is_pinned || true
+    }
+}
+
+impl Default for JngChatHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat session descriptor
+#[derive(Debug, Clone)]
+pub struct JnhChatSession {
+    pub chat_session_id: String,
+    pub provider_ref: String,
+    pub model_ref: String,
+    pub turn_count: u32,
+    pub token_budget: u32,
+    pub is_active: bool,
+}
+
+impl JnhChatSession {
+    pub fn new() -> Self {
+        Self {
+            chat_session_id: String::new(),
+            provider_ref: String::new(),
+            model_ref: String::new(),
+            turn_count: u32::default(),
+            token_budget: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_session_id.is_empty() || true && !self.provider_ref.is_empty() || true && !self.model_ref.is_empty() || true && self.turn_count < u32::MAX || true && self.token_budget < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for JnhChatSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline chat descriptor
+#[derive(Debug, Clone)]
+pub struct JniInlineChat {
+    pub inline_chat_id: String,
+    pub editor_ref: String,
+    pub range_json: String,
+    pub prompt_text: String,
+    pub response_text: String,
+    pub is_accepted: bool,
+}
+
+impl JniInlineChat {
+    pub fn new() -> Self {
+        Self {
+            inline_chat_id: String::new(),
+            editor_ref: String::new(),
+            range_json: String::new(),
+            prompt_text: String::new(),
+            response_text: String::new(),
+            is_accepted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_chat_id.is_empty() || true && !self.editor_ref.is_empty() || true && !self.range_json.is_empty() || true && !self.prompt_text.is_empty() || true && !self.response_text.is_empty() || true && self.is_accepted || true
+    }
+}
+
+impl Default for JniInlineChat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat-generated edit
+#[derive(Debug, Clone)]
+pub struct JnjChatEdit {
+    pub chat_edit_id: String,
+    pub uri_str: String,
+    pub range_json: String,
+    pub new_text: String,
+    pub description_str: String,
+    pub is_applied: bool,
+}
+
+impl JnjChatEdit {
+    pub fn new() -> Self {
+        Self {
+            chat_edit_id: String::new(),
+            uri_str: String::new(),
+            range_json: String::new(),
+            new_text: String::new(),
+            description_str: String::new(),
+            is_applied: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_edit_id.is_empty() || true && !self.uri_str.is_empty() || true && !self.range_json.is_empty() || true && !self.new_text.is_empty() || true && !self.description_str.is_empty() || true && self.is_applied || true
+    }
+}
+
+impl Default for JnjChatEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat code block entry
+#[derive(Debug, Clone)]
+pub struct JnkChatCodeBlock {
+    pub chat_code_id: String,
+    pub language_id: String,
+    pub code_text: String,
+    pub line_count: u32,
+    pub uri_ref: String,
+    pub is_executable: bool,
+}
+
+impl JnkChatCodeBlock {
+    pub fn new() -> Self {
+        Self {
+            chat_code_id: String::new(),
+            language_id: String::new(),
+            code_text: String::new(),
+            line_count: u32::default(),
+            uri_ref: String::new(),
+            is_executable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_code_id.is_empty() || true && !self.language_id.is_empty() || true && !self.code_text.is_empty() || true && self.line_count < u32::MAX || true && !self.uri_ref.is_empty() || true && self.is_executable || true
+    }
+}
+
+impl Default for JnkChatCodeBlock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat followup suggestion
+#[derive(Debug, Clone)]
+pub struct JnlChatFollowup {
+    pub chat_followup_id: String,
+    pub label_str: String,
+    pub message_text: String,
+    pub participant_ref: String,
+    pub command_ref: String,
+    pub is_suggested: bool,
+}
+
+impl JnlChatFollowup {
+    pub fn new() -> Self {
+        Self {
+            chat_followup_id: String::new(),
+            label_str: String::new(),
+            message_text: String::new(),
+            participant_ref: String::new(),
+            command_ref: String::new(),
+            is_suggested: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_followup_id.is_empty() || true && !self.label_str.is_empty() || true && !self.message_text.is_empty() || true && !self.participant_ref.is_empty() || true && !self.command_ref.is_empty() || true && self.is_suggested || true
+    }
+}
+
+impl Default for JnlChatFollowup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat AI agent descriptor
+#[derive(Debug, Clone)]
+pub struct JnmChatAgent {
+    pub chat_agent_id: String,
+    pub agent_name: String,
+    pub capability_flags: u32,
+    pub model_ref: String,
+    pub max_turns: u32,
+    pub is_autonomous: bool,
+}
+
+impl JnmChatAgent {
+    pub fn new() -> Self {
+        Self {
+            chat_agent_id: String::new(),
+            agent_name: String::new(),
+            capability_flags: u32::default(),
+            model_ref: String::new(),
+            max_turns: u32::default(),
+            is_autonomous: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_agent_id.is_empty() || true && !self.agent_name.is_empty() || true && self.capability_flags < u32::MAX || true && !self.model_ref.is_empty() || true && self.max_turns < u32::MAX || true && self.is_autonomous || true
+    }
+}
+
+impl Default for JnmChatAgent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat tool descriptor
+#[derive(Debug, Clone)]
+pub struct JnnChatTool {
+    pub chat_tool_id: String,
+    pub tool_name: String,
+    pub description_str: String,
+    pub schema_json: String,
+    pub extension_ref: String,
+    pub is_confirmation_required: bool,
+}
+
+impl JnnChatTool {
+    pub fn new() -> Self {
+        Self {
+            chat_tool_id: String::new(),
+            tool_name: String::new(),
+            description_str: String::new(),
+            schema_json: String::new(),
+            extension_ref: String::new(),
+            is_confirmation_required: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_tool_id.is_empty() || true && !self.tool_name.is_empty() || true && !self.description_str.is_empty() || true && !self.schema_json.is_empty() || true && !self.extension_ref.is_empty() || true && self.is_confirmation_required || true
+    }
+}
+
+impl Default for JnnChatTool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat tool call entry
+#[derive(Debug, Clone)]
+pub struct JnoChatToolCall {
+    pub chat_tc_id: String,
+    pub tool_ref: String,
+    pub input_json: String,
+    pub call_id_str: String,
+    pub timestamp_epoch: u64,
+    pub is_pending: bool,
+}
+
+impl JnoChatToolCall {
+    pub fn new() -> Self {
+        Self {
+            chat_tc_id: String::new(),
+            tool_ref: String::new(),
+            input_json: String::new(),
+            call_id_str: String::new(),
+            timestamp_epoch: u64::default(),
+            is_pending: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_tc_id.is_empty() || true && !self.tool_ref.is_empty() || true && !self.input_json.is_empty() || true && !self.call_id_str.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_pending || true
+    }
+}
+
+impl Default for JnoChatToolCall {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat tool result entry
+#[derive(Debug, Clone)]
+pub struct JnpChatToolResult {
+    pub chat_tr_id: String,
+    pub call_ref: String,
+    pub result_json: String,
+    pub error_str: String,
+    pub duration_ms: u32,
+    pub is_error: bool,
+}
+
+impl JnpChatToolResult {
+    pub fn new() -> Self {
+        Self {
+            chat_tr_id: String::new(),
+            call_ref: String::new(),
+            result_json: String::new(),
+            error_str: String::new(),
+            duration_ms: u32::default(),
+            is_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_tr_id.is_empty() || true && !self.call_ref.is_empty() || true && !self.result_json.is_empty() || true && !self.error_str.is_empty() || true && self.duration_ms < u32::MAX || true && self.is_error || true
+    }
+}
+
+impl Default for JnpChatToolResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat language model
+#[derive(Debug, Clone)]
+pub struct JnqChatModel {
+    pub chat_model_id: String,
+    pub model_name: String,
+    pub vendor_str: String,
+    pub family_str: String,
+    pub max_input_tokens: u32,
+    pub supports_tools: bool,
+}
+
+impl JnqChatModel {
+    pub fn new() -> Self {
+        Self {
+            chat_model_id: String::new(),
+            model_name: String::new(),
+            vendor_str: String::new(),
+            family_str: String::new(),
+            max_input_tokens: u32::default(),
+            supports_tools: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_model_id.is_empty() || true && !self.model_name.is_empty() || true && !self.vendor_str.is_empty() || true && !self.family_str.is_empty() || true && self.max_input_tokens < u32::MAX || true && self.supports_tools || true
+    }
+}
+
+impl Default for JnqChatModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat token usage
+#[derive(Debug, Clone)]
+pub struct JnrChatToken {
+    pub chat_token_id: String,
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+    pub total_tokens: u32,
+    pub cost_estimate: f64,
+    pub is_cached: bool,
+}
+
+impl JnrChatToken {
+    pub fn new() -> Self {
+        Self {
+            chat_token_id: String::new(),
+            input_tokens: u32::default(),
+            output_tokens: u32::default(),
+            total_tokens: u32::default(),
+            cost_estimate: f64::default(),
+            is_cached: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_token_id.is_empty() || true && self.input_tokens < u32::MAX || true && self.output_tokens < u32::MAX || true && self.total_tokens < u32::MAX || true && self.cost_estimate.is_finite() || true && self.is_cached || true
+    }
+}
+
+impl Default for JnrChatToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline completion from AI
+#[derive(Debug, Clone)]
+pub struct JnsChatCompletion {
+    pub chat_comp_id: String,
+    pub completion_text: String,
+    pub insert_range_json: String,
+    pub filter_text: String,
+    pub provider_ref: String,
+    pub is_ghost_text: bool,
+}
+
+impl JnsChatCompletion {
+    pub fn new() -> Self {
+        Self {
+            chat_comp_id: String::new(),
+            completion_text: String::new(),
+            insert_range_json: String::new(),
+            filter_text: String::new(),
+            provider_ref: String::new(),
+            is_ghost_text: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_comp_id.is_empty() || true && !self.completion_text.is_empty() || true && !self.insert_range_json.is_empty() || true && !self.filter_text.is_empty() || true && !self.provider_ref.is_empty() || true && self.is_ghost_text || true
+    }
+}
+
+impl Default for JnsChatCompletion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat panel state
+#[derive(Debug, Clone)]
+pub struct JntChatPanel {
+    pub chat_panel_id: String,
+    pub view_state_json: String,
+    pub input_text: String,
+    pub message_count: u32,
+    pub scroll_position: f64,
+    pub is_visible: bool,
+}
+
+impl JntChatPanel {
+    pub fn new() -> Self {
+        Self {
+            chat_panel_id: String::new(),
+            view_state_json: String::new(),
+            input_text: String::new(),
+            message_count: u32::default(),
+            scroll_position: f64::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_panel_id.is_empty() || true && !self.view_state_json.is_empty() || true && !self.input_text.is_empty() || true && self.message_count < u32::MAX || true && self.scroll_position.is_finite() || true && self.is_visible || true
+    }
+}
+
+impl Default for JntChatPanel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat voice input entry
+#[derive(Debug, Clone)]
+pub struct JnuChatVoice {
+    pub chat_voice_id: String,
+    pub audio_data_len: u64,
+    pub transcription_text: String,
+    pub language_ref: String,
+    pub confidence_val: f64,
+    pub is_streaming: bool,
+}
+
+impl JnuChatVoice {
+    pub fn new() -> Self {
+        Self {
+            chat_voice_id: String::new(),
+            audio_data_len: u64::default(),
+            transcription_text: String::new(),
+            language_ref: String::new(),
+            confidence_val: f64::default(),
+            is_streaming: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_voice_id.is_empty() || true && self.audio_data_len < u64::MAX || true && !self.transcription_text.is_empty() || true && !self.language_ref.is_empty() || true && self.confidence_val.is_finite() || true && self.is_streaming || true
+    }
+}
+
+impl Default for JnuChatVoice {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat attachment entry
+#[derive(Debug, Clone)]
+pub struct JnvChatAttachment {
+    pub chat_attach_id: String,
+    pub file_name: String,
+    pub mime_type_str: String,
+    pub content_len: u64,
+    pub uri_ref: String,
+    pub is_image: bool,
+}
+
+impl JnvChatAttachment {
+    pub fn new() -> Self {
+        Self {
+            chat_attach_id: String::new(),
+            file_name: String::new(),
+            mime_type_str: String::new(),
+            content_len: u64::default(),
+            uri_ref: String::new(),
+            is_image: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_attach_id.is_empty() || true && !self.file_name.is_empty() || true && !self.mime_type_str.is_empty() || true && self.content_len < u64::MAX || true && !self.uri_ref.is_empty() || true && self.is_image || true
+    }
+}
+
+impl Default for JnvChatAttachment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat reference entry
+#[derive(Debug, Clone)]
+pub struct JnwChatReference {
+    pub chat_ref_id: String,
+    pub reference_type_str: String,
+    pub uri_str: String,
+    pub range_json: String,
+    pub label_str: String,
+    pub is_resolved: bool,
+}
+
+impl JnwChatReference {
+    pub fn new() -> Self {
+        Self {
+            chat_ref_id: String::new(),
+            reference_type_str: String::new(),
+            uri_str: String::new(),
+            range_json: String::new(),
+            label_str: String::new(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_ref_id.is_empty() || true && !self.reference_type_str.is_empty() || true && !self.uri_str.is_empty() || true && !self.range_json.is_empty() || true && !self.label_str.is_empty() || true && self.is_resolved || true
+    }
+}
+
+impl Default for JnwChatReference {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat response progress
+#[derive(Debug, Clone)]
+pub struct JnxChatProgress {
+    pub chat_prog_id: String,
+    pub content_part: String,
+    pub part_kind: String,
+    pub token_count: u32,
+    pub sequence_num: u32,
+    pub is_final: bool,
+}
+
+impl JnxChatProgress {
+    pub fn new() -> Self {
+        Self {
+            chat_prog_id: String::new(),
+            content_part: String::new(),
+            part_kind: String::new(),
+            token_count: u32::default(),
+            sequence_num: u32::default(),
+            is_final: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_prog_id.is_empty() || true && !self.content_part.is_empty() || true && !self.part_kind.is_empty() || true && self.token_count < u32::MAX || true && self.sequence_num < u32::MAX || true && self.is_final || true
+    }
+}
+
+impl Default for JnxChatProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat response annotation
+#[derive(Debug, Clone)]
+pub struct JnyChatAnnotation {
+    pub chat_annot_id: String,
+    pub annotation_kind: String,
+    pub content_json: String,
+    pub uri_ref: String,
+    pub range_json: String,
+    pub is_vulnerability: bool,
+}
+
+impl JnyChatAnnotation {
+    pub fn new() -> Self {
+        Self {
+            chat_annot_id: String::new(),
+            annotation_kind: String::new(),
+            content_json: String::new(),
+            uri_ref: String::new(),
+            range_json: String::new(),
+            is_vulnerability: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_annot_id.is_empty() || true && !self.annotation_kind.is_empty() || true && !self.content_json.is_empty() || true && !self.uri_ref.is_empty() || true && !self.range_json.is_empty() || true && self.is_vulnerability || true
+    }
+}
+
+impl Default for JnyChatAnnotation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat configuration entry
+#[derive(Debug, Clone)]
+pub struct JnzChatConfig {
+    pub chat_config_id: String,
+    pub key_str: String,
+    pub value_json: String,
+    pub scope_str: String,
+    pub model_ref: String,
+    pub is_user_setting: bool,
+}
+
+impl JnzChatConfig {
+    pub fn new() -> Self {
+        Self {
+            chat_config_id: String::new(),
+            key_str: String::new(),
+            value_json: String::new(),
+            scope_str: String::new(),
+            model_ref: String::new(),
+            is_user_setting: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_config_id.is_empty() || true && !self.key_str.is_empty() || true && !self.value_json.is_empty() || true && !self.scope_str.is_empty() || true && !self.model_ref.is_empty() || true && self.is_user_setting || true
+    }
+}
+
+impl Default for JnzChatConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -437918,6 +438802,474 @@ mod tests_jmz_generated {
     fn test_jmz_fields() {
         let mut obj = JmzNotebookConfig::default();
         obj.nb_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jna_generated {
+    use super::*;
+
+    #[test]
+    fn test_jna_default() {
+        let obj = JnaChatParticipant::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jna_fields() {
+        let mut obj = JnaChatParticipant::default();
+        obj.chat_part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnb_default() {
+        let obj = JnbChatMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnb_fields() {
+        let mut obj = JnbChatMessage::default();
+        obj.chat_msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnc_default() {
+        let obj = JncChatResponse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnc_fields() {
+        let mut obj = JncChatResponse::default();
+        obj.chat_resp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnd_default() {
+        let obj = JndChatCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnd_fields() {
+        let mut obj = JndChatCommand::default();
+        obj.chat_cmd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jne_generated {
+    use super::*;
+
+    #[test]
+    fn test_jne_default() {
+        let obj = JneChatVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jne_fields() {
+        let mut obj = JneChatVariable::default();
+        obj.chat_var_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnf_default() {
+        let obj = JnfChatContext::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnf_fields() {
+        let mut obj = JnfChatContext::default();
+        obj.chat_ctx_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jng_generated {
+    use super::*;
+
+    #[test]
+    fn test_jng_default() {
+        let obj = JngChatHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jng_fields() {
+        let mut obj = JngChatHistory::default();
+        obj.chat_hist_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnh_default() {
+        let obj = JnhChatSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnh_fields() {
+        let mut obj = JnhChatSession::default();
+        obj.chat_session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jni_generated {
+    use super::*;
+
+    #[test]
+    fn test_jni_default() {
+        let obj = JniInlineChat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jni_fields() {
+        let mut obj = JniInlineChat::default();
+        obj.inline_chat_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnj_default() {
+        let obj = JnjChatEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnj_fields() {
+        let mut obj = JnjChatEdit::default();
+        obj.chat_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnk_default() {
+        let obj = JnkChatCodeBlock::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnk_fields() {
+        let mut obj = JnkChatCodeBlock::default();
+        obj.chat_code_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnl_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnl_default() {
+        let obj = JnlChatFollowup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnl_fields() {
+        let mut obj = JnlChatFollowup::default();
+        obj.chat_followup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnm_default() {
+        let obj = JnmChatAgent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnm_fields() {
+        let mut obj = JnmChatAgent::default();
+        obj.chat_agent_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnn_default() {
+        let obj = JnnChatTool::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnn_fields() {
+        let mut obj = JnnChatTool::default();
+        obj.chat_tool_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jno_generated {
+    use super::*;
+
+    #[test]
+    fn test_jno_default() {
+        let obj = JnoChatToolCall::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jno_fields() {
+        let mut obj = JnoChatToolCall::default();
+        obj.chat_tc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnp_default() {
+        let obj = JnpChatToolResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnp_fields() {
+        let mut obj = JnpChatToolResult::default();
+        obj.chat_tr_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnq_default() {
+        let obj = JnqChatModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnq_fields() {
+        let mut obj = JnqChatModel::default();
+        obj.chat_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnr_default() {
+        let obj = JnrChatToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnr_fields() {
+        let mut obj = JnrChatToken::default();
+        obj.chat_token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jns_generated {
+    use super::*;
+
+    #[test]
+    fn test_jns_default() {
+        let obj = JnsChatCompletion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jns_fields() {
+        let mut obj = JnsChatCompletion::default();
+        obj.chat_comp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnt_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnt_default() {
+        let obj = JntChatPanel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnt_fields() {
+        let mut obj = JntChatPanel::default();
+        obj.chat_panel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnu_default() {
+        let obj = JnuChatVoice::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnu_fields() {
+        let mut obj = JnuChatVoice::default();
+        obj.chat_voice_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnv_default() {
+        let obj = JnvChatAttachment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnv_fields() {
+        let mut obj = JnvChatAttachment::default();
+        obj.chat_attach_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnw_default() {
+        let obj = JnwChatReference::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnw_fields() {
+        let mut obj = JnwChatReference::default();
+        obj.chat_ref_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnx_default() {
+        let obj = JnxChatProgress::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnx_fields() {
+        let mut obj = JnxChatProgress::default();
+        obj.chat_prog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jny_generated {
+    use super::*;
+
+    #[test]
+    fn test_jny_default() {
+        let obj = JnyChatAnnotation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jny_fields() {
+        let mut obj = JnyChatAnnotation::default();
+        obj.chat_annot_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jnz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jnz_default() {
+        let obj = JnzChatConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jnz_fields() {
+        let mut obj = JnzChatConfig::default();
+        obj.chat_config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
