@@ -59501,6 +59501,213 @@ impl Default for FejTextMateTheme {
 }
 
 
+/// Piece table text buffer types
+#[derive(Debug, Clone)]
+pub struct FekPieceTable {
+    pub piece_buffer_index: u32,
+    pub piece_start_offset: u32,
+    pub piece_end_offset: u32,
+    pub piece_line_starts_index: u32,
+    pub piece_length: u32,
+    pub piece_line_feed_count: u32,
+    pub piece_is_add_buffer: bool,
+    pub piece_left_size: u32,
+    pub piece_right_size: u32,
+    pub piece_color: bool,
+}
+
+impl FekPieceTable {
+    pub fn new() -> Self {
+        Self {
+            piece_buffer_index: u32::default(),
+            piece_start_offset: u32::default(),
+            piece_end_offset: u32::default(),
+            piece_line_starts_index: u32::default(),
+            piece_length: u32::default(),
+            piece_line_feed_count: u32::default(),
+            piece_is_add_buffer: bool::default(),
+            piece_left_size: u32::default(),
+            piece_right_size: u32::default(),
+            piece_color: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.piece_buffer_index < u32::MAX || true && self.piece_start_offset < u32::MAX || true && self.piece_end_offset < u32::MAX || true && self.piece_line_starts_index < u32::MAX || true && self.piece_length < u32::MAX || true && self.piece_line_feed_count < u32::MAX || true && self.piece_is_add_buffer || true && self.piece_left_size < u32::MAX || true && self.piece_right_size < u32::MAX || true && self.piece_color || true
+    }
+}
+
+impl Default for FekPieceTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Piece table node types
+#[derive(Debug, Clone)]
+pub struct FelPieceNode {
+    pub piece_start: u32,
+    pub piece_end: u32,
+    pub piece_line_feed_cnt: u32,
+    pub piece_left_char_cnt: u32,
+    pub piece_left_lf_cnt: u32,
+    pub piece_parent_index: u32,
+    pub piece_left_index: u32,
+    pub piece_right_index: u32,
+    pub piece_size_left: u32,
+    pub piece_lf_left: u32,
+}
+
+impl FelPieceNode {
+    pub fn new() -> Self {
+        Self {
+            piece_start: u32::default(),
+            piece_end: u32::default(),
+            piece_line_feed_cnt: u32::default(),
+            piece_left_char_cnt: u32::default(),
+            piece_left_lf_cnt: u32::default(),
+            piece_parent_index: u32::default(),
+            piece_left_index: u32::default(),
+            piece_right_index: u32::default(),
+            piece_size_left: u32::default(),
+            piece_lf_left: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.piece_start < u32::MAX || true && self.piece_end < u32::MAX || true && self.piece_line_feed_cnt < u32::MAX || true && self.piece_left_char_cnt < u32::MAX || true && self.piece_left_lf_cnt < u32::MAX || true && self.piece_parent_index < u32::MAX || true && self.piece_left_index < u32::MAX || true && self.piece_right_index < u32::MAX || true && self.piece_size_left < u32::MAX || true && self.piece_lf_left < u32::MAX || true
+    }
+}
+
+impl Default for FelPieceNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Line starts array types
+#[derive(Debug, Clone)]
+pub struct FemLineStarts {
+    pub line_starts_count: u32,
+    pub line_starts_total_length: u64,
+    pub line_starts_eol: String,
+    pub line_starts_bom: String,
+    pub line_starts_contains_rtl: bool,
+    pub line_starts_contains_unusual: bool,
+    pub line_starts_is_basic_ascii: bool,
+    pub line_starts_normalized_eol: bool,
+    pub line_starts_max_line_length: u32,
+    pub line_starts_avg_line_length: u32,
+}
+
+impl FemLineStarts {
+    pub fn new() -> Self {
+        Self {
+            line_starts_count: u32::default(),
+            line_starts_total_length: u64::default(),
+            line_starts_eol: String::new(),
+            line_starts_bom: String::new(),
+            line_starts_contains_rtl: bool::default(),
+            line_starts_contains_unusual: bool::default(),
+            line_starts_is_basic_ascii: bool::default(),
+            line_starts_normalized_eol: bool::default(),
+            line_starts_max_line_length: u32::default(),
+            line_starts_avg_line_length: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.line_starts_count < u32::MAX || true && self.line_starts_total_length < u64::MAX || true && !self.line_starts_eol.is_empty() || true && !self.line_starts_bom.is_empty() || true && self.line_starts_contains_rtl || true && self.line_starts_contains_unusual || true && self.line_starts_is_basic_ascii || true && self.line_starts_normalized_eol || true && self.line_starts_max_line_length < u32::MAX || true && self.line_starts_avg_line_length < u32::MAX || true
+    }
+}
+
+impl Default for FemLineStarts {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Text buffer change delta types
+#[derive(Debug, Clone)]
+pub struct FenTextChange {
+    pub change_offset: u32,
+    pub change_length: u32,
+    pub change_text: String,
+    pub change_range_offset: u32,
+    pub change_range_length: u32,
+    pub change_eol: String,
+    pub change_is_undo: bool,
+    pub change_is_redo: bool,
+    pub change_source: String,
+    pub change_version_id: u32,
+}
+
+impl FenTextChange {
+    pub fn new() -> Self {
+        Self {
+            change_offset: u32::default(),
+            change_length: u32::default(),
+            change_text: String::new(),
+            change_range_offset: u32::default(),
+            change_range_length: u32::default(),
+            change_eol: String::new(),
+            change_is_undo: bool::default(),
+            change_is_redo: bool::default(),
+            change_source: String::new(),
+            change_version_id: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.change_offset < u32::MAX || true && self.change_length < u32::MAX || true && !self.change_text.is_empty() || true && self.change_range_offset < u32::MAX || true && self.change_range_length < u32::MAX || true && !self.change_eol.is_empty() || true && self.change_is_undo || true && self.change_is_redo || true && !self.change_source.is_empty() || true && self.change_version_id < u32::MAX || true
+    }
+}
+
+impl Default for FenTextChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Text buffer snapshot types
+#[derive(Debug, Clone)]
+pub struct FeoBufferSnapshot {
+    pub snapshot_id: u32,
+    pub snapshot_version: u32,
+    pub snapshot_line_count: u32,
+    pub snapshot_total_length: u64,
+    pub snapshot_eol: String,
+    pub snapshot_bom: String,
+    pub snapshot_encoding: String,
+    pub snapshot_is_too_large: bool,
+    pub snapshot_creation_time: u64,
+    pub snapshot_language_id: String,
+}
+
+impl FeoBufferSnapshot {
+    pub fn new() -> Self {
+        Self {
+            snapshot_id: u32::default(),
+            snapshot_version: u32::default(),
+            snapshot_line_count: u32::default(),
+            snapshot_total_length: u64::default(),
+            snapshot_eol: String::new(),
+            snapshot_bom: String::new(),
+            snapshot_encoding: String::new(),
+            snapshot_is_too_large: bool::default(),
+            snapshot_creation_time: u64::default(),
+            snapshot_language_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.snapshot_id < u32::MAX || true && self.snapshot_version < u32::MAX || true && self.snapshot_line_count < u32::MAX || true && self.snapshot_total_length < u64::MAX || true && !self.snapshot_eol.is_empty() || true && !self.snapshot_bom.is_empty() || true && !self.snapshot_encoding.is_empty() || true && self.snapshot_is_too_large || true && self.snapshot_creation_time < u64::MAX || true && !self.snapshot_language_id.is_empty() || true
+    }
+}
+
+impl Default for FeoBufferSnapshot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -272840,6 +273047,96 @@ mod tests_fej_generated {
     fn test_fej_fields() {
         let mut obj = FejTextMateTheme::default();
         obj.theme_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fek_generated {
+    use super::*;
+
+    #[test]
+    fn test_fek_default() {
+        let obj = FekPieceTable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fek_fields() {
+        let mut obj = FekPieceTable::default();
+        obj.piece_buffer_index = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fel_generated {
+    use super::*;
+
+    #[test]
+    fn test_fel_default() {
+        let obj = FelPieceNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fel_fields() {
+        let mut obj = FelPieceNode::default();
+        obj.piece_start = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fem_generated {
+    use super::*;
+
+    #[test]
+    fn test_fem_default() {
+        let obj = FemLineStarts::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fem_fields() {
+        let mut obj = FemLineStarts::default();
+        obj.line_starts_count = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fen_generated {
+    use super::*;
+
+    #[test]
+    fn test_fen_default() {
+        let obj = FenTextChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fen_fields() {
+        let mut obj = FenTextChange::default();
+        obj.change_offset = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_feo_generated {
+    use super::*;
+
+    #[test]
+    fn test_feo_default() {
+        let obj = FeoBufferSnapshot::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_feo_fields() {
+        let mut obj = FeoBufferSnapshot::default();
+        obj.snapshot_id = 42;
         assert!(obj.validate());
     }
 }
