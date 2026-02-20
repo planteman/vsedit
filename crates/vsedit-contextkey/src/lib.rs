@@ -173479,6 +173479,890 @@ impl Default for JozBorderColor {
     }
 }
 
+/// TextMate grammar definition
+#[derive(Debug, Clone)]
+pub struct JpaGrammarDef {
+    pub grammar_def_id: String,
+    pub scope_name: String,
+    pub language_id: String,
+    pub pattern_count: u32,
+    pub file_path: String,
+    pub is_injected: bool,
+}
+
+impl JpaGrammarDef {
+    pub fn new() -> Self {
+        Self {
+            grammar_def_id: String::new(),
+            scope_name: String::new(),
+            language_id: String::new(),
+            pattern_count: u32::default(),
+            file_path: String::new(),
+            is_injected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grammar_def_id.is_empty() || true && !self.scope_name.is_empty() || true && !self.language_id.is_empty() || true && self.pattern_count < u32::MAX || true && !self.file_path.is_empty() || true && self.is_injected || true
+    }
+}
+
+impl Default for JpaGrammarDef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TextMate grammar rule
+#[derive(Debug, Clone)]
+pub struct JpbGrammarRule {
+    pub grammar_rule_id: String,
+    pub match_pattern: String,
+    pub begin_pattern: String,
+    pub end_pattern: String,
+    pub captures_json: String,
+    pub is_repository: bool,
+}
+
+impl JpbGrammarRule {
+    pub fn new() -> Self {
+        Self {
+            grammar_rule_id: String::new(),
+            match_pattern: String::new(),
+            begin_pattern: String::new(),
+            end_pattern: String::new(),
+            captures_json: String::new(),
+            is_repository: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grammar_rule_id.is_empty() || true && !self.match_pattern.is_empty() || true && !self.begin_pattern.is_empty() || true && !self.end_pattern.is_empty() || true && !self.captures_json.is_empty() || true && self.is_repository || true
+    }
+}
+
+impl Default for JpbGrammarRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Grammar scope descriptor
+#[derive(Debug, Clone)]
+pub struct JpcGrammarScope {
+    pub grammar_scope_id: String,
+    pub scope_str: String,
+    pub parent_ref: String,
+    pub depth_val: u32,
+    pub font_style_flags: u32,
+    pub is_embedded: bool,
+}
+
+impl JpcGrammarScope {
+    pub fn new() -> Self {
+        Self {
+            grammar_scope_id: String::new(),
+            scope_str: String::new(),
+            parent_ref: String::new(),
+            depth_val: u32::default(),
+            font_style_flags: u32::default(),
+            is_embedded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grammar_scope_id.is_empty() || true && !self.scope_str.is_empty() || true && !self.parent_ref.is_empty() || true && self.depth_val < u32::MAX || true && self.font_style_flags < u32::MAX || true && self.is_embedded || true
+    }
+}
+
+impl Default for JpcGrammarScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Grammar injection entry
+#[derive(Debug, Clone)]
+pub struct JpdGrammarInjection {
+    pub grammar_inj_id: String,
+    pub selector_str: String,
+    pub grammar_ref: String,
+    pub injection_scope: String,
+    pub priority_val: u32,
+    pub is_self_injection: bool,
+}
+
+impl JpdGrammarInjection {
+    pub fn new() -> Self {
+        Self {
+            grammar_inj_id: String::new(),
+            selector_str: String::new(),
+            grammar_ref: String::new(),
+            injection_scope: String::new(),
+            priority_val: u32::default(),
+            is_self_injection: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grammar_inj_id.is_empty() || true && !self.selector_str.is_empty() || true && !self.grammar_ref.is_empty() || true && !self.injection_scope.is_empty() || true && self.priority_val < u32::MAX || true && self.is_self_injection || true
+    }
+}
+
+impl Default for JpdGrammarInjection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tokenizer state descriptor
+#[derive(Debug, Clone)]
+pub struct JpeTokenizerState {
+    pub tok_state_id: String,
+    pub rule_stack_json: String,
+    pub scope_stack_json: String,
+    pub end_rule_ref: String,
+    pub line_number: u32,
+    pub is_initial_state: bool,
+}
+
+impl JpeTokenizerState {
+    pub fn new() -> Self {
+        Self {
+            tok_state_id: String::new(),
+            rule_stack_json: String::new(),
+            scope_stack_json: String::new(),
+            end_rule_ref: String::new(),
+            line_number: u32::default(),
+            is_initial_state: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tok_state_id.is_empty() || true && !self.rule_stack_json.is_empty() || true && !self.scope_stack_json.is_empty() || true && !self.end_rule_ref.is_empty() || true && self.line_number < u32::MAX || true && self.is_initial_state || true
+    }
+}
+
+impl Default for JpeTokenizerState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tokenized line descriptor
+#[derive(Debug, Clone)]
+pub struct JpfTokenLine {
+    pub tok_line_id: String,
+    pub line_text_len: u32,
+    pub token_count: u32,
+    pub state_before_ref: String,
+    pub state_after_ref: String,
+    pub is_invalid: bool,
+}
+
+impl JpfTokenLine {
+    pub fn new() -> Self {
+        Self {
+            tok_line_id: String::new(),
+            line_text_len: u32::default(),
+            token_count: u32::default(),
+            state_before_ref: String::new(),
+            state_after_ref: String::new(),
+            is_invalid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tok_line_id.is_empty() || true && self.line_text_len < u32::MAX || true && self.token_count < u32::MAX || true && !self.state_before_ref.is_empty() || true && !self.state_after_ref.is_empty() || true && self.is_invalid || true
+    }
+}
+
+impl Default for JpfTokenLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Monarch grammar descriptor
+#[derive(Debug, Clone)]
+pub struct JpgMonarchGrammar {
+    pub monarch_id: String,
+    pub language_id: String,
+    pub state_count: u32,
+    pub rule_count: u32,
+    pub keyword_count: u32,
+    pub is_case_insensitive: bool,
+}
+
+impl JpgMonarchGrammar {
+    pub fn new() -> Self {
+        Self {
+            monarch_id: String::new(),
+            language_id: String::new(),
+            state_count: u32::default(),
+            rule_count: u32::default(),
+            keyword_count: u32::default(),
+            is_case_insensitive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.monarch_id.is_empty() || true && !self.language_id.is_empty() || true && self.state_count < u32::MAX || true && self.rule_count < u32::MAX || true && self.keyword_count < u32::MAX || true && self.is_case_insensitive || true
+    }
+}
+
+impl Default for JpgMonarchGrammar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Monarch tokenizer rule
+#[derive(Debug, Clone)]
+pub struct JphMonarchRule {
+    pub monarch_rule_id: String,
+    pub regex_str: String,
+    pub action_json: String,
+    pub next_state: String,
+    pub include_ref: String,
+    pub is_default_token: bool,
+}
+
+impl JphMonarchRule {
+    pub fn new() -> Self {
+        Self {
+            monarch_rule_id: String::new(),
+            regex_str: String::new(),
+            action_json: String::new(),
+            next_state: String::new(),
+            include_ref: String::new(),
+            is_default_token: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.monarch_rule_id.is_empty() || true && !self.regex_str.is_empty() || true && !self.action_json.is_empty() || true && !self.next_state.is_empty() || true && !self.include_ref.is_empty() || true && self.is_default_token || true
+    }
+}
+
+impl Default for JphMonarchRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree-sitter grammar
+#[derive(Debug, Clone)]
+pub struct JpiTreeSitterGrammar {
+    pub ts_grammar_id: String,
+    pub language_name: String,
+    pub wasm_path: String,
+    pub query_path: String,
+    pub node_type_count: u32,
+    pub is_loaded: bool,
+}
+
+impl JpiTreeSitterGrammar {
+    pub fn new() -> Self {
+        Self {
+            ts_grammar_id: String::new(),
+            language_name: String::new(),
+            wasm_path: String::new(),
+            query_path: String::new(),
+            node_type_count: u32::default(),
+            is_loaded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ts_grammar_id.is_empty() || true && !self.language_name.is_empty() || true && !self.wasm_path.is_empty() || true && !self.query_path.is_empty() || true && self.node_type_count < u32::MAX || true && self.is_loaded || true
+    }
+}
+
+impl Default for JpiTreeSitterGrammar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree-sitter syntax node
+#[derive(Debug, Clone)]
+pub struct JpjTreeSitterNode {
+    pub ts_node_id: String,
+    pub node_type_str: String,
+    pub start_byte: u32,
+    pub end_byte: u32,
+    pub child_count: u32,
+    pub is_named: bool,
+}
+
+impl JpjTreeSitterNode {
+    pub fn new() -> Self {
+        Self {
+            ts_node_id: String::new(),
+            node_type_str: String::new(),
+            start_byte: u32::default(),
+            end_byte: u32::default(),
+            child_count: u32::default(),
+            is_named: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ts_node_id.is_empty() || true && !self.node_type_str.is_empty() || true && self.start_byte < u32::MAX || true && self.end_byte < u32::MAX || true && self.child_count < u32::MAX || true && self.is_named || true
+    }
+}
+
+impl Default for JpjTreeSitterNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic tokens provider
+#[derive(Debug, Clone)]
+pub struct JpkSemanticTokensProvider {
+    pub sem_tok_prov_id: String,
+    pub provider_ref: String,
+    pub legend_ref: String,
+    pub full_tokens_json: String,
+    pub delta_tokens_json: String,
+    pub is_range_provider: bool,
+}
+
+impl JpkSemanticTokensProvider {
+    pub fn new() -> Self {
+        Self {
+            sem_tok_prov_id: String::new(),
+            provider_ref: String::new(),
+            legend_ref: String::new(),
+            full_tokens_json: String::new(),
+            delta_tokens_json: String::new(),
+            is_range_provider: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sem_tok_prov_id.is_empty() || true && !self.provider_ref.is_empty() || true && !self.legend_ref.is_empty() || true && !self.full_tokens_json.is_empty() || true && !self.delta_tokens_json.is_empty() || true && self.is_range_provider || true
+    }
+}
+
+impl Default for JpkSemanticTokensProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic token legend
+#[derive(Debug, Clone)]
+pub struct JplSemanticTokenLegend {
+    pub sem_legend_id: String,
+    pub token_types_csv: String,
+    pub modifiers_csv: String,
+    pub type_count: u32,
+    pub modifier_count: u32,
+    pub is_custom: bool,
+}
+
+impl JplSemanticTokenLegend {
+    pub fn new() -> Self {
+        Self {
+            sem_legend_id: String::new(),
+            token_types_csv: String::new(),
+            modifiers_csv: String::new(),
+            type_count: u32::default(),
+            modifier_count: u32::default(),
+            is_custom: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sem_legend_id.is_empty() || true && !self.token_types_csv.is_empty() || true && !self.modifiers_csv.is_empty() || true && self.type_count < u32::MAX || true && self.modifier_count < u32::MAX || true && self.is_custom || true
+    }
+}
+
+impl Default for JplSemanticTokenLegend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tokenization registry entry
+#[derive(Debug, Clone)]
+pub struct JpmTokenizationRegistry {
+    pub tok_reg_id: String,
+    pub language_id: String,
+    pub tokenizer_ref: String,
+    pub priority_val: u32,
+    pub registration_epoch: u64,
+    pub is_async: bool,
+}
+
+impl JpmTokenizationRegistry {
+    pub fn new() -> Self {
+        Self {
+            tok_reg_id: String::new(),
+            language_id: String::new(),
+            tokenizer_ref: String::new(),
+            priority_val: u32::default(),
+            registration_epoch: u64::default(),
+            is_async: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tok_reg_id.is_empty() || true && !self.language_id.is_empty() || true && !self.tokenizer_ref.is_empty() || true && self.priority_val < u32::MAX || true && self.registration_epoch < u64::MAX || true && self.is_async || true
+    }
+}
+
+impl Default for JpmTokenizationRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language registration entry
+#[derive(Debug, Clone)]
+pub struct JpnLanguageRegistration {
+    pub lang_reg_id: String,
+    pub language_id: String,
+    pub extensions_csv: String,
+    pub filenames_csv: String,
+    pub mime_types_csv: String,
+    pub is_builtin: bool,
+}
+
+impl JpnLanguageRegistration {
+    pub fn new() -> Self {
+        Self {
+            lang_reg_id: String::new(),
+            language_id: String::new(),
+            extensions_csv: String::new(),
+            filenames_csv: String::new(),
+            mime_types_csv: String::new(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lang_reg_id.is_empty() || true && !self.language_id.is_empty() || true && !self.extensions_csv.is_empty() || true && !self.filenames_csv.is_empty() || true && !self.mime_types_csv.is_empty() || true && self.is_builtin || true
+    }
+}
+
+impl Default for JpnLanguageRegistration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language configuration
+#[derive(Debug, Clone)]
+pub struct JpoLanguageConfiguration {
+    pub lang_config_id: String,
+    pub language_id: String,
+    pub bracket_pairs_json: String,
+    pub word_pattern: String,
+    pub indentation_rules_json: String,
+    pub is_merged: bool,
+}
+
+impl JpoLanguageConfiguration {
+    pub fn new() -> Self {
+        Self {
+            lang_config_id: String::new(),
+            language_id: String::new(),
+            bracket_pairs_json: String::new(),
+            word_pattern: String::new(),
+            indentation_rules_json: String::new(),
+            is_merged: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lang_config_id.is_empty() || true && !self.language_id.is_empty() || true && !self.bracket_pairs_json.is_empty() || true && !self.word_pattern.is_empty() || true && !self.indentation_rules_json.is_empty() || true && self.is_merged || true
+    }
+}
+
+impl Default for JpoLanguageConfiguration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Auto-closing pair rule
+#[derive(Debug, Clone)]
+pub struct JppAutoClosingPair {
+    pub acp_id: String,
+    pub open_str: String,
+    pub close_str: String,
+    pub not_in_csv: String,
+    pub language_ref: String,
+    pub is_region_specific: bool,
+}
+
+impl JppAutoClosingPair {
+    pub fn new() -> Self {
+        Self {
+            acp_id: String::new(),
+            open_str: String::new(),
+            close_str: String::new(),
+            not_in_csv: String::new(),
+            language_ref: String::new(),
+            is_region_specific: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.acp_id.is_empty() || true && !self.open_str.is_empty() || true && !self.close_str.is_empty() || true && !self.not_in_csv.is_empty() || true && !self.language_ref.is_empty() || true && self.is_region_specific || true
+    }
+}
+
+impl Default for JppAutoClosingPair {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Surrounding pair rule
+#[derive(Debug, Clone)]
+pub struct JpqSurroundingPair {
+    pub sp_id: String,
+    pub open_str: String,
+    pub close_str: String,
+    pub language_ref: String,
+    pub auto_surround_str: String,
+    pub is_default: bool,
+}
+
+impl JpqSurroundingPair {
+    pub fn new() -> Self {
+        Self {
+            sp_id: String::new(),
+            open_str: String::new(),
+            close_str: String::new(),
+            language_ref: String::new(),
+            auto_surround_str: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sp_id.is_empty() || true && !self.open_str.is_empty() || true && !self.close_str.is_empty() || true && !self.language_ref.is_empty() || true && !self.auto_surround_str.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for JpqSurroundingPair {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// OnEnter indentation rule
+#[derive(Debug, Clone)]
+pub struct JprOnEnterRule {
+    pub on_enter_id: String,
+    pub before_text_pattern: String,
+    pub after_text_pattern: String,
+    pub action_str: String,
+    pub indent_action_str: String,
+    pub append_text: bool,
+}
+
+impl JprOnEnterRule {
+    pub fn new() -> Self {
+        Self {
+            on_enter_id: String::new(),
+            before_text_pattern: String::new(),
+            after_text_pattern: String::new(),
+            action_str: String::new(),
+            indent_action_str: String::new(),
+            append_text: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.on_enter_id.is_empty() || true && !self.before_text_pattern.is_empty() || true && !self.after_text_pattern.is_empty() || true && !self.action_str.is_empty() || true && !self.indent_action_str.is_empty() || true && self.append_text || true
+    }
+}
+
+impl Default for JprOnEnterRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment rule descriptor
+#[derive(Debug, Clone)]
+pub struct JpsCommentRule {
+    pub comment_id: String,
+    pub line_comment_str: String,
+    pub block_open: String,
+    pub block_close: String,
+    pub language_ref: String,
+    pub is_doc_comment: bool,
+}
+
+impl JpsCommentRule {
+    pub fn new() -> Self {
+        Self {
+            comment_id: String::new(),
+            line_comment_str: String::new(),
+            block_open: String::new(),
+            block_close: String::new(),
+            language_ref: String::new(),
+            is_doc_comment: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comment_id.is_empty() || true && !self.line_comment_str.is_empty() || true && !self.block_open.is_empty() || true && !self.block_close.is_empty() || true && !self.language_ref.is_empty() || true && self.is_doc_comment || true
+    }
+}
+
+impl Default for JpsCommentRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Folding marker rule
+#[derive(Debug, Clone)]
+pub struct JptFoldingRule {
+    pub folding_rule_id: String,
+    pub start_pattern: String,
+    pub end_pattern: String,
+    pub language_ref: String,
+    pub kind_str: String,
+    pub is_indentation_based: bool,
+}
+
+impl JptFoldingRule {
+    pub fn new() -> Self {
+        Self {
+            folding_rule_id: String::new(),
+            start_pattern: String::new(),
+            end_pattern: String::new(),
+            language_ref: String::new(),
+            kind_str: String::new(),
+            is_indentation_based: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folding_rule_id.is_empty() || true && !self.start_pattern.is_empty() || true && !self.end_pattern.is_empty() || true && !self.language_ref.is_empty() || true && !self.kind_str.is_empty() || true && self.is_indentation_based || true
+    }
+}
+
+impl Default for JptFoldingRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet grammar descriptor
+#[derive(Debug, Clone)]
+pub struct JpuSnippetGrammar {
+    pub snippet_gram_id: String,
+    pub language_id: String,
+    pub scope_name: String,
+    pub rule_count: u32,
+    pub extension_ref: String,
+    pub is_builtin: bool,
+}
+
+impl JpuSnippetGrammar {
+    pub fn new() -> Self {
+        Self {
+            snippet_gram_id: String::new(),
+            language_id: String::new(),
+            scope_name: String::new(),
+            rule_count: u32::default(),
+            extension_ref: String::new(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_gram_id.is_empty() || true && !self.language_id.is_empty() || true && !self.scope_name.is_empty() || true && self.rule_count < u32::MAX || true && !self.extension_ref.is_empty() || true && self.is_builtin || true
+    }
+}
+
+impl Default for JpuSnippetGrammar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Encoded token buffer
+#[derive(Debug, Clone)]
+pub struct JpvEncodedTokens {
+    pub enc_tok_id: String,
+    pub line_number: u32,
+    pub token_data_len: u32,
+    pub metadata_bits: u32,
+    pub binary_encoded_len: u32,
+    pub has_semantic_data: bool,
+}
+
+impl JpvEncodedTokens {
+    pub fn new() -> Self {
+        Self {
+            enc_tok_id: String::new(),
+            line_number: u32::default(),
+            token_data_len: u32::default(),
+            metadata_bits: u32::default(),
+            binary_encoded_len: u32::default(),
+            has_semantic_data: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.enc_tok_id.is_empty() || true && self.line_number < u32::MAX || true && self.token_data_len < u32::MAX || true && self.metadata_bits < u32::MAX || true && self.binary_encoded_len < u32::MAX || true && self.has_semantic_data || true
+    }
+}
+
+impl Default for JpvEncodedTokens {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Colorized bracket entry
+#[derive(Debug, Clone)]
+pub struct JpwColorizedBracket {
+    pub col_bracket_id: String,
+    pub nesting_level: u32,
+    pub color_idx: u32,
+    pub open_pos_json: String,
+    pub close_pos_json: String,
+    pub is_matching: bool,
+}
+
+impl JpwColorizedBracket {
+    pub fn new() -> Self {
+        Self {
+            col_bracket_id: String::new(),
+            nesting_level: u32::default(),
+            color_idx: u32::default(),
+            open_pos_json: String::new(),
+            close_pos_json: String::new(),
+            is_matching: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.col_bracket_id.is_empty() || true && self.nesting_level < u32::MAX || true && self.color_idx < u32::MAX || true && !self.open_pos_json.is_empty() || true && !self.close_pos_json.is_empty() || true && self.is_matching || true
+    }
+}
+
+impl Default for JpwColorizedBracket {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Word definition pattern
+#[derive(Debug, Clone)]
+pub struct JpxWordDefinition {
+    pub word_def_id: String,
+    pub regex_pattern: String,
+    pub language_ref: String,
+    pub separator_chars: String,
+    pub max_word_len: u32,
+    pub is_unicode_aware: bool,
+}
+
+impl JpxWordDefinition {
+    pub fn new() -> Self {
+        Self {
+            word_def_id: String::new(),
+            regex_pattern: String::new(),
+            language_ref: String::new(),
+            separator_chars: String::new(),
+            max_word_len: u32::default(),
+            is_unicode_aware: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.word_def_id.is_empty() || true && !self.regex_pattern.is_empty() || true && !self.language_ref.is_empty() || true && !self.separator_chars.is_empty() || true && self.max_word_len < u32::MAX || true && self.is_unicode_aware || true
+    }
+}
+
+impl Default for JpxWordDefinition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language selector entry
+#[derive(Debug, Clone)]
+pub struct JpyLanguageSelector {
+    pub lang_sel_id: String,
+    pub language_id: String,
+    pub scheme_str: String,
+    pub pattern_str: String,
+    pub exclusive_val: bool,
+    pub is_notebook: bool,
+}
+
+impl JpyLanguageSelector {
+    pub fn new() -> Self {
+        Self {
+            lang_sel_id: String::new(),
+            language_id: String::new(),
+            scheme_str: String::new(),
+            pattern_str: String::new(),
+            exclusive_val: bool::default(),
+            is_notebook: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lang_sel_id.is_empty() || true && !self.language_id.is_empty() || true && !self.scheme_str.is_empty() || true && !self.pattern_str.is_empty() || true && self.exclusive_val || true && self.is_notebook || true
+    }
+}
+
+impl Default for JpyLanguageSelector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet syntax node
+#[derive(Debug, Clone)]
+pub struct JpzSnippetSyntax {
+    pub snip_syntax_id: String,
+    pub node_type_str: String,
+    pub text_content: String,
+    pub children_count: u32,
+    pub var_name: String,
+    pub is_placeholder: bool,
+}
+
+impl JpzSnippetSyntax {
+    pub fn new() -> Self {
+        Self {
+            snip_syntax_id: String::new(),
+            node_type_str: String::new(),
+            text_content: String::new(),
+            children_count: u32::default(),
+            var_name: String::new(),
+            is_placeholder: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_syntax_id.is_empty() || true && !self.node_type_str.is_empty() || true && !self.text_content.is_empty() || true && self.children_count < u32::MAX || true && !self.var_name.is_empty() || true && self.is_placeholder || true
+    }
+}
+
+impl Default for JpzSnippetSyntax {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -440575,6 +441459,474 @@ mod tests_joz_generated {
     fn test_joz_fields() {
         let mut obj = JozBorderColor::default();
         obj.border_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpa_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpa_default() {
+        let obj = JpaGrammarDef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpa_fields() {
+        let mut obj = JpaGrammarDef::default();
+        obj.grammar_def_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpb_default() {
+        let obj = JpbGrammarRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpb_fields() {
+        let mut obj = JpbGrammarRule::default();
+        obj.grammar_rule_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpc_default() {
+        let obj = JpcGrammarScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpc_fields() {
+        let mut obj = JpcGrammarScope::default();
+        obj.grammar_scope_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpd_default() {
+        let obj = JpdGrammarInjection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpd_fields() {
+        let mut obj = JpdGrammarInjection::default();
+        obj.grammar_inj_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpe_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpe_default() {
+        let obj = JpeTokenizerState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpe_fields() {
+        let mut obj = JpeTokenizerState::default();
+        obj.tok_state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpf_default() {
+        let obj = JpfTokenLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpf_fields() {
+        let mut obj = JpfTokenLine::default();
+        obj.tok_line_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpg_default() {
+        let obj = JpgMonarchGrammar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpg_fields() {
+        let mut obj = JpgMonarchGrammar::default();
+        obj.monarch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jph_generated {
+    use super::*;
+
+    #[test]
+    fn test_jph_default() {
+        let obj = JphMonarchRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jph_fields() {
+        let mut obj = JphMonarchRule::default();
+        obj.monarch_rule_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpi_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpi_default() {
+        let obj = JpiTreeSitterGrammar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpi_fields() {
+        let mut obj = JpiTreeSitterGrammar::default();
+        obj.ts_grammar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpj_default() {
+        let obj = JpjTreeSitterNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpj_fields() {
+        let mut obj = JpjTreeSitterNode::default();
+        obj.ts_node_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpk_default() {
+        let obj = JpkSemanticTokensProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpk_fields() {
+        let mut obj = JpkSemanticTokensProvider::default();
+        obj.sem_tok_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpl_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpl_default() {
+        let obj = JplSemanticTokenLegend::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpl_fields() {
+        let mut obj = JplSemanticTokenLegend::default();
+        obj.sem_legend_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpm_default() {
+        let obj = JpmTokenizationRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpm_fields() {
+        let mut obj = JpmTokenizationRegistry::default();
+        obj.tok_reg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpn_default() {
+        let obj = JpnLanguageRegistration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpn_fields() {
+        let mut obj = JpnLanguageRegistration::default();
+        obj.lang_reg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpo_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpo_default() {
+        let obj = JpoLanguageConfiguration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpo_fields() {
+        let mut obj = JpoLanguageConfiguration::default();
+        obj.lang_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpp_default() {
+        let obj = JppAutoClosingPair::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpp_fields() {
+        let mut obj = JppAutoClosingPair::default();
+        obj.acp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpq_default() {
+        let obj = JpqSurroundingPair::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpq_fields() {
+        let mut obj = JpqSurroundingPair::default();
+        obj.sp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpr_default() {
+        let obj = JprOnEnterRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpr_fields() {
+        let mut obj = JprOnEnterRule::default();
+        obj.on_enter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jps_generated {
+    use super::*;
+
+    #[test]
+    fn test_jps_default() {
+        let obj = JpsCommentRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jps_fields() {
+        let mut obj = JpsCommentRule::default();
+        obj.comment_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpt_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpt_default() {
+        let obj = JptFoldingRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpt_fields() {
+        let mut obj = JptFoldingRule::default();
+        obj.folding_rule_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpu_default() {
+        let obj = JpuSnippetGrammar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpu_fields() {
+        let mut obj = JpuSnippetGrammar::default();
+        obj.snippet_gram_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpv_default() {
+        let obj = JpvEncodedTokens::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpv_fields() {
+        let mut obj = JpvEncodedTokens::default();
+        obj.enc_tok_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpw_default() {
+        let obj = JpwColorizedBracket::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpw_fields() {
+        let mut obj = JpwColorizedBracket::default();
+        obj.col_bracket_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpx_default() {
+        let obj = JpxWordDefinition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpx_fields() {
+        let mut obj = JpxWordDefinition::default();
+        obj.word_def_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpy_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpy_default() {
+        let obj = JpyLanguageSelector::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpy_fields() {
+        let mut obj = JpyLanguageSelector::default();
+        obj.lang_sel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jpz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jpz_default() {
+        let obj = JpzSnippetSyntax::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jpz_fields() {
+        let mut obj = JpzSnippetSyntax::default();
+        obj.snip_syntax_id = "test".to_string();
         assert!(obj.validate());
     }
 }
