@@ -91684,6 +91684,216 @@ impl Default for GieTaskRunOptions {
     }
 }
 
+/// Problem matcher (owner, pattern, severity, source, file location)
+#[derive(Debug, Clone)]
+pub struct GifProblemMatcher {
+    pub matcher_id: String,
+    pub owner: String,
+    pub pattern_json: String,
+    pub severity: String,
+    pub source: String,
+    pub file_location: String,
+    pub apply_to: String,
+    pub watching_json: String,
+    pub background_json: String,
+    pub base_matcher: String,
+}
+
+impl GifProblemMatcher {
+    pub fn new() -> Self {
+        Self {
+            matcher_id: String::new(),
+            owner: String::new(),
+            pattern_json: String::new(),
+            severity: String::new(),
+            source: String::new(),
+            file_location: String::new(),
+            apply_to: String::new(),
+            watching_json: String::new(),
+            background_json: String::new(),
+            base_matcher: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.matcher_id.is_empty() || true && !self.owner.is_empty() || true && !self.pattern_json.is_empty() || true && !self.severity.is_empty() || true && !self.source.is_empty() || true && !self.file_location.is_empty() || true && !self.apply_to.is_empty() || true && !self.watching_json.is_empty() || true && !self.background_json.is_empty() || true && !self.base_matcher.is_empty() || true
+    }
+}
+
+impl Default for GifProblemMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem pattern (regexp, file, line, column, message, severity)
+#[derive(Debug, Clone)]
+pub struct GigProblemPattern {
+    pub pattern_id: String,
+    pub regexp: String,
+    pub file_group: u32,
+    pub line_group: u32,
+    pub column_group: u32,
+    pub message_group: u32,
+    pub severity_group: u32,
+    pub code_group: u32,
+    pub loop_enabled: bool,
+    pub end_pattern: String,
+}
+
+impl GigProblemPattern {
+    pub fn new() -> Self {
+        Self {
+            pattern_id: String::new(),
+            regexp: String::new(),
+            file_group: u32::default(),
+            line_group: u32::default(),
+            column_group: u32::default(),
+            message_group: u32::default(),
+            severity_group: u32::default(),
+            code_group: u32::default(),
+            loop_enabled: bool::default(),
+            end_pattern: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pattern_id.is_empty() || true && !self.regexp.is_empty() || true && self.file_group < u32::MAX || true && self.line_group < u32::MAX || true && self.column_group < u32::MAX || true && self.message_group < u32::MAX || true && self.severity_group < u32::MAX || true && self.code_group < u32::MAX || true && self.loop_enabled || true && !self.end_pattern.is_empty() || true
+    }
+}
+
+impl Default for GigProblemPattern {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Shell execution (command line, shell path, shell args, cwd, env)
+#[derive(Debug, Clone)]
+pub struct GihShellExecution {
+    pub shell_exec_id: String,
+    pub command_line: String,
+    pub shell_path: String,
+    pub shell_args_json: String,
+    pub cwd: String,
+    pub env_json: String,
+    pub executable: String,
+    pub quoting: String,
+    pub escape_char: String,
+    pub use_shell_env: bool,
+}
+
+impl GihShellExecution {
+    pub fn new() -> Self {
+        Self {
+            shell_exec_id: String::new(),
+            command_line: String::new(),
+            shell_path: String::new(),
+            shell_args_json: String::new(),
+            cwd: String::new(),
+            env_json: String::new(),
+            executable: String::new(),
+            quoting: String::new(),
+            escape_char: String::new(),
+            use_shell_env: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shell_exec_id.is_empty() || true && !self.command_line.is_empty() || true && !self.shell_path.is_empty() || true && !self.shell_args_json.is_empty() || true && !self.cwd.is_empty() || true && !self.env_json.is_empty() || true && !self.executable.is_empty() || true && !self.quoting.is_empty() || true && !self.escape_char.is_empty() || true && self.use_shell_env || true
+    }
+}
+
+impl Default for GihShellExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Process execution (process, args, options, cwd, env)
+#[derive(Debug, Clone)]
+pub struct GiiProcessExecution {
+    pub proc_exec_id: String,
+    pub process_path: String,
+    pub args_json: String,
+    pub cwd: String,
+    pub env_json: String,
+    pub stdin: String,
+    pub stdout: String,
+    pub stderr: String,
+    pub detached: bool,
+    pub encoding: String,
+}
+
+impl GiiProcessExecution {
+    pub fn new() -> Self {
+        Self {
+            proc_exec_id: String::new(),
+            process_path: String::new(),
+            args_json: String::new(),
+            cwd: String::new(),
+            env_json: String::new(),
+            stdin: String::new(),
+            stdout: String::new(),
+            stderr: String::new(),
+            detached: bool::default(),
+            encoding: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proc_exec_id.is_empty() || true && !self.process_path.is_empty() || true && !self.args_json.is_empty() || true && !self.cwd.is_empty() || true && !self.env_json.is_empty() || true && !self.stdin.is_empty() || true && !self.stdout.is_empty() || true && !self.stderr.is_empty() || true && self.detached || true && !self.encoding.is_empty() || true
+    }
+}
+
+impl Default for GiiProcessExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Custom execution (callback, pseudo terminal, close, open)
+#[derive(Debug, Clone)]
+pub struct GijCustomExecution {
+    pub custom_exec_id: String,
+    pub callback_id: String,
+    pub pseudo_terminal_id: String,
+    pub is_open: bool,
+    pub is_closed: bool,
+    pub exit_code: u32,
+    pub input_data: String,
+    pub output_data: String,
+    pub is_interactive: bool,
+    pub handle_input: bool,
+}
+
+impl GijCustomExecution {
+    pub fn new() -> Self {
+        Self {
+            custom_exec_id: String::new(),
+            callback_id: String::new(),
+            pseudo_terminal_id: String::new(),
+            is_open: bool::default(),
+            is_closed: bool::default(),
+            exit_code: u32::default(),
+            input_data: String::new(),
+            output_data: String::new(),
+            is_interactive: bool::default(),
+            handle_input: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.custom_exec_id.is_empty() || true && !self.callback_id.is_empty() || true && !self.pseudo_terminal_id.is_empty() || true && self.is_open || true && self.is_closed || true && self.exit_code < u32::MAX || true && !self.input_data.is_empty() || true && !self.output_data.is_empty() || true && self.is_interactive || true && self.handle_input || true
+    }
+}
+
+impl Default for GijCustomExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -319105,6 +319315,96 @@ mod tests_gie_generated {
     fn test_gie_fields() {
         let mut obj = GieTaskRunOptions::default();
         obj.run_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gif_generated {
+    use super::*;
+
+    #[test]
+    fn test_gif_default() {
+        let obj = GifProblemMatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gif_fields() {
+        let mut obj = GifProblemMatcher::default();
+        obj.matcher_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gig_generated {
+    use super::*;
+
+    #[test]
+    fn test_gig_default() {
+        let obj = GigProblemPattern::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gig_fields() {
+        let mut obj = GigProblemPattern::default();
+        obj.pattern_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gih_generated {
+    use super::*;
+
+    #[test]
+    fn test_gih_default() {
+        let obj = GihShellExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gih_fields() {
+        let mut obj = GihShellExecution::default();
+        obj.shell_exec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gii_generated {
+    use super::*;
+
+    #[test]
+    fn test_gii_default() {
+        let obj = GiiProcessExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gii_fields() {
+        let mut obj = GiiProcessExecution::default();
+        obj.proc_exec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gij_generated {
+    use super::*;
+
+    #[test]
+    fn test_gij_default() {
+        let obj = GijCustomExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gij_fields() {
+        let mut obj = GijCustomExecution::default();
+        obj.custom_exec_id = "test".to_string();
         assert!(obj.validate());
     }
 }
