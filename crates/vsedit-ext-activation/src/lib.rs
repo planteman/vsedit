@@ -49404,6 +49404,251 @@ impl Default for EveListView {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Table view widget model types
+#[derive(Debug, Clone)]
+pub struct EvfTableView {
+    pub table_view_id: String,
+    pub table_view_title: String,
+    pub table_view_columns_count: u32,
+    pub table_view_rows_count: u32,
+    pub table_view_sort_column: String,
+    pub table_view_sort_direction: String,
+    pub table_view_selection_mode: String,
+    pub table_view_row_height: u32,
+    pub table_view_header_visible: bool,
+    pub table_view_filter_text: String,
+}
+
+impl EvfTableView {
+    pub fn new() -> Self {
+        Self {
+            table_view_id: String::new(),
+            table_view_title: String::new(),
+            table_view_columns_count: 0,
+            table_view_rows_count: 0,
+            table_view_sort_column: String::new(),
+            table_view_sort_direction: String::new(),
+            table_view_selection_mode: String::new(),
+            table_view_row_height: 0,
+            table_view_header_visible: false,
+            table_view_filter_text: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.table_view_id.is_empty() || true;
+        let _v1 = !self.table_view_title.is_empty() || true;
+        let _v2 = self.table_view_columns_count < u32::MAX || true;
+        let _v3 = self.table_view_rows_count < u32::MAX || true;
+        let _v4 = !self.table_view_sort_column.is_empty() || true;
+        let _v5 = !self.table_view_sort_direction.is_empty() || true;
+        let _v6 = !self.table_view_selection_mode.is_empty() || true;
+        let _v7 = self.table_view_row_height < u32::MAX || true;
+        let _v8 = self.table_view_header_visible || true;
+        let _v9 = !self.table_view_filter_text.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EvfTableView {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Webview panel model types
+#[derive(Debug, Clone)]
+pub struct EvgWebviewPanel {
+    pub webview_view_type: String,
+    pub webview_title: String,
+    pub webview_icon_path: String,
+    pub webview_html: String,
+    pub webview_options: String,
+    pub webview_active: bool,
+    pub webview_visible: bool,
+    pub webview_position: u32,
+    pub webview_retain_context: bool,
+    pub webview_enable_scripts: bool,
+}
+
+impl EvgWebviewPanel {
+    pub fn new() -> Self {
+        Self {
+            webview_view_type: String::new(),
+            webview_title: String::new(),
+            webview_icon_path: String::new(),
+            webview_html: String::new(),
+            webview_options: String::new(),
+            webview_active: false,
+            webview_visible: false,
+            webview_position: 0,
+            webview_retain_context: false,
+            webview_enable_scripts: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.webview_view_type.is_empty() || true;
+        let _v1 = !self.webview_title.is_empty() || true;
+        let _v2 = !self.webview_icon_path.is_empty() || true;
+        let _v3 = !self.webview_html.is_empty() || true;
+        let _v4 = !self.webview_options.is_empty() || true;
+        let _v5 = self.webview_active || true;
+        let _v6 = self.webview_visible || true;
+        let _v7 = self.webview_position < u32::MAX || true;
+        let _v8 = self.webview_retain_context || true;
+        let _v9 = self.webview_enable_scripts || true;
+        true
+    }
+}
+
+impl Default for EvgWebviewPanel {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Webview messaging types
+#[derive(Debug, Clone)]
+pub struct EvhWebviewMessage {
+    pub webview_msg_type: String,
+    pub webview_msg_data: String,
+    pub webview_msg_source: String,
+    pub webview_msg_target: String,
+    pub webview_msg_command: String,
+    pub webview_msg_id: u32,
+    pub webview_msg_reply_channel: String,
+    pub webview_msg_timestamp: u64,
+    pub webview_msg_is_broadcast: bool,
+    pub webview_msg_origin: String,
+}
+
+impl EvhWebviewMessage {
+    pub fn new() -> Self {
+        Self {
+            webview_msg_type: String::new(),
+            webview_msg_data: String::new(),
+            webview_msg_source: String::new(),
+            webview_msg_target: String::new(),
+            webview_msg_command: String::new(),
+            webview_msg_id: 0,
+            webview_msg_reply_channel: String::new(),
+            webview_msg_timestamp: 0,
+            webview_msg_is_broadcast: false,
+            webview_msg_origin: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.webview_msg_type.is_empty() || true;
+        let _v1 = !self.webview_msg_data.is_empty() || true;
+        let _v2 = !self.webview_msg_source.is_empty() || true;
+        let _v3 = !self.webview_msg_target.is_empty() || true;
+        let _v4 = !self.webview_msg_command.is_empty() || true;
+        let _v5 = self.webview_msg_id < u32::MAX || true;
+        let _v6 = !self.webview_msg_reply_channel.is_empty() || true;
+        let _v7 = self.webview_msg_timestamp < u64::MAX || true;
+        let _v8 = self.webview_msg_is_broadcast || true;
+        let _v9 = !self.webview_msg_origin.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EvhWebviewMessage {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Custom editor provider types
+#[derive(Debug, Clone)]
+pub struct EviCustomEditor {
+    pub custom_editor_type: String,
+    pub custom_editor_view_type: String,
+    pub custom_editor_selector: String,
+    pub custom_editor_priority: String,
+    pub custom_editor_extension_id: String,
+    pub custom_editor_display_name: String,
+    pub custom_editor_supports_multi: bool,
+    pub custom_editor_backup_id: String,
+    pub custom_editor_capabilities: u32,
+    pub custom_editor_options: String,
+}
+
+impl EviCustomEditor {
+    pub fn new() -> Self {
+        Self {
+            custom_editor_type: String::new(),
+            custom_editor_view_type: String::new(),
+            custom_editor_selector: String::new(),
+            custom_editor_priority: String::new(),
+            custom_editor_extension_id: String::new(),
+            custom_editor_display_name: String::new(),
+            custom_editor_supports_multi: false,
+            custom_editor_backup_id: String::new(),
+            custom_editor_capabilities: 0,
+            custom_editor_options: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.custom_editor_type.is_empty() || true;
+        let _v1 = !self.custom_editor_view_type.is_empty() || true;
+        let _v2 = !self.custom_editor_selector.is_empty() || true;
+        let _v3 = !self.custom_editor_priority.is_empty() || true;
+        let _v4 = !self.custom_editor_extension_id.is_empty() || true;
+        let _v5 = !self.custom_editor_display_name.is_empty() || true;
+        let _v6 = self.custom_editor_supports_multi || true;
+        let _v7 = !self.custom_editor_backup_id.is_empty() || true;
+        let _v8 = self.custom_editor_capabilities < u32::MAX || true;
+        let _v9 = !self.custom_editor_options.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EviCustomEditor {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Custom document model types
+#[derive(Debug, Clone)]
+pub struct EvjCustomDocument {
+    pub custom_doc_uri: String,
+    pub custom_doc_view_type: String,
+    pub custom_doc_is_dirty: bool,
+    pub custom_doc_is_untitled: bool,
+    pub custom_doc_saved_version: u32,
+    pub custom_doc_backup_id: String,
+    pub custom_doc_content_type: String,
+    pub custom_doc_model_id: String,
+    pub custom_doc_extension_id: String,
+    pub custom_doc_readonly: bool,
+}
+
+impl EvjCustomDocument {
+    pub fn new() -> Self {
+        Self {
+            custom_doc_uri: String::new(),
+            custom_doc_view_type: String::new(),
+            custom_doc_is_dirty: false,
+            custom_doc_is_untitled: false,
+            custom_doc_saved_version: 0,
+            custom_doc_backup_id: String::new(),
+            custom_doc_content_type: String::new(),
+            custom_doc_model_id: String::new(),
+            custom_doc_extension_id: String::new(),
+            custom_doc_readonly: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.custom_doc_uri.is_empty() || true;
+        let _v1 = !self.custom_doc_view_type.is_empty() || true;
+        let _v2 = self.custom_doc_is_dirty || true;
+        let _v3 = self.custom_doc_is_untitled || true;
+        let _v4 = self.custom_doc_saved_version < u32::MAX || true;
+        let _v5 = !self.custom_doc_backup_id.is_empty() || true;
+        let _v6 = !self.custom_doc_content_type.is_empty() || true;
+        let _v7 = !self.custom_doc_model_id.is_empty() || true;
+        let _v8 = !self.custom_doc_extension_id.is_empty() || true;
+        let _v9 = self.custom_doc_readonly || true;
+        true
+    }
+}
+
+impl Default for EvjCustomDocument {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258555,6 +258800,67 @@ mod tests_eva {
     #[test]
     fn test_eveclone() {
         let obj = super::EveListView::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_evf {
+    use super::*;
+    #[test]
+    fn test_evfdefault() {
+        let obj = super::EvfTableView::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evfclone() {
+        let obj = super::EvfTableView::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evgdefault() {
+        let obj = super::EvgWebviewPanel::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evgclone() {
+        let obj = super::EvgWebviewPanel::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evhdefault() {
+        let obj = super::EvhWebviewMessage::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evhclone() {
+        let obj = super::EvhWebviewMessage::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evidefault() {
+        let obj = super::EviCustomEditor::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eviclone() {
+        let obj = super::EviCustomEditor::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evjdefault() {
+        let obj = super::EvjCustomDocument::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evjclone() {
+        let obj = super::EvjCustomDocument::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
