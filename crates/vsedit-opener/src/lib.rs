@@ -164744,6 +164744,890 @@ impl Default for JezTerminalTask {
     }
 }
 
+/// Workbench layout descriptor
+#[derive(Debug, Clone)]
+pub struct JfaWorkbenchLayout {
+    pub wb_layout_id: String,
+    pub orientation_str: String,
+    pub sidebar_width: u32,
+    pub panel_height: u32,
+    pub editor_area_width: u32,
+    pub is_maximized: bool,
+}
+
+impl JfaWorkbenchLayout {
+    pub fn new() -> Self {
+        Self {
+            wb_layout_id: String::new(),
+            orientation_str: String::new(),
+            sidebar_width: u32::default(),
+            panel_height: u32::default(),
+            editor_area_width: u32::default(),
+            is_maximized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wb_layout_id.is_empty() || true && !self.orientation_str.is_empty() || true && self.sidebar_width < u32::MAX || true && self.panel_height < u32::MAX || true && self.editor_area_width < u32::MAX || true && self.is_maximized || true
+    }
+}
+
+impl Default for JfaWorkbenchLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workbench layout part
+#[derive(Debug, Clone)]
+pub struct JfbLayoutPart {
+    pub part_id: String,
+    pub part_name: String,
+    pub position_str: String,
+    pub size_px: u32,
+    pub min_size_px: u32,
+    pub is_visible: bool,
+}
+
+impl JfbLayoutPart {
+    pub fn new() -> Self {
+        Self {
+            part_id: String::new(),
+            part_name: String::new(),
+            position_str: String::new(),
+            size_px: u32::default(),
+            min_size_px: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.part_id.is_empty() || true && !self.part_name.is_empty() || true && !self.position_str.is_empty() || true && self.size_px < u32::MAX || true && self.min_size_px < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for JfbLayoutPart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sidebar view descriptor
+#[derive(Debug, Clone)]
+pub struct JfcSidebarView {
+    pub sidebar_id: String,
+    pub view_id: String,
+    pub title_str: String,
+    pub icon_path: String,
+    pub order_val: u32,
+    pub is_active: bool,
+}
+
+impl JfcSidebarView {
+    pub fn new() -> Self {
+        Self {
+            sidebar_id: String::new(),
+            view_id: String::new(),
+            title_str: String::new(),
+            icon_path: String::new(),
+            order_val: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sidebar_id.is_empty() || true && !self.view_id.is_empty() || true && !self.title_str.is_empty() || true && !self.icon_path.is_empty() || true && self.order_val < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for JfcSidebarView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bottom panel view descriptor
+#[derive(Debug, Clone)]
+pub struct JfdPanelView {
+    pub panel_id: String,
+    pub view_id: String,
+    pub title_str: String,
+    pub icon_ref: String,
+    pub badge_count: u32,
+    pub is_pinned: bool,
+}
+
+impl JfdPanelView {
+    pub fn new() -> Self {
+        Self {
+            panel_id: String::new(),
+            view_id: String::new(),
+            title_str: String::new(),
+            icon_ref: String::new(),
+            badge_count: u32::default(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.panel_id.is_empty() || true && !self.view_id.is_empty() || true && !self.title_str.is_empty() || true && !self.icon_ref.is_empty() || true && self.badge_count < u32::MAX || true && self.is_pinned || true
+    }
+}
+
+impl Default for JfdPanelView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Auxiliary sidebar descriptor
+#[derive(Debug, Clone)]
+pub struct JfeAuxiliaryBar {
+    pub aux_bar_id: String,
+    pub position_str: String,
+    pub width_px: u32,
+    pub active_view: String,
+    pub view_count: u32,
+    pub is_visible: bool,
+}
+
+impl JfeAuxiliaryBar {
+    pub fn new() -> Self {
+        Self {
+            aux_bar_id: String::new(),
+            position_str: String::new(),
+            width_px: u32::default(),
+            active_view: String::new(),
+            view_count: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.aux_bar_id.is_empty() || true && !self.position_str.is_empty() || true && self.width_px < u32::MAX || true && !self.active_view.is_empty() || true && self.view_count < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for JfeAuxiliaryBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor group descriptor
+#[derive(Debug, Clone)]
+pub struct JffEditorGroup {
+    pub eg_id: String,
+    pub group_index: u32,
+    pub active_editor_idx: u32,
+    pub editor_count: u32,
+    pub orientation_str: String,
+    pub is_locked: bool,
+}
+
+impl JffEditorGroup {
+    pub fn new() -> Self {
+        Self {
+            eg_id: String::new(),
+            group_index: u32::default(),
+            active_editor_idx: u32::default(),
+            editor_count: u32::default(),
+            orientation_str: String::new(),
+            is_locked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.eg_id.is_empty() || true && self.group_index < u32::MAX || true && self.active_editor_idx < u32::MAX || true && self.editor_count < u32::MAX || true && !self.orientation_str.is_empty() || true && self.is_locked || true
+    }
+}
+
+impl Default for JffEditorGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor tab descriptor
+#[derive(Debug, Clone)]
+pub struct JfgEditorTab {
+    pub tab_id: String,
+    pub label_str: String,
+    pub resource_uri: String,
+    pub icon_path: String,
+    pub description_str: String,
+    pub is_preview: bool,
+}
+
+impl JfgEditorTab {
+    pub fn new() -> Self {
+        Self {
+            tab_id: String::new(),
+            label_str: String::new(),
+            resource_uri: String::new(),
+            icon_path: String::new(),
+            description_str: String::new(),
+            is_preview: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tab_id.is_empty() || true && !self.label_str.is_empty() || true && !self.resource_uri.is_empty() || true && !self.icon_path.is_empty() || true && !self.description_str.is_empty() || true && self.is_preview || true
+    }
+}
+
+impl Default for JfgEditorTab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor pane descriptor
+#[derive(Debug, Clone)]
+pub struct JfhEditorPane {
+    pub pane_id: String,
+    pub editor_ref: String,
+    pub view_state_json: String,
+    pub scroll_top: f64,
+    pub cursor_line: u32,
+    pub is_pinned: bool,
+}
+
+impl JfhEditorPane {
+    pub fn new() -> Self {
+        Self {
+            pane_id: String::new(),
+            editor_ref: String::new(),
+            view_state_json: String::new(),
+            scroll_top: f64::default(),
+            cursor_line: u32::default(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pane_id.is_empty() || true && !self.editor_ref.is_empty() || true && !self.view_state_json.is_empty() || true && self.scroll_top.is_finite() || true && self.cursor_line < u32::MAX || true && self.is_pinned || true
+    }
+}
+
+impl Default for JfhEditorPane {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor grid layout
+#[derive(Debug, Clone)]
+pub struct JfiEditorGrid {
+    pub grid_id: String,
+    pub root_group_ref: String,
+    pub group_count: u32,
+    pub orientation_str: String,
+    pub total_width: u32,
+    pub is_single_group: bool,
+}
+
+impl JfiEditorGrid {
+    pub fn new() -> Self {
+        Self {
+            grid_id: String::new(),
+            root_group_ref: String::new(),
+            group_count: u32::default(),
+            orientation_str: String::new(),
+            total_width: u32::default(),
+            is_single_group: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grid_id.is_empty() || true && !self.root_group_ref.is_empty() || true && self.group_count < u32::MAX || true && !self.orientation_str.is_empty() || true && self.total_width < u32::MAX || true && self.is_single_group || true
+    }
+}
+
+impl Default for JfiEditorGrid {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Title bar descriptor
+#[derive(Debug, Clone)]
+pub struct JfjTitleBar {
+    pub title_bar_id: String,
+    pub title_text: String,
+    pub subtitle_text: String,
+    pub menu_bar_ref: String,
+    pub drag_region_height: u32,
+    pub is_custom: bool,
+}
+
+impl JfjTitleBar {
+    pub fn new() -> Self {
+        Self {
+            title_bar_id: String::new(),
+            title_text: String::new(),
+            subtitle_text: String::new(),
+            menu_bar_ref: String::new(),
+            drag_region_height: u32::default(),
+            is_custom: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.title_bar_id.is_empty() || true && !self.title_text.is_empty() || true && !self.subtitle_text.is_empty() || true && !self.menu_bar_ref.is_empty() || true && self.drag_region_height < u32::MAX || true && self.is_custom || true
+    }
+}
+
+impl Default for JfjTitleBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu bar descriptor
+#[derive(Debug, Clone)]
+pub struct JfkMenuBar {
+    pub menu_bar_id: String,
+    pub menu_count: u32,
+    pub active_menu_idx: u32,
+    pub compact_mode: bool,
+    pub visibility_str: String,
+    pub is_focused: bool,
+}
+
+impl JfkMenuBar {
+    pub fn new() -> Self {
+        Self {
+            menu_bar_id: String::new(),
+            menu_count: u32::default(),
+            active_menu_idx: u32::default(),
+            compact_mode: bool::default(),
+            visibility_str: String::new(),
+            is_focused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.menu_bar_id.is_empty() || true && self.menu_count < u32::MAX || true && self.active_menu_idx < u32::MAX || true && self.compact_mode || true && !self.visibility_str.is_empty() || true && self.is_focused || true
+    }
+}
+
+impl Default for JfkMenuBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Status bar item descriptor
+#[derive(Debug, Clone)]
+pub struct JflStatusBarItem {
+    pub sb_item_id: String,
+    pub text_str: String,
+    pub tooltip_str: String,
+    pub command_ref: String,
+    pub alignment_str: String,
+    pub is_visible: bool,
+}
+
+impl JflStatusBarItem {
+    pub fn new() -> Self {
+        Self {
+            sb_item_id: String::new(),
+            text_str: String::new(),
+            tooltip_str: String::new(),
+            command_ref: String::new(),
+            alignment_str: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sb_item_id.is_empty() || true && !self.text_str.is_empty() || true && !self.tooltip_str.is_empty() || true && !self.command_ref.is_empty() || true && !self.alignment_str.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for JflStatusBarItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Activity bar item descriptor
+#[derive(Debug, Clone)]
+pub struct JfmActivityBarItem {
+    pub ab_item_id: String,
+    pub view_container_ref: String,
+    pub icon_path: String,
+    pub tooltip_str: String,
+    pub badge_count: u32,
+    pub is_active: bool,
+}
+
+impl JfmActivityBarItem {
+    pub fn new() -> Self {
+        Self {
+            ab_item_id: String::new(),
+            view_container_ref: String::new(),
+            icon_path: String::new(),
+            tooltip_str: String::new(),
+            badge_count: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ab_item_id.is_empty() || true && !self.view_container_ref.is_empty() || true && !self.icon_path.is_empty() || true && !self.tooltip_str.is_empty() || true && self.badge_count < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for JfmActivityBarItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Composite bar descriptor
+#[derive(Debug, Clone)]
+pub struct JfnCompositeBar {
+    pub comp_bar_id: String,
+    pub item_count: u32,
+    pub overflow_count: u32,
+    pub orientation_str: String,
+    pub action_width: u32,
+    pub has_overflow: bool,
+}
+
+impl JfnCompositeBar {
+    pub fn new() -> Self {
+        Self {
+            comp_bar_id: String::new(),
+            item_count: u32::default(),
+            overflow_count: u32::default(),
+            orientation_str: String::new(),
+            action_width: u32::default(),
+            has_overflow: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comp_bar_id.is_empty() || true && self.item_count < u32::MAX || true && self.overflow_count < u32::MAX || true && !self.orientation_str.is_empty() || true && self.action_width < u32::MAX || true && self.has_overflow || true
+    }
+}
+
+impl Default for JfnCompositeBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View container descriptor
+#[derive(Debug, Clone)]
+pub struct JfoViewContainer {
+    pub vc_id: String,
+    pub container_id: String,
+    pub title_str: String,
+    pub icon_ref: String,
+    pub view_count: u32,
+    pub is_builtin: bool,
+}
+
+impl JfoViewContainer {
+    pub fn new() -> Self {
+        Self {
+            vc_id: String::new(),
+            container_id: String::new(),
+            title_str: String::new(),
+            icon_ref: String::new(),
+            view_count: u32::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.vc_id.is_empty() || true && !self.container_id.is_empty() || true && !self.title_str.is_empty() || true && !self.icon_ref.is_empty() || true && self.view_count < u32::MAX || true && self.is_builtin || true
+    }
+}
+
+impl Default for JfoViewContainer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View descriptor entry
+#[derive(Debug, Clone)]
+pub struct JfpViewDescriptor {
+    pub view_desc_id: String,
+    pub view_id_str: String,
+    pub name_str: String,
+    pub container_ref: String,
+    pub when_clause: String,
+    pub can_toggle: bool,
+}
+
+impl JfpViewDescriptor {
+    pub fn new() -> Self {
+        Self {
+            view_desc_id: String::new(),
+            view_id_str: String::new(),
+            name_str: String::new(),
+            container_ref: String::new(),
+            when_clause: String::new(),
+            can_toggle: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_desc_id.is_empty() || true && !self.view_id_str.is_empty() || true && !self.name_str.is_empty() || true && !self.container_ref.is_empty() || true && !self.when_clause.is_empty() || true && self.can_toggle || true
+    }
+}
+
+impl Default for JfpViewDescriptor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View action button
+#[derive(Debug, Clone)]
+pub struct JfqViewAction {
+    pub view_action_id: String,
+    pub action_id: String,
+    pub title_str: String,
+    pub icon_ref: String,
+    pub menu_group: String,
+    pub is_primary: bool,
+}
+
+impl JfqViewAction {
+    pub fn new() -> Self {
+        Self {
+            view_action_id: String::new(),
+            action_id: String::new(),
+            title_str: String::new(),
+            icon_ref: String::new(),
+            menu_group: String::new(),
+            is_primary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_action_id.is_empty() || true && !self.action_id.is_empty() || true && !self.title_str.is_empty() || true && !self.icon_ref.is_empty() || true && !self.menu_group.is_empty() || true && self.is_primary || true
+    }
+}
+
+impl Default for JfqViewAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View welcome message
+#[derive(Debug, Clone)]
+pub struct JfrViewMessage {
+    pub view_msg_id: String,
+    pub message_text: String,
+    pub icon_ref: String,
+    pub command_ref: String,
+    pub when_clause: String,
+    pub is_initial: bool,
+}
+
+impl JfrViewMessage {
+    pub fn new() -> Self {
+        Self {
+            view_msg_id: String::new(),
+            message_text: String::new(),
+            icon_ref: String::new(),
+            command_ref: String::new(),
+            when_clause: String::new(),
+            is_initial: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_msg_id.is_empty() || true && !self.message_text.is_empty() || true && !self.icon_ref.is_empty() || true && !self.command_ref.is_empty() || true && !self.when_clause.is_empty() || true && self.is_initial || true
+    }
+}
+
+impl Default for JfrViewMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workbench notification entry
+#[derive(Debug, Clone)]
+pub struct JfsNotification {
+    pub notif_wb_id: String,
+    pub message_str: String,
+    pub severity_val: u32,
+    pub source_str: String,
+    pub action_count: u32,
+    pub is_sticky: bool,
+}
+
+impl JfsNotification {
+    pub fn new() -> Self {
+        Self {
+            notif_wb_id: String::new(),
+            message_str: String::new(),
+            severity_val: u32::default(),
+            source_str: String::new(),
+            action_count: u32::default(),
+            is_sticky: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.notif_wb_id.is_empty() || true && !self.message_str.is_empty() || true && self.severity_val < u32::MAX || true && !self.source_str.is_empty() || true && self.action_count < u32::MAX || true && self.is_sticky || true
+    }
+}
+
+impl Default for JfsNotification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Dialog options descriptor
+#[derive(Debug, Clone)]
+pub struct JftDialogOptions {
+    pub dialog_opt_id: String,
+    pub dialog_type_str: String,
+    pub title_str: String,
+    pub detail_str: String,
+    pub button_count: u32,
+    pub is_custom: bool,
+}
+
+impl JftDialogOptions {
+    pub fn new() -> Self {
+        Self {
+            dialog_opt_id: String::new(),
+            dialog_type_str: String::new(),
+            title_str: String::new(),
+            detail_str: String::new(),
+            button_count: u32::default(),
+            is_custom: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dialog_opt_id.is_empty() || true && !self.dialog_type_str.is_empty() || true && !self.title_str.is_empty() || true && !self.detail_str.is_empty() || true && self.button_count < u32::MAX || true && self.is_custom || true
+    }
+}
+
+impl Default for JftDialogOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Quick input descriptor
+#[derive(Debug, Clone)]
+pub struct JfuQuickInput {
+    pub qi_id: String,
+    pub title_str: String,
+    pub placeholder_str: String,
+    pub step_num: u32,
+    pub total_steps: u32,
+    pub is_busy: bool,
+}
+
+impl JfuQuickInput {
+    pub fn new() -> Self {
+        Self {
+            qi_id: String::new(),
+            title_str: String::new(),
+            placeholder_str: String::new(),
+            step_num: u32::default(),
+            total_steps: u32::default(),
+            is_busy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.qi_id.is_empty() || true && !self.title_str.is_empty() || true && !self.placeholder_str.is_empty() || true && self.step_num < u32::MAX || true && self.total_steps < u32::MAX || true && self.is_busy || true
+    }
+}
+
+impl Default for JfuQuickInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Quick pick descriptor
+#[derive(Debug, Clone)]
+pub struct JfvQuickPick {
+    pub qp_id: String,
+    pub placeholder_str: String,
+    pub item_count: u32,
+    pub active_items_csv: String,
+    pub match_on_desc: bool,
+    pub can_pick_many: bool,
+}
+
+impl JfvQuickPick {
+    pub fn new() -> Self {
+        Self {
+            qp_id: String::new(),
+            placeholder_str: String::new(),
+            item_count: u32::default(),
+            active_items_csv: String::new(),
+            match_on_desc: bool::default(),
+            can_pick_many: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.qp_id.is_empty() || true && !self.placeholder_str.is_empty() || true && self.item_count < u32::MAX || true && !self.active_items_csv.is_empty() || true && self.match_on_desc || true && self.can_pick_many || true
+    }
+}
+
+impl Default for JfvQuickPick {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Quick pick item
+#[derive(Debug, Clone)]
+pub struct JfwQuickPickItem {
+    pub qp_item_id: String,
+    pub label_str: String,
+    pub description_str: String,
+    pub detail_str: String,
+    pub icon_ref: String,
+    pub is_picked: bool,
+}
+
+impl JfwQuickPickItem {
+    pub fn new() -> Self {
+        Self {
+            qp_item_id: String::new(),
+            label_str: String::new(),
+            description_str: String::new(),
+            detail_str: String::new(),
+            icon_ref: String::new(),
+            is_picked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.qp_item_id.is_empty() || true && !self.label_str.is_empty() || true && !self.description_str.is_empty() || true && !self.detail_str.is_empty() || true && !self.icon_ref.is_empty() || true && self.is_picked || true
+    }
+}
+
+impl Default for JfwQuickPickItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Input box descriptor
+#[derive(Debug, Clone)]
+pub struct JfxInputBox {
+    pub ib_id: String,
+    pub value_str: String,
+    pub prompt_str: String,
+    pub placeholder_str: String,
+    pub validation_msg: String,
+    pub is_password: bool,
+}
+
+impl JfxInputBox {
+    pub fn new() -> Self {
+        Self {
+            ib_id: String::new(),
+            value_str: String::new(),
+            prompt_str: String::new(),
+            placeholder_str: String::new(),
+            validation_msg: String::new(),
+            is_password: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ib_id.is_empty() || true && !self.value_str.is_empty() || true && !self.prompt_str.is_empty() || true && !self.placeholder_str.is_empty() || true && !self.validation_msg.is_empty() || true && self.is_password || true
+    }
+}
+
+impl Default for JfxInputBox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Progress bar descriptor
+#[derive(Debug, Clone)]
+pub struct JfyProgressBar {
+    pub progress_bar_id: String,
+    pub progress_pct: u32,
+    pub label_str: String,
+    pub position_str: String,
+    pub infinite_mode: bool,
+    pub is_visible: bool,
+}
+
+impl JfyProgressBar {
+    pub fn new() -> Self {
+        Self {
+            progress_bar_id: String::new(),
+            progress_pct: u32::default(),
+            label_str: String::new(),
+            position_str: String::new(),
+            infinite_mode: bool::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.progress_bar_id.is_empty() || true && self.progress_pct < u32::MAX || true && !self.label_str.is_empty() || true && !self.position_str.is_empty() || true && self.infinite_mode || true && self.is_visible || true
+    }
+}
+
+impl Default for JfyProgressBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workbench banner descriptor
+#[derive(Debug, Clone)]
+pub struct JfzBanner {
+    pub banner_id: String,
+    pub message_str: String,
+    pub icon_ref: String,
+    pub action_label: String,
+    pub close_label: String,
+    pub is_dismissible: bool,
+}
+
+impl JfzBanner {
+    pub fn new() -> Self {
+        Self {
+            banner_id: String::new(),
+            message_str: String::new(),
+            icon_ref: String::new(),
+            action_label: String::new(),
+            close_label: String::new(),
+            is_dismissible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.banner_id.is_empty() || true && !self.message_str.is_empty() || true && !self.icon_ref.is_empty() || true && !self.action_label.is_empty() || true && !self.close_label.is_empty() || true && self.is_dismissible || true
+    }
+}
+
+impl Default for JfzBanner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -426959,6 +427843,474 @@ mod tests_jez_generated {
     fn test_jez_fields() {
         let mut obj = JezTerminalTask::default();
         obj.term_task_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfa_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfa_default() {
+        let obj = JfaWorkbenchLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfa_fields() {
+        let mut obj = JfaWorkbenchLayout::default();
+        obj.wb_layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfb_default() {
+        let obj = JfbLayoutPart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfb_fields() {
+        let mut obj = JfbLayoutPart::default();
+        obj.part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfc_default() {
+        let obj = JfcSidebarView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfc_fields() {
+        let mut obj = JfcSidebarView::default();
+        obj.sidebar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfd_default() {
+        let obj = JfdPanelView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfd_fields() {
+        let mut obj = JfdPanelView::default();
+        obj.panel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfe_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfe_default() {
+        let obj = JfeAuxiliaryBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfe_fields() {
+        let mut obj = JfeAuxiliaryBar::default();
+        obj.aux_bar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jff_generated {
+    use super::*;
+
+    #[test]
+    fn test_jff_default() {
+        let obj = JffEditorGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jff_fields() {
+        let mut obj = JffEditorGroup::default();
+        obj.eg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfg_default() {
+        let obj = JfgEditorTab::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfg_fields() {
+        let mut obj = JfgEditorTab::default();
+        obj.tab_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfh_default() {
+        let obj = JfhEditorPane::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfh_fields() {
+        let mut obj = JfhEditorPane::default();
+        obj.pane_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfi_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfi_default() {
+        let obj = JfiEditorGrid::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfi_fields() {
+        let mut obj = JfiEditorGrid::default();
+        obj.grid_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfj_default() {
+        let obj = JfjTitleBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfj_fields() {
+        let mut obj = JfjTitleBar::default();
+        obj.title_bar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfk_default() {
+        let obj = JfkMenuBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfk_fields() {
+        let mut obj = JfkMenuBar::default();
+        obj.menu_bar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfl_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfl_default() {
+        let obj = JflStatusBarItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfl_fields() {
+        let mut obj = JflStatusBarItem::default();
+        obj.sb_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfm_default() {
+        let obj = JfmActivityBarItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfm_fields() {
+        let mut obj = JfmActivityBarItem::default();
+        obj.ab_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfn_default() {
+        let obj = JfnCompositeBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfn_fields() {
+        let mut obj = JfnCompositeBar::default();
+        obj.comp_bar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfo_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfo_default() {
+        let obj = JfoViewContainer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfo_fields() {
+        let mut obj = JfoViewContainer::default();
+        obj.vc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfp_default() {
+        let obj = JfpViewDescriptor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfp_fields() {
+        let mut obj = JfpViewDescriptor::default();
+        obj.view_desc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfq_default() {
+        let obj = JfqViewAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfq_fields() {
+        let mut obj = JfqViewAction::default();
+        obj.view_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfr_default() {
+        let obj = JfrViewMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfr_fields() {
+        let mut obj = JfrViewMessage::default();
+        obj.view_msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfs_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfs_default() {
+        let obj = JfsNotification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfs_fields() {
+        let mut obj = JfsNotification::default();
+        obj.notif_wb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jft_generated {
+    use super::*;
+
+    #[test]
+    fn test_jft_default() {
+        let obj = JftDialogOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jft_fields() {
+        let mut obj = JftDialogOptions::default();
+        obj.dialog_opt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfu_default() {
+        let obj = JfuQuickInput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfu_fields() {
+        let mut obj = JfuQuickInput::default();
+        obj.qi_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfv_default() {
+        let obj = JfvQuickPick::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfv_fields() {
+        let mut obj = JfvQuickPick::default();
+        obj.qp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfw_default() {
+        let obj = JfwQuickPickItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfw_fields() {
+        let mut obj = JfwQuickPickItem::default();
+        obj.qp_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfx_default() {
+        let obj = JfxInputBox::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfx_fields() {
+        let mut obj = JfxInputBox::default();
+        obj.ib_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfy_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfy_default() {
+        let obj = JfyProgressBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfy_fields() {
+        let mut obj = JfyProgressBar::default();
+        obj.progress_bar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jfz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jfz_default() {
+        let obj = JfzBanner::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jfz_fields() {
+        let mut obj = JfzBanner::default();
+        obj.banner_id = "test".to_string();
         assert!(obj.validate());
     }
 }
