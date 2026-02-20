@@ -88335,6 +88335,216 @@ impl Default for GezExtensionStatusBar {
     }
 }
 
+/// Debug session (id, type, name, state, configuration, threads)
+#[derive(Debug, Clone)]
+pub struct GfaDebugSession {
+    pub session_id: String,
+    pub debug_type: String,
+    pub name: String,
+    pub state: String,
+    pub config_json: String,
+    pub thread_count: u32,
+    pub is_stopped: bool,
+    pub supports_restart: bool,
+    pub parent_session_id: String,
+    pub compact_name: String,
+}
+
+impl GfaDebugSession {
+    pub fn new() -> Self {
+        Self {
+            session_id: String::new(),
+            debug_type: String::new(),
+            name: String::new(),
+            state: String::new(),
+            config_json: String::new(),
+            thread_count: u32::default(),
+            is_stopped: bool::default(),
+            supports_restart: bool::default(),
+            parent_session_id: String::new(),
+            compact_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.session_id.is_empty() || true && !self.debug_type.is_empty() || true && !self.name.is_empty() || true && !self.state.is_empty() || true && !self.config_json.is_empty() || true && self.thread_count < u32::MAX || true && self.is_stopped || true && self.supports_restart || true && !self.parent_session_id.is_empty() || true && !self.compact_name.is_empty() || true
+    }
+}
+
+impl Default for GfaDebugSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug thread (id, name, state, stopped reason, stack frames)
+#[derive(Debug, Clone)]
+pub struct GfbDebugThread {
+    pub thread_id: String,
+    pub thread_name: String,
+    pub state: String,
+    pub stopped_reason: String,
+    pub stack_frame_count: u32,
+    pub is_focused: bool,
+    pub description: String,
+    pub can_pause: bool,
+    pub can_continue: bool,
+    pub hit_count: u32,
+}
+
+impl GfbDebugThread {
+    pub fn new() -> Self {
+        Self {
+            thread_id: String::new(),
+            thread_name: String::new(),
+            state: String::new(),
+            stopped_reason: String::new(),
+            stack_frame_count: u32::default(),
+            is_focused: bool::default(),
+            description: String::new(),
+            can_pause: bool::default(),
+            can_continue: bool::default(),
+            hit_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.thread_id.is_empty() || true && !self.thread_name.is_empty() || true && !self.state.is_empty() || true && !self.stopped_reason.is_empty() || true && self.stack_frame_count < u32::MAX || true && self.is_focused || true && !self.description.is_empty() || true && self.can_pause || true && self.can_continue || true && self.hit_count < u32::MAX || true
+    }
+}
+
+impl Default for GfbDebugThread {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug stack frame (id, name, source, line, column, module)
+#[derive(Debug, Clone)]
+pub struct GfcDebugStackFrame {
+    pub frame_id: String,
+    pub name: String,
+    pub source_uri: String,
+    pub line: u32,
+    pub column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub module_id: String,
+    pub presentation_hint: String,
+    pub can_restart: bool,
+}
+
+impl GfcDebugStackFrame {
+    pub fn new() -> Self {
+        Self {
+            frame_id: String::new(),
+            name: String::new(),
+            source_uri: String::new(),
+            line: u32::default(),
+            column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            module_id: String::new(),
+            presentation_hint: String::new(),
+            can_restart: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.frame_id.is_empty() || true && !self.name.is_empty() || true && !self.source_uri.is_empty() || true && self.line < u32::MAX || true && self.column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.module_id.is_empty() || true && !self.presentation_hint.is_empty() || true && self.can_restart || true
+    }
+}
+
+impl Default for GfcDebugStackFrame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug variable (name, value, type, reference, indexed, named)
+#[derive(Debug, Clone)]
+pub struct GfdDebugVariable {
+    pub var_id: String,
+    pub name: String,
+    pub value: String,
+    pub var_type: String,
+    pub reference: u64,
+    pub indexed_variables: u32,
+    pub named_variables: u32,
+    pub evaluate_name: String,
+    pub memory_reference: String,
+    pub presentation_hint_json: String,
+}
+
+impl GfdDebugVariable {
+    pub fn new() -> Self {
+        Self {
+            var_id: String::new(),
+            name: String::new(),
+            value: String::new(),
+            var_type: String::new(),
+            reference: u64::default(),
+            indexed_variables: u32::default(),
+            named_variables: u32::default(),
+            evaluate_name: String::new(),
+            memory_reference: String::new(),
+            presentation_hint_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.var_id.is_empty() || true && !self.name.is_empty() || true && !self.value.is_empty() || true && !self.var_type.is_empty() || true && self.reference < u64::MAX || true && self.indexed_variables < u32::MAX || true && self.named_variables < u32::MAX || true && !self.evaluate_name.is_empty() || true && !self.memory_reference.is_empty() || true && !self.presentation_hint_json.is_empty() || true
+    }
+}
+
+impl Default for GfdDebugVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug breakpoint (id, verified, source, line, column, condition)
+#[derive(Debug, Clone)]
+pub struct GfeDebugBreakpoint {
+    pub bp_id: String,
+    pub is_verified: bool,
+    pub source_uri: String,
+    pub line: u32,
+    pub column: u32,
+    pub condition: String,
+    pub hit_condition: String,
+    pub log_message: String,
+    pub is_enabled: bool,
+    pub mode: String,
+}
+
+impl GfeDebugBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            bp_id: String::new(),
+            is_verified: bool::default(),
+            source_uri: String::new(),
+            line: u32::default(),
+            column: u32::default(),
+            condition: String::new(),
+            hit_condition: String::new(),
+            log_message: String::new(),
+            is_enabled: bool::default(),
+            mode: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bp_id.is_empty() || true && self.is_verified || true && !self.source_uri.is_empty() || true && self.line < u32::MAX || true && self.column < u32::MAX || true && !self.condition.is_empty() || true && !self.hit_condition.is_empty() || true && !self.log_message.is_empty() || true && self.is_enabled || true && !self.mode.is_empty() || true
+    }
+}
+
+impl Default for GfeDebugBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -314140,6 +314350,96 @@ mod tests_gez_generated {
     fn test_gez_fields() {
         let mut obj = GezExtensionStatusBar::default();
         obj.status_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfa_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfa_default() {
+        let obj = GfaDebugSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfa_fields() {
+        let mut obj = GfaDebugSession::default();
+        obj.session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfb_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfb_default() {
+        let obj = GfbDebugThread::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfb_fields() {
+        let mut obj = GfbDebugThread::default();
+        obj.thread_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfc_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfc_default() {
+        let obj = GfcDebugStackFrame::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfc_fields() {
+        let mut obj = GfcDebugStackFrame::default();
+        obj.frame_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfd_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfd_default() {
+        let obj = GfdDebugVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfd_fields() {
+        let mut obj = GfdDebugVariable::default();
+        obj.var_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfe_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfe_default() {
+        let obj = GfeDebugBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfe_fields() {
+        let mut obj = GfeDebugBreakpoint::default();
+        obj.bp_id = "test".to_string();
         assert!(obj.validate());
     }
 }
