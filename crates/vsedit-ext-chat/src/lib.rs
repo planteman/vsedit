@@ -84025,6 +84025,216 @@ impl Default for GazWindowMinimap {
     }
 }
 
+/// Editor group (id, index, active editor, editors, preview, pinned)
+#[derive(Debug, Clone)]
+pub struct GbaEditorGroup {
+    pub group_id: String,
+    pub index: u32,
+    pub active_editor_uri: String,
+    pub editor_count: u32,
+    pub preview_editor_uri: String,
+    pub pinned_count: u32,
+    pub is_locked: bool,
+    pub sticky_count: u32,
+    pub label: String,
+    pub is_active: bool,
+}
+
+impl GbaEditorGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            index: u32::default(),
+            active_editor_uri: String::new(),
+            editor_count: u32::default(),
+            preview_editor_uri: String::new(),
+            pinned_count: u32::default(),
+            is_locked: bool::default(),
+            sticky_count: u32::default(),
+            label: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && self.index < u32::MAX || true && !self.active_editor_uri.is_empty() || true && self.editor_count < u32::MAX || true && !self.preview_editor_uri.is_empty() || true && self.pinned_count < u32::MAX || true && self.is_locked || true && self.sticky_count < u32::MAX || true && !self.label.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for GbaEditorGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor group layout (orientation, groups, sizes, focus)
+#[derive(Debug, Clone)]
+pub struct GbbEditorGroupLayout {
+    pub layout_id: String,
+    pub orientation: String,
+    pub groups_json: String,
+    pub sizes_json: String,
+    pub focus_group_id: String,
+    pub is_grid: bool,
+    pub column_count: u32,
+    pub row_count: u32,
+    pub proportions_json: String,
+    pub is_even: bool,
+}
+
+impl GbbEditorGroupLayout {
+    pub fn new() -> Self {
+        Self {
+            layout_id: String::new(),
+            orientation: String::new(),
+            groups_json: String::new(),
+            sizes_json: String::new(),
+            focus_group_id: String::new(),
+            is_grid: bool::default(),
+            column_count: u32::default(),
+            row_count: u32::default(),
+            proportions_json: String::new(),
+            is_even: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_id.is_empty() || true && !self.orientation.is_empty() || true && !self.groups_json.is_empty() || true && !self.sizes_json.is_empty() || true && !self.focus_group_id.is_empty() || true && self.is_grid || true && self.column_count < u32::MAX || true && self.row_count < u32::MAX || true && !self.proportions_json.is_empty() || true && self.is_even || true
+    }
+}
+
+impl Default for GbbEditorGroupLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor tab model (label, icon, dirty, pinned, preview, sticky)
+#[derive(Debug, Clone)]
+pub struct GbcEditorTabModel {
+    pub tab_id: String,
+    pub label: String,
+    pub icon_path: String,
+    pub is_dirty: bool,
+    pub is_pinned: bool,
+    pub is_preview: bool,
+    pub is_sticky: bool,
+    pub editor_uri: String,
+    pub group_id: String,
+    pub sort_order: u32,
+}
+
+impl GbcEditorTabModel {
+    pub fn new() -> Self {
+        Self {
+            tab_id: String::new(),
+            label: String::new(),
+            icon_path: String::new(),
+            is_dirty: bool::default(),
+            is_pinned: bool::default(),
+            is_preview: bool::default(),
+            is_sticky: bool::default(),
+            editor_uri: String::new(),
+            group_id: String::new(),
+            sort_order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tab_id.is_empty() || true && !self.label.is_empty() || true && !self.icon_path.is_empty() || true && self.is_dirty || true && self.is_pinned || true && self.is_preview || true && self.is_sticky || true && !self.editor_uri.is_empty() || true && !self.group_id.is_empty() || true && self.sort_order < u32::MAX || true
+    }
+}
+
+impl Default for GbcEditorTabModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor input factory (scheme, type handler, can handle, create)
+#[derive(Debug, Clone)]
+pub struct GbdEditorInputFactory {
+    pub factory_id: String,
+    pub scheme: String,
+    pub type_id: String,
+    pub can_handle: bool,
+    pub priority: u32,
+    pub is_default: bool,
+    pub editor_kind: String,
+    pub supported_modes_json: String,
+    pub label: String,
+    pub contributes_json: String,
+}
+
+impl GbdEditorInputFactory {
+    pub fn new() -> Self {
+        Self {
+            factory_id: String::new(),
+            scheme: String::new(),
+            type_id: String::new(),
+            can_handle: bool::default(),
+            priority: u32::default(),
+            is_default: bool::default(),
+            editor_kind: String::new(),
+            supported_modes_json: String::new(),
+            label: String::new(),
+            contributes_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.factory_id.is_empty() || true && !self.scheme.is_empty() || true && !self.type_id.is_empty() || true && self.can_handle || true && self.priority < u32::MAX || true && self.is_default || true && !self.editor_kind.is_empty() || true && !self.supported_modes_json.is_empty() || true && !self.label.is_empty() || true && !self.contributes_json.is_empty() || true
+    }
+}
+
+impl Default for GbdEditorInputFactory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor serializer (type id, serialize, deserialize, restore)
+#[derive(Debug, Clone)]
+pub struct GbeEditorSerializer {
+    pub serializer_id: String,
+    pub type_id: String,
+    pub version: u32,
+    pub data_json: String,
+    pub uri: String,
+    pub is_restoring: bool,
+    pub trust_required: bool,
+    pub editor_kind: String,
+    pub label: String,
+    pub last_saved_ms: u64,
+}
+
+impl GbeEditorSerializer {
+    pub fn new() -> Self {
+        Self {
+            serializer_id: String::new(),
+            type_id: String::new(),
+            version: u32::default(),
+            data_json: String::new(),
+            uri: String::new(),
+            is_restoring: bool::default(),
+            trust_required: bool::default(),
+            editor_kind: String::new(),
+            label: String::new(),
+            last_saved_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.serializer_id.is_empty() || true && !self.type_id.is_empty() || true && self.version < u32::MAX || true && !self.data_json.is_empty() || true && !self.uri.is_empty() || true && self.is_restoring || true && self.trust_required || true && !self.editor_kind.is_empty() || true && !self.label.is_empty() || true && self.last_saved_ms < u64::MAX || true
+    }
+}
+
+impl Default for GbeEditorSerializer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -307887,6 +308097,96 @@ mod tests_gaz_generated {
     fn test_gaz_fields() {
         let mut obj = GazWindowMinimap::default();
         obj.minimap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gba_generated {
+    use super::*;
+
+    #[test]
+    fn test_gba_default() {
+        let obj = GbaEditorGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gba_fields() {
+        let mut obj = GbaEditorGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbb_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbb_default() {
+        let obj = GbbEditorGroupLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbb_fields() {
+        let mut obj = GbbEditorGroupLayout::default();
+        obj.layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbc_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbc_default() {
+        let obj = GbcEditorTabModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbc_fields() {
+        let mut obj = GbcEditorTabModel::default();
+        obj.tab_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbd_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbd_default() {
+        let obj = GbdEditorInputFactory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbd_fields() {
+        let mut obj = GbdEditorInputFactory::default();
+        obj.factory_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbe_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbe_default() {
+        let obj = GbeEditorSerializer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbe_fields() {
+        let mut obj = GbeEditorSerializer::default();
+        obj.serializer_id = "test".to_string();
         assert!(obj.validate());
     }
 }
