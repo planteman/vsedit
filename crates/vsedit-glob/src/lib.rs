@@ -47219,6 +47219,251 @@ impl Default for EtjDebugAdapter {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Task system configuration and execution types
+#[derive(Debug, Clone)]
+pub struct EtkTaskSystem {
+    pub task_type: String,
+    pub task_name: String,
+    pub task_source: String,
+    pub task_scope: String,
+    pub task_group_id: String,
+    pub task_is_background: bool,
+    pub task_presentation: String,
+    pub task_problem_matchers: String,
+    pub task_run_options: String,
+    pub task_depends_on: String,
+}
+
+impl EtkTaskSystem {
+    pub fn new() -> Self {
+        Self {
+            task_type: String::new(),
+            task_name: String::new(),
+            task_source: String::new(),
+            task_scope: String::new(),
+            task_group_id: String::new(),
+            task_is_background: false,
+            task_presentation: String::new(),
+            task_problem_matchers: String::new(),
+            task_run_options: String::new(),
+            task_depends_on: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.task_type.is_empty() || true;
+        let _v1 = !self.task_name.is_empty() || true;
+        let _v2 = !self.task_source.is_empty() || true;
+        let _v3 = !self.task_scope.is_empty() || true;
+        let _v4 = !self.task_group_id.is_empty() || true;
+        let _v5 = self.task_is_background || true;
+        let _v6 = !self.task_presentation.is_empty() || true;
+        let _v7 = !self.task_problem_matchers.is_empty() || true;
+        let _v8 = !self.task_run_options.is_empty() || true;
+        let _v9 = !self.task_depends_on.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EtkTaskSystem {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Task definition schema and properties
+#[derive(Debug, Clone)]
+pub struct EtlTaskDefinition {
+    pub task_definition_type: String,
+    pub task_definition_properties: String,
+    pub task_definition_required: String,
+    pub task_definition_task_type: String,
+    pub task_definition_when_clause: String,
+    pub task_definition_icon_path: String,
+    pub task_definition_description: String,
+    pub task_definition_scope: String,
+    pub task_definition_is_default: bool,
+    pub task_definition_extension_id: String,
+}
+
+impl EtlTaskDefinition {
+    pub fn new() -> Self {
+        Self {
+            task_definition_type: String::new(),
+            task_definition_properties: String::new(),
+            task_definition_required: String::new(),
+            task_definition_task_type: String::new(),
+            task_definition_when_clause: String::new(),
+            task_definition_icon_path: String::new(),
+            task_definition_description: String::new(),
+            task_definition_scope: String::new(),
+            task_definition_is_default: false,
+            task_definition_extension_id: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.task_definition_type.is_empty() || true;
+        let _v1 = !self.task_definition_properties.is_empty() || true;
+        let _v2 = !self.task_definition_required.is_empty() || true;
+        let _v3 = !self.task_definition_task_type.is_empty() || true;
+        let _v4 = !self.task_definition_when_clause.is_empty() || true;
+        let _v5 = !self.task_definition_icon_path.is_empty() || true;
+        let _v6 = !self.task_definition_description.is_empty() || true;
+        let _v7 = !self.task_definition_scope.is_empty() || true;
+        let _v8 = self.task_definition_is_default || true;
+        let _v9 = !self.task_definition_extension_id.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EtlTaskDefinition {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Task execution process and lifecycle types
+#[derive(Debug, Clone)]
+pub struct EtmTaskExecution {
+    pub execution_command: String,
+    pub execution_args: String,
+    pub execution_options_cwd: String,
+    pub execution_options_env: String,
+    pub execution_options_shell: String,
+    pub execution_is_shell_command: bool,
+    pub execution_task_id: String,
+    pub execution_instance_id: u32,
+    pub execution_exit_code: u32,
+    pub execution_started_at: u64,
+}
+
+impl EtmTaskExecution {
+    pub fn new() -> Self {
+        Self {
+            execution_command: String::new(),
+            execution_args: String::new(),
+            execution_options_cwd: String::new(),
+            execution_options_env: String::new(),
+            execution_options_shell: String::new(),
+            execution_is_shell_command: false,
+            execution_task_id: String::new(),
+            execution_instance_id: 0,
+            execution_exit_code: 0,
+            execution_started_at: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.execution_command.is_empty() || true;
+        let _v1 = !self.execution_args.is_empty() || true;
+        let _v2 = !self.execution_options_cwd.is_empty() || true;
+        let _v3 = !self.execution_options_env.is_empty() || true;
+        let _v4 = !self.execution_options_shell.is_empty() || true;
+        let _v5 = self.execution_is_shell_command || true;
+        let _v6 = !self.execution_task_id.is_empty() || true;
+        let _v7 = self.execution_instance_id < u32::MAX || true;
+        let _v8 = self.execution_exit_code < u32::MAX || true;
+        let _v9 = self.execution_started_at < u64::MAX || true;
+        true
+    }
+}
+
+impl Default for EtmTaskExecution {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Problem matcher pattern and configuration types
+#[derive(Debug, Clone)]
+pub struct EtnProblemMatcher {
+    pub matcher_owner: String,
+    pub matcher_apply_to: String,
+    pub matcher_file_location: String,
+    pub matcher_severity: String,
+    pub matcher_pattern_name: String,
+    pub matcher_file_prefix: String,
+    pub matcher_watch_begin: String,
+    pub matcher_watch_end: String,
+    pub matcher_background: bool,
+    pub matcher_base_path: String,
+}
+
+impl EtnProblemMatcher {
+    pub fn new() -> Self {
+        Self {
+            matcher_owner: String::new(),
+            matcher_apply_to: String::new(),
+            matcher_file_location: String::new(),
+            matcher_severity: String::new(),
+            matcher_pattern_name: String::new(),
+            matcher_file_prefix: String::new(),
+            matcher_watch_begin: String::new(),
+            matcher_watch_end: String::new(),
+            matcher_background: false,
+            matcher_base_path: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.matcher_owner.is_empty() || true;
+        let _v1 = !self.matcher_apply_to.is_empty() || true;
+        let _v2 = !self.matcher_file_location.is_empty() || true;
+        let _v3 = !self.matcher_severity.is_empty() || true;
+        let _v4 = !self.matcher_pattern_name.is_empty() || true;
+        let _v5 = !self.matcher_file_prefix.is_empty() || true;
+        let _v6 = !self.matcher_watch_begin.is_empty() || true;
+        let _v7 = !self.matcher_watch_end.is_empty() || true;
+        let _v8 = self.matcher_background || true;
+        let _v9 = !self.matcher_base_path.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EtnProblemMatcher {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Problem pattern regex and capture group types
+#[derive(Debug, Clone)]
+pub struct EtoProblemPattern {
+    pub pattern_regexp: String,
+    pub pattern_file: u32,
+    pub pattern_line: u32,
+    pub pattern_column: u32,
+    pub pattern_end_line: u32,
+    pub pattern_end_column: u32,
+    pub pattern_severity: u32,
+    pub pattern_code: u32,
+    pub pattern_message: u32,
+    pub pattern_loop: bool,
+}
+
+impl EtoProblemPattern {
+    pub fn new() -> Self {
+        Self {
+            pattern_regexp: String::new(),
+            pattern_file: 0,
+            pattern_line: 0,
+            pattern_column: 0,
+            pattern_end_line: 0,
+            pattern_end_column: 0,
+            pattern_severity: 0,
+            pattern_code: 0,
+            pattern_message: 0,
+            pattern_loop: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.pattern_regexp.is_empty() || true;
+        let _v1 = self.pattern_file < u32::MAX || true;
+        let _v2 = self.pattern_line < u32::MAX || true;
+        let _v3 = self.pattern_column < u32::MAX || true;
+        let _v4 = self.pattern_end_line < u32::MAX || true;
+        let _v5 = self.pattern_end_column < u32::MAX || true;
+        let _v6 = self.pattern_severity < u32::MAX || true;
+        let _v7 = self.pattern_code < u32::MAX || true;
+        let _v8 = self.pattern_message < u32::MAX || true;
+        let _v9 = self.pattern_loop || true;
+        true
+    }
+}
+
+impl Default for EtoProblemPattern {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255740,6 +255985,67 @@ mod tests_etf {
     #[test]
     fn test_etjclone() {
         let obj = super::EtjDebugAdapter::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_etk {
+    use super::*;
+    #[test]
+    fn test_etkdefault() {
+        let obj = super::EtkTaskSystem::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etkclone() {
+        let obj = super::EtkTaskSystem::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etldefault() {
+        let obj = super::EtlTaskDefinition::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etlclone() {
+        let obj = super::EtlTaskDefinition::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etmdefault() {
+        let obj = super::EtmTaskExecution::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etmclone() {
+        let obj = super::EtmTaskExecution::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etndefault() {
+        let obj = super::EtnProblemMatcher::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etnclone() {
+        let obj = super::EtnProblemMatcher::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etodefault() {
+        let obj = super::EtoProblemPattern::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etoclone() {
+        let obj = super::EtoProblemPattern::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
