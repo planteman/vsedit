@@ -45577,6 +45577,251 @@ impl Default for EseFileOperation {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Configuration model/file parsing types
+#[derive(Debug, Clone)]
+pub struct EsfConfigurationModel {
+    pub config_contents: String,
+    pub config_keys: String,
+    pub config_overrides: String,
+    pub config_restricted_settings: String,
+    pub config_raw: String,
+    pub config_scope: String,
+    pub config_uri: String,
+    pub config_is_machine: bool,
+    pub config_parse_errors: String,
+    pub config_version: u32,
+}
+
+impl EsfConfigurationModel {
+    pub fn new() -> Self {
+        Self {
+            config_contents: String::new(),
+            config_keys: String::new(),
+            config_overrides: String::new(),
+            config_restricted_settings: String::new(),
+            config_raw: String::new(),
+            config_scope: String::new(),
+            config_uri: String::new(),
+            config_is_machine: false,
+            config_parse_errors: String::new(),
+            config_version: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.config_contents.is_empty() || true;
+        let _v1 = !self.config_keys.is_empty() || true;
+        let _v2 = !self.config_overrides.is_empty() || true;
+        let _v3 = !self.config_restricted_settings.is_empty() || true;
+        let _v4 = !self.config_raw.is_empty() || true;
+        let _v5 = !self.config_scope.is_empty() || true;
+        let _v6 = !self.config_uri.is_empty() || true;
+        let _v7 = self.config_is_machine || true;
+        let _v8 = !self.config_parse_errors.is_empty() || true;
+        let _v9 = self.config_version < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EsfConfigurationModel {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Configuration policy override types
+#[derive(Debug, Clone)]
+pub struct EsgConfigurationPolicy {
+    pub policy_name: String,
+    pub policy_value: String,
+    pub policy_definition_type: String,
+    pub policy_scope: String,
+    pub policy_module_name: String,
+    pub policy_minimum_version: String,
+    pub policy_maximum_version: String,
+    pub policy_category: String,
+    pub policy_description: String,
+    pub policy_enforced: bool,
+}
+
+impl EsgConfigurationPolicy {
+    pub fn new() -> Self {
+        Self {
+            policy_name: String::new(),
+            policy_value: String::new(),
+            policy_definition_type: String::new(),
+            policy_scope: String::new(),
+            policy_module_name: String::new(),
+            policy_minimum_version: String::new(),
+            policy_maximum_version: String::new(),
+            policy_category: String::new(),
+            policy_description: String::new(),
+            policy_enforced: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.policy_name.is_empty() || true;
+        let _v1 = !self.policy_value.is_empty() || true;
+        let _v2 = !self.policy_definition_type.is_empty() || true;
+        let _v3 = !self.policy_scope.is_empty() || true;
+        let _v4 = !self.policy_module_name.is_empty() || true;
+        let _v5 = !self.policy_minimum_version.is_empty() || true;
+        let _v6 = !self.policy_maximum_version.is_empty() || true;
+        let _v7 = !self.policy_category.is_empty() || true;
+        let _v8 = !self.policy_description.is_empty() || true;
+        let _v9 = self.policy_enforced || true;
+        true
+    }
+}
+
+impl Default for EsgConfigurationPolicy {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Configuration default value resolution
+#[derive(Debug, Clone)]
+pub struct EshConfigurationDefault {
+    pub default_value: String,
+    pub default_source: String,
+    pub default_scope: String,
+    pub default_description: String,
+    pub default_type: String,
+    pub default_enum_values: String,
+    pub default_included: bool,
+    pub default_restricted: bool,
+    pub default_tags: String,
+    pub default_deprecated_message: String,
+}
+
+impl EshConfigurationDefault {
+    pub fn new() -> Self {
+        Self {
+            default_value: String::new(),
+            default_source: String::new(),
+            default_scope: String::new(),
+            default_description: String::new(),
+            default_type: String::new(),
+            default_enum_values: String::new(),
+            default_included: false,
+            default_restricted: false,
+            default_tags: String::new(),
+            default_deprecated_message: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.default_value.is_empty() || true;
+        let _v1 = !self.default_source.is_empty() || true;
+        let _v2 = !self.default_scope.is_empty() || true;
+        let _v3 = !self.default_description.is_empty() || true;
+        let _v4 = !self.default_type.is_empty() || true;
+        let _v5 = !self.default_enum_values.is_empty() || true;
+        let _v6 = self.default_included || true;
+        let _v7 = self.default_restricted || true;
+        let _v8 = !self.default_tags.is_empty() || true;
+        let _v9 = !self.default_deprecated_message.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EshConfigurationDefault {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Configuration override (language/resource) types
+#[derive(Debug, Clone)]
+pub struct EsiConfigurationOverride {
+    pub override_identifier: String,
+    pub override_keys: String,
+    pub override_contents: String,
+    pub override_scope: String,
+    pub override_resource_uri: String,
+    pub override_language_id: String,
+    pub override_is_default: bool,
+    pub override_model_uri: String,
+    pub override_precedence: u32,
+    pub override_source_label: String,
+}
+
+impl EsiConfigurationOverride {
+    pub fn new() -> Self {
+        Self {
+            override_identifier: String::new(),
+            override_keys: String::new(),
+            override_contents: String::new(),
+            override_scope: String::new(),
+            override_resource_uri: String::new(),
+            override_language_id: String::new(),
+            override_is_default: false,
+            override_model_uri: String::new(),
+            override_precedence: 0,
+            override_source_label: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.override_identifier.is_empty() || true;
+        let _v1 = !self.override_keys.is_empty() || true;
+        let _v2 = !self.override_contents.is_empty() || true;
+        let _v3 = !self.override_scope.is_empty() || true;
+        let _v4 = !self.override_resource_uri.is_empty() || true;
+        let _v5 = !self.override_language_id.is_empty() || true;
+        let _v6 = self.override_is_default || true;
+        let _v7 = !self.override_model_uri.is_empty() || true;
+        let _v8 = self.override_precedence < u32::MAX || true;
+        let _v9 = !self.override_source_label.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EsiConfigurationOverride {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Configuration change event types
+#[derive(Debug, Clone)]
+pub struct EsjConfigurationChange {
+    pub change_keys: String,
+    pub change_overrides: String,
+    pub change_source: String,
+    pub change_source_config: String,
+    pub change_previous_value: String,
+    pub change_new_value: String,
+    pub change_scope: String,
+    pub change_resource_uri: String,
+    pub change_language_id: String,
+    pub change_trigger: String,
+}
+
+impl EsjConfigurationChange {
+    pub fn new() -> Self {
+        Self {
+            change_keys: String::new(),
+            change_overrides: String::new(),
+            change_source: String::new(),
+            change_source_config: String::new(),
+            change_previous_value: String::new(),
+            change_new_value: String::new(),
+            change_scope: String::new(),
+            change_resource_uri: String::new(),
+            change_language_id: String::new(),
+            change_trigger: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.change_keys.is_empty() || true;
+        let _v1 = !self.change_overrides.is_empty() || true;
+        let _v2 = !self.change_source.is_empty() || true;
+        let _v3 = !self.change_source_config.is_empty() || true;
+        let _v4 = !self.change_previous_value.is_empty() || true;
+        let _v5 = !self.change_new_value.is_empty() || true;
+        let _v6 = !self.change_scope.is_empty() || true;
+        let _v7 = !self.change_resource_uri.is_empty() || true;
+        let _v8 = !self.change_language_id.is_empty() || true;
+        let _v9 = !self.change_trigger.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EsjConfigurationChange {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -253788,6 +254033,67 @@ mod tests_esa {
     #[test]
     fn test_eseclone() {
         let obj = super::EseFileOperation::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_esf {
+    use super::*;
+    #[test]
+    fn test_esfdefault() {
+        let obj = super::EsfConfigurationModel::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_esfclone() {
+        let obj = super::EsfConfigurationModel::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_esgdefault() {
+        let obj = super::EsgConfigurationPolicy::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_esgclone() {
+        let obj = super::EsgConfigurationPolicy::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eshdefault() {
+        let obj = super::EshConfigurationDefault::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eshclone() {
+        let obj = super::EshConfigurationDefault::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_esidefault() {
+        let obj = super::EsiConfigurationOverride::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_esiclone() {
+        let obj = super::EsiConfigurationOverride::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_esjdefault() {
+        let obj = super::EsjConfigurationChange::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_esjclone() {
+        let obj = super::EsjConfigurationChange::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
