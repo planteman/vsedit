@@ -51318,6 +51318,254 @@ impl Default for EwtGitSubmodule {
 }
 
 
+/// Git remote configuration types
+#[derive(Debug, Clone)]
+pub struct EwuGitRemote {
+    pub remote_name: String,
+    pub remote_fetch_url: String,
+    pub remote_push_url: String,
+    pub remote_is_read_only: bool,
+    pub remote_head_ref: String,
+    pub remote_branch_count: u32,
+    pub remote_last_fetch: u64,
+    pub remote_is_prune: bool,
+    pub remote_mirror: bool,
+    pub remote_tags_mode: String,
+}
+
+impl EwuGitRemote {
+    pub fn new() -> Self {
+        Self {
+            remote_name: String::new(),
+            remote_fetch_url: String::new(),
+            remote_push_url: String::new(),
+            remote_is_read_only: bool::default(),
+            remote_head_ref: String::new(),
+            remote_branch_count: u32::default(),
+            remote_last_fetch: u64::default(),
+            remote_is_prune: bool::default(),
+            remote_mirror: bool::default(),
+            remote_tags_mode: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_name.is_empty() || true && !self.remote_fetch_url.is_empty() || true && !self.remote_push_url.is_empty() || true && self.remote_is_read_only || true && !self.remote_head_ref.is_empty() || true && self.remote_branch_count < u32::MAX || true && self.remote_last_fetch < u64::MAX || true && self.remote_is_prune || true && self.remote_mirror || true && !self.remote_tags_mode.is_empty() || true
+    }
+}
+
+impl Default for EwuGitRemote {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Git branch model types
+#[derive(Debug, Clone)]
+pub struct EwvGitBranch {
+    pub branch_name: String,
+    pub branch_commit: String,
+    pub branch_upstream: String,
+    pub branch_upstream_remote: String,
+    pub branch_ahead: u32,
+    pub branch_behind: u32,
+    pub branch_is_head: bool,
+    pub branch_is_remote: bool,
+    pub branch_tracking_status: String,
+    pub branch_last_commit_date: u64,
+}
+
+impl EwvGitBranch {
+    pub fn new() -> Self {
+        Self {
+            branch_name: String::new(),
+            branch_commit: String::new(),
+            branch_upstream: String::new(),
+            branch_upstream_remote: String::new(),
+            branch_ahead: u32::default(),
+            branch_behind: u32::default(),
+            branch_is_head: bool::default(),
+            branch_is_remote: bool::default(),
+            branch_tracking_status: String::new(),
+            branch_last_commit_date: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.branch_name.is_empty() || true && !self.branch_commit.is_empty() || true && !self.branch_upstream.is_empty() || true && !self.branch_upstream_remote.is_empty() || true && self.branch_ahead < u32::MAX || true && self.branch_behind < u32::MAX || true && self.branch_is_head || true && self.branch_is_remote || true && !self.branch_tracking_status.is_empty() || true && self.branch_last_commit_date < u64::MAX || true
+    }
+}
+
+impl Default for EwvGitBranch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Git tag model types
+#[derive(Debug, Clone)]
+pub struct EwwGitTag {
+    pub tag_name: String,
+    pub tag_commit: String,
+    pub tag_message: String,
+    pub tag_tagger_name: String,
+    pub tag_tagger_email: String,
+    pub tag_tagger_date: u64,
+    pub tag_is_annotated: bool,
+    pub tag_is_lightweight: bool,
+    pub tag_target_type: String,
+    pub tag_peel_commit: String,
+}
+
+impl EwwGitTag {
+    pub fn new() -> Self {
+        Self {
+            tag_name: String::new(),
+            tag_commit: String::new(),
+            tag_message: String::new(),
+            tag_tagger_name: String::new(),
+            tag_tagger_email: String::new(),
+            tag_tagger_date: u64::default(),
+            tag_is_annotated: bool::default(),
+            tag_is_lightweight: bool::default(),
+            tag_target_type: String::new(),
+            tag_peel_commit: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tag_name.is_empty() || true && !self.tag_commit.is_empty() || true && !self.tag_message.is_empty() || true && !self.tag_tagger_name.is_empty() || true && !self.tag_tagger_email.is_empty() || true && self.tag_tagger_date < u64::MAX || true && self.tag_is_annotated || true && self.tag_is_lightweight || true && !self.tag_target_type.is_empty() || true && !self.tag_peel_commit.is_empty() || true
+    }
+}
+
+impl Default for EwwGitTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Git merge/rebase state types
+#[derive(Debug, Clone)]
+pub struct EwxGitMerge {
+    pub merge_current_branch: String,
+    pub merge_target_branch: String,
+    pub merge_state: String,
+    pub merge_conflicts_count: u32,
+    pub merge_resolved_count: u32,
+    pub merge_is_rebase: bool,
+    pub merge_rebase_step: u32,
+    pub merge_rebase_total: u32,
+    pub merge_message: String,
+    pub merge_abort_safe: bool,
+}
+
+impl EwxGitMerge {
+    pub fn new() -> Self {
+        Self {
+            merge_current_branch: String::new(),
+            merge_target_branch: String::new(),
+            merge_state: String::new(),
+            merge_conflicts_count: u32::default(),
+            merge_resolved_count: u32::default(),
+            merge_is_rebase: bool::default(),
+            merge_rebase_step: u32::default(),
+            merge_rebase_total: u32::default(),
+            merge_message: String::new(),
+            merge_abort_safe: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.merge_current_branch.is_empty() || true && !self.merge_target_branch.is_empty() || true && !self.merge_state.is_empty() || true && self.merge_conflicts_count < u32::MAX || true && self.merge_resolved_count < u32::MAX || true && self.merge_is_rebase || true && self.merge_rebase_step < u32::MAX || true && self.merge_rebase_total < u32::MAX || true && !self.merge_message.is_empty() || true && self.merge_abort_safe || true
+    }
+}
+
+impl Default for EwxGitMerge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Git configuration entry types
+#[derive(Debug, Clone)]
+pub struct EwyGitConfig {
+    pub config_key: String,
+    pub config_value: String,
+    pub config_scope: String,
+    pub config_origin: String,
+    pub config_file_path: String,
+    pub config_is_readonly: bool,
+    pub config_section: String,
+    pub config_subsection: String,
+    pub config_name: String,
+    pub config_includes_from: String,
+}
+
+impl EwyGitConfig {
+    pub fn new() -> Self {
+        Self {
+            config_key: String::new(),
+            config_value: String::new(),
+            config_scope: String::new(),
+            config_origin: String::new(),
+            config_file_path: String::new(),
+            config_is_readonly: bool::default(),
+            config_section: String::new(),
+            config_subsection: String::new(),
+            config_name: String::new(),
+            config_includes_from: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_key.is_empty() || true && !self.config_value.is_empty() || true && !self.config_scope.is_empty() || true && !self.config_origin.is_empty() || true && !self.config_file_path.is_empty() || true && self.config_is_readonly || true && !self.config_section.is_empty() || true && !self.config_subsection.is_empty() || true && !self.config_name.is_empty() || true && !self.config_includes_from.is_empty() || true
+    }
+}
+
+impl Default for EwyGitConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Git credential helper types
+#[derive(Debug, Clone)]
+pub struct EwzGitCredential {
+    pub credential_host: String,
+    pub credential_protocol: String,
+    pub credential_username: String,
+    pub credential_helper: String,
+    pub credential_store_path: String,
+    pub credential_is_cached: bool,
+    pub credential_expires_at: u64,
+    pub credential_source: String,
+    pub credential_use_http_path: bool,
+    pub credential_oauth_refresh: String,
+}
+
+impl EwzGitCredential {
+    pub fn new() -> Self {
+        Self {
+            credential_host: String::new(),
+            credential_protocol: String::new(),
+            credential_username: String::new(),
+            credential_helper: String::new(),
+            credential_store_path: String::new(),
+            credential_is_cached: bool::default(),
+            credential_expires_at: u64::default(),
+            credential_source: String::new(),
+            credential_use_http_path: bool::default(),
+            credential_oauth_refresh: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.credential_host.is_empty() || true && !self.credential_protocol.is_empty() || true && !self.credential_username.is_empty() || true && !self.credential_helper.is_empty() || true && !self.credential_store_path.is_empty() || true && self.credential_is_cached || true && self.credential_expires_at < u64::MAX || true && !self.credential_source.is_empty() || true && self.credential_use_http_path || true && !self.credential_oauth_refresh.is_empty() || true
+    }
+}
+
+impl Default for EwzGitCredential {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -261006,6 +261254,114 @@ mod tests_ewt_generated {
     fn test_ewt_fields() {
         let mut obj = EwtGitSubmodule::default();
         obj.submodule_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewu_default() {
+        let obj = EwuGitRemote::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewu_fields() {
+        let mut obj = EwuGitRemote::default();
+        obj.remote_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewv_default() {
+        let obj = EwvGitBranch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewv_fields() {
+        let mut obj = EwvGitBranch::default();
+        obj.branch_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eww_generated {
+    use super::*;
+
+    #[test]
+    fn test_eww_default() {
+        let obj = EwwGitTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eww_fields() {
+        let mut obj = EwwGitTag::default();
+        obj.tag_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewx_default() {
+        let obj = EwxGitMerge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewx_fields() {
+        let mut obj = EwxGitMerge::default();
+        obj.merge_current_branch = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewy_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewy_default() {
+        let obj = EwyGitConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewy_fields() {
+        let mut obj = EwyGitConfig::default();
+        obj.config_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewz_default() {
+        let obj = EwzGitCredential::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewz_fields() {
+        let mut obj = EwzGitCredential::default();
+        obj.credential_host = "test".to_string();
         assert!(obj.validate());
     }
 }
