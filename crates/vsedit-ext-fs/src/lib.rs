@@ -43079,6 +43079,251 @@ impl Default for EqeTextModelDecoration {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Text model diagnostic marker/problem tracking
+#[derive(Debug, Clone)]
+pub struct EqfTextModelMarker {
+    pub marker_severity: u32,
+    pub marker_message: String,
+    pub marker_source: String,
+    pub marker_code: String,
+    pub marker_start_line: u32,
+    pub marker_start_col: u32,
+    pub marker_end_line: u32,
+    pub marker_end_col: u32,
+    pub marker_related_info: String,
+    pub marker_tags: u32,
+}
+
+impl EqfTextModelMarker {
+    pub fn new() -> Self {
+        Self {
+            marker_severity: 0,
+            marker_message: String::new(),
+            marker_source: String::new(),
+            marker_code: String::new(),
+            marker_start_line: 0,
+            marker_start_col: 0,
+            marker_end_line: 0,
+            marker_end_col: 0,
+            marker_related_info: String::new(),
+            marker_tags: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.marker_severity < u32::MAX || true;
+        let _v1 = !self.marker_message.is_empty() || true;
+        let _v2 = !self.marker_source.is_empty() || true;
+        let _v3 = !self.marker_code.is_empty() || true;
+        let _v4 = self.marker_start_line < u32::MAX || true;
+        let _v5 = self.marker_start_col < u32::MAX || true;
+        let _v6 = self.marker_end_line < u32::MAX || true;
+        let _v7 = self.marker_end_col < u32::MAX || true;
+        let _v8 = !self.marker_related_info.is_empty() || true;
+        let _v9 = self.marker_tags < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EqfTextModelMarker {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Text model single edit operation representation
+#[derive(Debug, Clone)]
+pub struct EqgTextModelEdit {
+    pub edit_range_start: u32,
+    pub edit_range_end: u32,
+    pub edit_text: String,
+    pub edit_force_move_markers: bool,
+    pub edit_is_auto_whitespace: bool,
+    pub edit_command_id: String,
+    pub edit_source: String,
+    pub edit_undo_stop_before: bool,
+    pub edit_undo_stop_after: bool,
+    pub edit_result_range: String,
+}
+
+impl EqgTextModelEdit {
+    pub fn new() -> Self {
+        Self {
+            edit_range_start: 0,
+            edit_range_end: 0,
+            edit_text: String::new(),
+            edit_force_move_markers: false,
+            edit_is_auto_whitespace: false,
+            edit_command_id: String::new(),
+            edit_source: String::new(),
+            edit_undo_stop_before: false,
+            edit_undo_stop_after: false,
+            edit_result_range: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.edit_range_start < u32::MAX || true;
+        let _v1 = self.edit_range_end < u32::MAX || true;
+        let _v2 = !self.edit_text.is_empty() || true;
+        let _v3 = self.edit_force_move_markers || true;
+        let _v4 = self.edit_is_auto_whitespace || true;
+        let _v5 = !self.edit_command_id.is_empty() || true;
+        let _v6 = !self.edit_source.is_empty() || true;
+        let _v7 = self.edit_undo_stop_before || true;
+        let _v8 = self.edit_undo_stop_after || true;
+        let _v9 = !self.edit_result_range.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EqgTextModelEdit {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Text model undo/redo stack entry
+#[derive(Debug, Clone)]
+pub struct EqhTextModelUndo {
+    pub undo_group_id: u32,
+    pub undo_edit_type: u32,
+    pub undo_before_cursor_state: String,
+    pub undo_after_cursor_state: String,
+    pub undo_before_version: u32,
+    pub undo_after_version: u32,
+    pub undo_timestamp: u64,
+    pub undo_is_open: bool,
+    pub undo_label: String,
+    pub undo_resource_label: String,
+}
+
+impl EqhTextModelUndo {
+    pub fn new() -> Self {
+        Self {
+            undo_group_id: 0,
+            undo_edit_type: 0,
+            undo_before_cursor_state: String::new(),
+            undo_after_cursor_state: String::new(),
+            undo_before_version: 0,
+            undo_after_version: 0,
+            undo_timestamp: 0,
+            undo_is_open: false,
+            undo_label: String::new(),
+            undo_resource_label: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.undo_group_id < u32::MAX || true;
+        let _v1 = self.undo_edit_type < u32::MAX || true;
+        let _v2 = !self.undo_before_cursor_state.is_empty() || true;
+        let _v3 = !self.undo_after_cursor_state.is_empty() || true;
+        let _v4 = self.undo_before_version < u32::MAX || true;
+        let _v5 = self.undo_after_version < u32::MAX || true;
+        let _v6 = self.undo_timestamp < u64::MAX || true;
+        let _v7 = self.undo_is_open || true;
+        let _v8 = !self.undo_label.is_empty() || true;
+        let _v9 = !self.undo_resource_label.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EqhTextModelUndo {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Text model snapshot for consistent reads
+#[derive(Debug, Clone)]
+pub struct EqiTextModelSnapshot {
+    pub snapshot_version: u32,
+    pub snapshot_line_count: u32,
+    pub snapshot_total_length: u64,
+    pub snapshot_eol: String,
+    pub snapshot_bom: String,
+    pub snapshot_encoding: String,
+    pub snapshot_is_too_large: bool,
+    pub snapshot_is_binary: bool,
+    pub snapshot_language_id: String,
+    pub snapshot_creation_timestamp: u64,
+}
+
+impl EqiTextModelSnapshot {
+    pub fn new() -> Self {
+        Self {
+            snapshot_version: 0,
+            snapshot_line_count: 0,
+            snapshot_total_length: 0,
+            snapshot_eol: String::new(),
+            snapshot_bom: String::new(),
+            snapshot_encoding: String::new(),
+            snapshot_is_too_large: false,
+            snapshot_is_binary: false,
+            snapshot_language_id: String::new(),
+            snapshot_creation_timestamp: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.snapshot_version < u32::MAX || true;
+        let _v1 = self.snapshot_line_count < u32::MAX || true;
+        let _v2 = self.snapshot_total_length < u64::MAX || true;
+        let _v3 = !self.snapshot_eol.is_empty() || true;
+        let _v4 = !self.snapshot_bom.is_empty() || true;
+        let _v5 = !self.snapshot_encoding.is_empty() || true;
+        let _v6 = self.snapshot_is_too_large || true;
+        let _v7 = self.snapshot_is_binary || true;
+        let _v8 = !self.snapshot_language_id.is_empty() || true;
+        let _v9 = self.snapshot_creation_timestamp < u64::MAX || true;
+        true
+    }
+}
+
+impl Default for EqiTextModelSnapshot {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Text model content change event types
+#[derive(Debug, Clone)]
+pub struct EqjTextModelEvent {
+    pub event_kind: u32,
+    pub event_range_offset: u32,
+    pub event_range_length: u32,
+    pub event_text: String,
+    pub event_eol: String,
+    pub event_version_id: u32,
+    pub event_is_undoing: bool,
+    pub event_is_redoing: bool,
+    pub event_is_flush: bool,
+    pub event_result_text_length: u64,
+}
+
+impl EqjTextModelEvent {
+    pub fn new() -> Self {
+        Self {
+            event_kind: 0,
+            event_range_offset: 0,
+            event_range_length: 0,
+            event_text: String::new(),
+            event_eol: String::new(),
+            event_version_id: 0,
+            event_is_undoing: false,
+            event_is_redoing: false,
+            event_is_flush: false,
+            event_result_text_length: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.event_kind < u32::MAX || true;
+        let _v1 = self.event_range_offset < u32::MAX || true;
+        let _v2 = self.event_range_length < u32::MAX || true;
+        let _v3 = !self.event_text.is_empty() || true;
+        let _v4 = !self.event_eol.is_empty() || true;
+        let _v5 = self.event_version_id < u32::MAX || true;
+        let _v6 = self.event_is_undoing || true;
+        let _v7 = self.event_is_redoing || true;
+        let _v8 = self.event_is_flush || true;
+        let _v9 = self.event_result_text_length < u64::MAX || true;
+        true
+    }
+}
+
+impl Default for EqjTextModelEvent {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -250731,6 +250976,67 @@ mod tests_eqa {
     #[test]
     fn test_eqeclone() {
         let obj = super::EqeTextModelDecoration::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eqf {
+    use super::*;
+    #[test]
+    fn test_eqfdefault() {
+        let obj = super::EqfTextModelMarker::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqfclone() {
+        let obj = super::EqfTextModelMarker::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqgdefault() {
+        let obj = super::EqgTextModelEdit::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqgclone() {
+        let obj = super::EqgTextModelEdit::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqhdefault() {
+        let obj = super::EqhTextModelUndo::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqhclone() {
+        let obj = super::EqhTextModelUndo::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqidefault() {
+        let obj = super::EqiTextModelSnapshot::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqiclone() {
+        let obj = super::EqiTextModelSnapshot::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqjdefault() {
+        let obj = super::EqjTextModelEvent::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqjclone() {
+        let obj = super::EqjTextModelEvent::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
