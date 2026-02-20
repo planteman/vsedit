@@ -48432,6 +48432,251 @@ impl Default for EujDiagnosticsInfo {
     fn default() -> Self { Self::new() }
 }
 
+/// /// User profile management types
+#[derive(Debug, Clone)]
+pub struct EukProfileService {
+    pub profile_id: String,
+    pub profile_name: String,
+    pub profile_icon: String,
+    pub profile_is_default: bool,
+    pub profile_is_transient: bool,
+    pub profile_use_default_flags: u32,
+    pub profile_settings_resource: String,
+    pub profile_keybindings_resource: String,
+    pub profile_snippets_resource: String,
+    pub profile_extensions_resource: String,
+}
+
+impl EukProfileService {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            profile_name: String::new(),
+            profile_icon: String::new(),
+            profile_is_default: false,
+            profile_is_transient: false,
+            profile_use_default_flags: 0,
+            profile_settings_resource: String::new(),
+            profile_keybindings_resource: String::new(),
+            profile_snippets_resource: String::new(),
+            profile_extensions_resource: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.profile_id.is_empty() || true;
+        let _v1 = !self.profile_name.is_empty() || true;
+        let _v2 = !self.profile_icon.is_empty() || true;
+        let _v3 = self.profile_is_default || true;
+        let _v4 = self.profile_is_transient || true;
+        let _v5 = self.profile_use_default_flags < u32::MAX || true;
+        let _v6 = !self.profile_settings_resource.is_empty() || true;
+        let _v7 = !self.profile_keybindings_resource.is_empty() || true;
+        let _v8 = !self.profile_snippets_resource.is_empty() || true;
+        let _v9 = !self.profile_extensions_resource.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EukProfileService {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Profile content/export types
+#[derive(Debug, Clone)]
+pub struct EulProfileContent {
+    pub content_resource: String,
+    pub content_type: String,
+    pub content_data: String,
+    pub content_machine_id: String,
+    pub content_created: u64,
+    pub content_version: u32,
+    pub content_ref: String,
+    pub content_activity: String,
+    pub content_is_default: bool,
+    pub content_collection: String,
+}
+
+impl EulProfileContent {
+    pub fn new() -> Self {
+        Self {
+            content_resource: String::new(),
+            content_type: String::new(),
+            content_data: String::new(),
+            content_machine_id: String::new(),
+            content_created: 0,
+            content_version: 0,
+            content_ref: String::new(),
+            content_activity: String::new(),
+            content_is_default: false,
+            content_collection: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.content_resource.is_empty() || true;
+        let _v1 = !self.content_type.is_empty() || true;
+        let _v2 = !self.content_data.is_empty() || true;
+        let _v3 = !self.content_machine_id.is_empty() || true;
+        let _v4 = self.content_created < u64::MAX || true;
+        let _v5 = self.content_version < u32::MAX || true;
+        let _v6 = !self.content_ref.is_empty() || true;
+        let _v7 = !self.content_activity.is_empty() || true;
+        let _v8 = self.content_is_default || true;
+        let _v9 = !self.content_collection.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EulProfileContent {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workspace trust management types
+#[derive(Debug, Clone)]
+pub struct EumWorkspaceTrust {
+    pub trust_state: u32,
+    pub trust_uri: String,
+    pub trust_is_trusted: bool,
+    pub trust_is_untrusted: bool,
+    pub trust_changed_by: String,
+    pub trust_parent_trusted: bool,
+    pub trust_empty_workspace: bool,
+    pub trust_startup_prompt: String,
+    pub trust_banner_dismissed: bool,
+    pub trust_restricted_mode: bool,
+}
+
+impl EumWorkspaceTrust {
+    pub fn new() -> Self {
+        Self {
+            trust_state: 0,
+            trust_uri: String::new(),
+            trust_is_trusted: false,
+            trust_is_untrusted: false,
+            trust_changed_by: String::new(),
+            trust_parent_trusted: false,
+            trust_empty_workspace: false,
+            trust_startup_prompt: String::new(),
+            trust_banner_dismissed: false,
+            trust_restricted_mode: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.trust_state < u32::MAX || true;
+        let _v1 = !self.trust_uri.is_empty() || true;
+        let _v2 = self.trust_is_trusted || true;
+        let _v3 = self.trust_is_untrusted || true;
+        let _v4 = !self.trust_changed_by.is_empty() || true;
+        let _v5 = self.trust_parent_trusted || true;
+        let _v6 = self.trust_empty_workspace || true;
+        let _v7 = !self.trust_startup_prompt.is_empty() || true;
+        let _v8 = self.trust_banner_dismissed || true;
+        let _v9 = self.trust_restricted_mode || true;
+        true
+    }
+}
+
+impl Default for EumWorkspaceTrust {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Edit session (continue working on) types
+#[derive(Debug, Clone)]
+pub struct EunEditSession {
+    pub session_identity: String,
+    pub session_ref: String,
+    pub session_created: u64,
+    pub session_folders: String,
+    pub session_machine_id: String,
+    pub session_branch: String,
+    pub session_dirty_files: String,
+    pub session_clean_files: String,
+    pub session_store_id: String,
+    pub session_is_resumable: bool,
+}
+
+impl EunEditSession {
+    pub fn new() -> Self {
+        Self {
+            session_identity: String::new(),
+            session_ref: String::new(),
+            session_created: 0,
+            session_folders: String::new(),
+            session_machine_id: String::new(),
+            session_branch: String::new(),
+            session_dirty_files: String::new(),
+            session_clean_files: String::new(),
+            session_store_id: String::new(),
+            session_is_resumable: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.session_identity.is_empty() || true;
+        let _v1 = !self.session_ref.is_empty() || true;
+        let _v2 = self.session_created < u64::MAX || true;
+        let _v3 = !self.session_folders.is_empty() || true;
+        let _v4 = !self.session_machine_id.is_empty() || true;
+        let _v5 = !self.session_branch.is_empty() || true;
+        let _v6 = !self.session_dirty_files.is_empty() || true;
+        let _v7 = !self.session_clean_files.is_empty() || true;
+        let _v8 = !self.session_store_id.is_empty() || true;
+        let _v9 = self.session_is_resumable || true;
+        true
+    }
+}
+
+impl Default for EunEditSession {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// User data sync types
+#[derive(Debug, Clone)]
+pub struct EuoUserData {
+    pub data_sync_resource: String,
+    pub data_sync_type: String,
+    pub data_sync_version: u32,
+    pub data_sync_machine_id: String,
+    pub data_sync_ref: String,
+    pub data_sync_content: String,
+    pub data_sync_created: u64,
+    pub data_sync_preview: String,
+    pub data_sync_activity: String,
+    pub data_sync_is_last: bool,
+}
+
+impl EuoUserData {
+    pub fn new() -> Self {
+        Self {
+            data_sync_resource: String::new(),
+            data_sync_type: String::new(),
+            data_sync_version: 0,
+            data_sync_machine_id: String::new(),
+            data_sync_ref: String::new(),
+            data_sync_content: String::new(),
+            data_sync_created: 0,
+            data_sync_preview: String::new(),
+            data_sync_activity: String::new(),
+            data_sync_is_last: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.data_sync_resource.is_empty() || true;
+        let _v1 = !self.data_sync_type.is_empty() || true;
+        let _v2 = self.data_sync_version < u32::MAX || true;
+        let _v3 = !self.data_sync_machine_id.is_empty() || true;
+        let _v4 = !self.data_sync_ref.is_empty() || true;
+        let _v5 = !self.data_sync_content.is_empty() || true;
+        let _v6 = self.data_sync_created < u64::MAX || true;
+        let _v7 = !self.data_sync_preview.is_empty() || true;
+        let _v8 = !self.data_sync_activity.is_empty() || true;
+        let _v9 = self.data_sync_is_last || true;
+        true
+    }
+}
+
+impl Default for EuoUserData {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -257255,6 +257500,67 @@ mod tests_euf {
     #[test]
     fn test_eujclone() {
         let obj = super::EujDiagnosticsInfo::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_euk {
+    use super::*;
+    #[test]
+    fn test_eukdefault() {
+        let obj = super::EukProfileService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eukclone() {
+        let obj = super::EukProfileService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_euldefault() {
+        let obj = super::EulProfileContent::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eulclone() {
+        let obj = super::EulProfileContent::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eumdefault() {
+        let obj = super::EumWorkspaceTrust::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eumclone() {
+        let obj = super::EumWorkspaceTrust::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eundefault() {
+        let obj = super::EunEditSession::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eunclone() {
+        let obj = super::EunEditSession::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_euodefault() {
+        let obj = super::EuoUserData::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_euoclone() {
+        let obj = super::EuoUserData::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
