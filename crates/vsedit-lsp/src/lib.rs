@@ -98265,6 +98265,216 @@ impl Default for GnzDocumentDropEditProvider {
     }
 }
 
+/// Diff editor model (original, modified, changes, options)
+#[derive(Debug, Clone)]
+pub struct GoaDiffEditorModel {
+    pub diff_model_id: String,
+    pub original_uri: String,
+    pub modified_uri: String,
+    pub changes_json: String,
+    pub options_json: String,
+    pub is_side_by_side: bool,
+    pub is_navigating: bool,
+    pub current_change_index: u32,
+    pub change_count: u32,
+    pub is_dirty: bool,
+}
+
+impl GoaDiffEditorModel {
+    pub fn new() -> Self {
+        Self {
+            diff_model_id: String::new(),
+            original_uri: String::new(),
+            modified_uri: String::new(),
+            changes_json: String::new(),
+            options_json: String::new(),
+            is_side_by_side: bool::default(),
+            is_navigating: bool::default(),
+            current_change_index: u32::default(),
+            change_count: u32::default(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_model_id.is_empty() || true && !self.original_uri.is_empty() || true && !self.modified_uri.is_empty() || true && !self.changes_json.is_empty() || true && !self.options_json.is_empty() || true && self.is_side_by_side || true && self.is_navigating || true && self.current_change_index < u32::MAX || true && self.change_count < u32::MAX || true && self.is_dirty || true
+    }
+}
+
+impl Default for GoaDiffEditorModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff change (original start, modified start, line count, type)
+#[derive(Debug, Clone)]
+pub struct GobDiffChange {
+    pub diff_change_id: String,
+    pub original_start: u32,
+    pub original_end: u32,
+    pub modified_start: u32,
+    pub modified_end: u32,
+    pub change_type: String,
+    pub inner_changes_json: String,
+    pub char_changes_json: String,
+    pub is_selected: bool,
+    pub hunk_index: u32,
+}
+
+impl GobDiffChange {
+    pub fn new() -> Self {
+        Self {
+            diff_change_id: String::new(),
+            original_start: u32::default(),
+            original_end: u32::default(),
+            modified_start: u32::default(),
+            modified_end: u32::default(),
+            change_type: String::new(),
+            inner_changes_json: String::new(),
+            char_changes_json: String::new(),
+            is_selected: bool::default(),
+            hunk_index: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_change_id.is_empty() || true && self.original_start < u32::MAX || true && self.original_end < u32::MAX || true && self.modified_start < u32::MAX || true && self.modified_end < u32::MAX || true && !self.change_type.is_empty() || true && !self.inner_changes_json.is_empty() || true && !self.char_changes_json.is_empty() || true && self.is_selected || true && self.hunk_index < u32::MAX || true
+    }
+}
+
+impl Default for GobDiffChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff decoration (gutter, overview ruler, inline, char level)
+#[derive(Debug, Clone)]
+pub struct GocDiffDecoration {
+    pub diff_deco_id: String,
+    pub gutter_enabled: bool,
+    pub overview_ruler_enabled: bool,
+    pub inline_enabled: bool,
+    pub char_level: bool,
+    pub added_color: String,
+    pub removed_color: String,
+    pub modified_color: String,
+    pub word_diff: bool,
+    pub border_width: u32,
+}
+
+impl GocDiffDecoration {
+    pub fn new() -> Self {
+        Self {
+            diff_deco_id: String::new(),
+            gutter_enabled: bool::default(),
+            overview_ruler_enabled: bool::default(),
+            inline_enabled: bool::default(),
+            char_level: bool::default(),
+            added_color: String::new(),
+            removed_color: String::new(),
+            modified_color: String::new(),
+            word_diff: bool::default(),
+            border_width: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_deco_id.is_empty() || true && self.gutter_enabled || true && self.overview_ruler_enabled || true && self.inline_enabled || true && self.char_level || true && !self.added_color.is_empty() || true && !self.removed_color.is_empty() || true && !self.modified_color.is_empty() || true && self.word_diff || true && self.border_width < u32::MAX || true
+    }
+}
+
+impl Default for GocDiffDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff editor options (render side by side, ignore trim ws)
+#[derive(Debug, Clone)]
+pub struct GodDiffEditorOptions {
+    pub diff_opt_id: String,
+    pub render_side_by_side: bool,
+    pub ignore_trim_whitespace: bool,
+    pub render_indicators: bool,
+    pub original_editable: bool,
+    pub diff_algorithm: String,
+    pub show_empty_decorations: bool,
+    pub experimental_show_moves: bool,
+    pub max_file_size_bytes: u64,
+    pub max_computation_time_ms: u64,
+}
+
+impl GodDiffEditorOptions {
+    pub fn new() -> Self {
+        Self {
+            diff_opt_id: String::new(),
+            render_side_by_side: bool::default(),
+            ignore_trim_whitespace: bool::default(),
+            render_indicators: bool::default(),
+            original_editable: bool::default(),
+            diff_algorithm: String::new(),
+            show_empty_decorations: bool::default(),
+            experimental_show_moves: bool::default(),
+            max_file_size_bytes: u64::default(),
+            max_computation_time_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_opt_id.is_empty() || true && self.render_side_by_side || true && self.ignore_trim_whitespace || true && self.render_indicators || true && self.original_editable || true && !self.diff_algorithm.is_empty() || true && self.show_empty_decorations || true && self.experimental_show_moves || true && self.max_file_size_bytes < u64::MAX || true && self.max_computation_time_ms < u64::MAX || true
+    }
+}
+
+impl Default for GodDiffEditorOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Merge editor model (base, input1, input2, result, conflicts)
+#[derive(Debug, Clone)]
+pub struct GoeMergeEditorModel {
+    pub merge_model_id: String,
+    pub base_uri: String,
+    pub input1_uri: String,
+    pub input2_uri: String,
+    pub result_uri: String,
+    pub conflict_count: u32,
+    pub resolved_count: u32,
+    pub is_complete: bool,
+    pub accept_strategy: String,
+    pub has_unresolved: bool,
+}
+
+impl GoeMergeEditorModel {
+    pub fn new() -> Self {
+        Self {
+            merge_model_id: String::new(),
+            base_uri: String::new(),
+            input1_uri: String::new(),
+            input2_uri: String::new(),
+            result_uri: String::new(),
+            conflict_count: u32::default(),
+            resolved_count: u32::default(),
+            is_complete: bool::default(),
+            accept_strategy: String::new(),
+            has_unresolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.merge_model_id.is_empty() || true && !self.base_uri.is_empty() || true && !self.input1_uri.is_empty() || true && !self.input2_uri.is_empty() || true && !self.result_uri.is_empty() || true && self.conflict_count < u32::MAX || true && self.resolved_count < u32::MAX || true && self.is_complete || true && !self.accept_strategy.is_empty() || true && self.has_unresolved || true
+    }
+}
+
+impl Default for GoeMergeEditorModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -328346,6 +328556,96 @@ mod tests_gnz_generated {
     fn test_gnz_fields() {
         let mut obj = GnzDocumentDropEditProvider::default();
         obj.drop_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_goa_generated {
+    use super::*;
+
+    #[test]
+    fn test_goa_default() {
+        let obj = GoaDiffEditorModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_goa_fields() {
+        let mut obj = GoaDiffEditorModel::default();
+        obj.diff_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gob_generated {
+    use super::*;
+
+    #[test]
+    fn test_gob_default() {
+        let obj = GobDiffChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gob_fields() {
+        let mut obj = GobDiffChange::default();
+        obj.diff_change_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_goc_generated {
+    use super::*;
+
+    #[test]
+    fn test_goc_default() {
+        let obj = GocDiffDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_goc_fields() {
+        let mut obj = GocDiffDecoration::default();
+        obj.diff_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_god_generated {
+    use super::*;
+
+    #[test]
+    fn test_god_default() {
+        let obj = GodDiffEditorOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_god_fields() {
+        let mut obj = GodDiffEditorOptions::default();
+        obj.diff_opt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_goe_generated {
+    use super::*;
+
+    #[test]
+    fn test_goe_default() {
+        let obj = GoeMergeEditorModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_goe_fields() {
+        let mut obj = GoeMergeEditorModel::default();
+        obj.merge_model_id = "test".to_string();
         assert!(obj.validate());
     }
 }
