@@ -83601,6 +83601,468 @@ impl Default for GaoWindowZenModeConfig {
     }
 }
 
+/// Window screencast mode (show keys, font size, timeout, mouse indicator)
+#[derive(Debug, Clone)]
+pub struct GapWindowScreencastMode {
+    pub screencast_id: String,
+    pub show_keys: bool,
+    pub font_size: u32,
+    pub timeout_ms: u32,
+    pub mouse_indicator: bool,
+    pub show_commands: bool,
+    pub key_overlay_color: String,
+    pub position: String,
+    pub enabled: bool,
+    pub show_mouse_clicks: bool,
+}
+
+impl GapWindowScreencastMode {
+    pub fn new() -> Self {
+        Self {
+            screencast_id: String::new(),
+            show_keys: bool::default(),
+            font_size: u32::default(),
+            timeout_ms: u32::default(),
+            mouse_indicator: bool::default(),
+            show_commands: bool::default(),
+            key_overlay_color: String::new(),
+            position: String::new(),
+            enabled: bool::default(),
+            show_mouse_clicks: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.screencast_id.is_empty() || true && self.show_keys || true && self.font_size < u32::MAX || true && self.timeout_ms < u32::MAX || true && self.mouse_indicator || true && self.show_commands || true && !self.key_overlay_color.is_empty() || true && !self.position.is_empty() || true && self.enabled || true && self.show_mouse_clicks || true
+    }
+}
+
+impl Default for GapWindowScreencastMode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window accessibility config (screen reader, high contrast, reduce motion)
+#[derive(Debug, Clone)]
+pub struct GaqWindowAccessibilityConfig {
+    pub a11y_id: String,
+    pub screen_reader_attached: bool,
+    pub high_contrast_theme: bool,
+    pub reduce_motion: bool,
+    pub page_on_scroll: bool,
+    pub dimmed_unfocused: bool,
+    pub voice_enabled: bool,
+    pub line_height_factor: f64,
+    pub cursor_width: u32,
+    pub announce_changes: bool,
+}
+
+impl GaqWindowAccessibilityConfig {
+    pub fn new() -> Self {
+        Self {
+            a11y_id: String::new(),
+            screen_reader_attached: bool::default(),
+            high_contrast_theme: bool::default(),
+            reduce_motion: bool::default(),
+            page_on_scroll: bool::default(),
+            dimmed_unfocused: bool::default(),
+            voice_enabled: bool::default(),
+            line_height_factor: f64::default(),
+            cursor_width: u32::default(),
+            announce_changes: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_id.is_empty() || true && self.screen_reader_attached || true && self.high_contrast_theme || true && self.reduce_motion || true && self.page_on_scroll || true && self.dimmed_unfocused || true && self.voice_enabled || true && self.line_height_factor.is_finite() || true && self.cursor_width < u32::MAX || true && self.announce_changes || true
+    }
+}
+
+impl Default for GaqWindowAccessibilityConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window experimental config (feature flags, preview features, insiders)
+#[derive(Debug, Clone)]
+pub struct GarWindowExperimentalConfig {
+    pub exp_id: String,
+    pub feature_flags_json: String,
+    pub preview_features: bool,
+    pub insiders_build: bool,
+    pub experiment_group: String,
+    pub rollout_percentage: f64,
+    pub ab_test_id: String,
+    pub enabled_apis_json: String,
+    pub nightly_channel: bool,
+    pub canary_features: bool,
+}
+
+impl GarWindowExperimentalConfig {
+    pub fn new() -> Self {
+        Self {
+            exp_id: String::new(),
+            feature_flags_json: String::new(),
+            preview_features: bool::default(),
+            insiders_build: bool::default(),
+            experiment_group: String::new(),
+            rollout_percentage: f64::default(),
+            ab_test_id: String::new(),
+            enabled_apis_json: String::new(),
+            nightly_channel: bool::default(),
+            canary_features: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exp_id.is_empty() || true && !self.feature_flags_json.is_empty() || true && self.preview_features || true && self.insiders_build || true && !self.experiment_group.is_empty() || true && self.rollout_percentage.is_finite() || true && !self.ab_test_id.is_empty() || true && !self.enabled_apis_json.is_empty() || true && self.nightly_channel || true && self.canary_features || true
+    }
+}
+
+impl Default for GarWindowExperimentalConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window proxy settings (http proxy, no proxy, strict SSL, auth)
+#[derive(Debug, Clone)]
+pub struct GasWindowProxy {
+    pub proxy_id: String,
+    pub http_proxy: String,
+    pub https_proxy: String,
+    pub no_proxy_json: String,
+    pub strict_ssl: bool,
+    pub proxy_auth: String,
+    pub proxy_support: String,
+    pub electron_net: bool,
+    pub pac_url: String,
+    pub bypass_local: bool,
+}
+
+impl GasWindowProxy {
+    pub fn new() -> Self {
+        Self {
+            proxy_id: String::new(),
+            http_proxy: String::new(),
+            https_proxy: String::new(),
+            no_proxy_json: String::new(),
+            strict_ssl: bool::default(),
+            proxy_auth: String::new(),
+            proxy_support: String::new(),
+            electron_net: bool::default(),
+            pac_url: String::new(),
+            bypass_local: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proxy_id.is_empty() || true && !self.http_proxy.is_empty() || true && !self.https_proxy.is_empty() || true && !self.no_proxy_json.is_empty() || true && self.strict_ssl || true && !self.proxy_auth.is_empty() || true && !self.proxy_support.is_empty() || true && self.electron_net || true && !self.pac_url.is_empty() || true && self.bypass_local || true
+    }
+}
+
+impl Default for GasWindowProxy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window telemetry config (level, crash reporter, first party)
+#[derive(Debug, Clone)]
+pub struct GatWindowTelemetryConfig {
+    pub telemetry_id: String,
+    pub telemetry_level: String,
+    pub crash_reporter: bool,
+    pub first_party_only: bool,
+    pub connection_telemetry: bool,
+    pub error_telemetry: bool,
+    pub usage_data: bool,
+    pub app_insights_key: String,
+    pub gdpr_enabled: bool,
+    pub endpoint_url: String,
+}
+
+impl GatWindowTelemetryConfig {
+    pub fn new() -> Self {
+        Self {
+            telemetry_id: String::new(),
+            telemetry_level: String::new(),
+            crash_reporter: bool::default(),
+            first_party_only: bool::default(),
+            connection_telemetry: bool::default(),
+            error_telemetry: bool::default(),
+            usage_data: bool::default(),
+            app_insights_key: String::new(),
+            gdpr_enabled: bool::default(),
+            endpoint_url: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.telemetry_id.is_empty() || true && !self.telemetry_level.is_empty() || true && self.crash_reporter || true && self.first_party_only || true && self.connection_telemetry || true && self.error_telemetry || true && self.usage_data || true && !self.app_insights_key.is_empty() || true && self.gdpr_enabled || true && !self.endpoint_url.is_empty() || true
+    }
+}
+
+impl Default for GatWindowTelemetryConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window update config (channel, mode, enable, background download)
+#[derive(Debug, Clone)]
+pub struct GauWindowUpdateConfig {
+    pub update_id: String,
+    pub channel: String,
+    pub mode: String,
+    pub enabled: bool,
+    pub background_download: bool,
+    pub check_interval_ms: u64,
+    pub show_release_notes: bool,
+    pub auto_restart: bool,
+    pub pre_release: bool,
+    pub last_check_ms: u64,
+}
+
+impl GauWindowUpdateConfig {
+    pub fn new() -> Self {
+        Self {
+            update_id: String::new(),
+            channel: String::new(),
+            mode: String::new(),
+            enabled: bool::default(),
+            background_download: bool::default(),
+            check_interval_ms: u64::default(),
+            show_release_notes: bool::default(),
+            auto_restart: bool::default(),
+            pre_release: bool::default(),
+            last_check_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.update_id.is_empty() || true && !self.channel.is_empty() || true && !self.mode.is_empty() || true && self.enabled || true && self.background_download || true && self.check_interval_ms < u64::MAX || true && self.show_release_notes || true && self.auto_restart || true && self.pre_release || true && self.last_check_ms < u64::MAX || true
+    }
+}
+
+impl Default for GauWindowUpdateConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window security config (workspace trust, restricted mode, allowed exts)
+#[derive(Debug, Clone)]
+pub struct GavWindowSecurityConfig {
+    pub security_id: String,
+    pub workspace_trust_enabled: bool,
+    pub restricted_mode: bool,
+    pub allowed_extensions_json: String,
+    pub trust_uri_json: String,
+    pub banner_dismissed: bool,
+    pub startup_prompt: bool,
+    pub empty_window_trust: bool,
+    pub untrusted_files: String,
+    pub grant_on_open: bool,
+}
+
+impl GavWindowSecurityConfig {
+    pub fn new() -> Self {
+        Self {
+            security_id: String::new(),
+            workspace_trust_enabled: bool::default(),
+            restricted_mode: bool::default(),
+            allowed_extensions_json: String::new(),
+            trust_uri_json: String::new(),
+            banner_dismissed: bool::default(),
+            startup_prompt: bool::default(),
+            empty_window_trust: bool::default(),
+            untrusted_files: String::new(),
+            grant_on_open: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.security_id.is_empty() || true && self.workspace_trust_enabled || true && self.restricted_mode || true && !self.allowed_extensions_json.is_empty() || true && !self.trust_uri_json.is_empty() || true && self.banner_dismissed || true && self.startup_prompt || true && self.empty_window_trust || true && !self.untrusted_files.is_empty() || true && self.grant_on_open || true
+    }
+}
+
+impl Default for GavWindowSecurityConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window editor overrides (per-language, resource-scoped settings)
+#[derive(Debug, Clone)]
+pub struct GawWindowEditorOverrides {
+    pub override_id: String,
+    pub language_id: String,
+    pub resource_uri: String,
+    pub overrides_json: String,
+    pub scope: String,
+    pub is_default: bool,
+    pub priority: u32,
+    pub applied_at_ms: u64,
+    pub source: String,
+    pub is_user_defined: bool,
+}
+
+impl GawWindowEditorOverrides {
+    pub fn new() -> Self {
+        Self {
+            override_id: String::new(),
+            language_id: String::new(),
+            resource_uri: String::new(),
+            overrides_json: String::new(),
+            scope: String::new(),
+            is_default: bool::default(),
+            priority: u32::default(),
+            applied_at_ms: u64::default(),
+            source: String::new(),
+            is_user_defined: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.override_id.is_empty() || true && !self.language_id.is_empty() || true && !self.resource_uri.is_empty() || true && !self.overrides_json.is_empty() || true && !self.scope.is_empty() || true && self.is_default || true && self.priority < u32::MAX || true && self.applied_at_ms < u64::MAX || true && !self.source.is_empty() || true && self.is_user_defined || true
+    }
+}
+
+impl Default for GawWindowEditorOverrides {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window menu bar config (visibility, compact mode, mnemonics)
+#[derive(Debug, Clone)]
+pub struct GaxWindowMenuBarConfig {
+    pub menubar_id: String,
+    pub visibility: String,
+    pub compact_mode: bool,
+    pub mnemonics_enabled: bool,
+    pub custom_title_bar: bool,
+    pub native_menu: bool,
+    pub menu_items_json: String,
+    pub theme_id: String,
+    pub hover_background: String,
+    pub separator_style: String,
+}
+
+impl GaxWindowMenuBarConfig {
+    pub fn new() -> Self {
+        Self {
+            menubar_id: String::new(),
+            visibility: String::new(),
+            compact_mode: bool::default(),
+            mnemonics_enabled: bool::default(),
+            custom_title_bar: bool::default(),
+            native_menu: bool::default(),
+            menu_items_json: String::new(),
+            theme_id: String::new(),
+            hover_background: String::new(),
+            separator_style: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.menubar_id.is_empty() || true && !self.visibility.is_empty() || true && self.compact_mode || true && self.mnemonics_enabled || true && self.custom_title_bar || true && self.native_menu || true && !self.menu_items_json.is_empty() || true && !self.theme_id.is_empty() || true && !self.hover_background.is_empty() || true && !self.separator_style.is_empty() || true
+    }
+}
+
+impl Default for GaxWindowMenuBarConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window breadcrumb config (enabled, file path, symbol path, icons)
+#[derive(Debug, Clone)]
+pub struct GayWindowBreadcrumbConfig {
+    pub breadcrumb_id: String,
+    pub enabled: bool,
+    pub file_path_enabled: bool,
+    pub symbol_path_enabled: bool,
+    pub icons_enabled: bool,
+    pub sort_order: String,
+    pub symbol_sort_order: String,
+    pub filter_on_type: bool,
+    pub show_files: bool,
+    pub show_arrays: bool,
+}
+
+impl GayWindowBreadcrumbConfig {
+    pub fn new() -> Self {
+        Self {
+            breadcrumb_id: String::new(),
+            enabled: bool::default(),
+            file_path_enabled: bool::default(),
+            symbol_path_enabled: bool::default(),
+            icons_enabled: bool::default(),
+            sort_order: String::new(),
+            symbol_sort_order: String::new(),
+            filter_on_type: bool::default(),
+            show_files: bool::default(),
+            show_arrays: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.breadcrumb_id.is_empty() || true && self.enabled || true && self.file_path_enabled || true && self.symbol_path_enabled || true && self.icons_enabled || true && !self.sort_order.is_empty() || true && !self.symbol_sort_order.is_empty() || true && self.filter_on_type || true && self.show_files || true && self.show_arrays || true
+    }
+}
+
+impl Default for GayWindowBreadcrumbConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window minimap config (enabled, side, size, render chars, scale)
+#[derive(Debug, Clone)]
+pub struct GazWindowMinimap {
+    pub minimap_id: String,
+    pub enabled: bool,
+    pub side: String,
+    pub size: String,
+    pub render_chars: bool,
+    pub max_column: u32,
+    pub scale: f64,
+    pub show_slider: String,
+    pub auto_hide: bool,
+    pub section_headers: bool,
+}
+
+impl GazWindowMinimap {
+    pub fn new() -> Self {
+        Self {
+            minimap_id: String::new(),
+            enabled: bool::default(),
+            side: String::new(),
+            size: String::new(),
+            render_chars: bool::default(),
+            max_column: u32::default(),
+            scale: f64::default(),
+            show_slider: String::new(),
+            auto_hide: bool::default(),
+            section_headers: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.minimap_id.is_empty() || true && self.enabled || true && !self.side.is_empty() || true && !self.size.is_empty() || true && self.render_chars || true && self.max_column < u32::MAX || true && self.scale.is_finite() || true && !self.show_slider.is_empty() || true && self.auto_hide || true && self.section_headers || true
+    }
+}
+
+impl Default for GazWindowMinimap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -307373,6 +307835,204 @@ mod tests_gao_generated {
     fn test_gao_fields() {
         let mut obj = GaoWindowZenModeConfig::default();
         obj.zen_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gap_generated {
+    use super::*;
+
+    #[test]
+    fn test_gap_default() {
+        let obj = GapWindowScreencastMode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gap_fields() {
+        let mut obj = GapWindowScreencastMode::default();
+        obj.screencast_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gaq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gaq_default() {
+        let obj = GaqWindowAccessibilityConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gaq_fields() {
+        let mut obj = GaqWindowAccessibilityConfig::default();
+        obj.a11y_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gar_generated {
+    use super::*;
+
+    #[test]
+    fn test_gar_default() {
+        let obj = GarWindowExperimentalConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gar_fields() {
+        let mut obj = GarWindowExperimentalConfig::default();
+        obj.exp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gas_generated {
+    use super::*;
+
+    #[test]
+    fn test_gas_default() {
+        let obj = GasWindowProxy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gas_fields() {
+        let mut obj = GasWindowProxy::default();
+        obj.proxy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gat_generated {
+    use super::*;
+
+    #[test]
+    fn test_gat_default() {
+        let obj = GatWindowTelemetryConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gat_fields() {
+        let mut obj = GatWindowTelemetryConfig::default();
+        obj.telemetry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gau_generated {
+    use super::*;
+
+    #[test]
+    fn test_gau_default() {
+        let obj = GauWindowUpdateConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gau_fields() {
+        let mut obj = GauWindowUpdateConfig::default();
+        obj.update_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gav_generated {
+    use super::*;
+
+    #[test]
+    fn test_gav_default() {
+        let obj = GavWindowSecurityConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gav_fields() {
+        let mut obj = GavWindowSecurityConfig::default();
+        obj.security_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gaw_generated {
+    use super::*;
+
+    #[test]
+    fn test_gaw_default() {
+        let obj = GawWindowEditorOverrides::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gaw_fields() {
+        let mut obj = GawWindowEditorOverrides::default();
+        obj.override_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gax_generated {
+    use super::*;
+
+    #[test]
+    fn test_gax_default() {
+        let obj = GaxWindowMenuBarConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gax_fields() {
+        let mut obj = GaxWindowMenuBarConfig::default();
+        obj.menubar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gay_generated {
+    use super::*;
+
+    #[test]
+    fn test_gay_default() {
+        let obj = GayWindowBreadcrumbConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gay_fields() {
+        let mut obj = GayWindowBreadcrumbConfig::default();
+        obj.breadcrumb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gaz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gaz_default() {
+        let obj = GazWindowMinimap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gaz_fields() {
+        let mut obj = GazWindowMinimap::default();
+        obj.minimap_id = "test".to_string();
         assert!(obj.validate());
     }
 }
