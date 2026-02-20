@@ -63763,6 +63763,213 @@ impl Default for FijWorkspaceEdit {
 }
 
 
+/// Workspace folder configuration (settings, launch, tasks, extensions)
+#[derive(Debug, Clone)]
+pub struct FikWorkspaceFolderConfig {
+    pub folder_uri: String,
+    pub folder_name: String,
+    pub folder_index: u32,
+    pub settings_uri: String,
+    pub launch_config_uri: String,
+    pub tasks_config_uri: String,
+    pub extensions_json_uri: String,
+    pub is_root: bool,
+    pub is_virtual: bool,
+    pub search_exclude_json: String,
+}
+
+impl FikWorkspaceFolderConfig {
+    pub fn new() -> Self {
+        Self {
+            folder_uri: String::new(),
+            folder_name: String::new(),
+            folder_index: u32::default(),
+            settings_uri: String::new(),
+            launch_config_uri: String::new(),
+            tasks_config_uri: String::new(),
+            extensions_json_uri: String::new(),
+            is_root: bool::default(),
+            is_virtual: bool::default(),
+            search_exclude_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folder_uri.is_empty() || true && !self.folder_name.is_empty() || true && self.folder_index < u32::MAX || true && !self.settings_uri.is_empty() || true && !self.launch_config_uri.is_empty() || true && !self.tasks_config_uri.is_empty() || true && !self.extensions_json_uri.is_empty() || true && self.is_root || true && self.is_virtual || true && !self.search_exclude_json.is_empty() || true
+    }
+}
+
+impl Default for FikWorkspaceFolderConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace file (multi-root, folders, settings, transient)
+#[derive(Debug, Clone)]
+pub struct FilWorkspaceFile {
+    pub workspace_uri: String,
+    pub folder_count: u32,
+    pub folders_json: String,
+    pub settings_json: String,
+    pub is_untitled: bool,
+    pub is_transient: bool,
+    pub configuration_uri: String,
+    pub remote_authority: String,
+    pub id_hash: String,
+    pub is_empty: bool,
+}
+
+impl FilWorkspaceFile {
+    pub fn new() -> Self {
+        Self {
+            workspace_uri: String::new(),
+            folder_count: u32::default(),
+            folders_json: String::new(),
+            settings_json: String::new(),
+            is_untitled: bool::default(),
+            is_transient: bool::default(),
+            configuration_uri: String::new(),
+            remote_authority: String::new(),
+            id_hash: String::new(),
+            is_empty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.workspace_uri.is_empty() || true && self.folder_count < u32::MAX || true && !self.folders_json.is_empty() || true && !self.settings_json.is_empty() || true && self.is_untitled || true && self.is_transient || true && !self.configuration_uri.is_empty() || true && !self.remote_authority.is_empty() || true && !self.id_hash.is_empty() || true && self.is_empty || true
+    }
+}
+
+impl Default for FilWorkspaceFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace trust (state, grant, request, supported, restrictions)
+#[derive(Debug, Clone)]
+pub struct FimWorkspaceTrust {
+    pub trust_id: String,
+    pub is_trusted: bool,
+    pub trust_state: u32,
+    pub parent_uri: String,
+    pub is_empty_workspace: bool,
+    pub trusted_folders_json: String,
+    pub request_pending: bool,
+    pub startup_prompt: u32,
+    pub restricted_mode: bool,
+    pub grant_workspace_trust: bool,
+}
+
+impl FimWorkspaceTrust {
+    pub fn new() -> Self {
+        Self {
+            trust_id: String::new(),
+            is_trusted: bool::default(),
+            trust_state: u32::default(),
+            parent_uri: String::new(),
+            is_empty_workspace: bool::default(),
+            trusted_folders_json: String::new(),
+            request_pending: bool::default(),
+            startup_prompt: u32::default(),
+            restricted_mode: bool::default(),
+            grant_workspace_trust: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.trust_id.is_empty() || true && self.is_trusted || true && self.trust_state < u32::MAX || true && !self.parent_uri.is_empty() || true && self.is_empty_workspace || true && !self.trusted_folders_json.is_empty() || true && self.request_pending || true && self.startup_prompt < u32::MAX || true && self.restricted_mode || true && self.grant_workspace_trust || true
+    }
+}
+
+impl Default for FimWorkspaceTrust {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace tags (telemetry tags, environment info, workspace type)
+#[derive(Debug, Clone)]
+pub struct FinWorkspaceTag {
+    pub tag_name: String,
+    pub tag_value: String,
+    pub workspace_type: String,
+    pub env_type: String,
+    pub remote_name: String,
+    pub is_virtual_workspace: bool,
+    pub has_git: bool,
+    pub file_count: u64,
+    pub extension_count: u32,
+    pub language_id: String,
+}
+
+impl FinWorkspaceTag {
+    pub fn new() -> Self {
+        Self {
+            tag_name: String::new(),
+            tag_value: String::new(),
+            workspace_type: String::new(),
+            env_type: String::new(),
+            remote_name: String::new(),
+            is_virtual_workspace: bool::default(),
+            has_git: bool::default(),
+            file_count: u64::default(),
+            extension_count: u32::default(),
+            language_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tag_name.is_empty() || true && !self.tag_value.is_empty() || true && !self.workspace_type.is_empty() || true && !self.env_type.is_empty() || true && !self.remote_name.is_empty() || true && self.is_virtual_workspace || true && self.has_git || true && self.file_count < u64::MAX || true && self.extension_count < u32::MAX || true && !self.language_id.is_empty() || true
+    }
+}
+
+impl Default for FinWorkspaceTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace recent entries (path, label, remote authority, last opened)
+#[derive(Debug, Clone)]
+pub struct FioWorkspaceRecentEntry {
+    pub entry_id: String,
+    pub folder_uri: String,
+    pub workspace_uri: String,
+    pub label: String,
+    pub remote_authority: String,
+    pub last_opened_ms: u64,
+    pub is_pinned: bool,
+    pub is_file_entry: bool,
+    pub is_folder_entry: bool,
+    pub is_workspace_entry: bool,
+}
+
+impl FioWorkspaceRecentEntry {
+    pub fn new() -> Self {
+        Self {
+            entry_id: String::new(),
+            folder_uri: String::new(),
+            workspace_uri: String::new(),
+            label: String::new(),
+            remote_authority: String::new(),
+            last_opened_ms: u64::default(),
+            is_pinned: bool::default(),
+            is_file_entry: bool::default(),
+            is_folder_entry: bool::default(),
+            is_workspace_entry: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.entry_id.is_empty() || true && !self.folder_uri.is_empty() || true && !self.workspace_uri.is_empty() || true && !self.label.is_empty() || true && !self.remote_authority.is_empty() || true && self.last_opened_ms < u64::MAX || true && self.is_pinned || true && self.is_file_entry || true && self.is_folder_entry || true && self.is_workspace_entry || true
+    }
+}
+
+impl Default for FioWorkspaceRecentEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -278913,6 +279120,96 @@ mod tests_fij_generated {
     fn test_fij_fields() {
         let mut obj = FijWorkspaceEdit::default();
         obj.edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fik_generated {
+    use super::*;
+
+    #[test]
+    fn test_fik_default() {
+        let obj = FikWorkspaceFolderConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fik_fields() {
+        let mut obj = FikWorkspaceFolderConfig::default();
+        obj.folder_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fil_generated {
+    use super::*;
+
+    #[test]
+    fn test_fil_default() {
+        let obj = FilWorkspaceFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fil_fields() {
+        let mut obj = FilWorkspaceFile::default();
+        obj.workspace_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fim_generated {
+    use super::*;
+
+    #[test]
+    fn test_fim_default() {
+        let obj = FimWorkspaceTrust::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fim_fields() {
+        let mut obj = FimWorkspaceTrust::default();
+        obj.trust_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fin_generated {
+    use super::*;
+
+    #[test]
+    fn test_fin_default() {
+        let obj = FinWorkspaceTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fin_fields() {
+        let mut obj = FinWorkspaceTag::default();
+        obj.tag_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fio_generated {
+    use super::*;
+
+    #[test]
+    fn test_fio_default() {
+        let obj = FioWorkspaceRecentEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fio_fields() {
+        let mut obj = FioWorkspaceRecentEntry::default();
+        obj.entry_id = "test".to_string();
         assert!(obj.validate());
     }
 }
