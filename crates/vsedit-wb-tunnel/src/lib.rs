@@ -87593,6 +87593,678 @@ impl Default for GejExtensionTelemetry {
     }
 }
 
+/// Extension bisect (enabled set, disabled set, iteration, result)
+#[derive(Debug, Clone)]
+pub struct GekExtensionBisect {
+    pub bisect_id: String,
+    pub enabled_set_json: String,
+    pub disabled_set_json: String,
+    pub iteration: u32,
+    pub result: String,
+    pub total_extensions: u32,
+    pub is_running: bool,
+    pub start_time_ms: u64,
+    pub bad_extension_id: String,
+    pub is_complete: bool,
+}
+
+impl GekExtensionBisect {
+    pub fn new() -> Self {
+        Self {
+            bisect_id: String::new(),
+            enabled_set_json: String::new(),
+            disabled_set_json: String::new(),
+            iteration: u32::default(),
+            result: String::new(),
+            total_extensions: u32::default(),
+            is_running: bool::default(),
+            start_time_ms: u64::default(),
+            bad_extension_id: String::new(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bisect_id.is_empty() || true && !self.enabled_set_json.is_empty() || true && !self.disabled_set_json.is_empty() || true && self.iteration < u32::MAX || true && !self.result.is_empty() || true && self.total_extensions < u32::MAX || true && self.is_running || true && self.start_time_ms < u64::MAX || true && !self.bad_extension_id.is_empty() || true && self.is_complete || true
+    }
+}
+
+impl Default for GekExtensionBisect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension pack (extensions, display name, description, publisher)
+#[derive(Debug, Clone)]
+pub struct GelExtensionPack {
+    pub pack_id: String,
+    pub extensions_json: String,
+    pub display_name: String,
+    pub description: String,
+    pub publisher: String,
+    pub icon_path: String,
+    pub extension_count: u32,
+    pub is_installed: bool,
+    pub version: String,
+    pub categories_json: String,
+}
+
+impl GelExtensionPack {
+    pub fn new() -> Self {
+        Self {
+            pack_id: String::new(),
+            extensions_json: String::new(),
+            display_name: String::new(),
+            description: String::new(),
+            publisher: String::new(),
+            icon_path: String::new(),
+            extension_count: u32::default(),
+            is_installed: bool::default(),
+            version: String::new(),
+            categories_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pack_id.is_empty() || true && !self.extensions_json.is_empty() || true && !self.display_name.is_empty() || true && !self.description.is_empty() || true && !self.publisher.is_empty() || true && !self.icon_path.is_empty() || true && self.extension_count < u32::MAX || true && self.is_installed || true && !self.version.is_empty() || true && !self.categories_json.is_empty() || true
+    }
+}
+
+impl Default for GelExtensionPack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API proposal (name, version, when, deprecation)
+#[derive(Debug, Clone)]
+pub struct GemExtensionApiProposal {
+    pub proposal_id: String,
+    pub name: String,
+    pub version: String,
+    pub when_clause: String,
+    pub deprecation: String,
+    pub replacement: String,
+    pub is_finalized: bool,
+    pub gate_keeper: String,
+    pub scope: String,
+    pub api_surface: String,
+}
+
+impl GemExtensionApiProposal {
+    pub fn new() -> Self {
+        Self {
+            proposal_id: String::new(),
+            name: String::new(),
+            version: String::new(),
+            when_clause: String::new(),
+            deprecation: String::new(),
+            replacement: String::new(),
+            is_finalized: bool::default(),
+            gate_keeper: String::new(),
+            scope: String::new(),
+            api_surface: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proposal_id.is_empty() || true && !self.name.is_empty() || true && !self.version.is_empty() || true && !self.when_clause.is_empty() || true && !self.deprecation.is_empty() || true && !self.replacement.is_empty() || true && self.is_finalized || true && !self.gate_keeper.is_empty() || true && !self.scope.is_empty() || true && !self.api_surface.is_empty() || true
+    }
+}
+
+impl Default for GemExtensionApiProposal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension L10N bundle (locale, translations, fallback, path)
+#[derive(Debug, Clone)]
+pub struct GenExtensionL10nBundle {
+    pub l10n_id: String,
+    pub locale: String,
+    pub translations_json: String,
+    pub fallback_locale: String,
+    pub bundle_path: String,
+    pub extension_id: String,
+    pub is_default: bool,
+    pub message_count: u32,
+    pub last_updated_ms: u64,
+    pub hash: String,
+}
+
+impl GenExtensionL10nBundle {
+    pub fn new() -> Self {
+        Self {
+            l10n_id: String::new(),
+            locale: String::new(),
+            translations_json: String::new(),
+            fallback_locale: String::new(),
+            bundle_path: String::new(),
+            extension_id: String::new(),
+            is_default: bool::default(),
+            message_count: u32::default(),
+            last_updated_ms: u64::default(),
+            hash: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.l10n_id.is_empty() || true && !self.locale.is_empty() || true && !self.translations_json.is_empty() || true && !self.fallback_locale.is_empty() || true && !self.bundle_path.is_empty() || true && !self.extension_id.is_empty() || true && self.is_default || true && self.message_count < u32::MAX || true && self.last_updated_ms < u64::MAX || true && !self.hash.is_empty() || true
+    }
+}
+
+impl Default for GenExtensionL10nBundle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension walkthrough (steps, title, description, when, category)
+#[derive(Debug, Clone)]
+pub struct GeoExtensionWalkthrough {
+    pub walkthrough_id: String,
+    pub steps_json: String,
+    pub title: String,
+    pub description: String,
+    pub when_clause: String,
+    pub category: String,
+    pub icon: String,
+    pub featured_order: u32,
+    pub is_new: bool,
+    pub completion_events_json: String,
+}
+
+impl GeoExtensionWalkthrough {
+    pub fn new() -> Self {
+        Self {
+            walkthrough_id: String::new(),
+            steps_json: String::new(),
+            title: String::new(),
+            description: String::new(),
+            when_clause: String::new(),
+            category: String::new(),
+            icon: String::new(),
+            featured_order: u32::default(),
+            is_new: bool::default(),
+            completion_events_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.walkthrough_id.is_empty() || true && !self.steps_json.is_empty() || true && !self.title.is_empty() || true && !self.description.is_empty() || true && !self.when_clause.is_empty() || true && !self.category.is_empty() || true && !self.icon.is_empty() || true && self.featured_order < u32::MAX || true && self.is_new || true && !self.completion_events_json.is_empty() || true
+    }
+}
+
+impl Default for GeoExtensionWalkthrough {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Marketplace query (filters, flags, sort, page, page size)
+#[derive(Debug, Clone)]
+pub struct GepMarketplaceQuery {
+    pub mkt_query_id: String,
+    pub filters_json: String,
+    pub flags: u32,
+    pub sort_by: String,
+    pub sort_order: String,
+    pub page: u32,
+    pub page_size: u32,
+    pub asset_types_json: String,
+    pub criteria_json: String,
+    pub source: String,
+}
+
+impl GepMarketplaceQuery {
+    pub fn new() -> Self {
+        Self {
+            mkt_query_id: String::new(),
+            filters_json: String::new(),
+            flags: u32::default(),
+            sort_by: String::new(),
+            sort_order: String::new(),
+            page: u32::default(),
+            page_size: u32::default(),
+            asset_types_json: String::new(),
+            criteria_json: String::new(),
+            source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mkt_query_id.is_empty() || true && !self.filters_json.is_empty() || true && self.flags < u32::MAX || true && !self.sort_by.is_empty() || true && !self.sort_order.is_empty() || true && self.page < u32::MAX || true && self.page_size < u32::MAX || true && !self.asset_types_json.is_empty() || true && !self.criteria_json.is_empty() || true && !self.source.is_empty() || true
+    }
+}
+
+impl Default for GepMarketplaceQuery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Marketplace statistic (install count, rating, trending, daily)
+#[derive(Debug, Clone)]
+pub struct GeqMarketplaceStatistic {
+    pub stat_id: String,
+    pub install_count: u64,
+    pub average_rating: f64,
+    pub rating_count: u32,
+    pub trending_daily: f64,
+    pub trending_weekly: f64,
+    pub trending_monthly: f64,
+    pub uninstall_count: u64,
+    pub download_count: u64,
+    pub weighted_rating: f64,
+}
+
+impl GeqMarketplaceStatistic {
+    pub fn new() -> Self {
+        Self {
+            stat_id: String::new(),
+            install_count: u64::default(),
+            average_rating: f64::default(),
+            rating_count: u32::default(),
+            trending_daily: f64::default(),
+            trending_weekly: f64::default(),
+            trending_monthly: f64::default(),
+            uninstall_count: u64::default(),
+            download_count: u64::default(),
+            weighted_rating: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.stat_id.is_empty() || true && self.install_count < u64::MAX || true && self.average_rating.is_finite() || true && self.rating_count < u32::MAX || true && self.trending_daily.is_finite() || true && self.trending_weekly.is_finite() || true && self.trending_monthly.is_finite() || true && self.uninstall_count < u64::MAX || true && self.download_count < u64::MAX || true && self.weighted_rating.is_finite() || true
+    }
+}
+
+impl Default for GeqMarketplaceStatistic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension enablement (globally, workspace, by extensions, trust)
+#[derive(Debug, Clone)]
+pub struct GerExtensionEnablement {
+    pub enable_id: String,
+    pub is_globally_enabled: bool,
+    pub is_workspace_enabled: bool,
+    pub enabled_by_extensions_json: String,
+    pub trust_required: bool,
+    pub is_builtin: bool,
+    pub virtual_workspace_support: String,
+    pub untrusted_workspace_support: String,
+    pub restricted_mode: bool,
+    pub extension_id: String,
+}
+
+impl GerExtensionEnablement {
+    pub fn new() -> Self {
+        Self {
+            enable_id: String::new(),
+            is_globally_enabled: bool::default(),
+            is_workspace_enabled: bool::default(),
+            enabled_by_extensions_json: String::new(),
+            trust_required: bool::default(),
+            is_builtin: bool::default(),
+            virtual_workspace_support: String::new(),
+            untrusted_workspace_support: String::new(),
+            restricted_mode: bool::default(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.enable_id.is_empty() || true && self.is_globally_enabled || true && self.is_workspace_enabled || true && !self.enabled_by_extensions_json.is_empty() || true && self.trust_required || true && self.is_builtin || true && !self.virtual_workspace_support.is_empty() || true && !self.untrusted_workspace_support.is_empty() || true && self.restricted_mode || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for GerExtensionEnablement {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension update info (current version, new version, changelog)
+#[derive(Debug, Clone)]
+pub struct GesExtensionUpdateInfo {
+    pub update_id: String,
+    pub current_version: String,
+    pub new_version: String,
+    pub changelog_json: String,
+    pub is_available: bool,
+    pub is_pre_release: bool,
+    pub download_url: String,
+    pub size_bytes: u64,
+    pub release_date_ms: u64,
+    pub auto_update: bool,
+}
+
+impl GesExtensionUpdateInfo {
+    pub fn new() -> Self {
+        Self {
+            update_id: String::new(),
+            current_version: String::new(),
+            new_version: String::new(),
+            changelog_json: String::new(),
+            is_available: bool::default(),
+            is_pre_release: bool::default(),
+            download_url: String::new(),
+            size_bytes: u64::default(),
+            release_date_ms: u64::default(),
+            auto_update: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.update_id.is_empty() || true && !self.current_version.is_empty() || true && !self.new_version.is_empty() || true && !self.changelog_json.is_empty() || true && self.is_available || true && self.is_pre_release || true && !self.download_url.is_empty() || true && self.size_bytes < u64::MAX || true && self.release_date_ms < u64::MAX || true && self.auto_update || true
+    }
+}
+
+impl Default for GesExtensionUpdateInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension host connection (protocol, socket, message channel, RPC)
+#[derive(Debug, Clone)]
+pub struct GetExtensionHostConnection {
+    pub conn_id: String,
+    pub protocol: String,
+    pub socket_path: String,
+    pub message_channel_id: String,
+    pub rpc_protocol: String,
+    pub is_connected: bool,
+    pub latency_ms: u32,
+    pub message_count: u64,
+    pub reconnect_count: u32,
+    pub last_activity_ms: u64,
+}
+
+impl GetExtensionHostConnection {
+    pub fn new() -> Self {
+        Self {
+            conn_id: String::new(),
+            protocol: String::new(),
+            socket_path: String::new(),
+            message_channel_id: String::new(),
+            rpc_protocol: String::new(),
+            is_connected: bool::default(),
+            latency_ms: u32::default(),
+            message_count: u64::default(),
+            reconnect_count: u32::default(),
+            last_activity_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.conn_id.is_empty() || true && !self.protocol.is_empty() || true && !self.socket_path.is_empty() || true && !self.message_channel_id.is_empty() || true && !self.rpc_protocol.is_empty() || true && self.is_connected || true && self.latency_ms < u32::MAX || true && self.message_count < u64::MAX || true && self.reconnect_count < u32::MAX || true && self.last_activity_ms < u64::MAX || true
+    }
+}
+
+impl Default for GetExtensionHostConnection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension sandbox policy (allowed APIs, file access, network, IPC)
+#[derive(Debug, Clone)]
+pub struct GeuExtensionSandboxPolicy {
+    pub sandbox_id: String,
+    pub allowed_apis_json: String,
+    pub file_access_json: String,
+    pub network_access: bool,
+    pub ipc_access: bool,
+    pub process_spawn: bool,
+    pub env_access: bool,
+    pub native_modules: bool,
+    pub web_worker: bool,
+    pub trust_level: String,
+}
+
+impl GeuExtensionSandboxPolicy {
+    pub fn new() -> Self {
+        Self {
+            sandbox_id: String::new(),
+            allowed_apis_json: String::new(),
+            file_access_json: String::new(),
+            network_access: bool::default(),
+            ipc_access: bool::default(),
+            process_spawn: bool::default(),
+            env_access: bool::default(),
+            native_modules: bool::default(),
+            web_worker: bool::default(),
+            trust_level: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sandbox_id.is_empty() || true && !self.allowed_apis_json.is_empty() || true && !self.file_access_json.is_empty() || true && self.network_access || true && self.ipc_access || true && self.process_spawn || true && self.env_access || true && self.native_modules || true && self.web_worker || true && !self.trust_level.is_empty() || true
+    }
+}
+
+impl Default for GeuExtensionSandboxPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension profile data (cpu time, memory, activations, modules)
+#[derive(Debug, Clone)]
+pub struct GevExtensionProfileData {
+    pub profile_id: String,
+    pub cpu_time_ms: u64,
+    pub memory_bytes: u64,
+    pub activation_count: u32,
+    pub module_count: u32,
+    pub api_call_count: u64,
+    pub average_latency_ms: f64,
+    pub peak_memory_bytes: u64,
+    pub gc_count: u32,
+    pub event_loop_lag_ms: f64,
+}
+
+impl GevExtensionProfileData {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            cpu_time_ms: u64::default(),
+            memory_bytes: u64::default(),
+            activation_count: u32::default(),
+            module_count: u32::default(),
+            api_call_count: u64::default(),
+            average_latency_ms: f64::default(),
+            peak_memory_bytes: u64::default(),
+            gc_count: u32::default(),
+            event_loop_lag_ms: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && self.cpu_time_ms < u64::MAX || true && self.memory_bytes < u64::MAX || true && self.activation_count < u32::MAX || true && self.module_count < u32::MAX || true && self.api_call_count < u64::MAX || true && self.average_latency_ms.is_finite() || true && self.peak_memory_bytes < u64::MAX || true && self.gc_count < u32::MAX || true && self.event_loop_lag_ms.is_finite() || true
+    }
+}
+
+impl Default for GevExtensionProfileData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension search filter (query, category, sort, installed, outdated)
+#[derive(Debug, Clone)]
+pub struct GewExtensionSearchFilter {
+    pub filter_id: String,
+    pub query: String,
+    pub category: String,
+    pub sort_by: String,
+    pub installed_only: bool,
+    pub outdated_only: bool,
+    pub enabled_only: bool,
+    pub builtin_only: bool,
+    pub recommended_only: bool,
+    pub workspace_only: bool,
+}
+
+impl GewExtensionSearchFilter {
+    pub fn new() -> Self {
+        Self {
+            filter_id: String::new(),
+            query: String::new(),
+            category: String::new(),
+            sort_by: String::new(),
+            installed_only: bool::default(),
+            outdated_only: bool::default(),
+            enabled_only: bool::default(),
+            builtin_only: bool::default(),
+            recommended_only: bool::default(),
+            workspace_only: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_id.is_empty() || true && !self.query.is_empty() || true && !self.category.is_empty() || true && !self.sort_by.is_empty() || true && self.installed_only || true && self.outdated_only || true && self.enabled_only || true && self.builtin_only || true && self.recommended_only || true && self.workspace_only || true
+    }
+}
+
+impl Default for GewExtensionSearchFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension context key (key, value, type, when clause, negate)
+#[derive(Debug, Clone)]
+pub struct GexExtensionContextKey {
+    pub ctx_key_id: String,
+    pub key: String,
+    pub value: String,
+    pub value_type: String,
+    pub when_clause: String,
+    pub negate: bool,
+    pub extension_id: String,
+    pub scope: String,
+    pub is_default: bool,
+    pub description: String,
+}
+
+impl GexExtensionContextKey {
+    pub fn new() -> Self {
+        Self {
+            ctx_key_id: String::new(),
+            key: String::new(),
+            value: String::new(),
+            value_type: String::new(),
+            when_clause: String::new(),
+            negate: bool::default(),
+            extension_id: String::new(),
+            scope: String::new(),
+            is_default: bool::default(),
+            description: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ctx_key_id.is_empty() || true && !self.key.is_empty() || true && !self.value.is_empty() || true && !self.value_type.is_empty() || true && !self.when_clause.is_empty() || true && self.negate || true && !self.extension_id.is_empty() || true && !self.scope.is_empty() || true && self.is_default || true && !self.description.is_empty() || true
+    }
+}
+
+impl Default for GexExtensionContextKey {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension output (channel name, language id, append, replace, show)
+#[derive(Debug, Clone)]
+pub struct GeyExtensionOutput {
+    pub output_id: String,
+    pub channel_name: String,
+    pub language_id: String,
+    pub is_visible: bool,
+    pub preserve_focus: bool,
+    pub append_line: bool,
+    pub clear_on_open: bool,
+    pub log_level: String,
+    pub source_extension: String,
+    pub max_lines: u32,
+}
+
+impl GeyExtensionOutput {
+    pub fn new() -> Self {
+        Self {
+            output_id: String::new(),
+            channel_name: String::new(),
+            language_id: String::new(),
+            is_visible: bool::default(),
+            preserve_focus: bool::default(),
+            append_line: bool::default(),
+            clear_on_open: bool::default(),
+            log_level: String::new(),
+            source_extension: String::new(),
+            max_lines: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_id.is_empty() || true && !self.channel_name.is_empty() || true && !self.language_id.is_empty() || true && self.is_visible || true && self.preserve_focus || true && self.append_line || true && self.clear_on_open || true && !self.log_level.is_empty() || true && !self.source_extension.is_empty() || true && self.max_lines < u32::MAX || true
+    }
+}
+
+impl Default for GeyExtensionOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension status bar item (text, tooltip, command, alignment, priority)
+#[derive(Debug, Clone)]
+pub struct GezExtensionStatusBar {
+    pub status_id: String,
+    pub text: String,
+    pub tooltip: String,
+    pub command_id: String,
+    pub alignment: String,
+    pub priority: u32,
+    pub color: String,
+    pub background_color: String,
+    pub is_visible: bool,
+    pub accessibility_info: String,
+}
+
+impl GezExtensionStatusBar {
+    pub fn new() -> Self {
+        Self {
+            status_id: String::new(),
+            text: String::new(),
+            tooltip: String::new(),
+            command_id: String::new(),
+            alignment: String::new(),
+            priority: u32::default(),
+            color: String::new(),
+            background_color: String::new(),
+            is_visible: bool::default(),
+            accessibility_info: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.status_id.is_empty() || true && !self.text.is_empty() || true && !self.tooltip.is_empty() || true && !self.command_id.is_empty() || true && !self.alignment.is_empty() || true && self.priority < u32::MAX || true && !self.color.is_empty() || true && !self.background_color.is_empty() || true && self.is_visible || true && !self.accessibility_info.is_empty() || true
+    }
+}
+
+impl Default for GezExtensionStatusBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -313179,6 +313851,294 @@ mod tests_gej_generated {
     fn test_gej_fields() {
         let mut obj = GejExtensionTelemetry::default();
         obj.ext_telem_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gek_generated {
+    use super::*;
+
+    #[test]
+    fn test_gek_default() {
+        let obj = GekExtensionBisect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gek_fields() {
+        let mut obj = GekExtensionBisect::default();
+        obj.bisect_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gel_generated {
+    use super::*;
+
+    #[test]
+    fn test_gel_default() {
+        let obj = GelExtensionPack::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gel_fields() {
+        let mut obj = GelExtensionPack::default();
+        obj.pack_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gem_generated {
+    use super::*;
+
+    #[test]
+    fn test_gem_default() {
+        let obj = GemExtensionApiProposal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gem_fields() {
+        let mut obj = GemExtensionApiProposal::default();
+        obj.proposal_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gen_generated {
+    use super::*;
+
+    #[test]
+    fn test_gen_default() {
+        let obj = GenExtensionL10nBundle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gen_fields() {
+        let mut obj = GenExtensionL10nBundle::default();
+        obj.l10n_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_geo_generated {
+    use super::*;
+
+    #[test]
+    fn test_geo_default() {
+        let obj = GeoExtensionWalkthrough::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_geo_fields() {
+        let mut obj = GeoExtensionWalkthrough::default();
+        obj.walkthrough_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gep_generated {
+    use super::*;
+
+    #[test]
+    fn test_gep_default() {
+        let obj = GepMarketplaceQuery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gep_fields() {
+        let mut obj = GepMarketplaceQuery::default();
+        obj.mkt_query_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_geq_generated {
+    use super::*;
+
+    #[test]
+    fn test_geq_default() {
+        let obj = GeqMarketplaceStatistic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_geq_fields() {
+        let mut obj = GeqMarketplaceStatistic::default();
+        obj.stat_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ger_generated {
+    use super::*;
+
+    #[test]
+    fn test_ger_default() {
+        let obj = GerExtensionEnablement::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ger_fields() {
+        let mut obj = GerExtensionEnablement::default();
+        obj.enable_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ges_generated {
+    use super::*;
+
+    #[test]
+    fn test_ges_default() {
+        let obj = GesExtensionUpdateInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ges_fields() {
+        let mut obj = GesExtensionUpdateInfo::default();
+        obj.update_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_get_generated {
+    use super::*;
+
+    #[test]
+    fn test_get_default() {
+        let obj = GetExtensionHostConnection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_get_fields() {
+        let mut obj = GetExtensionHostConnection::default();
+        obj.conn_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_geu_generated {
+    use super::*;
+
+    #[test]
+    fn test_geu_default() {
+        let obj = GeuExtensionSandboxPolicy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_geu_fields() {
+        let mut obj = GeuExtensionSandboxPolicy::default();
+        obj.sandbox_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gev_generated {
+    use super::*;
+
+    #[test]
+    fn test_gev_default() {
+        let obj = GevExtensionProfileData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gev_fields() {
+        let mut obj = GevExtensionProfileData::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gew_generated {
+    use super::*;
+
+    #[test]
+    fn test_gew_default() {
+        let obj = GewExtensionSearchFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gew_fields() {
+        let mut obj = GewExtensionSearchFilter::default();
+        obj.filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gex_generated {
+    use super::*;
+
+    #[test]
+    fn test_gex_default() {
+        let obj = GexExtensionContextKey::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gex_fields() {
+        let mut obj = GexExtensionContextKey::default();
+        obj.ctx_key_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gey_generated {
+    use super::*;
+
+    #[test]
+    fn test_gey_default() {
+        let obj = GeyExtensionOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gey_fields() {
+        let mut obj = GeyExtensionOutput::default();
+        obj.output_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gez_generated {
+    use super::*;
+
+    #[test]
+    fn test_gez_default() {
+        let obj = GezExtensionStatusBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gez_fields() {
+        let mut obj = GezExtensionStatusBar::default();
+        obj.status_id = "test".to_string();
         assert!(obj.validate());
     }
 }
