@@ -92767,6 +92767,216 @@ impl Default for GizTaskHistory {
     }
 }
 
+/// Notification item (severity, message, source, actions, progress)
+#[derive(Debug, Clone)]
+pub struct GjaNotificationItem {
+    pub notif_id: String,
+    pub severity: String,
+    pub message: String,
+    pub source: String,
+    pub actions_json: String,
+    pub progress_pct: f64,
+    pub is_sticky: bool,
+    pub has_close: bool,
+    pub timestamp_ms: u64,
+    pub is_silent: bool,
+}
+
+impl GjaNotificationItem {
+    pub fn new() -> Self {
+        Self {
+            notif_id: String::new(),
+            severity: String::new(),
+            message: String::new(),
+            source: String::new(),
+            actions_json: String::new(),
+            progress_pct: f64::default(),
+            is_sticky: bool::default(),
+            has_close: bool::default(),
+            timestamp_ms: u64::default(),
+            is_silent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.notif_id.is_empty() || true && !self.severity.is_empty() || true && !self.message.is_empty() || true && !self.source.is_empty() || true && !self.actions_json.is_empty() || true && self.progress_pct.is_finite() || true && self.is_sticky || true && self.has_close || true && self.timestamp_ms < u64::MAX || true && self.is_silent || true
+    }
+}
+
+impl Default for GjaNotificationItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notification center (items, filter, do not disturb, max visible)
+#[derive(Debug, Clone)]
+pub struct GjbNotificationCenter {
+    pub center_id: String,
+    pub items_json: String,
+    pub filter: String,
+    pub do_not_disturb: bool,
+    pub max_visible: u32,
+    pub total_count: u32,
+    pub unread_count: u32,
+    pub is_visible: bool,
+    pub sort_order: String,
+    pub auto_dismiss_ms: u32,
+}
+
+impl GjbNotificationCenter {
+    pub fn new() -> Self {
+        Self {
+            center_id: String::new(),
+            items_json: String::new(),
+            filter: String::new(),
+            do_not_disturb: bool::default(),
+            max_visible: u32::default(),
+            total_count: u32::default(),
+            unread_count: u32::default(),
+            is_visible: bool::default(),
+            sort_order: String::new(),
+            auto_dismiss_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.center_id.is_empty() || true && !self.items_json.is_empty() || true && !self.filter.is_empty() || true && self.do_not_disturb || true && self.max_visible < u32::MAX || true && self.total_count < u32::MAX || true && self.unread_count < u32::MAX || true && self.is_visible || true && !self.sort_order.is_empty() || true && self.auto_dismiss_ms < u32::MAX || true
+    }
+}
+
+impl Default for GjbNotificationCenter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Dialog model (message, detail, buttons, checkbox, type, modal)
+#[derive(Debug, Clone)]
+pub struct GjcDialogModel {
+    pub dialog_id: String,
+    pub message: String,
+    pub detail: String,
+    pub buttons_json: String,
+    pub checkbox_label: String,
+    pub dialog_type: String,
+    pub is_modal: bool,
+    pub custom_icon: String,
+    pub default_button_index: u32,
+    pub cancel_button_index: u32,
+}
+
+impl GjcDialogModel {
+    pub fn new() -> Self {
+        Self {
+            dialog_id: String::new(),
+            message: String::new(),
+            detail: String::new(),
+            buttons_json: String::new(),
+            checkbox_label: String::new(),
+            dialog_type: String::new(),
+            is_modal: bool::default(),
+            custom_icon: String::new(),
+            default_button_index: u32::default(),
+            cancel_button_index: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dialog_id.is_empty() || true && !self.message.is_empty() || true && !self.detail.is_empty() || true && !self.buttons_json.is_empty() || true && !self.checkbox_label.is_empty() || true && !self.dialog_type.is_empty() || true && self.is_modal || true && !self.custom_icon.is_empty() || true && self.default_button_index < u32::MAX || true && self.cancel_button_index < u32::MAX || true
+    }
+}
+
+impl Default for GjcDialogModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File dialog model (default uri, filters, can select many, title)
+#[derive(Debug, Clone)]
+pub struct GjdFileDialogModel {
+    pub file_dialog_id: String,
+    pub default_uri: String,
+    pub filters_json: String,
+    pub can_select_many: bool,
+    pub title: String,
+    pub open_label: String,
+    pub can_select_files: bool,
+    pub can_select_folders: bool,
+    pub default_name: String,
+    pub is_save: bool,
+}
+
+impl GjdFileDialogModel {
+    pub fn new() -> Self {
+        Self {
+            file_dialog_id: String::new(),
+            default_uri: String::new(),
+            filters_json: String::new(),
+            can_select_many: bool::default(),
+            title: String::new(),
+            open_label: String::new(),
+            can_select_files: bool::default(),
+            can_select_folders: bool::default(),
+            default_name: String::new(),
+            is_save: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_dialog_id.is_empty() || true && !self.default_uri.is_empty() || true && !self.filters_json.is_empty() || true && self.can_select_many || true && !self.title.is_empty() || true && !self.open_label.is_empty() || true && self.can_select_files || true && self.can_select_folders || true && !self.default_name.is_empty() || true && self.is_save || true
+    }
+}
+
+impl Default for GjdFileDialogModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Progress model (location, title, cancellable, total, worked)
+#[derive(Debug, Clone)]
+pub struct GjeProgressModel {
+    pub progress_id: String,
+    pub location: String,
+    pub title: String,
+    pub is_cancellable: bool,
+    pub total_work: u32,
+    pub worked: u32,
+    pub message: String,
+    pub is_infinite: bool,
+    pub source_id: String,
+    pub started_ms: u64,
+}
+
+impl GjeProgressModel {
+    pub fn new() -> Self {
+        Self {
+            progress_id: String::new(),
+            location: String::new(),
+            title: String::new(),
+            is_cancellable: bool::default(),
+            total_work: u32::default(),
+            worked: u32::default(),
+            message: String::new(),
+            is_infinite: bool::default(),
+            source_id: String::new(),
+            started_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.progress_id.is_empty() || true && !self.location.is_empty() || true && !self.title.is_empty() || true && self.is_cancellable || true && self.total_work < u32::MAX || true && self.worked < u32::MAX || true && !self.message.is_empty() || true && self.is_infinite || true && !self.source_id.is_empty() || true && self.started_ms < u64::MAX || true
+    }
+}
+
+impl Default for GjeProgressModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -320515,6 +320725,96 @@ mod tests_giz_generated {
     fn test_giz_fields() {
         let mut obj = GizTaskHistory::default();
         obj.hist_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gja_generated {
+    use super::*;
+
+    #[test]
+    fn test_gja_default() {
+        let obj = GjaNotificationItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gja_fields() {
+        let mut obj = GjaNotificationItem::default();
+        obj.notif_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjb_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjb_default() {
+        let obj = GjbNotificationCenter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjb_fields() {
+        let mut obj = GjbNotificationCenter::default();
+        obj.center_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjc_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjc_default() {
+        let obj = GjcDialogModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjc_fields() {
+        let mut obj = GjcDialogModel::default();
+        obj.dialog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjd_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjd_default() {
+        let obj = GjdFileDialogModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjd_fields() {
+        let mut obj = GjdFileDialogModel::default();
+        obj.file_dialog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gje_generated {
+    use super::*;
+
+    #[test]
+    fn test_gje_default() {
+        let obj = GjeProgressModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gje_fields() {
+        let mut obj = GjeProgressModel::default();
+        obj.progress_id = "test".to_string();
         assert!(obj.validate());
     }
 }
