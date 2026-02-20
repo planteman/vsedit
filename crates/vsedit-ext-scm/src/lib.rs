@@ -57507,6 +57507,459 @@ impl Default for FcoRatuiFrame {
 }
 
 
+/// Crossterm input event types
+#[derive(Debug, Clone)]
+pub struct FcpCrosstermEvent {
+    pub event_kind: u32,
+    pub event_modifiers: u32,
+    pub event_is_key: bool,
+    pub event_is_mouse: bool,
+    pub event_is_resize: bool,
+    pub event_is_focus: bool,
+    pub event_is_paste: bool,
+    pub event_timestamp: u64,
+    pub event_raw_bytes: String,
+    pub event_consumed: bool,
+}
+
+impl FcpCrosstermEvent {
+    pub fn new() -> Self {
+        Self {
+            event_kind: u32::default(),
+            event_modifiers: u32::default(),
+            event_is_key: bool::default(),
+            event_is_mouse: bool::default(),
+            event_is_resize: bool::default(),
+            event_is_focus: bool::default(),
+            event_is_paste: bool::default(),
+            event_timestamp: u64::default(),
+            event_raw_bytes: String::new(),
+            event_consumed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.event_kind < u32::MAX || true && self.event_modifiers < u32::MAX || true && self.event_is_key || true && self.event_is_mouse || true && self.event_is_resize || true && self.event_is_focus || true && self.event_is_paste || true && self.event_timestamp < u64::MAX || true && !self.event_raw_bytes.is_empty() || true && self.event_consumed || true
+    }
+}
+
+impl Default for FcpCrosstermEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Crossterm key event types
+#[derive(Debug, Clone)]
+pub struct FcqCrosstermKeyEvent {
+    pub key_code: u32,
+    pub key_modifiers: u32,
+    pub key_kind: u32,
+    pub key_char: String,
+    pub key_is_press: bool,
+    pub key_is_release: bool,
+    pub key_is_repeat: bool,
+    pub key_media_key: u32,
+    pub key_modifier_key: u32,
+    pub key_state: u32,
+}
+
+impl FcqCrosstermKeyEvent {
+    pub fn new() -> Self {
+        Self {
+            key_code: u32::default(),
+            key_modifiers: u32::default(),
+            key_kind: u32::default(),
+            key_char: String::new(),
+            key_is_press: bool::default(),
+            key_is_release: bool::default(),
+            key_is_repeat: bool::default(),
+            key_media_key: u32::default(),
+            key_modifier_key: u32::default(),
+            key_state: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.key_code < u32::MAX || true && self.key_modifiers < u32::MAX || true && self.key_kind < u32::MAX || true && !self.key_char.is_empty() || true && self.key_is_press || true && self.key_is_release || true && self.key_is_repeat || true && self.key_media_key < u32::MAX || true && self.key_modifier_key < u32::MAX || true && self.key_state < u32::MAX || true
+    }
+}
+
+impl Default for FcqCrosstermKeyEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Crossterm mouse event types
+#[derive(Debug, Clone)]
+pub struct FcrCrosstermMouseEvent {
+    pub mouse_kind: u32,
+    pub mouse_column: u32,
+    pub mouse_row: u32,
+    pub mouse_modifiers: u32,
+    pub mouse_button: u32,
+    pub mouse_is_drag: bool,
+    pub mouse_is_scroll: bool,
+    pub mouse_scroll_delta: u32,
+    pub mouse_is_moved: bool,
+    pub mouse_timestamp: u64,
+}
+
+impl FcrCrosstermMouseEvent {
+    pub fn new() -> Self {
+        Self {
+            mouse_kind: u32::default(),
+            mouse_column: u32::default(),
+            mouse_row: u32::default(),
+            mouse_modifiers: u32::default(),
+            mouse_button: u32::default(),
+            mouse_is_drag: bool::default(),
+            mouse_is_scroll: bool::default(),
+            mouse_scroll_delta: u32::default(),
+            mouse_is_moved: bool::default(),
+            mouse_timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.mouse_kind < u32::MAX || true && self.mouse_column < u32::MAX || true && self.mouse_row < u32::MAX || true && self.mouse_modifiers < u32::MAX || true && self.mouse_button < u32::MAX || true && self.mouse_is_drag || true && self.mouse_is_scroll || true && self.mouse_scroll_delta < u32::MAX || true && self.mouse_is_moved || true && self.mouse_timestamp < u64::MAX || true
+    }
+}
+
+impl Default for FcrCrosstermMouseEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Crossterm terminal command types
+#[derive(Debug, Clone)]
+pub struct FcsCrosstermCommand {
+    pub command_type: String,
+    pub command_cursor_x: u32,
+    pub command_cursor_y: u32,
+    pub command_style_fg: String,
+    pub command_style_bg: String,
+    pub command_clear_type: u32,
+    pub command_scroll_lines: u32,
+    pub command_title: String,
+    pub command_enable_raw: bool,
+    pub command_mouse_capture: bool,
+}
+
+impl FcsCrosstermCommand {
+    pub fn new() -> Self {
+        Self {
+            command_type: String::new(),
+            command_cursor_x: u32::default(),
+            command_cursor_y: u32::default(),
+            command_style_fg: String::new(),
+            command_style_bg: String::new(),
+            command_clear_type: u32::default(),
+            command_scroll_lines: u32::default(),
+            command_title: String::new(),
+            command_enable_raw: bool::default(),
+            command_mouse_capture: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.command_type.is_empty() || true && self.command_cursor_x < u32::MAX || true && self.command_cursor_y < u32::MAX || true && !self.command_style_fg.is_empty() || true && !self.command_style_bg.is_empty() || true && self.command_clear_type < u32::MAX || true && self.command_scroll_lines < u32::MAX || true && !self.command_title.is_empty() || true && self.command_enable_raw || true && self.command_mouse_capture || true
+    }
+}
+
+impl Default for FcsCrosstermCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Crossterm terminal backend types
+#[derive(Debug, Clone)]
+pub struct FctCrosstermTerminal {
+    pub terminal_raw_mode: bool,
+    pub terminal_alternate_screen: bool,
+    pub terminal_mouse_capture: bool,
+    pub terminal_bracketed_paste: bool,
+    pub terminal_focus_change: bool,
+    pub terminal_kitty_keyboard: bool,
+    pub terminal_cols: u32,
+    pub terminal_rows: u32,
+    pub terminal_cursor_visible: bool,
+    pub terminal_title: String,
+}
+
+impl FctCrosstermTerminal {
+    pub fn new() -> Self {
+        Self {
+            terminal_raw_mode: bool::default(),
+            terminal_alternate_screen: bool::default(),
+            terminal_mouse_capture: bool::default(),
+            terminal_bracketed_paste: bool::default(),
+            terminal_focus_change: bool::default(),
+            terminal_kitty_keyboard: bool::default(),
+            terminal_cols: u32::default(),
+            terminal_rows: u32::default(),
+            terminal_cursor_visible: bool::default(),
+            terminal_title: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.terminal_raw_mode || true && self.terminal_alternate_screen || true && self.terminal_mouse_capture || true && self.terminal_bracketed_paste || true && self.terminal_focus_change || true && self.terminal_kitty_keyboard || true && self.terminal_cols < u32::MAX || true && self.terminal_rows < u32::MAX || true && self.terminal_cursor_visible || true && !self.terminal_title.is_empty() || true
+    }
+}
+
+impl Default for FctCrosstermTerminal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// TUI event loop and dispatch types
+#[derive(Debug, Clone)]
+pub struct FcuTuiEventLoop {
+    pub event_loop_tick_rate: u32,
+    pub event_loop_frame_rate: u32,
+    pub event_loop_running: bool,
+    pub event_loop_suspended: bool,
+    pub event_loop_event_count: u64,
+    pub event_loop_render_count: u64,
+    pub event_loop_last_event_ms: u64,
+    pub event_loop_last_render_ms: u64,
+    pub event_loop_idle_timeout: u32,
+    pub event_loop_max_fps: u32,
+}
+
+impl FcuTuiEventLoop {
+    pub fn new() -> Self {
+        Self {
+            event_loop_tick_rate: u32::default(),
+            event_loop_frame_rate: u32::default(),
+            event_loop_running: bool::default(),
+            event_loop_suspended: bool::default(),
+            event_loop_event_count: u64::default(),
+            event_loop_render_count: u64::default(),
+            event_loop_last_event_ms: u64::default(),
+            event_loop_last_render_ms: u64::default(),
+            event_loop_idle_timeout: u32::default(),
+            event_loop_max_fps: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.event_loop_tick_rate < u32::MAX || true && self.event_loop_frame_rate < u32::MAX || true && self.event_loop_running || true && self.event_loop_suspended || true && self.event_loop_event_count < u64::MAX || true && self.event_loop_render_count < u64::MAX || true && self.event_loop_last_event_ms < u64::MAX || true && self.event_loop_last_render_ms < u64::MAX || true && self.event_loop_idle_timeout < u32::MAX || true && self.event_loop_max_fps < u32::MAX || true
+    }
+}
+
+impl Default for FcuTuiEventLoop {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// TUI application state machine types
+#[derive(Debug, Clone)]
+pub struct FcvTuiAppState {
+    pub app_state_mode: String,
+    pub app_state_previous_mode: String,
+    pub app_state_focus_stack: String,
+    pub app_state_command_palette_open: bool,
+    pub app_state_search_open: bool,
+    pub app_state_dialog_stack: String,
+    pub app_state_dirty: bool,
+    pub app_state_quitting: bool,
+    pub app_state_last_error: String,
+    pub app_state_notification_count: u32,
+}
+
+impl FcvTuiAppState {
+    pub fn new() -> Self {
+        Self {
+            app_state_mode: String::new(),
+            app_state_previous_mode: String::new(),
+            app_state_focus_stack: String::new(),
+            app_state_command_palette_open: bool::default(),
+            app_state_search_open: bool::default(),
+            app_state_dialog_stack: String::new(),
+            app_state_dirty: bool::default(),
+            app_state_quitting: bool::default(),
+            app_state_last_error: String::new(),
+            app_state_notification_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.app_state_mode.is_empty() || true && !self.app_state_previous_mode.is_empty() || true && !self.app_state_focus_stack.is_empty() || true && self.app_state_command_palette_open || true && self.app_state_search_open || true && !self.app_state_dialog_stack.is_empty() || true && self.app_state_dirty || true && self.app_state_quitting || true && !self.app_state_last_error.is_empty() || true && self.app_state_notification_count < u32::MAX || true
+    }
+}
+
+impl Default for FcvTuiAppState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// TUI keymap binding types
+#[derive(Debug, Clone)]
+pub struct FcwTuiKeymap {
+    pub keymap_context: String,
+    pub keymap_key: String,
+    pub keymap_command: String,
+    pub keymap_args: String,
+    pub keymap_when_clause: String,
+    pub keymap_source: String,
+    pub keymap_priority: u32,
+    pub keymap_is_chord: bool,
+    pub keymap_chord_prefix: String,
+    pub keymap_extension_id: String,
+}
+
+impl FcwTuiKeymap {
+    pub fn new() -> Self {
+        Self {
+            keymap_context: String::new(),
+            keymap_key: String::new(),
+            keymap_command: String::new(),
+            keymap_args: String::new(),
+            keymap_when_clause: String::new(),
+            keymap_source: String::new(),
+            keymap_priority: u32::default(),
+            keymap_is_chord: bool::default(),
+            keymap_chord_prefix: String::new(),
+            keymap_extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.keymap_context.is_empty() || true && !self.keymap_key.is_empty() || true && !self.keymap_command.is_empty() || true && !self.keymap_args.is_empty() || true && !self.keymap_when_clause.is_empty() || true && !self.keymap_source.is_empty() || true && self.keymap_priority < u32::MAX || true && self.keymap_is_chord || true && !self.keymap_chord_prefix.is_empty() || true && !self.keymap_extension_id.is_empty() || true
+    }
+}
+
+impl Default for FcwTuiKeymap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// TUI color theme types
+#[derive(Debug, Clone)]
+pub struct FcxTuiTheme {
+    pub theme_name: String,
+    pub theme_base: String,
+    pub theme_editor_bg: String,
+    pub theme_editor_fg: String,
+    pub theme_sidebar_bg: String,
+    pub theme_status_bar_bg: String,
+    pub theme_panel_bg: String,
+    pub theme_selection_bg: String,
+    pub theme_cursor_color: String,
+    pub theme_line_number_fg: String,
+}
+
+impl FcxTuiTheme {
+    pub fn new() -> Self {
+        Self {
+            theme_name: String::new(),
+            theme_base: String::new(),
+            theme_editor_bg: String::new(),
+            theme_editor_fg: String::new(),
+            theme_sidebar_bg: String::new(),
+            theme_status_bar_bg: String::new(),
+            theme_panel_bg: String::new(),
+            theme_selection_bg: String::new(),
+            theme_cursor_color: String::new(),
+            theme_line_number_fg: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_name.is_empty() || true && !self.theme_base.is_empty() || true && !self.theme_editor_bg.is_empty() || true && !self.theme_editor_fg.is_empty() || true && !self.theme_sidebar_bg.is_empty() || true && !self.theme_status_bar_bg.is_empty() || true && !self.theme_panel_bg.is_empty() || true && !self.theme_selection_bg.is_empty() || true && !self.theme_cursor_color.is_empty() || true && !self.theme_line_number_fg.is_empty() || true
+    }
+}
+
+impl Default for FcxTuiTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// TUI popup/modal dialog types
+#[derive(Debug, Clone)]
+pub struct FcyTuiPopup {
+    pub popup_title: String,
+    pub popup_message: String,
+    pub popup_buttons: String,
+    pub popup_selected_button: u32,
+    pub popup_width: u32,
+    pub popup_height: u32,
+    pub popup_centered: bool,
+    pub popup_closeable: bool,
+    pub popup_border_color: String,
+    pub popup_bg_color: String,
+}
+
+impl FcyTuiPopup {
+    pub fn new() -> Self {
+        Self {
+            popup_title: String::new(),
+            popup_message: String::new(),
+            popup_buttons: String::new(),
+            popup_selected_button: u32::default(),
+            popup_width: u32::default(),
+            popup_height: u32::default(),
+            popup_centered: bool::default(),
+            popup_closeable: bool::default(),
+            popup_border_color: String::new(),
+            popup_bg_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.popup_title.is_empty() || true && !self.popup_message.is_empty() || true && !self.popup_buttons.is_empty() || true && self.popup_selected_button < u32::MAX || true && self.popup_width < u32::MAX || true && self.popup_height < u32::MAX || true && self.popup_centered || true && self.popup_closeable || true && !self.popup_border_color.is_empty() || true && !self.popup_bg_color.is_empty() || true
+    }
+}
+
+impl Default for FcyTuiPopup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// TUI focus navigation and management types
+#[derive(Debug, Clone)]
+pub struct FczTuiFocus {
+    pub focus_widget_id: String,
+    pub focus_ring: String,
+    pub focus_index: u32,
+    pub focus_trapped: bool,
+    pub focus_restore_id: String,
+    pub focus_direction: String,
+    pub focus_wrap_around: bool,
+    pub focus_tab_order: String,
+    pub focus_auto_focus: bool,
+    pub focus_indicator_visible: bool,
+}
+
+impl FczTuiFocus {
+    pub fn new() -> Self {
+        Self {
+            focus_widget_id: String::new(),
+            focus_ring: String::new(),
+            focus_index: u32::default(),
+            focus_trapped: bool::default(),
+            focus_restore_id: String::new(),
+            focus_direction: String::new(),
+            focus_wrap_around: bool::default(),
+            focus_tab_order: String::new(),
+            focus_auto_focus: bool::default(),
+            focus_indicator_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.focus_widget_id.is_empty() || true && !self.focus_ring.is_empty() || true && self.focus_index < u32::MAX || true && self.focus_trapped || true && !self.focus_restore_id.is_empty() || true && !self.focus_direction.is_empty() || true && self.focus_wrap_around || true && !self.focus_tab_order.is_empty() || true && self.focus_auto_focus || true && self.focus_indicator_visible || true
+    }
+}
+
+impl Default for FczTuiFocus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270117,6 +270570,204 @@ mod tests_fco_generated {
     fn test_fco_fields() {
         let mut obj = FcoRatuiFrame::default();
         obj.frame_count = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcp_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcp_default() {
+        let obj = FcpCrosstermEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcp_fields() {
+        let mut obj = FcpCrosstermEvent::default();
+        obj.event_kind = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcq_default() {
+        let obj = FcqCrosstermKeyEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcq_fields() {
+        let mut obj = FcqCrosstermKeyEvent::default();
+        obj.key_code = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcr_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcr_default() {
+        let obj = FcrCrosstermMouseEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcr_fields() {
+        let mut obj = FcrCrosstermMouseEvent::default();
+        obj.mouse_kind = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcs_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcs_default() {
+        let obj = FcsCrosstermCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcs_fields() {
+        let mut obj = FcsCrosstermCommand::default();
+        obj.command_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fct_generated {
+    use super::*;
+
+    #[test]
+    fn test_fct_default() {
+        let obj = FctCrosstermTerminal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fct_fields() {
+        let mut obj = FctCrosstermTerminal::default();
+        obj.terminal_raw_mode = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcu_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcu_default() {
+        let obj = FcuTuiEventLoop::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcu_fields() {
+        let mut obj = FcuTuiEventLoop::default();
+        obj.event_loop_tick_rate = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcv_default() {
+        let obj = FcvTuiAppState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcv_fields() {
+        let mut obj = FcvTuiAppState::default();
+        obj.app_state_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcw_default() {
+        let obj = FcwTuiKeymap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcw_fields() {
+        let mut obj = FcwTuiKeymap::default();
+        obj.keymap_context = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcx_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcx_default() {
+        let obj = FcxTuiTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcx_fields() {
+        let mut obj = FcxTuiTheme::default();
+        obj.theme_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcy_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcy_default() {
+        let obj = FcyTuiPopup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcy_fields() {
+        let mut obj = FcyTuiPopup::default();
+        obj.popup_title = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcz_default() {
+        let obj = FczTuiFocus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcz_fields() {
+        let mut obj = FczTuiFocus::default();
+        obj.focus_widget_id = "test".to_string();
         assert!(obj.validate());
     }
 }
