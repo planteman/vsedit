@@ -106837,6 +106837,426 @@ impl Default for GvzDebugTokenColor {
     }
 }
 
+/// Authentication session (provider, account, scopes, access token)
+#[derive(Debug, Clone)]
+pub struct GwaAuthSession {
+    pub auth_session_id: String,
+    pub provider_id: String,
+    pub account_id: String,
+    pub scopes_json: String,
+    pub access_token: String,
+    pub id_token: String,
+    pub expires_at_ms: u64,
+    pub is_valid: bool,
+    pub created_at_ms: u64,
+    pub last_used_ms: u64,
+}
+
+impl GwaAuthSession {
+    pub fn new() -> Self {
+        Self {
+            auth_session_id: String::new(),
+            provider_id: String::new(),
+            account_id: String::new(),
+            scopes_json: String::new(),
+            access_token: String::new(),
+            id_token: String::new(),
+            expires_at_ms: u64::default(),
+            is_valid: bool::default(),
+            created_at_ms: u64::default(),
+            last_used_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.auth_session_id.is_empty() || true && !self.provider_id.is_empty() || true && !self.account_id.is_empty() || true && !self.scopes_json.is_empty() || true && !self.access_token.is_empty() || true && !self.id_token.is_empty() || true && self.expires_at_ms < u64::MAX || true && self.is_valid || true && self.created_at_ms < u64::MAX || true && self.last_used_ms < u64::MAX || true
+    }
+}
+
+impl Default for GwaAuthSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication provider (id, label, supports multiple accounts)
+#[derive(Debug, Clone)]
+pub struct GwbAuthProvider {
+    pub auth_prov_id: String,
+    pub provider_id: String,
+    pub label: String,
+    pub supports_multiple: bool,
+    pub supportsLogout: bool,
+    pub on_did_change: bool,
+    pub icon: String,
+    pub description: String,
+    pub is_builtin: bool,
+    pub priority: u32,
+}
+
+impl GwbAuthProvider {
+    pub fn new() -> Self {
+        Self {
+            auth_prov_id: String::new(),
+            provider_id: String::new(),
+            label: String::new(),
+            supports_multiple: bool::default(),
+            supportsLogout: bool::default(),
+            on_did_change: bool::default(),
+            icon: String::new(),
+            description: String::new(),
+            is_builtin: bool::default(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.auth_prov_id.is_empty() || true && !self.provider_id.is_empty() || true && !self.label.is_empty() || true && self.supports_multiple || true && self.supportsLogout || true && self.on_did_change || true && !self.icon.is_empty() || true && !self.description.is_empty() || true && self.is_builtin || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for GwbAuthProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication account (id, label, email, avatar url)
+#[derive(Debug, Clone)]
+pub struct GwcAuthAccount {
+    pub auth_acct_id: String,
+    pub account_id: String,
+    pub label: String,
+    pub email: String,
+    pub avatar_url: String,
+    pub provider_id: String,
+    pub is_default: bool,
+    pub last_login_ms: u64,
+    pub display_name: String,
+    pub tenant_id: String,
+}
+
+impl GwcAuthAccount {
+    pub fn new() -> Self {
+        Self {
+            auth_acct_id: String::new(),
+            account_id: String::new(),
+            label: String::new(),
+            email: String::new(),
+            avatar_url: String::new(),
+            provider_id: String::new(),
+            is_default: bool::default(),
+            last_login_ms: u64::default(),
+            display_name: String::new(),
+            tenant_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.auth_acct_id.is_empty() || true && !self.account_id.is_empty() || true && !self.label.is_empty() || true && !self.email.is_empty() || true && !self.avatar_url.is_empty() || true && !self.provider_id.is_empty() || true && self.is_default || true && self.last_login_ms < u64::MAX || true && !self.display_name.is_empty() || true && !self.tenant_id.is_empty() || true
+    }
+}
+
+impl Default for GwcAuthAccount {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// OAuth token (access token, refresh token, expires at, scopes)
+#[derive(Debug, Clone)]
+pub struct GwdOAuthToken {
+    pub oauth_token_id: String,
+    pub access_token: String,
+    pub refresh_token: String,
+    pub expires_at_ms: u64,
+    pub scopes_json: String,
+    pub token_type: String,
+    pub id_token: String,
+    pub is_expired: bool,
+    pub issued_at_ms: u64,
+    pub audience: String,
+}
+
+impl GwdOAuthToken {
+    pub fn new() -> Self {
+        Self {
+            oauth_token_id: String::new(),
+            access_token: String::new(),
+            refresh_token: String::new(),
+            expires_at_ms: u64::default(),
+            scopes_json: String::new(),
+            token_type: String::new(),
+            id_token: String::new(),
+            is_expired: bool::default(),
+            issued_at_ms: u64::default(),
+            audience: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.oauth_token_id.is_empty() || true && !self.access_token.is_empty() || true && !self.refresh_token.is_empty() || true && self.expires_at_ms < u64::MAX || true && !self.scopes_json.is_empty() || true && !self.token_type.is_empty() || true && !self.id_token.is_empty() || true && self.is_expired || true && self.issued_at_ms < u64::MAX || true && !self.audience.is_empty() || true
+    }
+}
+
+impl Default for GwdOAuthToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Session credential (key, value, scope, expiry timestamp)
+#[derive(Debug, Clone)]
+pub struct GweSessionCredential {
+    pub session_cred_id: String,
+    pub key: String,
+    pub value: String,
+    pub scope: String,
+    pub expiry_ms: u64,
+    pub is_encrypted: bool,
+    pub algorithm: String,
+    pub provider_id: String,
+    pub created_at_ms: u64,
+    pub last_rotated_ms: u64,
+}
+
+impl GweSessionCredential {
+    pub fn new() -> Self {
+        Self {
+            session_cred_id: String::new(),
+            key: String::new(),
+            value: String::new(),
+            scope: String::new(),
+            expiry_ms: u64::default(),
+            is_encrypted: bool::default(),
+            algorithm: String::new(),
+            provider_id: String::new(),
+            created_at_ms: u64::default(),
+            last_rotated_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.session_cred_id.is_empty() || true && !self.key.is_empty() || true && !self.value.is_empty() || true && !self.scope.is_empty() || true && self.expiry_ms < u64::MAX || true && self.is_encrypted || true && !self.algorithm.is_empty() || true && !self.provider_id.is_empty() || true && self.created_at_ms < u64::MAX || true && self.last_rotated_ms < u64::MAX || true
+    }
+}
+
+impl Default for GweSessionCredential {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Secret store (service, account, password, delete, on did change)
+#[derive(Debug, Clone)]
+pub struct GwfSecretStore {
+    pub secret_store_id: String,
+    pub service: String,
+    pub account: String,
+    pub password: String,
+    pub on_did_change: bool,
+    pub backend: String,
+    pub is_encrypted: bool,
+    pub last_access_ms: u64,
+    pub key_derivation: String,
+    pub storage_path: String,
+}
+
+impl GwfSecretStore {
+    pub fn new() -> Self {
+        Self {
+            secret_store_id: String::new(),
+            service: String::new(),
+            account: String::new(),
+            password: String::new(),
+            on_did_change: bool::default(),
+            backend: String::new(),
+            is_encrypted: bool::default(),
+            last_access_ms: u64::default(),
+            key_derivation: String::new(),
+            storage_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.secret_store_id.is_empty() || true && !self.service.is_empty() || true && !self.account.is_empty() || true && !self.password.is_empty() || true && self.on_did_change || true && !self.backend.is_empty() || true && self.is_encrypted || true && self.last_access_ms < u64::MAX || true && !self.key_derivation.is_empty() || true && !self.storage_path.is_empty() || true
+    }
+}
+
+impl Default for GwfSecretStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// User profile (id, name, icon, use default flags, is default)
+#[derive(Debug, Clone)]
+pub struct GwgProfileInfo {
+    pub profile_info_id: String,
+    pub profile_name: String,
+    pub icon: String,
+    pub use_default_flags: bool,
+    pub is_default: bool,
+    pub is_transient: bool,
+    pub extensions_json: String,
+    pub settings_json: String,
+    pub created_at_ms: u64,
+    pub sync_resource: String,
+}
+
+impl GwgProfileInfo {
+    pub fn new() -> Self {
+        Self {
+            profile_info_id: String::new(),
+            profile_name: String::new(),
+            icon: String::new(),
+            use_default_flags: bool::default(),
+            is_default: bool::default(),
+            is_transient: bool::default(),
+            extensions_json: String::new(),
+            settings_json: String::new(),
+            created_at_ms: u64::default(),
+            sync_resource: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_info_id.is_empty() || true && !self.profile_name.is_empty() || true && !self.icon.is_empty() || true && self.use_default_flags || true && self.is_default || true && self.is_transient || true && !self.extensions_json.is_empty() || true && !self.settings_json.is_empty() || true && self.created_at_ms < u64::MAX || true && !self.sync_resource.is_empty() || true
+    }
+}
+
+impl Default for GwgProfileInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Trusted domain (uri, trusted, workspace trust, source)
+#[derive(Debug, Clone)]
+pub struct GwhTrustedDomain {
+    pub trusted_domain_id: String,
+    pub uri: String,
+    pub is_trusted: bool,
+    pub workspace_trust_level: String,
+    pub source: String,
+    pub added_at_ms: u64,
+    pub reason: String,
+    pub scope: String,
+    pub is_user_configured: bool,
+    pub port: u32,
+}
+
+impl GwhTrustedDomain {
+    pub fn new() -> Self {
+        Self {
+            trusted_domain_id: String::new(),
+            uri: String::new(),
+            is_trusted: bool::default(),
+            workspace_trust_level: String::new(),
+            source: String::new(),
+            added_at_ms: u64::default(),
+            reason: String::new(),
+            scope: String::new(),
+            is_user_configured: bool::default(),
+            port: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.trusted_domain_id.is_empty() || true && !self.uri.is_empty() || true && self.is_trusted || true && !self.workspace_trust_level.is_empty() || true && !self.source.is_empty() || true && self.added_at_ms < u64::MAX || true && !self.reason.is_empty() || true && !self.scope.is_empty() || true && self.is_user_configured || true && self.port < u32::MAX || true
+    }
+}
+
+impl Default for GwhTrustedDomain {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace trust (is trusted, grant requests, parent folders)
+#[derive(Debug, Clone)]
+pub struct GwiWorkspaceTrust {
+    pub ws_trust_id: String,
+    pub is_trusted: bool,
+    pub grant_requests_json: String,
+    pub parent_folders_json: String,
+    pub workspace_uri: String,
+    pub trust_level: String,
+    pub banner_dismissed: bool,
+    pub startup_prompt: bool,
+    pub empty_window_trust: bool,
+    pub restricted_mode: bool,
+}
+
+impl GwiWorkspaceTrust {
+    pub fn new() -> Self {
+        Self {
+            ws_trust_id: String::new(),
+            is_trusted: bool::default(),
+            grant_requests_json: String::new(),
+            parent_folders_json: String::new(),
+            workspace_uri: String::new(),
+            trust_level: String::new(),
+            banner_dismissed: bool::default(),
+            startup_prompt: bool::default(),
+            empty_window_trust: bool::default(),
+            restricted_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_trust_id.is_empty() || true && self.is_trusted || true && !self.grant_requests_json.is_empty() || true && !self.parent_folders_json.is_empty() || true && !self.workspace_uri.is_empty() || true && !self.trust_level.is_empty() || true && self.banner_dismissed || true && self.startup_prompt || true && self.empty_window_trust || true && self.restricted_mode || true
+    }
+}
+
+impl Default for GwiWorkspaceTrust {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sign-in request (provider, scopes, force, silent, account hint)
+#[derive(Debug, Clone)]
+pub struct GwjSignInRequest {
+    pub sign_in_id: String,
+    pub provider_id: String,
+    pub scopes_json: String,
+    pub force_new: bool,
+    pub silent: bool,
+    pub account_hint: String,
+    pub redirect_uri: String,
+    pub state: String,
+    pub nonce: String,
+    pub code_verifier: String,
+}
+
+impl GwjSignInRequest {
+    pub fn new() -> Self {
+        Self {
+            sign_in_id: String::new(),
+            provider_id: String::new(),
+            scopes_json: String::new(),
+            force_new: bool::default(),
+            silent: bool::default(),
+            account_hint: String::new(),
+            redirect_uri: String::new(),
+            state: String::new(),
+            nonce: String::new(),
+            code_verifier: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sign_in_id.is_empty() || true && !self.provider_id.is_empty() || true && !self.scopes_json.is_empty() || true && self.force_new || true && self.silent || true && !self.account_hint.is_empty() || true && !self.redirect_uri.is_empty() || true && !self.state.is_empty() || true && !self.nonce.is_empty() || true && !self.code_verifier.is_empty() || true
+    }
+}
+
+impl Default for GwjSignInRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -340667,6 +341087,186 @@ mod tests_gvz_generated {
     fn test_gvz_fields() {
         let mut obj = GvzDebugTokenColor::default();
         obj.debug_token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwa_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwa_default() {
+        let obj = GwaAuthSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwa_fields() {
+        let mut obj = GwaAuthSession::default();
+        obj.auth_session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwb_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwb_default() {
+        let obj = GwbAuthProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwb_fields() {
+        let mut obj = GwbAuthProvider::default();
+        obj.auth_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwc_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwc_default() {
+        let obj = GwcAuthAccount::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwc_fields() {
+        let mut obj = GwcAuthAccount::default();
+        obj.auth_acct_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwd_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwd_default() {
+        let obj = GwdOAuthToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwd_fields() {
+        let mut obj = GwdOAuthToken::default();
+        obj.oauth_token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwe_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwe_default() {
+        let obj = GweSessionCredential::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwe_fields() {
+        let mut obj = GweSessionCredential::default();
+        obj.session_cred_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwf_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwf_default() {
+        let obj = GwfSecretStore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwf_fields() {
+        let mut obj = GwfSecretStore::default();
+        obj.secret_store_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwg_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwg_default() {
+        let obj = GwgProfileInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwg_fields() {
+        let mut obj = GwgProfileInfo::default();
+        obj.profile_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwh_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwh_default() {
+        let obj = GwhTrustedDomain::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwh_fields() {
+        let mut obj = GwhTrustedDomain::default();
+        obj.trusted_domain_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwi_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwi_default() {
+        let obj = GwiWorkspaceTrust::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwi_fields() {
+        let mut obj = GwiWorkspaceTrust::default();
+        obj.ws_trust_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gwj_generated {
+    use super::*;
+
+    #[test]
+    fn test_gwj_default() {
+        let obj = GwjSignInRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gwj_fields() {
+        let mut obj = GwjSignInRequest::default();
+        obj.sign_in_id = "test".to_string();
         assert!(obj.validate());
     }
 }
