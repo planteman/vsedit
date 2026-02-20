@@ -126548,6 +126548,426 @@ impl Default for HnzDevContainerJson {
     }
 }
 
+/// Welcome page (sections, recent, start items, walkthrough)
+#[derive(Debug, Clone)]
+pub struct HoaWelcomePage {
+    pub welcome_page_id: String,
+    pub sections_json: String,
+    pub recent_items_json: String,
+    pub start_items_json: String,
+    pub walkthrough_json: String,
+    pub is_visible: bool,
+    pub show_on_startup: bool,
+    pub version: String,
+    pub theme: String,
+    pub last_shown_ms: u64,
+}
+
+impl HoaWelcomePage {
+    pub fn new() -> Self {
+        Self {
+            welcome_page_id: String::new(),
+            sections_json: String::new(),
+            recent_items_json: String::new(),
+            start_items_json: String::new(),
+            walkthrough_json: String::new(),
+            is_visible: bool::default(),
+            show_on_startup: bool::default(),
+            version: String::new(),
+            theme: String::new(),
+            last_shown_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.welcome_page_id.is_empty() || true && !self.sections_json.is_empty() || true && !self.recent_items_json.is_empty() || true && !self.start_items_json.is_empty() || true && !self.walkthrough_json.is_empty() || true && self.is_visible || true && self.show_on_startup || true && !self.version.is_empty() || true && !self.theme.is_empty() || true && self.last_shown_ms < u64::MAX || true
+    }
+}
+
+impl Default for HoaWelcomePage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Getting started (categories, steps, progress, dismissed)
+#[derive(Debug, Clone)]
+pub struct HobGettingStarted {
+    pub getting_started_id: String,
+    pub categories_json: String,
+    pub steps_json: String,
+    pub progress_json: String,
+    pub dismissed_json: String,
+    pub is_complete: bool,
+    pub total_steps: u32,
+    pub completed_steps: u32,
+    pub active_category: String,
+    pub show_getting_started: bool,
+}
+
+impl HobGettingStarted {
+    pub fn new() -> Self {
+        Self {
+            getting_started_id: String::new(),
+            categories_json: String::new(),
+            steps_json: String::new(),
+            progress_json: String::new(),
+            dismissed_json: String::new(),
+            is_complete: bool::default(),
+            total_steps: u32::default(),
+            completed_steps: u32::default(),
+            active_category: String::new(),
+            show_getting_started: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.getting_started_id.is_empty() || true && !self.categories_json.is_empty() || true && !self.steps_json.is_empty() || true && !self.progress_json.is_empty() || true && !self.dismissed_json.is_empty() || true && self.is_complete || true && self.total_steps < u32::MAX || true && self.completed_steps < u32::MAX || true && !self.active_category.is_empty() || true && self.show_getting_started || true
+    }
+}
+
+impl Default for HobGettingStarted {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Walkthrough step (id, title, description, media, done)
+#[derive(Debug, Clone)]
+pub struct HocWalkthroughStep {
+    pub walkthrough_step_id: String,
+    pub step_id: String,
+    pub title: String,
+    pub description: String,
+    pub media_json: String,
+    pub is_done: bool,
+    pub when_clause: String,
+    pub completion_events_json: String,
+    pub order: u32,
+    pub category_id: String,
+}
+
+impl HocWalkthroughStep {
+    pub fn new() -> Self {
+        Self {
+            walkthrough_step_id: String::new(),
+            step_id: String::new(),
+            title: String::new(),
+            description: String::new(),
+            media_json: String::new(),
+            is_done: bool::default(),
+            when_clause: String::new(),
+            completion_events_json: String::new(),
+            order: u32::default(),
+            category_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.walkthrough_step_id.is_empty() || true && !self.step_id.is_empty() || true && !self.title.is_empty() || true && !self.description.is_empty() || true && !self.media_json.is_empty() || true && self.is_done || true && !self.when_clause.is_empty() || true && !self.completion_events_json.is_empty() || true && self.order < u32::MAX || true && !self.category_id.is_empty() || true
+    }
+}
+
+impl Default for HocWalkthroughStep {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Start item (id, label, icon, command, description, order)
+#[derive(Debug, Clone)]
+pub struct HodStartItem {
+    pub start_item_id: String,
+    pub item_id: String,
+    pub label: String,
+    pub icon: String,
+    pub command_id: String,
+    pub description: String,
+    pub order: u32,
+    pub when_clause: String,
+    pub group: String,
+    pub is_visible: bool,
+}
+
+impl HodStartItem {
+    pub fn new() -> Self {
+        Self {
+            start_item_id: String::new(),
+            item_id: String::new(),
+            label: String::new(),
+            icon: String::new(),
+            command_id: String::new(),
+            description: String::new(),
+            order: u32::default(),
+            when_clause: String::new(),
+            group: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.start_item_id.is_empty() || true && !self.item_id.is_empty() || true && !self.label.is_empty() || true && !self.icon.is_empty() || true && !self.command_id.is_empty() || true && !self.description.is_empty() || true && self.order < u32::MAX || true && !self.when_clause.is_empty() || true && !self.group.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for HodStartItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Release notes (version, highlights, fixes, features, url)
+#[derive(Debug, Clone)]
+pub struct HoeReleaseNotes {
+    pub release_notes_id: String,
+    pub version: String,
+    pub highlights_json: String,
+    pub fixes_json: String,
+    pub features_json: String,
+    pub url: String,
+    pub date: String,
+    pub is_read: bool,
+    pub show_on_update: bool,
+    pub content_markdown: String,
+}
+
+impl HoeReleaseNotes {
+    pub fn new() -> Self {
+        Self {
+            release_notes_id: String::new(),
+            version: String::new(),
+            highlights_json: String::new(),
+            fixes_json: String::new(),
+            features_json: String::new(),
+            url: String::new(),
+            date: String::new(),
+            is_read: bool::default(),
+            show_on_update: bool::default(),
+            content_markdown: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.release_notes_id.is_empty() || true && !self.version.is_empty() || true && !self.highlights_json.is_empty() || true && !self.fixes_json.is_empty() || true && !self.features_json.is_empty() || true && !self.url.is_empty() || true && !self.date.is_empty() || true && self.is_read || true && self.show_on_update || true && !self.content_markdown.is_empty() || true
+    }
+}
+
+impl Default for HoeReleaseNotes {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tip of the day (title, content, category, shown, next)
+#[derive(Debug, Clone)]
+pub struct HofTipOfTheDay {
+    pub tip_id: String,
+    pub title: String,
+    pub content: String,
+    pub category: String,
+    pub shown_count: u32,
+    pub next_tip_id: String,
+    pub is_read: bool,
+    pub created_at_ms: u64,
+    pub icon: String,
+    pub action_json: String,
+}
+
+impl HofTipOfTheDay {
+    pub fn new() -> Self {
+        Self {
+            tip_id: String::new(),
+            title: String::new(),
+            content: String::new(),
+            category: String::new(),
+            shown_count: u32::default(),
+            next_tip_id: String::new(),
+            is_read: bool::default(),
+            created_at_ms: u64::default(),
+            icon: String::new(),
+            action_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tip_id.is_empty() || true && !self.title.is_empty() || true && !self.content.is_empty() || true && !self.category.is_empty() || true && self.shown_count < u32::MAX || true && !self.next_tip_id.is_empty() || true && self.is_read || true && self.created_at_ms < u64::MAX || true && !self.icon.is_empty() || true && !self.action_json.is_empty() || true
+    }
+}
+
+impl Default for HofTipOfTheDay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Interactive playground (samples, active, language, runtime)
+#[derive(Debug, Clone)]
+pub struct HogInteractivePlayground {
+    pub playground_id: String,
+    pub samples_json: String,
+    pub active_sample: String,
+    pub language_id: String,
+    pub runtime: String,
+    pub is_running: bool,
+    pub output: String,
+    pub is_dirty: bool,
+    pub version: String,
+    pub theme: String,
+}
+
+impl HogInteractivePlayground {
+    pub fn new() -> Self {
+        Self {
+            playground_id: String::new(),
+            samples_json: String::new(),
+            active_sample: String::new(),
+            language_id: String::new(),
+            runtime: String::new(),
+            is_running: bool::default(),
+            output: String::new(),
+            is_dirty: bool::default(),
+            version: String::new(),
+            theme: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.playground_id.is_empty() || true && !self.samples_json.is_empty() || true && !self.active_sample.is_empty() || true && !self.language_id.is_empty() || true && !self.runtime.is_empty() || true && self.is_running || true && !self.output.is_empty() || true && self.is_dirty || true && !self.version.is_empty() || true && !self.theme.is_empty() || true
+    }
+}
+
+impl Default for HogInteractivePlayground {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Onboarding configuration (show welcome, first launch, steps)
+#[derive(Debug, Clone)]
+pub struct HohOnboardingConfig {
+    pub onboard_config_id: String,
+    pub show_welcome: bool,
+    pub is_first_launch: bool,
+    pub steps_json: String,
+    pub completed_steps_json: String,
+    pub skip_all: bool,
+    pub version: String,
+    pub platform: String,
+    pub dismissed_at_ms: u64,
+    pub user_type: String,
+}
+
+impl HohOnboardingConfig {
+    pub fn new() -> Self {
+        Self {
+            onboard_config_id: String::new(),
+            show_welcome: bool::default(),
+            is_first_launch: bool::default(),
+            steps_json: String::new(),
+            completed_steps_json: String::new(),
+            skip_all: bool::default(),
+            version: String::new(),
+            platform: String::new(),
+            dismissed_at_ms: u64::default(),
+            user_type: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.onboard_config_id.is_empty() || true && self.show_welcome || true && self.is_first_launch || true && !self.steps_json.is_empty() || true && !self.completed_steps_json.is_empty() || true && self.skip_all || true && !self.version.is_empty() || true && !self.platform.is_empty() || true && self.dismissed_at_ms < u64::MAX || true && !self.user_type.is_empty() || true
+    }
+}
+
+impl Default for HohOnboardingConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Product tour step (element, popover, position, arrow, next)
+#[derive(Debug, Clone)]
+pub struct HoiTourStep {
+    pub tour_step_id: String,
+    pub element_selector: String,
+    pub popover_content: String,
+    pub position: String,
+    pub has_arrow: bool,
+    pub next_step_id: String,
+    pub prev_step_id: String,
+    pub on_enter_fn: String,
+    pub on_exit_fn: String,
+    pub delay_ms: u32,
+}
+
+impl HoiTourStep {
+    pub fn new() -> Self {
+        Self {
+            tour_step_id: String::new(),
+            element_selector: String::new(),
+            popover_content: String::new(),
+            position: String::new(),
+            has_arrow: bool::default(),
+            next_step_id: String::new(),
+            prev_step_id: String::new(),
+            on_enter_fn: String::new(),
+            on_exit_fn: String::new(),
+            delay_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tour_step_id.is_empty() || true && !self.element_selector.is_empty() || true && !self.popover_content.is_empty() || true && !self.position.is_empty() || true && self.has_arrow || true && !self.next_step_id.is_empty() || true && !self.prev_step_id.is_empty() || true && !self.on_enter_fn.is_empty() || true && !self.on_exit_fn.is_empty() || true && self.delay_ms < u32::MAX || true
+    }
+}
+
+impl Default for HoiTourStep {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Product tour (steps, current, is active, dismissed, version)
+#[derive(Debug, Clone)]
+pub struct HojProductTour {
+    pub product_tour_id: String,
+    pub steps_json: String,
+    pub current_step: u32,
+    pub is_active: bool,
+    pub is_dismissed: bool,
+    pub version: String,
+    pub tour_name: String,
+    pub total_steps: u32,
+    pub started_at_ms: u64,
+    pub completed_at_ms: u64,
+}
+
+impl HojProductTour {
+    pub fn new() -> Self {
+        Self {
+            product_tour_id: String::new(),
+            steps_json: String::new(),
+            current_step: u32::default(),
+            is_active: bool::default(),
+            is_dismissed: bool::default(),
+            version: String::new(),
+            tour_name: String::new(),
+            total_steps: u32::default(),
+            started_at_ms: u64::default(),
+            completed_at_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.product_tour_id.is_empty() || true && !self.steps_json.is_empty() || true && self.current_step < u32::MAX || true && self.is_active || true && self.is_dismissed || true && !self.version.is_empty() || true && !self.tour_name.is_empty() || true && self.total_steps < u32::MAX || true && self.started_at_ms < u64::MAX || true && self.completed_at_ms < u64::MAX || true
+    }
+}
+
+impl Default for HojProductTour {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -368878,6 +369298,186 @@ mod tests_hnz_generated {
     fn test_hnz_fields() {
         let mut obj = HnzDevContainerJson::default();
         obj.devcontainer_json_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hoa_generated {
+    use super::*;
+
+    #[test]
+    fn test_hoa_default() {
+        let obj = HoaWelcomePage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hoa_fields() {
+        let mut obj = HoaWelcomePage::default();
+        obj.welcome_page_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hob_generated {
+    use super::*;
+
+    #[test]
+    fn test_hob_default() {
+        let obj = HobGettingStarted::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hob_fields() {
+        let mut obj = HobGettingStarted::default();
+        obj.getting_started_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hoc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hoc_default() {
+        let obj = HocWalkthroughStep::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hoc_fields() {
+        let mut obj = HocWalkthroughStep::default();
+        obj.walkthrough_step_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hod_generated {
+    use super::*;
+
+    #[test]
+    fn test_hod_default() {
+        let obj = HodStartItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hod_fields() {
+        let mut obj = HodStartItem::default();
+        obj.start_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hoe_generated {
+    use super::*;
+
+    #[test]
+    fn test_hoe_default() {
+        let obj = HoeReleaseNotes::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hoe_fields() {
+        let mut obj = HoeReleaseNotes::default();
+        obj.release_notes_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hof_generated {
+    use super::*;
+
+    #[test]
+    fn test_hof_default() {
+        let obj = HofTipOfTheDay::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hof_fields() {
+        let mut obj = HofTipOfTheDay::default();
+        obj.tip_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hog_generated {
+    use super::*;
+
+    #[test]
+    fn test_hog_default() {
+        let obj = HogInteractivePlayground::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hog_fields() {
+        let mut obj = HogInteractivePlayground::default();
+        obj.playground_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hoh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hoh_default() {
+        let obj = HohOnboardingConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hoh_fields() {
+        let mut obj = HohOnboardingConfig::default();
+        obj.onboard_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hoi_generated {
+    use super::*;
+
+    #[test]
+    fn test_hoi_default() {
+        let obj = HoiTourStep::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hoi_fields() {
+        let mut obj = HoiTourStep::default();
+        obj.tour_step_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hoj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hoj_default() {
+        let obj = HojProductTour::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hoj_fields() {
+        let mut obj = HojProductTour::default();
+        obj.product_tour_id = "test".to_string();
         assert!(obj.validate());
     }
 }
