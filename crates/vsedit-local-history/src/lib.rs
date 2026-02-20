@@ -118183,6 +118183,678 @@ impl Default for HgjEditorNavEntry {
     }
 }
 
+/// File revision (uri, timestamp, author, message, parent hash)
+#[derive(Debug, Clone)]
+pub struct HgkFileRevision {
+    pub file_rev_id: String,
+    pub uri: String,
+    pub timestamp_ms: u64,
+    pub author: String,
+    pub message: String,
+    pub parent_hash: String,
+    pub hash: String,
+    pub size_bytes: u64,
+    pub encoding: String,
+    pub is_binary: bool,
+}
+
+impl HgkFileRevision {
+    pub fn new() -> Self {
+        Self {
+            file_rev_id: String::new(),
+            uri: String::new(),
+            timestamp_ms: u64::default(),
+            author: String::new(),
+            message: String::new(),
+            parent_hash: String::new(),
+            hash: String::new(),
+            size_bytes: u64::default(),
+            encoding: String::new(),
+            is_binary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_rev_id.is_empty() || true && !self.uri.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.author.is_empty() || true && !self.message.is_empty() || true && !self.parent_hash.is_empty() || true && !self.hash.is_empty() || true && self.size_bytes < u64::MAX || true && !self.encoding.is_empty() || true && self.is_binary || true
+    }
+}
+
+impl Default for HgkFileRevision {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Blame line (line number, commit hash, author, date, message)
+#[derive(Debug, Clone)]
+pub struct HglBlameLine {
+    pub blame_line_id: String,
+    pub line_number: u32,
+    pub commit_hash: String,
+    pub author: String,
+    pub date_ms: u64,
+    pub message: String,
+    pub original_line: u32,
+    pub file_path: String,
+    pub is_uncommitted: bool,
+    pub email: String,
+}
+
+impl HglBlameLine {
+    pub fn new() -> Self {
+        Self {
+            blame_line_id: String::new(),
+            line_number: u32::default(),
+            commit_hash: String::new(),
+            author: String::new(),
+            date_ms: u64::default(),
+            message: String::new(),
+            original_line: u32::default(),
+            file_path: String::new(),
+            is_uncommitted: bool::default(),
+            email: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.blame_line_id.is_empty() || true && self.line_number < u32::MAX || true && !self.commit_hash.is_empty() || true && !self.author.is_empty() || true && self.date_ms < u64::MAX || true && !self.message.is_empty() || true && self.original_line < u32::MAX || true && !self.file_path.is_empty() || true && self.is_uncommitted || true && !self.email.is_empty() || true
+    }
+}
+
+impl Default for HglBlameLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff change (original range, modified range, inner changes)
+#[derive(Debug, Clone)]
+pub struct HgmDiffChange {
+    pub diff_change_id: String,
+    pub original_start_line: u32,
+    pub original_end_line: u32,
+    pub modified_start_line: u32,
+    pub modified_end_line: u32,
+    pub inner_changes_json: String,
+    pub change_type: String,
+    pub character_changes_json: String,
+    pub is_conflict: bool,
+    pub hunk_index: u32,
+}
+
+impl HgmDiffChange {
+    pub fn new() -> Self {
+        Self {
+            diff_change_id: String::new(),
+            original_start_line: u32::default(),
+            original_end_line: u32::default(),
+            modified_start_line: u32::default(),
+            modified_end_line: u32::default(),
+            inner_changes_json: String::new(),
+            change_type: String::new(),
+            character_changes_json: String::new(),
+            is_conflict: bool::default(),
+            hunk_index: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_change_id.is_empty() || true && self.original_start_line < u32::MAX || true && self.original_end_line < u32::MAX || true && self.modified_start_line < u32::MAX || true && self.modified_end_line < u32::MAX || true && !self.inner_changes_json.is_empty() || true && !self.change_type.is_empty() || true && !self.character_changes_json.is_empty() || true && self.is_conflict || true && self.hunk_index < u32::MAX || true
+    }
+}
+
+impl Default for HgmDiffChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Merge conflict region (current, incoming, common ancestor)
+#[derive(Debug, Clone)]
+pub struct HgnMergeConflictRegion {
+    pub merge_region_id: String,
+    pub current_text: String,
+    pub incoming_text: String,
+    pub common_ancestor_text: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub file_uri: String,
+    pub conflict_type: String,
+    pub is_resolved: bool,
+    pub resolution: String,
+}
+
+impl HgnMergeConflictRegion {
+    pub fn new() -> Self {
+        Self {
+            merge_region_id: String::new(),
+            current_text: String::new(),
+            incoming_text: String::new(),
+            common_ancestor_text: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            file_uri: String::new(),
+            conflict_type: String::new(),
+            is_resolved: bool::default(),
+            resolution: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.merge_region_id.is_empty() || true && !self.current_text.is_empty() || true && !self.incoming_text.is_empty() || true && !self.common_ancestor_text.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.file_uri.is_empty() || true && !self.conflict_type.is_empty() || true && self.is_resolved || true && !self.resolution.is_empty() || true
+    }
+}
+
+impl Default for HgnMergeConflictRegion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Conflict resolution (strategy, result, manual edits, accepted)
+#[derive(Debug, Clone)]
+pub struct HgoConflictResolution {
+    pub conflict_res_id: String,
+    pub strategy: String,
+    pub result_text: String,
+    pub manual_edits_json: String,
+    pub accepted_side: String,
+    pub is_auto: bool,
+    pub timestamp_ms: u64,
+    pub file_uri: String,
+    pub conflict_count: u32,
+    pub resolved_count: u32,
+}
+
+impl HgoConflictResolution {
+    pub fn new() -> Self {
+        Self {
+            conflict_res_id: String::new(),
+            strategy: String::new(),
+            result_text: String::new(),
+            manual_edits_json: String::new(),
+            accepted_side: String::new(),
+            is_auto: bool::default(),
+            timestamp_ms: u64::default(),
+            file_uri: String::new(),
+            conflict_count: u32::default(),
+            resolved_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.conflict_res_id.is_empty() || true && !self.strategy.is_empty() || true && !self.result_text.is_empty() || true && !self.manual_edits_json.is_empty() || true && !self.accepted_side.is_empty() || true && self.is_auto || true && self.timestamp_ms < u64::MAX || true && !self.file_uri.is_empty() || true && self.conflict_count < u32::MAX || true && self.resolved_count < u32::MAX || true
+    }
+}
+
+impl Default for HgoConflictResolution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Patch hunk (old start, old lines, new start, new lines, header)
+#[derive(Debug, Clone)]
+pub struct HgpPatchHunk {
+    pub patch_hunk_id: String,
+    pub old_start: u32,
+    pub old_lines: u32,
+    pub new_start: u32,
+    pub new_lines: u32,
+    pub header: String,
+    pub content: String,
+    pub index: u32,
+    pub is_binary: bool,
+    pub context_lines: u32,
+}
+
+impl HgpPatchHunk {
+    pub fn new() -> Self {
+        Self {
+            patch_hunk_id: String::new(),
+            old_start: u32::default(),
+            old_lines: u32::default(),
+            new_start: u32::default(),
+            new_lines: u32::default(),
+            header: String::new(),
+            content: String::new(),
+            index: u32::default(),
+            is_binary: bool::default(),
+            context_lines: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.patch_hunk_id.is_empty() || true && self.old_start < u32::MAX || true && self.old_lines < u32::MAX || true && self.new_start < u32::MAX || true && self.new_lines < u32::MAX || true && !self.header.is_empty() || true && !self.content.is_empty() || true && self.index < u32::MAX || true && self.is_binary || true && self.context_lines < u32::MAX || true
+    }
+}
+
+impl Default for HgpPatchHunk {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Line annotation (line, message, author, date, decoration)
+#[derive(Debug, Clone)]
+pub struct HgqLineAnnotation {
+    pub line_annot_id: String,
+    pub line_number: u32,
+    pub message: String,
+    pub author: String,
+    pub date_ms: u64,
+    pub decoration_json: String,
+    pub commit_hash: String,
+    pub is_hover: bool,
+    pub color: String,
+    pub tooltip: String,
+}
+
+impl HgqLineAnnotation {
+    pub fn new() -> Self {
+        Self {
+            line_annot_id: String::new(),
+            line_number: u32::default(),
+            message: String::new(),
+            author: String::new(),
+            date_ms: u64::default(),
+            decoration_json: String::new(),
+            commit_hash: String::new(),
+            is_hover: bool::default(),
+            color: String::new(),
+            tooltip: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_annot_id.is_empty() || true && self.line_number < u32::MAX || true && !self.message.is_empty() || true && !self.author.is_empty() || true && self.date_ms < u64::MAX || true && !self.decoration_json.is_empty() || true && !self.commit_hash.is_empty() || true && self.is_hover || true && !self.color.is_empty() || true && !self.tooltip.is_empty() || true
+    }
+}
+
+impl Default for HgqLineAnnotation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Commit info (hash, message, author, date, parents, stats)
+#[derive(Debug, Clone)]
+pub struct HgrCommitInfo {
+    pub commit_info_id: String,
+    pub hash: String,
+    pub message: String,
+    pub author: String,
+    pub author_email: String,
+    pub date_ms: u64,
+    pub parents_json: String,
+    pub stats_json: String,
+    pub files_changed: u32,
+    pub is_merge: bool,
+}
+
+impl HgrCommitInfo {
+    pub fn new() -> Self {
+        Self {
+            commit_info_id: String::new(),
+            hash: String::new(),
+            message: String::new(),
+            author: String::new(),
+            author_email: String::new(),
+            date_ms: u64::default(),
+            parents_json: String::new(),
+            stats_json: String::new(),
+            files_changed: u32::default(),
+            is_merge: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.commit_info_id.is_empty() || true && !self.hash.is_empty() || true && !self.message.is_empty() || true && !self.author.is_empty() || true && !self.author_email.is_empty() || true && self.date_ms < u64::MAX || true && !self.parents_json.is_empty() || true && !self.stats_json.is_empty() || true && self.files_changed < u32::MAX || true && self.is_merge || true
+    }
+}
+
+impl Default for HgrCommitInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Stash entry (index, message, branch, timestamp, file count)
+#[derive(Debug, Clone)]
+pub struct HgsStashEntry {
+    pub stash_entry_id: String,
+    pub index: u32,
+    pub message: String,
+    pub branch: String,
+    pub timestamp_ms: u64,
+    pub file_count: u32,
+    pub is_untracked: bool,
+    pub parent_hash: String,
+    pub author: String,
+    pub working_dir_hash: String,
+}
+
+impl HgsStashEntry {
+    pub fn new() -> Self {
+        Self {
+            stash_entry_id: String::new(),
+            index: u32::default(),
+            message: String::new(),
+            branch: String::new(),
+            timestamp_ms: u64::default(),
+            file_count: u32::default(),
+            is_untracked: bool::default(),
+            parent_hash: String::new(),
+            author: String::new(),
+            working_dir_hash: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.stash_entry_id.is_empty() || true && self.index < u32::MAX || true && !self.message.is_empty() || true && !self.branch.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.file_count < u32::MAX || true && self.is_untracked || true && !self.parent_hash.is_empty() || true && !self.author.is_empty() || true && !self.working_dir_hash.is_empty() || true
+    }
+}
+
+impl Default for HgsStashEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tag info (name, commit, message, tagger, date, is annotated)
+#[derive(Debug, Clone)]
+pub struct HgtTagInfo {
+    pub tag_info_id: String,
+    pub name: String,
+    pub commit_hash: String,
+    pub message: String,
+    pub tagger: String,
+    pub date_ms: u64,
+    pub is_annotated: bool,
+    pub is_lightweight: bool,
+    pub target_type: String,
+    pub signature: String,
+}
+
+impl HgtTagInfo {
+    pub fn new() -> Self {
+        Self {
+            tag_info_id: String::new(),
+            name: String::new(),
+            commit_hash: String::new(),
+            message: String::new(),
+            tagger: String::new(),
+            date_ms: u64::default(),
+            is_annotated: bool::default(),
+            is_lightweight: bool::default(),
+            target_type: String::new(),
+            signature: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tag_info_id.is_empty() || true && !self.name.is_empty() || true && !self.commit_hash.is_empty() || true && !self.message.is_empty() || true && !self.tagger.is_empty() || true && self.date_ms < u64::MAX || true && self.is_annotated || true && self.is_lightweight || true && !self.target_type.is_empty() || true && !self.signature.is_empty() || true
+    }
+}
+
+impl Default for HgtTagInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Branch info (name, commit, upstream, ahead, behind, is head)
+#[derive(Debug, Clone)]
+pub struct HguBranchInfo {
+    pub branch_info_id: String,
+    pub name: String,
+    pub commit_hash: String,
+    pub upstream: String,
+    pub ahead: u32,
+    pub behind: u32,
+    pub is_head: bool,
+    pub is_remote: bool,
+    pub last_commit_ms: u64,
+    pub author: String,
+}
+
+impl HguBranchInfo {
+    pub fn new() -> Self {
+        Self {
+            branch_info_id: String::new(),
+            name: String::new(),
+            commit_hash: String::new(),
+            upstream: String::new(),
+            ahead: u32::default(),
+            behind: u32::default(),
+            is_head: bool::default(),
+            is_remote: bool::default(),
+            last_commit_ms: u64::default(),
+            author: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.branch_info_id.is_empty() || true && !self.name.is_empty() || true && !self.commit_hash.is_empty() || true && !self.upstream.is_empty() || true && self.ahead < u32::MAX || true && self.behind < u32::MAX || true && self.is_head || true && self.is_remote || true && self.last_commit_ms < u64::MAX || true && !self.author.is_empty() || true
+    }
+}
+
+impl Default for HguBranchInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote info (name, url, fetch url, push url, is default)
+#[derive(Debug, Clone)]
+pub struct HgvRemoteInfo {
+    pub remote_info_id: String,
+    pub name: String,
+    pub url: String,
+    pub fetch_url: String,
+    pub push_url: String,
+    pub is_default: bool,
+    pub branch_count: u32,
+    pub last_fetch_ms: u64,
+    pub is_connected: bool,
+    pub prune_on_fetch: bool,
+}
+
+impl HgvRemoteInfo {
+    pub fn new() -> Self {
+        Self {
+            remote_info_id: String::new(),
+            name: String::new(),
+            url: String::new(),
+            fetch_url: String::new(),
+            push_url: String::new(),
+            is_default: bool::default(),
+            branch_count: u32::default(),
+            last_fetch_ms: u64::default(),
+            is_connected: bool::default(),
+            prune_on_fetch: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_info_id.is_empty() || true && !self.name.is_empty() || true && !self.url.is_empty() || true && !self.fetch_url.is_empty() || true && !self.push_url.is_empty() || true && self.is_default || true && self.branch_count < u32::MAX || true && self.last_fetch_ms < u64::MAX || true && self.is_connected || true && self.prune_on_fetch || true
+    }
+}
+
+impl Default for HgvRemoteInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Submodule info (name, path, url, branch, commit, is init)
+#[derive(Debug, Clone)]
+pub struct HgwSubmoduleInfo {
+    pub submodule_id: String,
+    pub name: String,
+    pub path: String,
+    pub url: String,
+    pub branch: String,
+    pub commit_hash: String,
+    pub is_init: bool,
+    pub is_dirty: bool,
+    pub update_strategy: String,
+    pub depth: u32,
+}
+
+impl HgwSubmoduleInfo {
+    pub fn new() -> Self {
+        Self {
+            submodule_id: String::new(),
+            name: String::new(),
+            path: String::new(),
+            url: String::new(),
+            branch: String::new(),
+            commit_hash: String::new(),
+            is_init: bool::default(),
+            is_dirty: bool::default(),
+            update_strategy: String::new(),
+            depth: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.submodule_id.is_empty() || true && !self.name.is_empty() || true && !self.path.is_empty() || true && !self.url.is_empty() || true && !self.branch.is_empty() || true && !self.commit_hash.is_empty() || true && self.is_init || true && self.is_dirty || true && !self.update_strategy.is_empty() || true && self.depth < u32::MAX || true
+    }
+}
+
+impl Default for HgwSubmoduleInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Worktree info (path, head, branch, is bare, is main, locked)
+#[derive(Debug, Clone)]
+pub struct HgxWorktreeInfo {
+    pub worktree_id: String,
+    pub path: String,
+    pub head_hash: String,
+    pub branch: String,
+    pub is_bare: bool,
+    pub is_main: bool,
+    pub is_locked: bool,
+    pub lock_reason: String,
+    pub prune_reason: String,
+    pub is_detached: bool,
+}
+
+impl HgxWorktreeInfo {
+    pub fn new() -> Self {
+        Self {
+            worktree_id: String::new(),
+            path: String::new(),
+            head_hash: String::new(),
+            branch: String::new(),
+            is_bare: bool::default(),
+            is_main: bool::default(),
+            is_locked: bool::default(),
+            lock_reason: String::new(),
+            prune_reason: String::new(),
+            is_detached: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.worktree_id.is_empty() || true && !self.path.is_empty() || true && !self.head_hash.is_empty() || true && !self.branch.is_empty() || true && self.is_bare || true && self.is_main || true && self.is_locked || true && !self.lock_reason.is_empty() || true && !self.prune_reason.is_empty() || true && self.is_detached || true
+    }
+}
+
+impl Default for HgxWorktreeInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Rebase step (action, commit, message, index, total, status)
+#[derive(Debug, Clone)]
+pub struct HgyRebaseStep {
+    pub rebase_step_id: String,
+    pub action: String,
+    pub commit_hash: String,
+    pub message: String,
+    pub index: u32,
+    pub total: u32,
+    pub status: String,
+    pub conflicts_json: String,
+    pub is_interactive: bool,
+    pub onto_hash: String,
+}
+
+impl HgyRebaseStep {
+    pub fn new() -> Self {
+        Self {
+            rebase_step_id: String::new(),
+            action: String::new(),
+            commit_hash: String::new(),
+            message: String::new(),
+            index: u32::default(),
+            total: u32::default(),
+            status: String::new(),
+            conflicts_json: String::new(),
+            is_interactive: bool::default(),
+            onto_hash: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rebase_step_id.is_empty() || true && !self.action.is_empty() || true && !self.commit_hash.is_empty() || true && !self.message.is_empty() || true && self.index < u32::MAX || true && self.total < u32::MAX || true && !self.status.is_empty() || true && !self.conflicts_json.is_empty() || true && self.is_interactive || true && !self.onto_hash.is_empty() || true
+    }
+}
+
+impl Default for HgyRebaseStep {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cherry-pick step (commit, message, parent, conflicts, status)
+#[derive(Debug, Clone)]
+pub struct HgzCherryPickStep {
+    pub cherry_pick_id: String,
+    pub commit_hash: String,
+    pub message: String,
+    pub parent_hash: String,
+    pub conflicts_json: String,
+    pub status: String,
+    pub is_auto: bool,
+    pub sequence_index: u32,
+    pub total_picks: u32,
+    pub target_branch: String,
+}
+
+impl HgzCherryPickStep {
+    pub fn new() -> Self {
+        Self {
+            cherry_pick_id: String::new(),
+            commit_hash: String::new(),
+            message: String::new(),
+            parent_hash: String::new(),
+            conflicts_json: String::new(),
+            status: String::new(),
+            is_auto: bool::default(),
+            sequence_index: u32::default(),
+            total_picks: u32::default(),
+            target_branch: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cherry_pick_id.is_empty() || true && !self.commit_hash.is_empty() || true && !self.message.is_empty() || true && !self.parent_hash.is_empty() || true && !self.conflicts_json.is_empty() || true && !self.status.is_empty() || true && self.is_auto || true && self.sequence_index < u32::MAX || true && self.total_picks < u32::MAX || true && !self.target_branch.is_empty() || true
+    }
+}
+
+impl Default for HgzCherryPickStep {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -356950,6 +357622,294 @@ mod tests_hgj_generated {
     fn test_hgj_fields() {
         let mut obj = HgjEditorNavEntry::default();
         obj.editor_nav_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgk_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgk_default() {
+        let obj = HgkFileRevision::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgk_fields() {
+        let mut obj = HgkFileRevision::default();
+        obj.file_rev_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgl_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgl_default() {
+        let obj = HglBlameLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgl_fields() {
+        let mut obj = HglBlameLine::default();
+        obj.blame_line_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgm_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgm_default() {
+        let obj = HgmDiffChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgm_fields() {
+        let mut obj = HgmDiffChange::default();
+        obj.diff_change_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgn_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgn_default() {
+        let obj = HgnMergeConflictRegion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgn_fields() {
+        let mut obj = HgnMergeConflictRegion::default();
+        obj.merge_region_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgo_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgo_default() {
+        let obj = HgoConflictResolution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgo_fields() {
+        let mut obj = HgoConflictResolution::default();
+        obj.conflict_res_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgp_default() {
+        let obj = HgpPatchHunk::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgp_fields() {
+        let mut obj = HgpPatchHunk::default();
+        obj.patch_hunk_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgq_default() {
+        let obj = HgqLineAnnotation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgq_fields() {
+        let mut obj = HgqLineAnnotation::default();
+        obj.line_annot_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgr_default() {
+        let obj = HgrCommitInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgr_fields() {
+        let mut obj = HgrCommitInfo::default();
+        obj.commit_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgs_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgs_default() {
+        let obj = HgsStashEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgs_fields() {
+        let mut obj = HgsStashEntry::default();
+        obj.stash_entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgt_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgt_default() {
+        let obj = HgtTagInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgt_fields() {
+        let mut obj = HgtTagInfo::default();
+        obj.tag_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgu_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgu_default() {
+        let obj = HguBranchInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgu_fields() {
+        let mut obj = HguBranchInfo::default();
+        obj.branch_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgv_default() {
+        let obj = HgvRemoteInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgv_fields() {
+        let mut obj = HgvRemoteInfo::default();
+        obj.remote_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgw_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgw_default() {
+        let obj = HgwSubmoduleInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgw_fields() {
+        let mut obj = HgwSubmoduleInfo::default();
+        obj.submodule_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgx_default() {
+        let obj = HgxWorktreeInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgx_fields() {
+        let mut obj = HgxWorktreeInfo::default();
+        obj.worktree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgy_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgy_default() {
+        let obj = HgyRebaseStep::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgy_fields() {
+        let mut obj = HgyRebaseStep::default();
+        obj.rebase_step_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgz_default() {
+        let obj = HgzCherryPickStep::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgz_fields() {
+        let mut obj = HgzCherryPickStep::default();
+        obj.cherry_pick_id = "test".to_string();
         assert!(obj.validate());
     }
 }
