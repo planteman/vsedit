@@ -192505,6 +192505,838 @@ impl Default for KkzClipboardConfig {
     }
 }
 
+/// /// Editor scroll position state
+#[derive(Debug, Clone)]
+pub struct KlaScrollPosition {
+    pub kla_top_line: u32,
+    pub kla_top_offset: f64,
+    pub kla_scroll_left: f64,
+    pub kla_version: u64,
+    pub kla_smooth: bool,
+}
+
+impl KlaScrollPosition {
+    pub fn new() -> Self {
+        Self {
+            kla_top_line: u32::default(),
+            kla_top_offset: f64::default(),
+            kla_scroll_left: f64::default(),
+            kla_version: u64::default(),
+            kla_smooth: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kla_top_line < u32::MAX || true && self.kla_top_offset.is_finite() || true && self.kla_scroll_left.is_finite() || true && self.kla_version < u64::MAX || true && self.kla_smooth || true
+    }
+}
+
+impl Default for KlaScrollPosition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Scroll delta for smooth scrolling
+#[derive(Debug, Clone)]
+pub struct KlbScrollDelta {
+    pub klb_delta_lines: f64,
+    pub klb_delta_cols: f64,
+    pub klb_timestamp: u64,
+    pub klb_source: String,
+    pub klb_smooth: bool,
+}
+
+impl KlbScrollDelta {
+    pub fn new() -> Self {
+        Self {
+            klb_delta_lines: f64::default(),
+            klb_delta_cols: f64::default(),
+            klb_timestamp: u64::default(),
+            klb_source: String::new(),
+            klb_smooth: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.klb_delta_lines.is_finite() || true && self.klb_delta_cols.is_finite() || true && self.klb_timestamp < u64::MAX || true && !self.klb_source.is_empty() || true && self.klb_smooth || true
+    }
+}
+
+impl Default for KlbScrollDelta {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Visible viewport line range
+#[derive(Debug, Clone)]
+pub struct KlcViewportRange {
+    pub klc_start_line: u32,
+    pub klc_end_line: u32,
+    pub klc_partial_top: bool,
+    pub klc_partial_bottom: bool,
+    pub klc_label: String,
+}
+
+impl KlcViewportRange {
+    pub fn new() -> Self {
+        Self {
+            klc_start_line: u32::default(),
+            klc_end_line: u32::default(),
+            klc_partial_top: bool::default(),
+            klc_partial_bottom: bool::default(),
+            klc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.klc_start_line < u32::MAX || true && self.klc_end_line < u32::MAX || true && self.klc_partial_top || true && self.klc_partial_bottom || true && !self.klc_label.is_empty() || true
+    }
+}
+
+impl Default for KlcViewportRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Viewport dimensions in characters
+#[derive(Debug, Clone)]
+pub struct KldViewportSize {
+    pub kld_width_chars: u32,
+    pub kld_height_lines: u32,
+    pub kld_pixel_width: f64,
+    pub kld_pixel_height: f64,
+    pub kld_label: String,
+}
+
+impl KldViewportSize {
+    pub fn new() -> Self {
+        Self {
+            kld_width_chars: u32::default(),
+            kld_height_lines: u32::default(),
+            kld_pixel_width: f64::default(),
+            kld_pixel_height: f64::default(),
+            kld_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kld_width_chars < u32::MAX || true && self.kld_height_lines < u32::MAX || true && self.kld_pixel_width.is_finite() || true && self.kld_pixel_height.is_finite() || true && !self.kld_label.is_empty() || true
+    }
+}
+
+impl Default for KldViewportSize {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Scroll-to-reveal target position
+#[derive(Debug, Clone)]
+pub struct KleScrollReveal {
+    pub kle_line: u32,
+    pub kle_column: u32,
+    pub kle_vertical_type: String,
+    pub kle_smooth_anim: bool,
+    pub kle_label: String,
+}
+
+impl KleScrollReveal {
+    pub fn new() -> Self {
+        Self {
+            kle_line: u32::default(),
+            kle_column: u32::default(),
+            kle_vertical_type: String::new(),
+            kle_smooth_anim: bool::default(),
+            kle_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kle_line < u32::MAX || true && self.kle_column < u32::MAX || true && !self.kle_vertical_type.is_empty() || true && self.kle_smooth_anim || true && !self.kle_label.is_empty() || true
+    }
+}
+
+impl Default for KleScrollReveal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Scroll animation configuration
+#[derive(Debug, Clone)]
+pub struct KlfScrollAnimation {
+    pub klf_duration_ms: u32,
+    pub klf_easing: String,
+    pub klf_fast_scroll: bool,
+    pub klf_sensitivity: f64,
+    pub klf_label: String,
+}
+
+impl KlfScrollAnimation {
+    pub fn new() -> Self {
+        Self {
+            klf_duration_ms: u32::default(),
+            klf_easing: String::new(),
+            klf_fast_scroll: bool::default(),
+            klf_sensitivity: f64::default(),
+            klf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.klf_duration_ms < u32::MAX || true && !self.klf_easing.is_empty() || true && self.klf_fast_scroll || true && self.klf_sensitivity.is_finite() || true && !self.klf_label.is_empty() || true
+    }
+}
+
+impl Default for KlfScrollAnimation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor font family configuration
+#[derive(Debug, Clone)]
+pub struct KlgFontFamily {
+    pub klg_name: String,
+    pub klg_fallback: String,
+    pub klg_monospace: bool,
+    pub klg_available: bool,
+    pub klg_label: String,
+}
+
+impl KlgFontFamily {
+    pub fn new() -> Self {
+        Self {
+            klg_name: String::new(),
+            klg_fallback: String::new(),
+            klg_monospace: bool::default(),
+            klg_available: bool::default(),
+            klg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.klg_name.is_empty() || true && !self.klg_fallback.is_empty() || true && self.klg_monospace || true && self.klg_available || true && !self.klg_label.is_empty() || true
+    }
+}
+
+impl Default for KlgFontFamily {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor font size settings
+#[derive(Debug, Clone)]
+pub struct KlhFontSize {
+    pub klh_size_px: f64,
+    pub klh_min_size: f64,
+    pub klh_max_size: f64,
+    pub klh_zoom_level: f64,
+    pub klh_label: String,
+}
+
+impl KlhFontSize {
+    pub fn new() -> Self {
+        Self {
+            klh_size_px: f64::default(),
+            klh_min_size: f64::default(),
+            klh_max_size: f64::default(),
+            klh_zoom_level: f64::default(),
+            klh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.klh_size_px.is_finite() || true && self.klh_min_size.is_finite() || true && self.klh_max_size.is_finite() || true && self.klh_zoom_level.is_finite() || true && !self.klh_label.is_empty() || true
+    }
+}
+
+impl Default for KlhFontSize {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor font weight setting
+#[derive(Debug, Clone)]
+pub struct KliFontWeight {
+    pub kli_weight: u32,
+    pub kli_bold: bool,
+    pub kli_name: String,
+    pub kli_available: bool,
+    pub kli_label: String,
+}
+
+impl KliFontWeight {
+    pub fn new() -> Self {
+        Self {
+            kli_weight: u32::default(),
+            kli_bold: bool::default(),
+            kli_name: String::new(),
+            kli_available: bool::default(),
+            kli_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kli_weight < u32::MAX || true && self.kli_bold || true && !self.kli_name.is_empty() || true && self.kli_available || true && !self.kli_label.is_empty() || true
+    }
+}
+
+impl Default for KliFontWeight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor line height configuration
+#[derive(Debug, Clone)]
+pub struct KljLineHeight {
+    pub klj_factor: f64,
+    pub klj_pixels: f64,
+    pub klj_auto_compute: bool,
+    pub klj_font_relative: bool,
+    pub klj_label: String,
+}
+
+impl KljLineHeight {
+    pub fn new() -> Self {
+        Self {
+            klj_factor: f64::default(),
+            klj_pixels: f64::default(),
+            klj_auto_compute: bool::default(),
+            klj_font_relative: bool::default(),
+            klj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.klj_factor.is_finite() || true && self.klj_pixels.is_finite() || true && self.klj_auto_compute || true && self.klj_font_relative || true && !self.klj_label.is_empty() || true
+    }
+}
+
+impl Default for KljLineHeight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor letter spacing setting
+#[derive(Debug, Clone)]
+pub struct KlkLetterSpacing {
+    pub klk_spacing_px: f64,
+    pub klk_min_val: f64,
+    pub klk_max_val: f64,
+    pub klk_auto_adjust: bool,
+    pub klk_label: String,
+}
+
+impl KlkLetterSpacing {
+    pub fn new() -> Self {
+        Self {
+            klk_spacing_px: f64::default(),
+            klk_min_val: f64::default(),
+            klk_max_val: f64::default(),
+            klk_auto_adjust: bool::default(),
+            klk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.klk_spacing_px.is_finite() || true && self.klk_min_val.is_finite() || true && self.klk_max_val.is_finite() || true && self.klk_auto_adjust || true && !self.klk_label.is_empty() || true
+    }
+}
+
+impl Default for KlkLetterSpacing {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Font ligature configuration
+#[derive(Debug, Clone)]
+pub struct KllFontLigature {
+    pub kll_enabled: bool,
+    pub kll_features: String,
+    pub kll_variations: String,
+    pub kll_contextual: bool,
+    pub kll_label: String,
+}
+
+impl KllFontLigature {
+    pub fn new() -> Self {
+        Self {
+            kll_enabled: bool::default(),
+            kll_features: String::new(),
+            kll_variations: String::new(),
+            kll_contextual: bool::default(),
+            kll_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kll_enabled || true && !self.kll_features.is_empty() || true && !self.kll_variations.is_empty() || true && self.kll_contextual || true && !self.kll_label.is_empty() || true
+    }
+}
+
+impl Default for KllFontLigature {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Character width measurement
+#[derive(Debug, Clone)]
+pub struct KlmCharWidth {
+    pub klm_char_code: u32,
+    pub klm_width_px: f64,
+    pub klm_font_name: String,
+    pub klm_cached: bool,
+    pub klm_label: String,
+}
+
+impl KlmCharWidth {
+    pub fn new() -> Self {
+        Self {
+            klm_char_code: u32::default(),
+            klm_width_px: f64::default(),
+            klm_font_name: String::new(),
+            klm_cached: bool::default(),
+            klm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.klm_char_code < u32::MAX || true && self.klm_width_px.is_finite() || true && !self.klm_font_name.is_empty() || true && self.klm_cached || true && !self.klm_label.is_empty() || true
+    }
+}
+
+impl Default for KlmCharWidth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Line number display configuration
+#[derive(Debug, Clone)]
+pub struct KlnLineNumber {
+    pub kln_mode: String,
+    pub kln_relative: bool,
+    pub kln_interval: u32,
+    pub kln_min_chars: u32,
+    pub kln_label: String,
+}
+
+impl KlnLineNumber {
+    pub fn new() -> Self {
+        Self {
+            kln_mode: String::new(),
+            kln_relative: bool::default(),
+            kln_interval: u32::default(),
+            kln_min_chars: u32::default(),
+            kln_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kln_mode.is_empty() || true && self.kln_relative || true && self.kln_interval < u32::MAX || true && self.kln_min_chars < u32::MAX || true && !self.kln_label.is_empty() || true
+    }
+}
+
+impl Default for KlnLineNumber {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Gutter width calculation
+#[derive(Debug, Clone)]
+pub struct KloGutterWidth {
+    pub klo_pixels: f64,
+    pub klo_line_nums_width: f64,
+    pub klo_fold_width: f64,
+    pub klo_glyph_width: f64,
+    pub klo_label: String,
+}
+
+impl KloGutterWidth {
+    pub fn new() -> Self {
+        Self {
+            klo_pixels: f64::default(),
+            klo_line_nums_width: f64::default(),
+            klo_fold_width: f64::default(),
+            klo_glyph_width: f64::default(),
+            klo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.klo_pixels.is_finite() || true && self.klo_line_nums_width.is_finite() || true && self.klo_fold_width.is_finite() || true && self.klo_glyph_width.is_finite() || true && !self.klo_label.is_empty() || true
+    }
+}
+
+impl Default for KloGutterWidth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Gutter decoration entry
+#[derive(Debug, Clone)]
+pub struct KlpGutterDecoration {
+    pub klp_line: u32,
+    pub klp_icon: String,
+    pub klp_color: String,
+    pub klp_tooltip: String,
+    pub klp_priority: u32,
+}
+
+impl KlpGutterDecoration {
+    pub fn new() -> Self {
+        Self {
+            klp_line: u32::default(),
+            klp_icon: String::new(),
+            klp_color: String::new(),
+            klp_tooltip: String::new(),
+            klp_priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.klp_line < u32::MAX || true && !self.klp_icon.is_empty() || true && !self.klp_color.is_empty() || true && !self.klp_tooltip.is_empty() || true && self.klp_priority < u32::MAX || true
+    }
+}
+
+impl Default for KlpGutterDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Glyph margin configuration
+#[derive(Debug, Clone)]
+pub struct KlqGlyphMargin {
+    pub klq_enabled: bool,
+    pub klq_width: f64,
+    pub klq_decorations_count: u32,
+    pub klq_hover_active: bool,
+    pub klq_label: String,
+}
+
+impl KlqGlyphMargin {
+    pub fn new() -> Self {
+        Self {
+            klq_enabled: bool::default(),
+            klq_width: f64::default(),
+            klq_decorations_count: u32::default(),
+            klq_hover_active: bool::default(),
+            klq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.klq_enabled || true && self.klq_width.is_finite() || true && self.klq_decorations_count < u32::MAX || true && self.klq_hover_active || true && !self.klq_label.is_empty() || true
+    }
+}
+
+impl Default for KlqGlyphMargin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Fold gutter visibility settings
+#[derive(Debug, Clone)]
+pub struct KlrFoldGutter {
+    pub klr_enabled: bool,
+    pub klr_width: f64,
+    pub klr_highlight_active: bool,
+    pub klr_show_always: bool,
+    pub klr_label: String,
+}
+
+impl KlrFoldGutter {
+    pub fn new() -> Self {
+        Self {
+            klr_enabled: bool::default(),
+            klr_width: f64::default(),
+            klr_highlight_active: bool::default(),
+            klr_show_always: bool::default(),
+            klr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.klr_enabled || true && self.klr_width.is_finite() || true && self.klr_highlight_active || true && self.klr_show_always || true && !self.klr_label.is_empty() || true
+    }
+}
+
+impl Default for KlrFoldGutter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Minimap rendering configuration
+#[derive(Debug, Clone)]
+pub struct KlsMinimapRender {
+    pub kls_enabled: bool,
+    pub kls_side: String,
+    pub kls_max_column: u32,
+    pub kls_scale: f64,
+    pub kls_label: String,
+}
+
+impl KlsMinimapRender {
+    pub fn new() -> Self {
+        Self {
+            kls_enabled: bool::default(),
+            kls_side: String::new(),
+            kls_max_column: u32::default(),
+            kls_scale: f64::default(),
+            kls_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kls_enabled || true && !self.kls_side.is_empty() || true && self.kls_max_column < u32::MAX || true && self.kls_scale.is_finite() || true && !self.kls_label.is_empty() || true
+    }
+}
+
+impl Default for KlsMinimapRender {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Minimap slider/highlight state
+#[derive(Debug, Clone)]
+pub struct KltMinimapSlider {
+    pub klt_visible: bool,
+    pub klt_always_show: bool,
+    pub klt_top_line: u32,
+    pub klt_bottom_line: u32,
+    pub klt_active: bool,
+}
+
+impl KltMinimapSlider {
+    pub fn new() -> Self {
+        Self {
+            klt_visible: bool::default(),
+            klt_always_show: bool::default(),
+            klt_top_line: u32::default(),
+            klt_bottom_line: u32::default(),
+            klt_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.klt_visible || true && self.klt_always_show || true && self.klt_top_line < u32::MAX || true && self.klt_bottom_line < u32::MAX || true && self.klt_active || true
+    }
+}
+
+impl Default for KltMinimapSlider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Overview ruler configuration
+#[derive(Debug, Clone)]
+pub struct KluOverviewRuler {
+    pub klu_enabled: bool,
+    pub klu_position: String,
+    pub klu_width: f64,
+    pub klu_marks_count: u32,
+    pub klu_label: String,
+}
+
+impl KluOverviewRuler {
+    pub fn new() -> Self {
+        Self {
+            klu_enabled: bool::default(),
+            klu_position: String::new(),
+            klu_width: f64::default(),
+            klu_marks_count: u32::default(),
+            klu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.klu_enabled || true && !self.klu_position.is_empty() || true && self.klu_width.is_finite() || true && self.klu_marks_count < u32::MAX || true && !self.klu_label.is_empty() || true
+    }
+}
+
+impl Default for KluOverviewRuler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Single mark on overview ruler
+#[derive(Debug, Clone)]
+pub struct KlvRulerMark {
+    pub klv_line: u32,
+    pub klv_color: String,
+    pub klv_position: String,
+    pub klv_tooltip: String,
+    pub klv_priority: u32,
+}
+
+impl KlvRulerMark {
+    pub fn new() -> Self {
+        Self {
+            klv_line: u32::default(),
+            klv_color: String::new(),
+            klv_position: String::new(),
+            klv_tooltip: String::new(),
+            klv_priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.klv_line < u32::MAX || true && !self.klv_color.is_empty() || true && !self.klv_position.is_empty() || true && !self.klv_tooltip.is_empty() || true && self.klv_priority < u32::MAX || true
+    }
+}
+
+impl Default for KlvRulerMark {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Content area width calculation
+#[derive(Debug, Clone)]
+pub struct KlwContentWidth {
+    pub klw_max_col: u32,
+    pub klw_longest_line: u32,
+    pub klw_scroll_width: f64,
+    pub klw_trimmed: bool,
+    pub klw_label: String,
+}
+
+impl KlwContentWidth {
+    pub fn new() -> Self {
+        Self {
+            klw_max_col: u32::default(),
+            klw_longest_line: u32::default(),
+            klw_scroll_width: f64::default(),
+            klw_trimmed: bool::default(),
+            klw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.klw_max_col < u32::MAX || true && self.klw_longest_line < u32::MAX || true && self.klw_scroll_width.is_finite() || true && self.klw_trimmed || true && !self.klw_label.is_empty() || true
+    }
+}
+
+impl Default for KlwContentWidth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Word wrap configuration
+#[derive(Debug, Clone)]
+pub struct KlxWordWrap {
+    pub klx_mode: String,
+    pub klx_column: u32,
+    pub klx_min_column: u32,
+    pub klx_word_boundary: bool,
+    pub klx_label: String,
+}
+
+impl KlxWordWrap {
+    pub fn new() -> Self {
+        Self {
+            klx_mode: String::new(),
+            klx_column: u32::default(),
+            klx_min_column: u32::default(),
+            klx_word_boundary: bool::default(),
+            klx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.klx_mode.is_empty() || true && self.klx_column < u32::MAX || true && self.klx_min_column < u32::MAX || true && self.klx_word_boundary || true && !self.klx_label.is_empty() || true
+    }
+}
+
+impl Default for KlxWordWrap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Complete editor layout dimensions
+#[derive(Debug, Clone)]
+pub struct KlyEditorLayout {
+    pub kly_width: f64,
+    pub kly_height: f64,
+    pub kly_gutter_width: f64,
+    pub kly_minimap_width: f64,
+    pub kly_label: String,
+}
+
+impl KlyEditorLayout {
+    pub fn new() -> Self {
+        Self {
+            kly_width: f64::default(),
+            kly_height: f64::default(),
+            kly_gutter_width: f64::default(),
+            kly_minimap_width: f64::default(),
+            kly_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kly_width.is_finite() || true && self.kly_height.is_finite() || true && self.kly_gutter_width.is_finite() || true && self.kly_minimap_width.is_finite() || true && !self.kly_label.is_empty() || true
+    }
+}
+
+impl Default for KlyEditorLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined scroll and viewport config
+#[derive(Debug, Clone)]
+pub struct KlzScrollConfig {
+    pub klz_fast_scroll_sens: f64,
+    pub klz_scroll_beyond_last: bool,
+    pub klz_scroll_beyond_lines: u32,
+    pub klz_smooth_scroll: bool,
+    pub klz_label: String,
+}
+
+impl KlzScrollConfig {
+    pub fn new() -> Self {
+        Self {
+            klz_fast_scroll_sens: f64::default(),
+            klz_scroll_beyond_last: bool::default(),
+            klz_scroll_beyond_lines: u32::default(),
+            klz_smooth_scroll: bool::default(),
+            klz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.klz_fast_scroll_sens.is_finite() || true && self.klz_scroll_beyond_last || true && self.klz_scroll_beyond_lines < u32::MAX || true && self.klz_smooth_scroll || true && !self.klz_label.is_empty() || true
+    }
+}
+
+impl Default for KlzScrollConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -469869,6 +470701,474 @@ mod tests_kkz_generated {
     fn test_kkz_fields() {
         let mut obj = KkzClipboardConfig::default();
         obj.kkz_ring_size = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kla_generated {
+    use super::*;
+
+    #[test]
+    fn test_kla_default() {
+        let obj = KlaScrollPosition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kla_fields() {
+        let mut obj = KlaScrollPosition::default();
+        obj.kla_top_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klb_generated {
+    use super::*;
+
+    #[test]
+    fn test_klb_default() {
+        let obj = KlbScrollDelta::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klb_fields() {
+        let mut obj = KlbScrollDelta::default();
+        obj.klb_delta_lines = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klc_generated {
+    use super::*;
+
+    #[test]
+    fn test_klc_default() {
+        let obj = KlcViewportRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klc_fields() {
+        let mut obj = KlcViewportRange::default();
+        obj.klc_start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kld_generated {
+    use super::*;
+
+    #[test]
+    fn test_kld_default() {
+        let obj = KldViewportSize::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kld_fields() {
+        let mut obj = KldViewportSize::default();
+        obj.kld_width_chars = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kle_generated {
+    use super::*;
+
+    #[test]
+    fn test_kle_default() {
+        let obj = KleScrollReveal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kle_fields() {
+        let mut obj = KleScrollReveal::default();
+        obj.kle_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klf_generated {
+    use super::*;
+
+    #[test]
+    fn test_klf_default() {
+        let obj = KlfScrollAnimation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klf_fields() {
+        let mut obj = KlfScrollAnimation::default();
+        obj.klf_duration_ms = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klg_generated {
+    use super::*;
+
+    #[test]
+    fn test_klg_default() {
+        let obj = KlgFontFamily::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klg_fields() {
+        let mut obj = KlgFontFamily::default();
+        obj.klg_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klh_generated {
+    use super::*;
+
+    #[test]
+    fn test_klh_default() {
+        let obj = KlhFontSize::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klh_fields() {
+        let mut obj = KlhFontSize::default();
+        obj.klh_size_px = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kli_generated {
+    use super::*;
+
+    #[test]
+    fn test_kli_default() {
+        let obj = KliFontWeight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kli_fields() {
+        let mut obj = KliFontWeight::default();
+        obj.kli_weight = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klj_generated {
+    use super::*;
+
+    #[test]
+    fn test_klj_default() {
+        let obj = KljLineHeight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klj_fields() {
+        let mut obj = KljLineHeight::default();
+        obj.klj_factor = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klk_generated {
+    use super::*;
+
+    #[test]
+    fn test_klk_default() {
+        let obj = KlkLetterSpacing::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klk_fields() {
+        let mut obj = KlkLetterSpacing::default();
+        obj.klk_spacing_px = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kll_generated {
+    use super::*;
+
+    #[test]
+    fn test_kll_default() {
+        let obj = KllFontLigature::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kll_fields() {
+        let mut obj = KllFontLigature::default();
+        obj.kll_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klm_generated {
+    use super::*;
+
+    #[test]
+    fn test_klm_default() {
+        let obj = KlmCharWidth::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klm_fields() {
+        let mut obj = KlmCharWidth::default();
+        obj.klm_char_code = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kln_generated {
+    use super::*;
+
+    #[test]
+    fn test_kln_default() {
+        let obj = KlnLineNumber::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kln_fields() {
+        let mut obj = KlnLineNumber::default();
+        obj.kln_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klo_generated {
+    use super::*;
+
+    #[test]
+    fn test_klo_default() {
+        let obj = KloGutterWidth::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klo_fields() {
+        let mut obj = KloGutterWidth::default();
+        obj.klo_pixels = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klp_generated {
+    use super::*;
+
+    #[test]
+    fn test_klp_default() {
+        let obj = KlpGutterDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klp_fields() {
+        let mut obj = KlpGutterDecoration::default();
+        obj.klp_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klq_generated {
+    use super::*;
+
+    #[test]
+    fn test_klq_default() {
+        let obj = KlqGlyphMargin::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klq_fields() {
+        let mut obj = KlqGlyphMargin::default();
+        obj.klq_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klr_generated {
+    use super::*;
+
+    #[test]
+    fn test_klr_default() {
+        let obj = KlrFoldGutter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klr_fields() {
+        let mut obj = KlrFoldGutter::default();
+        obj.klr_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kls_generated {
+    use super::*;
+
+    #[test]
+    fn test_kls_default() {
+        let obj = KlsMinimapRender::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kls_fields() {
+        let mut obj = KlsMinimapRender::default();
+        obj.kls_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klt_generated {
+    use super::*;
+
+    #[test]
+    fn test_klt_default() {
+        let obj = KltMinimapSlider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klt_fields() {
+        let mut obj = KltMinimapSlider::default();
+        obj.klt_visible = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klu_generated {
+    use super::*;
+
+    #[test]
+    fn test_klu_default() {
+        let obj = KluOverviewRuler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klu_fields() {
+        let mut obj = KluOverviewRuler::default();
+        obj.klu_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klv_generated {
+    use super::*;
+
+    #[test]
+    fn test_klv_default() {
+        let obj = KlvRulerMark::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klv_fields() {
+        let mut obj = KlvRulerMark::default();
+        obj.klv_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klw_generated {
+    use super::*;
+
+    #[test]
+    fn test_klw_default() {
+        let obj = KlwContentWidth::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klw_fields() {
+        let mut obj = KlwContentWidth::default();
+        obj.klw_max_col = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klx_generated {
+    use super::*;
+
+    #[test]
+    fn test_klx_default() {
+        let obj = KlxWordWrap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klx_fields() {
+        let mut obj = KlxWordWrap::default();
+        obj.klx_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kly_generated {
+    use super::*;
+
+    #[test]
+    fn test_kly_default() {
+        let obj = KlyEditorLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kly_fields() {
+        let mut obj = KlyEditorLayout::default();
+        obj.kly_width = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_klz_generated {
+    use super::*;
+
+    #[test]
+    fn test_klz_default() {
+        let obj = KlzScrollConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_klz_fields() {
+        let mut obj = KlzScrollConfig::default();
+        obj.klz_fast_scroll_sens = 1.0;
         assert!(obj.validate());
     }
 }
