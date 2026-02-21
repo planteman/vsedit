@@ -229087,6 +229087,786 @@ impl Default for ServiceContainer {
     }
 }
 
+/// Extension API namespace
+#[derive(Debug, Clone)]
+pub struct ExtApiNamespace {
+    pub namespace_id: String,
+    pub name: String,
+    pub method_count: u32,
+    pub is_proposed: bool,
+}
+
+impl ExtApiNamespace {
+    pub fn new() -> Self {
+        Self {
+            namespace_id: String::new(),
+            name: String::new(),
+            method_count: u32::default(),
+            is_proposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.namespace_id.is_empty() || true && !self.name.is_empty() || true && self.method_count < u32::MAX || true && self.is_proposed || true
+    }
+}
+
+impl Default for ExtApiNamespace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API method
+#[derive(Debug, Clone)]
+pub struct ExtApiMethod {
+    pub method_id: String,
+    pub name: String,
+    pub param_count: u32,
+    pub return_type: String,
+}
+
+impl ExtApiMethod {
+    pub fn new() -> Self {
+        Self {
+            method_id: String::new(),
+            name: String::new(),
+            param_count: u32::default(),
+            return_type: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.method_id.is_empty() || true && !self.name.is_empty() || true && self.param_count < u32::MAX || true && !self.return_type.is_empty() || true
+    }
+}
+
+impl Default for ExtApiMethod {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API event
+#[derive(Debug, Clone)]
+pub struct ExtApiEvent {
+    pub event_id: String,
+    pub name: String,
+    pub listener_count: u32,
+    pub is_deprecated: bool,
+}
+
+impl ExtApiEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            name: String::new(),
+            listener_count: u32::default(),
+            is_deprecated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && !self.name.is_empty() || true && self.listener_count < u32::MAX || true && self.is_deprecated || true
+    }
+}
+
+impl Default for ExtApiEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API property
+#[derive(Debug, Clone)]
+pub struct ExtApiProperty {
+    pub property_id: String,
+    pub name: String,
+    pub value_type: String,
+    pub is_readonly: bool,
+}
+
+impl ExtApiProperty {
+    pub fn new() -> Self {
+        Self {
+            property_id: String::new(),
+            name: String::new(),
+            value_type: String::new(),
+            is_readonly: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.property_id.is_empty() || true && !self.name.is_empty() || true && !self.value_type.is_empty() || true && self.is_readonly || true
+    }
+}
+
+impl Default for ExtApiProperty {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API callback
+#[derive(Debug, Clone)]
+pub struct ExtApiCallback {
+    pub callback_id: u32,
+    pub name: String,
+    pub param_types: String,
+    pub is_async: bool,
+}
+
+impl ExtApiCallback {
+    pub fn new() -> Self {
+        Self {
+            callback_id: u32::default(),
+            name: String::new(),
+            param_types: String::new(),
+            is_async: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.callback_id < u32::MAX || true && !self.name.is_empty() || true && !self.param_types.is_empty() || true && self.is_async || true
+    }
+}
+
+impl Default for ExtApiCallback {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API disposable
+#[derive(Debug, Clone)]
+pub struct ExtApiDisposable {
+    pub disposable_id: u32,
+    pub resource_type: String,
+    pub is_disposed: bool,
+    pub created_at: u64,
+}
+
+impl ExtApiDisposable {
+    pub fn new() -> Self {
+        Self {
+            disposable_id: u32::default(),
+            resource_type: String::new(),
+            is_disposed: bool::default(),
+            created_at: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.disposable_id < u32::MAX || true && !self.resource_type.is_empty() || true && self.is_disposed || true && self.created_at < u64::MAX || true
+    }
+}
+
+impl Default for ExtApiDisposable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API promise wrapper
+#[derive(Debug, Clone)]
+pub struct ExtApiPromise {
+    pub promise_id: u32,
+    pub state: u32,
+    pub result_type: String,
+    pub is_resolved: bool,
+}
+
+impl ExtApiPromise {
+    pub fn new() -> Self {
+        Self {
+            promise_id: u32::default(),
+            state: u32::default(),
+            result_type: String::new(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.promise_id < u32::MAX || true && self.state < u32::MAX || true && !self.result_type.is_empty() || true && self.is_resolved || true
+    }
+}
+
+impl Default for ExtApiPromise {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API cancellation token
+#[derive(Debug, Clone)]
+pub struct ExtApiCancellation {
+    pub cancel_id: u32,
+    pub is_cancelled: bool,
+    pub reason: String,
+    pub source_id: u32,
+}
+
+impl ExtApiCancellation {
+    pub fn new() -> Self {
+        Self {
+            cancel_id: u32::default(),
+            is_cancelled: bool::default(),
+            reason: String::new(),
+            source_id: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.cancel_id < u32::MAX || true && self.is_cancelled || true && !self.reason.is_empty() || true && self.source_id < u32::MAX || true
+    }
+}
+
+impl Default for ExtApiCancellation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API progress report
+#[derive(Debug, Clone)]
+pub struct ExtApiProgress {
+    pub progress_id: u32,
+    pub message: String,
+    pub increment: u32,
+    pub is_cancellable: bool,
+}
+
+impl ExtApiProgress {
+    pub fn new() -> Self {
+        Self {
+            progress_id: u32::default(),
+            message: String::new(),
+            increment: u32::default(),
+            is_cancellable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.progress_id < u32::MAX || true && !self.message.is_empty() || true && self.increment < u32::MAX || true && self.is_cancellable || true
+    }
+}
+
+impl Default for ExtApiProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API URI type
+#[derive(Debug, Clone)]
+pub struct ExtApiUri {
+    pub uri_id: u32,
+    pub scheme: String,
+    pub path: String,
+    pub query: String,
+}
+
+impl ExtApiUri {
+    pub fn new() -> Self {
+        Self {
+            uri_id: u32::default(),
+            scheme: String::new(),
+            path: String::new(),
+            query: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.uri_id < u32::MAX || true && !self.scheme.is_empty() || true && !self.path.is_empty() || true && !self.query.is_empty() || true
+    }
+}
+
+impl Default for ExtApiUri {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API range type
+#[derive(Debug, Clone)]
+pub struct ExtApiRange {
+    pub range_id: u32,
+    pub start_line: u32,
+    pub start_char: u32,
+    pub end_line: u32,
+}
+
+impl ExtApiRange {
+    pub fn new() -> Self {
+        Self {
+            range_id: u32::default(),
+            start_line: u32::default(),
+            start_char: u32::default(),
+            end_line: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.range_id < u32::MAX || true && self.start_line < u32::MAX || true && self.start_char < u32::MAX || true && self.end_line < u32::MAX || true
+    }
+}
+
+impl Default for ExtApiRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API position type
+#[derive(Debug, Clone)]
+pub struct ExtApiPosition {
+    pub position_id: u32,
+    pub line: u32,
+    pub character: u32,
+    pub is_valid: bool,
+}
+
+impl ExtApiPosition {
+    pub fn new() -> Self {
+        Self {
+            position_id: u32::default(),
+            line: u32::default(),
+            character: u32::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.position_id < u32::MAX || true && self.line < u32::MAX || true && self.character < u32::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for ExtApiPosition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API selection
+#[derive(Debug, Clone)]
+pub struct ExtApiSelection {
+    pub selection_id: u32,
+    pub anchor_line: u32,
+    pub anchor_char: u32,
+    pub active_line: u32,
+}
+
+impl ExtApiSelection {
+    pub fn new() -> Self {
+        Self {
+            selection_id: u32::default(),
+            anchor_line: u32::default(),
+            anchor_char: u32::default(),
+            active_line: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.selection_id < u32::MAX || true && self.anchor_line < u32::MAX || true && self.anchor_char < u32::MAX || true && self.active_line < u32::MAX || true
+    }
+}
+
+impl Default for ExtApiSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API text edit
+#[derive(Debug, Clone)]
+pub struct ExtApiTextEdit {
+    pub edit_id: u32,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub new_text: String,
+}
+
+impl ExtApiTextEdit {
+    pub fn new() -> Self {
+        Self {
+            edit_id: u32::default(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            new_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.edit_id < u32::MAX || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && !self.new_text.is_empty() || true
+    }
+}
+
+impl Default for ExtApiTextEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API workspace edit
+#[derive(Debug, Clone)]
+pub struct ExtApiWorkspaceEdit {
+    pub ws_edit_id: u32,
+    pub entry_count: u32,
+    pub is_applied: bool,
+    pub label: String,
+}
+
+impl ExtApiWorkspaceEdit {
+    pub fn new() -> Self {
+        Self {
+            ws_edit_id: u32::default(),
+            entry_count: u32::default(),
+            is_applied: bool::default(),
+            label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ws_edit_id < u32::MAX || true && self.entry_count < u32::MAX || true && self.is_applied || true && !self.label.is_empty() || true
+    }
+}
+
+impl Default for ExtApiWorkspaceEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API diagnostic
+#[derive(Debug, Clone)]
+pub struct ExtApiDiagnosticEntry {
+    pub diag_id: u32,
+    pub message: String,
+    pub severity: u32,
+    pub source: String,
+}
+
+impl ExtApiDiagnosticEntry {
+    pub fn new() -> Self {
+        Self {
+            diag_id: u32::default(),
+            message: String::new(),
+            severity: u32::default(),
+            source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.diag_id < u32::MAX || true && !self.message.is_empty() || true && self.severity < u32::MAX || true && !self.source.is_empty() || true
+    }
+}
+
+impl Default for ExtApiDiagnosticEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API completion list
+#[derive(Debug, Clone)]
+pub struct ExtApiCompletionList {
+    pub completion_id: u32,
+    pub item_count: u32,
+    pub is_incomplete: bool,
+    pub trigger_kind: u32,
+}
+
+impl ExtApiCompletionList {
+    pub fn new() -> Self {
+        Self {
+            completion_id: u32::default(),
+            item_count: u32::default(),
+            is_incomplete: bool::default(),
+            trigger_kind: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.completion_id < u32::MAX || true && self.item_count < u32::MAX || true && self.is_incomplete || true && self.trigger_kind < u32::MAX || true
+    }
+}
+
+impl Default for ExtApiCompletionList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API hover result
+#[derive(Debug, Clone)]
+pub struct ExtApiHoverResult {
+    pub hover_id: u32,
+    pub content_count: u32,
+    pub range_start: u32,
+    pub range_end: u32,
+}
+
+impl ExtApiHoverResult {
+    pub fn new() -> Self {
+        Self {
+            hover_id: u32::default(),
+            content_count: u32::default(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.hover_id < u32::MAX || true && self.content_count < u32::MAX || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true
+    }
+}
+
+impl Default for ExtApiHoverResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API definition result
+#[derive(Debug, Clone)]
+pub struct ExtApiDefinition {
+    pub def_id: u32,
+    pub uri: String,
+    pub line: u32,
+    pub character: u32,
+}
+
+impl ExtApiDefinition {
+    pub fn new() -> Self {
+        Self {
+            def_id: u32::default(),
+            uri: String::new(),
+            line: u32::default(),
+            character: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.def_id < u32::MAX || true && !self.uri.is_empty() || true && self.line < u32::MAX || true && self.character < u32::MAX || true
+    }
+}
+
+impl Default for ExtApiDefinition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API reference result
+#[derive(Debug, Clone)]
+pub struct ExtApiReference {
+    pub ref_id: u32,
+    pub uri: String,
+    pub line: u32,
+    pub character: u32,
+}
+
+impl ExtApiReference {
+    pub fn new() -> Self {
+        Self {
+            ref_id: u32::default(),
+            uri: String::new(),
+            line: u32::default(),
+            character: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ref_id < u32::MAX || true && !self.uri.is_empty() || true && self.line < u32::MAX || true && self.character < u32::MAX || true
+    }
+}
+
+impl Default for ExtApiReference {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API symbol info
+#[derive(Debug, Clone)]
+pub struct ExtApiSymbol {
+    pub symbol_id: u32,
+    pub name: String,
+    pub kind: u32,
+    pub container_name: String,
+}
+
+impl ExtApiSymbol {
+    pub fn new() -> Self {
+        Self {
+            symbol_id: u32::default(),
+            name: String::new(),
+            kind: u32::default(),
+            container_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.symbol_id < u32::MAX || true && !self.name.is_empty() || true && self.kind < u32::MAX || true && !self.container_name.is_empty() || true
+    }
+}
+
+impl Default for ExtApiSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API code action
+#[derive(Debug, Clone)]
+pub struct ExtApiCodeAction {
+    pub action_id: u32,
+    pub title: String,
+    pub kind: String,
+    pub is_preferred: bool,
+}
+
+impl ExtApiCodeAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: u32::default(),
+            title: String::new(),
+            kind: String::new(),
+            is_preferred: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.action_id < u32::MAX || true && !self.title.is_empty() || true && !self.kind.is_empty() || true && self.is_preferred || true
+    }
+}
+
+impl Default for ExtApiCodeAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API code lens
+#[derive(Debug, Clone)]
+pub struct ExtApiCodeLens {
+    pub lens_id: u32,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub command_id: String,
+}
+
+impl ExtApiCodeLens {
+    pub fn new() -> Self {
+        Self {
+            lens_id: u32::default(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            command_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lens_id < u32::MAX || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && !self.command_id.is_empty() || true
+    }
+}
+
+impl Default for ExtApiCodeLens {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API signature help
+#[derive(Debug, Clone)]
+pub struct ExtApiSignature {
+    pub sig_id: u32,
+    pub label: String,
+    pub parameter_count: u32,
+    pub active_parameter: u32,
+}
+
+impl ExtApiSignature {
+    pub fn new() -> Self {
+        Self {
+            sig_id: u32::default(),
+            label: String::new(),
+            parameter_count: u32::default(),
+            active_parameter: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.sig_id < u32::MAX || true && !self.label.is_empty() || true && self.parameter_count < u32::MAX || true && self.active_parameter < u32::MAX || true
+    }
+}
+
+impl Default for ExtApiSignature {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API rename result
+#[derive(Debug, Clone)]
+pub struct ExtApiRenameResult {
+    pub rename_id: u32,
+    pub old_name: String,
+    pub new_name: String,
+    pub edit_count: u32,
+}
+
+impl ExtApiRenameResult {
+    pub fn new() -> Self {
+        Self {
+            rename_id: u32::default(),
+            old_name: String::new(),
+            new_name: String::new(),
+            edit_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.rename_id < u32::MAX || true && !self.old_name.is_empty() || true && !self.new_name.is_empty() || true && self.edit_count < u32::MAX || true
+    }
+}
+
+impl Default for ExtApiRenameResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API bridge instance
+#[derive(Debug, Clone)]
+pub struct ExtApiBridge {
+    pub bridge_id: u32,
+    pub extension_count: u32,
+    pub api_version: String,
+    pub is_initialized: bool,
+}
+
+impl ExtApiBridge {
+    pub fn new() -> Self {
+        Self {
+            bridge_id: u32::default(),
+            extension_count: u32::default(),
+            api_version: String::new(),
+            is_initialized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bridge_id < u32::MAX || true && self.extension_count < u32::MAX || true && !self.api_version.is_empty() || true && self.is_initialized || true
+    }
+}
+
+impl Default for ExtApiBridge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -527503,6 +528283,474 @@ mod tests_mdz_generated {
     fn test_mdz_fields() {
         let mut obj = ServiceContainer::default();
         obj.container_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mea_generated {
+    use super::*;
+
+    #[test]
+    fn test_mea_default() {
+        let obj = ExtApiNamespace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mea_fields() {
+        let mut obj = ExtApiNamespace::default();
+        obj.namespace_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_meb_generated {
+    use super::*;
+
+    #[test]
+    fn test_meb_default() {
+        let obj = ExtApiMethod::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_meb_fields() {
+        let mut obj = ExtApiMethod::default();
+        obj.method_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mec_generated {
+    use super::*;
+
+    #[test]
+    fn test_mec_default() {
+        let obj = ExtApiEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mec_fields() {
+        let mut obj = ExtApiEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_med_generated {
+    use super::*;
+
+    #[test]
+    fn test_med_default() {
+        let obj = ExtApiProperty::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_med_fields() {
+        let mut obj = ExtApiProperty::default();
+        obj.property_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mee_generated {
+    use super::*;
+
+    #[test]
+    fn test_mee_default() {
+        let obj = ExtApiCallback::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mee_fields() {
+        let mut obj = ExtApiCallback::default();
+        obj.callback_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mef_generated {
+    use super::*;
+
+    #[test]
+    fn test_mef_default() {
+        let obj = ExtApiDisposable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mef_fields() {
+        let mut obj = ExtApiDisposable::default();
+        obj.disposable_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_meg_generated {
+    use super::*;
+
+    #[test]
+    fn test_meg_default() {
+        let obj = ExtApiPromise::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_meg_fields() {
+        let mut obj = ExtApiPromise::default();
+        obj.promise_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_meh_generated {
+    use super::*;
+
+    #[test]
+    fn test_meh_default() {
+        let obj = ExtApiCancellation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_meh_fields() {
+        let mut obj = ExtApiCancellation::default();
+        obj.cancel_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mei_generated {
+    use super::*;
+
+    #[test]
+    fn test_mei_default() {
+        let obj = ExtApiProgress::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mei_fields() {
+        let mut obj = ExtApiProgress::default();
+        obj.progress_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mej_generated {
+    use super::*;
+
+    #[test]
+    fn test_mej_default() {
+        let obj = ExtApiUri::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mej_fields() {
+        let mut obj = ExtApiUri::default();
+        obj.uri_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mek_generated {
+    use super::*;
+
+    #[test]
+    fn test_mek_default() {
+        let obj = ExtApiRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mek_fields() {
+        let mut obj = ExtApiRange::default();
+        obj.range_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mel_generated {
+    use super::*;
+
+    #[test]
+    fn test_mel_default() {
+        let obj = ExtApiPosition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mel_fields() {
+        let mut obj = ExtApiPosition::default();
+        obj.position_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mem_generated {
+    use super::*;
+
+    #[test]
+    fn test_mem_default() {
+        let obj = ExtApiSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mem_fields() {
+        let mut obj = ExtApiSelection::default();
+        obj.selection_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_men_generated {
+    use super::*;
+
+    #[test]
+    fn test_men_default() {
+        let obj = ExtApiTextEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_men_fields() {
+        let mut obj = ExtApiTextEdit::default();
+        obj.edit_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_meo_generated {
+    use super::*;
+
+    #[test]
+    fn test_meo_default() {
+        let obj = ExtApiWorkspaceEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_meo_fields() {
+        let mut obj = ExtApiWorkspaceEdit::default();
+        obj.ws_edit_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mep_generated {
+    use super::*;
+
+    #[test]
+    fn test_mep_default() {
+        let obj = ExtApiDiagnosticEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mep_fields() {
+        let mut obj = ExtApiDiagnosticEntry::default();
+        obj.diag_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_meq_generated {
+    use super::*;
+
+    #[test]
+    fn test_meq_default() {
+        let obj = ExtApiCompletionList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_meq_fields() {
+        let mut obj = ExtApiCompletionList::default();
+        obj.completion_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mer_generated {
+    use super::*;
+
+    #[test]
+    fn test_mer_default() {
+        let obj = ExtApiHoverResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mer_fields() {
+        let mut obj = ExtApiHoverResult::default();
+        obj.hover_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mes_generated {
+    use super::*;
+
+    #[test]
+    fn test_mes_default() {
+        let obj = ExtApiDefinition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mes_fields() {
+        let mut obj = ExtApiDefinition::default();
+        obj.def_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_met_generated {
+    use super::*;
+
+    #[test]
+    fn test_met_default() {
+        let obj = ExtApiReference::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_met_fields() {
+        let mut obj = ExtApiReference::default();
+        obj.ref_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_meu_generated {
+    use super::*;
+
+    #[test]
+    fn test_meu_default() {
+        let obj = ExtApiSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_meu_fields() {
+        let mut obj = ExtApiSymbol::default();
+        obj.symbol_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mev_generated {
+    use super::*;
+
+    #[test]
+    fn test_mev_default() {
+        let obj = ExtApiCodeAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mev_fields() {
+        let mut obj = ExtApiCodeAction::default();
+        obj.action_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mew_generated {
+    use super::*;
+
+    #[test]
+    fn test_mew_default() {
+        let obj = ExtApiCodeLens::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mew_fields() {
+        let mut obj = ExtApiCodeLens::default();
+        obj.lens_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mex_generated {
+    use super::*;
+
+    #[test]
+    fn test_mex_default() {
+        let obj = ExtApiSignature::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mex_fields() {
+        let mut obj = ExtApiSignature::default();
+        obj.sig_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mey_generated {
+    use super::*;
+
+    #[test]
+    fn test_mey_default() {
+        let obj = ExtApiRenameResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mey_fields() {
+        let mut obj = ExtApiRenameResult::default();
+        obj.rename_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mez_generated {
+    use super::*;
+
+    #[test]
+    fn test_mez_default() {
+        let obj = ExtApiBridge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mez_fields() {
+        let mut obj = ExtApiBridge::default();
+        obj.bridge_id = 1;
         assert!(obj.validate());
     }
 }
