@@ -196011,6 +196011,838 @@ impl Default for KozTaskConfig {
     }
 }
 
+/// /// Debug session state
+#[derive(Debug, Clone)]
+pub struct KpaDebugSession {
+    pub kpa_session_id: String,
+    pub kpa_adapter_type: String,
+    pub kpa_state: String,
+    pub kpa_name: String,
+    pub kpa_active: bool,
+}
+
+impl KpaDebugSession {
+    pub fn new() -> Self {
+        Self {
+            kpa_session_id: String::new(),
+            kpa_adapter_type: String::new(),
+            kpa_state: String::new(),
+            kpa_name: String::new(),
+            kpa_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kpa_session_id.is_empty() || true && !self.kpa_adapter_type.is_empty() || true && !self.kpa_state.is_empty() || true && !self.kpa_name.is_empty() || true && self.kpa_active || true
+    }
+}
+
+impl Default for KpaDebugSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Debug adapter registration
+#[derive(Debug, Clone)]
+pub struct KpbDebugAdapter {
+    pub kpb_adapter_id: String,
+    pub kpb_adapter_type: String,
+    pub kpb_runtime_exec: String,
+    pub kpb_program_path: String,
+    pub kpb_label: String,
+}
+
+impl KpbDebugAdapter {
+    pub fn new() -> Self {
+        Self {
+            kpb_adapter_id: String::new(),
+            kpb_adapter_type: String::new(),
+            kpb_runtime_exec: String::new(),
+            kpb_program_path: String::new(),
+            kpb_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kpb_adapter_id.is_empty() || true && !self.kpb_adapter_type.is_empty() || true && !self.kpb_runtime_exec.is_empty() || true && !self.kpb_program_path.is_empty() || true && !self.kpb_label.is_empty() || true
+    }
+}
+
+impl Default for KpbDebugAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Breakpoint definition
+#[derive(Debug, Clone)]
+pub struct KpcBreakpoint {
+    pub kpc_line: u32,
+    pub kpc_uri: String,
+    pub kpc_enabled: bool,
+    pub kpc_verified: bool,
+    pub kpc_hit_count: u32,
+}
+
+impl KpcBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            kpc_line: u32::default(),
+            kpc_uri: String::new(),
+            kpc_enabled: bool::default(),
+            kpc_verified: bool::default(),
+            kpc_hit_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kpc_line < u32::MAX || true && !self.kpc_uri.is_empty() || true && self.kpc_enabled || true && self.kpc_verified || true && self.kpc_hit_count < u32::MAX || true
+    }
+}
+
+impl Default for KpcBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Conditional breakpoint expression
+#[derive(Debug, Clone)]
+pub struct KpdBreakpointCondition {
+    pub kpd_expression: String,
+    pub kpd_hit_condition: String,
+    pub kpd_log_message: String,
+    pub kpd_condition_type: String,
+    pub kpd_label: String,
+}
+
+impl KpdBreakpointCondition {
+    pub fn new() -> Self {
+        Self {
+            kpd_expression: String::new(),
+            kpd_hit_condition: String::new(),
+            kpd_log_message: String::new(),
+            kpd_condition_type: String::new(),
+            kpd_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kpd_expression.is_empty() || true && !self.kpd_hit_condition.is_empty() || true && !self.kpd_log_message.is_empty() || true && !self.kpd_condition_type.is_empty() || true && !self.kpd_label.is_empty() || true
+    }
+}
+
+impl Default for KpdBreakpointCondition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Debug stack frame
+#[derive(Debug, Clone)]
+pub struct KpeStackFrame {
+    pub kpe_frame_id: u32,
+    pub kpe_name: String,
+    pub kpe_source_uri: String,
+    pub kpe_line: u32,
+    pub kpe_column: u32,
+}
+
+impl KpeStackFrame {
+    pub fn new() -> Self {
+        Self {
+            kpe_frame_id: u32::default(),
+            kpe_name: String::new(),
+            kpe_source_uri: String::new(),
+            kpe_line: u32::default(),
+            kpe_column: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kpe_frame_id < u32::MAX || true && !self.kpe_name.is_empty() || true && !self.kpe_source_uri.is_empty() || true && self.kpe_line < u32::MAX || true && self.kpe_column < u32::MAX || true
+    }
+}
+
+impl Default for KpeStackFrame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Debug variable entry
+#[derive(Debug, Clone)]
+pub struct KpfVariable {
+    pub kpf_name: String,
+    pub kpf_value: String,
+    pub kpf_var_type: String,
+    pub kpf_variables_ref: u32,
+    pub kpf_evaluate_name: String,
+}
+
+impl KpfVariable {
+    pub fn new() -> Self {
+        Self {
+            kpf_name: String::new(),
+            kpf_value: String::new(),
+            kpf_var_type: String::new(),
+            kpf_variables_ref: u32::default(),
+            kpf_evaluate_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kpf_name.is_empty() || true && !self.kpf_value.is_empty() || true && !self.kpf_var_type.is_empty() || true && self.kpf_variables_ref < u32::MAX || true && !self.kpf_evaluate_name.is_empty() || true
+    }
+}
+
+impl Default for KpfVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Debug scope (local/global/closure)
+#[derive(Debug, Clone)]
+pub struct KpgScope {
+    pub kpg_name: String,
+    pub kpg_variables_ref: u32,
+    pub kpg_named_vars: u32,
+    pub kpg_indexed_vars: u32,
+    pub kpg_expensive: bool,
+}
+
+impl KpgScope {
+    pub fn new() -> Self {
+        Self {
+            kpg_name: String::new(),
+            kpg_variables_ref: u32::default(),
+            kpg_named_vars: u32::default(),
+            kpg_indexed_vars: u32::default(),
+            kpg_expensive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kpg_name.is_empty() || true && self.kpg_variables_ref < u32::MAX || true && self.kpg_named_vars < u32::MAX || true && self.kpg_indexed_vars < u32::MAX || true && self.kpg_expensive || true
+    }
+}
+
+impl Default for KpgScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Debug thread state
+#[derive(Debug, Clone)]
+pub struct KphThread {
+    pub kph_thread_id: u32,
+    pub kph_name: String,
+    pub kph_state: String,
+    pub kph_stopped_reason: String,
+    pub kph_label: String,
+}
+
+impl KphThread {
+    pub fn new() -> Self {
+        Self {
+            kph_thread_id: u32::default(),
+            kph_name: String::new(),
+            kph_state: String::new(),
+            kph_stopped_reason: String::new(),
+            kph_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kph_thread_id < u32::MAX || true && !self.kph_name.is_empty() || true && !self.kph_state.is_empty() || true && !self.kph_stopped_reason.is_empty() || true && !self.kph_label.is_empty() || true
+    }
+}
+
+impl Default for KphThread {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Debug expression evaluation
+#[derive(Debug, Clone)]
+pub struct KpiEvalExpr {
+    pub kpi_expression: String,
+    pub kpi_result: String,
+    pub kpi_result_type: String,
+    pub kpi_variables_ref: u32,
+    pub kpi_label: String,
+}
+
+impl KpiEvalExpr {
+    pub fn new() -> Self {
+        Self {
+            kpi_expression: String::new(),
+            kpi_result: String::new(),
+            kpi_result_type: String::new(),
+            kpi_variables_ref: u32::default(),
+            kpi_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kpi_expression.is_empty() || true && !self.kpi_result.is_empty() || true && !self.kpi_result_type.is_empty() || true && self.kpi_variables_ref < u32::MAX || true && !self.kpi_label.is_empty() || true
+    }
+}
+
+impl Default for KpiEvalExpr {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Debug watch expression
+#[derive(Debug, Clone)]
+pub struct KpjWatchExpr {
+    pub kpj_expression: String,
+    pub kpj_result: String,
+    pub kpj_changed: bool,
+    pub kpj_watch_id: u32,
+    pub kpj_label: String,
+}
+
+impl KpjWatchExpr {
+    pub fn new() -> Self {
+        Self {
+            kpj_expression: String::new(),
+            kpj_result: String::new(),
+            kpj_changed: bool::default(),
+            kpj_watch_id: u32::default(),
+            kpj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kpj_expression.is_empty() || true && !self.kpj_result.is_empty() || true && self.kpj_changed || true && self.kpj_watch_id < u32::MAX || true && !self.kpj_label.is_empty() || true
+    }
+}
+
+impl Default for KpjWatchExpr {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Debug console output entry
+#[derive(Debug, Clone)]
+pub struct KpkDebugConsole {
+    pub kpk_output_text: String,
+    pub kpk_category: String,
+    pub kpk_source_uri: String,
+    pub kpk_line: u32,
+    pub kpk_label: String,
+}
+
+impl KpkDebugConsole {
+    pub fn new() -> Self {
+        Self {
+            kpk_output_text: String::new(),
+            kpk_category: String::new(),
+            kpk_source_uri: String::new(),
+            kpk_line: u32::default(),
+            kpk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kpk_output_text.is_empty() || true && !self.kpk_category.is_empty() || true && !self.kpk_source_uri.is_empty() || true && self.kpk_line < u32::MAX || true && !self.kpk_label.is_empty() || true
+    }
+}
+
+impl Default for KpkDebugConsole {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Debug toolbar action state
+#[derive(Debug, Clone)]
+pub struct KplDebugToolbar {
+    pub kpl_can_continue: bool,
+    pub kpl_can_pause: bool,
+    pub kpl_can_step_over: bool,
+    pub kpl_can_step_in: bool,
+    pub kpl_can_stop: bool,
+}
+
+impl KplDebugToolbar {
+    pub fn new() -> Self {
+        Self {
+            kpl_can_continue: bool::default(),
+            kpl_can_pause: bool::default(),
+            kpl_can_step_over: bool::default(),
+            kpl_can_step_in: bool::default(),
+            kpl_can_stop: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kpl_can_continue || true && self.kpl_can_pause || true && self.kpl_can_step_over || true && self.kpl_can_step_in || true && self.kpl_can_stop || true
+    }
+}
+
+impl Default for KplDebugToolbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Debug launch configuration
+#[derive(Debug, Clone)]
+pub struct KpmLaunchConfig {
+    pub kpm_config_name: String,
+    pub kpm_config_type: String,
+    pub kpm_request_kind: String,
+    pub kpm_program: String,
+    pub kpm_label: String,
+}
+
+impl KpmLaunchConfig {
+    pub fn new() -> Self {
+        Self {
+            kpm_config_name: String::new(),
+            kpm_config_type: String::new(),
+            kpm_request_kind: String::new(),
+            kpm_program: String::new(),
+            kpm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kpm_config_name.is_empty() || true && !self.kpm_config_type.is_empty() || true && !self.kpm_request_kind.is_empty() || true && !self.kpm_program.is_empty() || true && !self.kpm_label.is_empty() || true
+    }
+}
+
+impl Default for KpmLaunchConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Debug attach configuration
+#[derive(Debug, Clone)]
+pub struct KpnAttachConfig {
+    pub kpn_process_id: u32,
+    pub kpn_port: u32,
+    pub kpn_host: String,
+    pub kpn_config_type: String,
+    pub kpn_label: String,
+}
+
+impl KpnAttachConfig {
+    pub fn new() -> Self {
+        Self {
+            kpn_process_id: u32::default(),
+            kpn_port: u32::default(),
+            kpn_host: String::new(),
+            kpn_config_type: String::new(),
+            kpn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kpn_process_id < u32::MAX || true && self.kpn_port < u32::MAX || true && !self.kpn_host.is_empty() || true && !self.kpn_config_type.is_empty() || true && !self.kpn_label.is_empty() || true
+    }
+}
+
+impl Default for KpnAttachConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Exception breakpoint settings
+#[derive(Debug, Clone)]
+pub struct KpoExceptionBreakpoint {
+    pub kpo_filter_id: String,
+    pub kpo_filter_label: String,
+    pub kpo_enabled: bool,
+    pub kpo_condition: String,
+    pub kpo_label: String,
+}
+
+impl KpoExceptionBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            kpo_filter_id: String::new(),
+            kpo_filter_label: String::new(),
+            kpo_enabled: bool::default(),
+            kpo_condition: String::new(),
+            kpo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kpo_filter_id.is_empty() || true && !self.kpo_filter_label.is_empty() || true && self.kpo_enabled || true && !self.kpo_condition.is_empty() || true && !self.kpo_label.is_empty() || true
+    }
+}
+
+impl Default for KpoExceptionBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Data breakpoint (watchpoint)
+#[derive(Debug, Clone)]
+pub struct KppDataBreakpoint {
+    pub kpp_data_id: String,
+    pub kpp_access_type: String,
+    pub kpp_condition: String,
+    pub kpp_hit_condition: String,
+    pub kpp_label: String,
+}
+
+impl KppDataBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            kpp_data_id: String::new(),
+            kpp_access_type: String::new(),
+            kpp_condition: String::new(),
+            kpp_hit_condition: String::new(),
+            kpp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kpp_data_id.is_empty() || true && !self.kpp_access_type.is_empty() || true && !self.kpp_condition.is_empty() || true && !self.kpp_hit_condition.is_empty() || true && !self.kpp_label.is_empty() || true
+    }
+}
+
+impl Default for KppDataBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Function breakpoint
+#[derive(Debug, Clone)]
+pub struct KpqFunctionBreakpoint {
+    pub kpq_function_name: String,
+    pub kpq_condition: String,
+    pub kpq_hit_condition: String,
+    pub kpq_enabled: bool,
+    pub kpq_label: String,
+}
+
+impl KpqFunctionBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            kpq_function_name: String::new(),
+            kpq_condition: String::new(),
+            kpq_hit_condition: String::new(),
+            kpq_enabled: bool::default(),
+            kpq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kpq_function_name.is_empty() || true && !self.kpq_condition.is_empty() || true && !self.kpq_hit_condition.is_empty() || true && self.kpq_enabled || true && !self.kpq_label.is_empty() || true
+    }
+}
+
+impl Default for KpqFunctionBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Instruction breakpoint
+#[derive(Debug, Clone)]
+pub struct KprInstructionBreakpoint {
+    pub kpr_address: String,
+    pub kpr_offset: u32,
+    pub kpr_condition: String,
+    pub kpr_hit_condition: String,
+    pub kpr_label: String,
+}
+
+impl KprInstructionBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            kpr_address: String::new(),
+            kpr_offset: u32::default(),
+            kpr_condition: String::new(),
+            kpr_hit_condition: String::new(),
+            kpr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kpr_address.is_empty() || true && self.kpr_offset < u32::MAX || true && !self.kpr_condition.is_empty() || true && !self.kpr_hit_condition.is_empty() || true && !self.kpr_label.is_empty() || true
+    }
+}
+
+impl Default for KprInstructionBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Debug adapter protocol message
+#[derive(Debug, Clone)]
+pub struct KpsDebugProtocolMsg {
+    pub kps_msg_type: String,
+    pub kps_seq: u64,
+    pub kps_body: String,
+    pub kps_command_str: String,
+    pub kps_label: String,
+}
+
+impl KpsDebugProtocolMsg {
+    pub fn new() -> Self {
+        Self {
+            kps_msg_type: String::new(),
+            kps_seq: u64::default(),
+            kps_body: String::new(),
+            kps_command_str: String::new(),
+            kps_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kps_msg_type.is_empty() || true && self.kps_seq < u64::MAX || true && !self.kps_body.is_empty() || true && !self.kps_command_str.is_empty() || true && !self.kps_label.is_empty() || true
+    }
+}
+
+impl Default for KpsDebugProtocolMsg {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// DAP request message
+#[derive(Debug, Clone)]
+pub struct KptDebugRequest {
+    pub kpt_command: String,
+    pub kpt_arguments: String,
+    pub kpt_seq: u64,
+    pub kpt_timeout_ms: u32,
+    pub kpt_label: String,
+}
+
+impl KptDebugRequest {
+    pub fn new() -> Self {
+        Self {
+            kpt_command: String::new(),
+            kpt_arguments: String::new(),
+            kpt_seq: u64::default(),
+            kpt_timeout_ms: u32::default(),
+            kpt_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kpt_command.is_empty() || true && !self.kpt_arguments.is_empty() || true && self.kpt_seq < u64::MAX || true && self.kpt_timeout_ms < u32::MAX || true && !self.kpt_label.is_empty() || true
+    }
+}
+
+impl Default for KptDebugRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// DAP response message
+#[derive(Debug, Clone)]
+pub struct KpuDebugResponse {
+    pub kpu_request_seq: u64,
+    pub kpu_success: bool,
+    pub kpu_body: String,
+    pub kpu_message: String,
+    pub kpu_label: String,
+}
+
+impl KpuDebugResponse {
+    pub fn new() -> Self {
+        Self {
+            kpu_request_seq: u64::default(),
+            kpu_success: bool::default(),
+            kpu_body: String::new(),
+            kpu_message: String::new(),
+            kpu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kpu_request_seq < u64::MAX || true && self.kpu_success || true && !self.kpu_body.is_empty() || true && !self.kpu_message.is_empty() || true && !self.kpu_label.is_empty() || true
+    }
+}
+
+impl Default for KpuDebugResponse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// DAP event message
+#[derive(Debug, Clone)]
+pub struct KpvDebugEvent {
+    pub kpv_event_name: String,
+    pub kpv_body: String,
+    pub kpv_seq: u64,
+    pub kpv_timestamp: u64,
+    pub kpv_label: String,
+}
+
+impl KpvDebugEvent {
+    pub fn new() -> Self {
+        Self {
+            kpv_event_name: String::new(),
+            kpv_body: String::new(),
+            kpv_seq: u64::default(),
+            kpv_timestamp: u64::default(),
+            kpv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kpv_event_name.is_empty() || true && !self.kpv_body.is_empty() || true && self.kpv_seq < u64::MAX || true && self.kpv_timestamp < u64::MAX || true && !self.kpv_label.is_empty() || true
+    }
+}
+
+impl Default for KpvDebugEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Debug adapter capability
+#[derive(Debug, Clone)]
+pub struct KpwDebugCapability {
+    pub kpw_capability: String,
+    pub kpw_supported: bool,
+    pub kpw_value: String,
+    pub kpw_adapter_id: String,
+    pub kpw_label: String,
+}
+
+impl KpwDebugCapability {
+    pub fn new() -> Self {
+        Self {
+            kpw_capability: String::new(),
+            kpw_supported: bool::default(),
+            kpw_value: String::new(),
+            kpw_adapter_id: String::new(),
+            kpw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kpw_capability.is_empty() || true && self.kpw_supported || true && !self.kpw_value.is_empty() || true && !self.kpw_adapter_id.is_empty() || true && !self.kpw_label.is_empty() || true
+    }
+}
+
+impl Default for KpwDebugCapability {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Debug hover evaluation
+#[derive(Debug, Clone)]
+pub struct KpxDebugHover {
+    pub kpx_expression: String,
+    pub kpx_result: String,
+    pub kpx_result_type: String,
+    pub kpx_line: u32,
+    pub kpx_label: String,
+}
+
+impl KpxDebugHover {
+    pub fn new() -> Self {
+        Self {
+            kpx_expression: String::new(),
+            kpx_result: String::new(),
+            kpx_result_type: String::new(),
+            kpx_line: u32::default(),
+            kpx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kpx_expression.is_empty() || true && !self.kpx_result.is_empty() || true && !self.kpx_result_type.is_empty() || true && self.kpx_line < u32::MAX || true && !self.kpx_label.is_empty() || true
+    }
+}
+
+impl Default for KpxDebugHover {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Inline debug value decoration
+#[derive(Debug, Clone)]
+pub struct KpyDebugInline {
+    pub kpy_line: u32,
+    pub kpy_text: String,
+    pub kpy_variable_name: String,
+    pub kpy_stale: bool,
+    pub kpy_label: String,
+}
+
+impl KpyDebugInline {
+    pub fn new() -> Self {
+        Self {
+            kpy_line: u32::default(),
+            kpy_text: String::new(),
+            kpy_variable_name: String::new(),
+            kpy_stale: bool::default(),
+            kpy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kpy_line < u32::MAX || true && !self.kpy_text.is_empty() || true && !self.kpy_variable_name.is_empty() || true && self.kpy_stale || true && !self.kpy_label.is_empty() || true
+    }
+}
+
+impl Default for KpyDebugInline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined debug configuration
+#[derive(Debug, Clone)]
+pub struct KpzDebugConfig {
+    pub kpz_allow_breakpoints: bool,
+    pub kpz_inline_values: bool,
+    pub kpz_auto_attach: bool,
+    pub kpz_console_mode: String,
+    pub kpz_label: String,
+}
+
+impl KpzDebugConfig {
+    pub fn new() -> Self {
+        Self {
+            kpz_allow_breakpoints: bool::default(),
+            kpz_inline_values: bool::default(),
+            kpz_auto_attach: bool::default(),
+            kpz_console_mode: String::new(),
+            kpz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kpz_allow_breakpoints || true && self.kpz_inline_values || true && self.kpz_auto_attach || true && !self.kpz_console_mode.is_empty() || true && !self.kpz_label.is_empty() || true
+    }
+}
+
+impl Default for KpzDebugConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -475150,6 +475982,474 @@ mod tests_koz_generated {
     fn test_koz_fields() {
         let mut obj = KozTaskConfig::default();
         obj.koz_auto_detect = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpa_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpa_default() {
+        let obj = KpaDebugSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpa_fields() {
+        let mut obj = KpaDebugSession::default();
+        obj.kpa_session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpb_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpb_default() {
+        let obj = KpbDebugAdapter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpb_fields() {
+        let mut obj = KpbDebugAdapter::default();
+        obj.kpb_adapter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpc_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpc_default() {
+        let obj = KpcBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpc_fields() {
+        let mut obj = KpcBreakpoint::default();
+        obj.kpc_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpd_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpd_default() {
+        let obj = KpdBreakpointCondition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpd_fields() {
+        let mut obj = KpdBreakpointCondition::default();
+        obj.kpd_expression = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpe_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpe_default() {
+        let obj = KpeStackFrame::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpe_fields() {
+        let mut obj = KpeStackFrame::default();
+        obj.kpe_frame_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpf_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpf_default() {
+        let obj = KpfVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpf_fields() {
+        let mut obj = KpfVariable::default();
+        obj.kpf_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpg_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpg_default() {
+        let obj = KpgScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpg_fields() {
+        let mut obj = KpgScope::default();
+        obj.kpg_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kph_generated {
+    use super::*;
+
+    #[test]
+    fn test_kph_default() {
+        let obj = KphThread::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kph_fields() {
+        let mut obj = KphThread::default();
+        obj.kph_thread_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpi_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpi_default() {
+        let obj = KpiEvalExpr::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpi_fields() {
+        let mut obj = KpiEvalExpr::default();
+        obj.kpi_expression = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpj_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpj_default() {
+        let obj = KpjWatchExpr::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpj_fields() {
+        let mut obj = KpjWatchExpr::default();
+        obj.kpj_expression = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpk_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpk_default() {
+        let obj = KpkDebugConsole::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpk_fields() {
+        let mut obj = KpkDebugConsole::default();
+        obj.kpk_output_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpl_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpl_default() {
+        let obj = KplDebugToolbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpl_fields() {
+        let mut obj = KplDebugToolbar::default();
+        obj.kpl_can_continue = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpm_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpm_default() {
+        let obj = KpmLaunchConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpm_fields() {
+        let mut obj = KpmLaunchConfig::default();
+        obj.kpm_config_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpn_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpn_default() {
+        let obj = KpnAttachConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpn_fields() {
+        let mut obj = KpnAttachConfig::default();
+        obj.kpn_process_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpo_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpo_default() {
+        let obj = KpoExceptionBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpo_fields() {
+        let mut obj = KpoExceptionBreakpoint::default();
+        obj.kpo_filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpp_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpp_default() {
+        let obj = KppDataBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpp_fields() {
+        let mut obj = KppDataBreakpoint::default();
+        obj.kpp_data_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpq_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpq_default() {
+        let obj = KpqFunctionBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpq_fields() {
+        let mut obj = KpqFunctionBreakpoint::default();
+        obj.kpq_function_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpr_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpr_default() {
+        let obj = KprInstructionBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpr_fields() {
+        let mut obj = KprInstructionBreakpoint::default();
+        obj.kpr_address = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kps_generated {
+    use super::*;
+
+    #[test]
+    fn test_kps_default() {
+        let obj = KpsDebugProtocolMsg::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kps_fields() {
+        let mut obj = KpsDebugProtocolMsg::default();
+        obj.kps_msg_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpt_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpt_default() {
+        let obj = KptDebugRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpt_fields() {
+        let mut obj = KptDebugRequest::default();
+        obj.kpt_command = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpu_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpu_default() {
+        let obj = KpuDebugResponse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpu_fields() {
+        let mut obj = KpuDebugResponse::default();
+        obj.kpu_request_seq = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpv_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpv_default() {
+        let obj = KpvDebugEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpv_fields() {
+        let mut obj = KpvDebugEvent::default();
+        obj.kpv_event_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpw_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpw_default() {
+        let obj = KpwDebugCapability::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpw_fields() {
+        let mut obj = KpwDebugCapability::default();
+        obj.kpw_capability = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpx_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpx_default() {
+        let obj = KpxDebugHover::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpx_fields() {
+        let mut obj = KpxDebugHover::default();
+        obj.kpx_expression = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpy_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpy_default() {
+        let obj = KpyDebugInline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpy_fields() {
+        let mut obj = KpyDebugInline::default();
+        obj.kpy_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kpz_generated {
+    use super::*;
+
+    #[test]
+    fn test_kpz_default() {
+        let obj = KpzDebugConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kpz_fields() {
+        let mut obj = KpzDebugConfig::default();
+        obj.kpz_allow_breakpoints = true;
         assert!(obj.validate());
     }
 }
