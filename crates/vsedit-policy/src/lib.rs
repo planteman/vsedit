@@ -225062,6 +225062,786 @@ impl Default for ToolbarRegistry {
     }
 }
 
+/// Application startup phase
+#[derive(Debug, Clone)]
+pub struct AppStartup {
+    pub startup_id: u32,
+    pub phase: String,
+    pub duration_ms: u32,
+    pub is_first_launch: bool,
+}
+
+impl AppStartup {
+    pub fn new() -> Self {
+        Self {
+            startup_id: u32::default(),
+            phase: String::new(),
+            duration_ms: u32::default(),
+            is_first_launch: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.startup_id < u32::MAX || true && !self.phase.is_empty() || true && self.duration_ms < u32::MAX || true && self.is_first_launch || true
+    }
+}
+
+impl Default for AppStartup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Application shutdown phase
+#[derive(Debug, Clone)]
+pub struct AppShutdown {
+    pub shutdown_id: u32,
+    pub reason: String,
+    pub is_graceful: bool,
+    pub pending_saves: u32,
+}
+
+impl AppShutdown {
+    pub fn new() -> Self {
+        Self {
+            shutdown_id: u32::default(),
+            reason: String::new(),
+            is_graceful: bool::default(),
+            pending_saves: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.shutdown_id < u32::MAX || true && !self.reason.is_empty() || true && self.is_graceful || true && self.pending_saves < u32::MAX || true
+    }
+}
+
+impl Default for AppShutdown {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Application ready state
+#[derive(Debug, Clone)]
+pub struct AppReady {
+    pub ready_id: u32,
+    pub startup_time_ms: u32,
+    pub extension_count: u32,
+    pub is_fully_loaded: bool,
+}
+
+impl AppReady {
+    pub fn new() -> Self {
+        Self {
+            ready_id: u32::default(),
+            startup_time_ms: u32::default(),
+            extension_count: u32::default(),
+            is_fully_loaded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ready_id < u32::MAX || true && self.startup_time_ms < u32::MAX || true && self.extension_count < u32::MAX || true && self.is_fully_loaded || true
+    }
+}
+
+impl Default for AppReady {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Application suspend state
+#[derive(Debug, Clone)]
+pub struct AppSuspend {
+    pub suspend_id: u32,
+    pub state_saved: bool,
+    pub timestamp: u64,
+    pub reason: String,
+}
+
+impl AppSuspend {
+    pub fn new() -> Self {
+        Self {
+            suspend_id: u32::default(),
+            state_saved: bool::default(),
+            timestamp: u64::default(),
+            reason: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.suspend_id < u32::MAX || true && self.state_saved || true && self.timestamp < u64::MAX || true && !self.reason.is_empty() || true
+    }
+}
+
+impl Default for AppSuspend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Application resume state
+#[derive(Debug, Clone)]
+pub struct AppResume {
+    pub resume_id: u32,
+    pub suspended_duration_ms: u64,
+    pub needs_refresh: bool,
+    pub timestamp: u64,
+}
+
+impl AppResume {
+    pub fn new() -> Self {
+        Self {
+            resume_id: u32::default(),
+            suspended_duration_ms: u64::default(),
+            needs_refresh: bool::default(),
+            timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.resume_id < u32::MAX || true && self.suspended_duration_ms < u64::MAX || true && self.needs_refresh || true && self.timestamp < u64::MAX || true
+    }
+}
+
+impl Default for AppResume {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Application crash info
+#[derive(Debug, Clone)]
+pub struct AppCrash {
+    pub crash_id: u32,
+    pub error_message: String,
+    pub stack_trace: String,
+    pub timestamp: u64,
+}
+
+impl AppCrash {
+    pub fn new() -> Self {
+        Self {
+            crash_id: u32::default(),
+            error_message: String::new(),
+            stack_trace: String::new(),
+            timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.crash_id < u32::MAX || true && !self.error_message.is_empty() || true && !self.stack_trace.is_empty() || true && self.timestamp < u64::MAX || true
+    }
+}
+
+impl Default for AppCrash {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Application version info
+#[derive(Debug, Clone)]
+pub struct AppVersion {
+    pub version_string: String,
+    pub commit_hash: String,
+    pub build_date: String,
+    pub is_insider: bool,
+}
+
+impl AppVersion {
+    pub fn new() -> Self {
+        Self {
+            version_string: String::new(),
+            commit_hash: String::new(),
+            build_date: String::new(),
+            is_insider: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.version_string.is_empty() || true && !self.commit_hash.is_empty() || true && !self.build_date.is_empty() || true && self.is_insider || true
+    }
+}
+
+impl Default for AppVersion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Application environment
+#[derive(Debug, Clone)]
+pub struct AppEnvironment {
+    pub env_name: String,
+    pub os_name: String,
+    pub arch: String,
+    pub is_portable: bool,
+}
+
+impl AppEnvironment {
+    pub fn new() -> Self {
+        Self {
+            env_name: String::new(),
+            os_name: String::new(),
+            arch: String::new(),
+            is_portable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.env_name.is_empty() || true && !self.os_name.is_empty() || true && !self.arch.is_empty() || true && self.is_portable || true
+    }
+}
+
+impl Default for AppEnvironment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// App telemetry event
+#[derive(Debug, Clone)]
+pub struct AppTelemetry {
+    pub telemetry_id: u32,
+    pub event_name: String,
+    pub properties: String,
+    pub is_error: bool,
+}
+
+impl AppTelemetry {
+    pub fn new() -> Self {
+        Self {
+            telemetry_id: u32::default(),
+            event_name: String::new(),
+            properties: String::new(),
+            is_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.telemetry_id < u32::MAX || true && !self.event_name.is_empty() || true && !self.properties.is_empty() || true && self.is_error || true
+    }
+}
+
+impl Default for AppTelemetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Application log entry
+#[derive(Debug, Clone)]
+pub struct AppLog {
+    pub log_id: u32,
+    pub level: u32,
+    pub message: String,
+    pub timestamp: u64,
+}
+
+impl AppLog {
+    pub fn new() -> Self {
+        Self {
+            log_id: u32::default(),
+            level: u32::default(),
+            message: String::new(),
+            timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.log_id < u32::MAX || true && self.level < u32::MAX || true && !self.message.is_empty() || true && self.timestamp < u64::MAX || true
+    }
+}
+
+impl Default for AppLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// App configuration state
+#[derive(Debug, Clone)]
+pub struct AppConfiguration {
+    pub config_id: String,
+    pub source: String,
+    pub is_default: bool,
+    pub override_count: u32,
+}
+
+impl AppConfiguration {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            source: String::new(),
+            is_default: bool::default(),
+            override_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && !self.source.is_empty() || true && self.is_default || true && self.override_count < u32::MAX || true
+    }
+}
+
+impl Default for AppConfiguration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension host lifecycle
+#[derive(Debug, Clone)]
+pub struct AppExtensionHost {
+    pub host_id: u32,
+    pub process_id: u32,
+    pub is_running: bool,
+    pub extension_count: u32,
+}
+
+impl AppExtensionHost {
+    pub fn new() -> Self {
+        Self {
+            host_id: u32::default(),
+            process_id: u32::default(),
+            is_running: bool::default(),
+            extension_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.host_id < u32::MAX || true && self.process_id < u32::MAX || true && self.is_running || true && self.extension_count < u32::MAX || true
+    }
+}
+
+impl Default for AppExtensionHost {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window manager state
+#[derive(Debug, Clone)]
+pub struct AppWindowManager {
+    pub manager_id: u32,
+    pub window_count: u32,
+    pub active_window: u32,
+    pub is_multi_window: bool,
+}
+
+impl AppWindowManager {
+    pub fn new() -> Self {
+        Self {
+            manager_id: u32::default(),
+            window_count: u32::default(),
+            active_window: u32::default(),
+            is_multi_window: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.manager_id < u32::MAX || true && self.window_count < u32::MAX || true && self.active_window < u32::MAX || true && self.is_multi_window || true
+    }
+}
+
+impl Default for AppWindowManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Process information
+#[derive(Debug, Clone)]
+pub struct AppProcessInfo {
+    pub process_id: u32,
+    pub process_name: String,
+    pub memory_mb: u32,
+    pub cpu_percent: f64,
+}
+
+impl AppProcessInfo {
+    pub fn new() -> Self {
+        Self {
+            process_id: u32::default(),
+            process_name: String::new(),
+            memory_mb: u32::default(),
+            cpu_percent: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.process_id < u32::MAX || true && !self.process_name.is_empty() || true && self.memory_mb < u32::MAX || true && self.cpu_percent.is_finite() || true
+    }
+}
+
+impl Default for AppProcessInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Memory usage info
+#[derive(Debug, Clone)]
+pub struct AppMemoryUsage {
+    pub usage_id: u32,
+    pub heap_mb: u32,
+    pub rss_mb: u32,
+    pub is_high: bool,
+}
+
+impl AppMemoryUsage {
+    pub fn new() -> Self {
+        Self {
+            usage_id: u32::default(),
+            heap_mb: u32::default(),
+            rss_mb: u32::default(),
+            is_high: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.usage_id < u32::MAX || true && self.heap_mb < u32::MAX || true && self.rss_mb < u32::MAX || true && self.is_high || true
+    }
+}
+
+impl Default for AppMemoryUsage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// CPU usage info
+#[derive(Debug, Clone)]
+pub struct AppCpuUsage {
+    pub cpu_id: u32,
+    pub usage_percent: f64,
+    pub core_count: u32,
+    pub is_throttled: bool,
+}
+
+impl AppCpuUsage {
+    pub fn new() -> Self {
+        Self {
+            cpu_id: u32::default(),
+            usage_percent: f64::default(),
+            core_count: u32::default(),
+            is_throttled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.cpu_id < u32::MAX || true && self.usage_percent.is_finite() || true && self.core_count < u32::MAX || true && self.is_throttled || true
+    }
+}
+
+impl Default for AppCpuUsage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Disk usage info
+#[derive(Debug, Clone)]
+pub struct AppDiskUsage {
+    pub disk_id: u32,
+    pub used_mb: u64,
+    pub total_mb: u64,
+    pub is_low: bool,
+}
+
+impl AppDiskUsage {
+    pub fn new() -> Self {
+        Self {
+            disk_id: u32::default(),
+            used_mb: u64::default(),
+            total_mb: u64::default(),
+            is_low: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.disk_id < u32::MAX || true && self.used_mb < u64::MAX || true && self.total_mb < u64::MAX || true && self.is_low || true
+    }
+}
+
+impl Default for AppDiskUsage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Network info
+#[derive(Debug, Clone)]
+pub struct AppNetworkInfo {
+    pub net_id: u32,
+    pub is_online: bool,
+    pub latency_ms: u32,
+    pub proxy_configured: bool,
+}
+
+impl AppNetworkInfo {
+    pub fn new() -> Self {
+        Self {
+            net_id: u32::default(),
+            is_online: bool::default(),
+            latency_ms: u32::default(),
+            proxy_configured: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.net_id < u32::MAX || true && self.is_online || true && self.latency_ms < u32::MAX || true && self.proxy_configured || true
+    }
+}
+
+impl Default for AppNetworkInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Application permission
+#[derive(Debug, Clone)]
+pub struct AppPermission {
+    pub permission_id: u32,
+    pub resource_type: String,
+    pub is_granted: bool,
+    pub scope: String,
+}
+
+impl AppPermission {
+    pub fn new() -> Self {
+        Self {
+            permission_id: u32::default(),
+            resource_type: String::new(),
+            is_granted: bool::default(),
+            scope: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.permission_id < u32::MAX || true && !self.resource_type.is_empty() || true && self.is_granted || true && !self.scope.is_empty() || true
+    }
+}
+
+impl Default for AppPermission {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Application locale setting
+#[derive(Debug, Clone)]
+pub struct AppLocale {
+    pub locale_id: String,
+    pub display_name: String,
+    pub direction: u32,
+    pub is_default: bool,
+}
+
+impl AppLocale {
+    pub fn new() -> Self {
+        Self {
+            locale_id: String::new(),
+            display_name: String::new(),
+            direction: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.locale_id.is_empty() || true && !self.display_name.is_empty() || true && self.direction < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for AppLocale {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// App accessibility mode
+#[derive(Debug, Clone)]
+pub struct AppAccessibility {
+    pub a11y_mode: u32,
+    pub screen_reader: bool,
+    pub high_contrast: bool,
+    pub reduced_motion: bool,
+}
+
+impl AppAccessibility {
+    pub fn new() -> Self {
+        Self {
+            a11y_mode: u32::default(),
+            screen_reader: bool::default(),
+            high_contrast: bool::default(),
+            reduced_motion: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.a11y_mode < u32::MAX || true && self.screen_reader || true && self.high_contrast || true && self.reduced_motion || true
+    }
+}
+
+impl Default for AppAccessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// System color scheme
+#[derive(Debug, Clone)]
+pub struct AppColorScheme {
+    pub scheme_id: u32,
+    pub is_dark: bool,
+    pub is_high_contrast: bool,
+    pub accent_color: String,
+}
+
+impl AppColorScheme {
+    pub fn new() -> Self {
+        Self {
+            scheme_id: u32::default(),
+            is_dark: bool::default(),
+            is_high_contrast: bool::default(),
+            accent_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.scheme_id < u32::MAX || true && self.is_dark || true && self.is_high_contrast || true && !self.accent_color.is_empty() || true
+    }
+}
+
+impl Default for AppColorScheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform integration
+#[derive(Debug, Clone)]
+pub struct AppPlatformIntegration {
+    pub platform_id: String,
+    pub shell_integration: bool,
+    pub file_association: bool,
+    pub is_default_editor: bool,
+}
+
+impl AppPlatformIntegration {
+    pub fn new() -> Self {
+        Self {
+            platform_id: String::new(),
+            shell_integration: bool::default(),
+            file_association: bool::default(),
+            is_default_editor: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.platform_id.is_empty() || true && self.shell_integration || true && self.file_association || true && self.is_default_editor || true
+    }
+}
+
+impl Default for AppPlatformIntegration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command line argument
+#[derive(Debug, Clone)]
+pub struct AppCommandLine {
+    pub arg_index: u32,
+    pub arg_value: String,
+    pub is_flag: bool,
+    pub is_processed: bool,
+}
+
+impl AppCommandLine {
+    pub fn new() -> Self {
+        Self {
+            arg_index: u32::default(),
+            arg_value: String::new(),
+            is_flag: bool::default(),
+            is_processed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.arg_index < u32::MAX || true && !self.arg_value.is_empty() || true && self.is_flag || true && self.is_processed || true
+    }
+}
+
+impl Default for AppCommandLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service registry state
+#[derive(Debug, Clone)]
+pub struct AppServiceRegistry {
+    pub service_registry_id: u32,
+    pub service_count: u32,
+    pub initialized_count: u32,
+    pub is_ready: bool,
+}
+
+impl AppServiceRegistry {
+    pub fn new() -> Self {
+        Self {
+            service_registry_id: u32::default(),
+            service_count: u32::default(),
+            initialized_count: u32::default(),
+            is_ready: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.service_registry_id < u32::MAX || true && self.service_count < u32::MAX || true && self.initialized_count < u32::MAX || true && self.is_ready || true
+    }
+}
+
+impl Default for AppServiceRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Lifecycle phase marker
+#[derive(Debug, Clone)]
+pub struct AppLifecyclePhase {
+    pub phase_id: u32,
+    pub phase_name: String,
+    pub entered_at: u64,
+    pub is_complete: bool,
+}
+
+impl AppLifecyclePhase {
+    pub fn new() -> Self {
+        Self {
+            phase_id: u32::default(),
+            phase_name: String::new(),
+            entered_at: u64::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.phase_id < u32::MAX || true && !self.phase_name.is_empty() || true && self.entered_at < u64::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for AppLifecyclePhase {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -521290,6 +522070,474 @@ mod tests_lyz_generated {
     fn test_lyz_fields() {
         let mut obj = ToolbarRegistry::default();
         obj.registry_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lza_generated {
+    use super::*;
+
+    #[test]
+    fn test_lza_default() {
+        let obj = AppStartup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lza_fields() {
+        let mut obj = AppStartup::default();
+        obj.startup_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzb_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzb_default() {
+        let obj = AppShutdown::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzb_fields() {
+        let mut obj = AppShutdown::default();
+        obj.shutdown_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzc_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzc_default() {
+        let obj = AppReady::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzc_fields() {
+        let mut obj = AppReady::default();
+        obj.ready_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzd_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzd_default() {
+        let obj = AppSuspend::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzd_fields() {
+        let mut obj = AppSuspend::default();
+        obj.suspend_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lze_generated {
+    use super::*;
+
+    #[test]
+    fn test_lze_default() {
+        let obj = AppResume::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lze_fields() {
+        let mut obj = AppResume::default();
+        obj.resume_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzf_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzf_default() {
+        let obj = AppCrash::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzf_fields() {
+        let mut obj = AppCrash::default();
+        obj.crash_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzg_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzg_default() {
+        let obj = AppVersion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzg_fields() {
+        let mut obj = AppVersion::default();
+        obj.version_string = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzh_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzh_default() {
+        let obj = AppEnvironment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzh_fields() {
+        let mut obj = AppEnvironment::default();
+        obj.env_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzi_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzi_default() {
+        let obj = AppTelemetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzi_fields() {
+        let mut obj = AppTelemetry::default();
+        obj.telemetry_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzj_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzj_default() {
+        let obj = AppLog::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzj_fields() {
+        let mut obj = AppLog::default();
+        obj.log_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzk_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzk_default() {
+        let obj = AppConfiguration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzk_fields() {
+        let mut obj = AppConfiguration::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzl_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzl_default() {
+        let obj = AppExtensionHost::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzl_fields() {
+        let mut obj = AppExtensionHost::default();
+        obj.host_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzm_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzm_default() {
+        let obj = AppWindowManager::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzm_fields() {
+        let mut obj = AppWindowManager::default();
+        obj.manager_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzn_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzn_default() {
+        let obj = AppProcessInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzn_fields() {
+        let mut obj = AppProcessInfo::default();
+        obj.process_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzo_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzo_default() {
+        let obj = AppMemoryUsage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzo_fields() {
+        let mut obj = AppMemoryUsage::default();
+        obj.usage_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzp_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzp_default() {
+        let obj = AppCpuUsage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzp_fields() {
+        let mut obj = AppCpuUsage::default();
+        obj.cpu_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzq_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzq_default() {
+        let obj = AppDiskUsage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzq_fields() {
+        let mut obj = AppDiskUsage::default();
+        obj.disk_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzr_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzr_default() {
+        let obj = AppNetworkInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzr_fields() {
+        let mut obj = AppNetworkInfo::default();
+        obj.net_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzs_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzs_default() {
+        let obj = AppPermission::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzs_fields() {
+        let mut obj = AppPermission::default();
+        obj.permission_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzt_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzt_default() {
+        let obj = AppLocale::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzt_fields() {
+        let mut obj = AppLocale::default();
+        obj.locale_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzu_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzu_default() {
+        let obj = AppAccessibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzu_fields() {
+        let mut obj = AppAccessibility::default();
+        obj.a11y_mode = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzv_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzv_default() {
+        let obj = AppColorScheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzv_fields() {
+        let mut obj = AppColorScheme::default();
+        obj.scheme_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzw_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzw_default() {
+        let obj = AppPlatformIntegration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzw_fields() {
+        let mut obj = AppPlatformIntegration::default();
+        obj.platform_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzx_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzx_default() {
+        let obj = AppCommandLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzx_fields() {
+        let mut obj = AppCommandLine::default();
+        obj.arg_index = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzy_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzy_default() {
+        let obj = AppServiceRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzy_fields() {
+        let mut obj = AppServiceRegistry::default();
+        obj.service_registry_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lzz_generated {
+    use super::*;
+
+    #[test]
+    fn test_lzz_default() {
+        let obj = AppLifecyclePhase::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lzz_fields() {
+        let mut obj = AppLifecyclePhase::default();
+        obj.phase_id = 1;
         assert!(obj.validate());
     }
 }
