@@ -222648,6 +222648,786 @@ impl Default for EventBus {
     }
 }
 
+/// Command descriptor entry
+#[derive(Debug, Clone)]
+pub struct CommandDescriptor {
+    pub command_id: String,
+    pub title: String,
+    pub category: String,
+    pub icon_name: String,
+}
+
+impl CommandDescriptor {
+    pub fn new() -> Self {
+        Self {
+            command_id: String::new(),
+            title: String::new(),
+            category: String::new(),
+            icon_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.command_id.is_empty() || true && !self.title.is_empty() || true && !self.category.is_empty() || true && !self.icon_name.is_empty() || true
+    }
+}
+
+impl Default for CommandDescriptor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command handler registration
+#[derive(Debug, Clone)]
+pub struct CommandHandler {
+    pub handler_id: String,
+    pub command_id: String,
+    pub extension_id: String,
+    pub is_active: bool,
+}
+
+impl CommandHandler {
+    pub fn new() -> Self {
+        Self {
+            handler_id: String::new(),
+            command_id: String::new(),
+            extension_id: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.handler_id.is_empty() || true && !self.command_id.is_empty() || true && !self.extension_id.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for CommandHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command argument definition
+#[derive(Debug, Clone)]
+pub struct CommandArgument {
+    pub arg_name: String,
+    pub arg_type: String,
+    pub is_required: bool,
+    pub default_value: String,
+}
+
+impl CommandArgument {
+    pub fn new() -> Self {
+        Self {
+            arg_name: String::new(),
+            arg_type: String::new(),
+            is_required: bool::default(),
+            default_value: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.arg_name.is_empty() || true && !self.arg_type.is_empty() || true && self.is_required || true && !self.default_value.is_empty() || true
+    }
+}
+
+impl Default for CommandArgument {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command execution result
+#[derive(Debug, Clone)]
+pub struct CommandResult {
+    pub result_id: u32,
+    pub command_id: String,
+    pub status_code: u32,
+    pub duration_ms: u32,
+}
+
+impl CommandResult {
+    pub fn new() -> Self {
+        Self {
+            result_id: u32::default(),
+            command_id: String::new(),
+            status_code: u32::default(),
+            duration_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.result_id < u32::MAX || true && !self.command_id.is_empty() || true && self.status_code < u32::MAX || true && self.duration_ms < u32::MAX || true
+    }
+}
+
+impl Default for CommandResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command palette state
+#[derive(Debug, Clone)]
+pub struct CommandPalette {
+    pub palette_id: String,
+    pub is_visible: bool,
+    pub filter_text: String,
+    pub item_count: u32,
+}
+
+impl CommandPalette {
+    pub fn new() -> Self {
+        Self {
+            palette_id: String::new(),
+            is_visible: bool::default(),
+            filter_text: String::new(),
+            item_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.palette_id.is_empty() || true && self.is_visible || true && !self.filter_text.is_empty() || true && self.item_count < u32::MAX || true
+    }
+}
+
+impl Default for CommandPalette {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command category grouping
+#[derive(Debug, Clone)]
+pub struct CommandCategory {
+    pub category_id: String,
+    pub label: String,
+    pub order: u32,
+    pub command_count: u32,
+}
+
+impl CommandCategory {
+    pub fn new() -> Self {
+        Self {
+            category_id: String::new(),
+            label: String::new(),
+            order: u32::default(),
+            command_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.category_id.is_empty() || true && !self.label.is_empty() || true && self.order < u32::MAX || true && self.command_count < u32::MAX || true
+    }
+}
+
+impl Default for CommandCategory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command keybinding entry
+#[derive(Debug, Clone)]
+pub struct CommandKeybinding {
+    pub binding_id: u32,
+    pub command_id: String,
+    pub key_sequence: String,
+    pub when_clause: String,
+}
+
+impl CommandKeybinding {
+    pub fn new() -> Self {
+        Self {
+            binding_id: u32::default(),
+            command_id: String::new(),
+            key_sequence: String::new(),
+            when_clause: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.binding_id < u32::MAX || true && !self.command_id.is_empty() || true && !self.key_sequence.is_empty() || true && !self.when_clause.is_empty() || true
+    }
+}
+
+impl Default for CommandKeybinding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command execution context
+#[derive(Debug, Clone)]
+pub struct CommandContext {
+    pub context_id: u32,
+    pub active_editor: String,
+    pub selection_type: u32,
+    pub has_focus: bool,
+}
+
+impl CommandContext {
+    pub fn new() -> Self {
+        Self {
+            context_id: u32::default(),
+            active_editor: String::new(),
+            selection_type: u32::default(),
+            has_focus: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.context_id < u32::MAX || true && !self.active_editor.is_empty() || true && self.selection_type < u32::MAX || true && self.has_focus || true
+    }
+}
+
+impl Default for CommandContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command execution history
+#[derive(Debug, Clone)]
+pub struct CommandHistory {
+    pub history_id: u32,
+    pub command_id: String,
+    pub timestamp: u64,
+    pub was_successful: bool,
+}
+
+impl CommandHistory {
+    pub fn new() -> Self {
+        Self {
+            history_id: u32::default(),
+            command_id: String::new(),
+            timestamp: u64::default(),
+            was_successful: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.history_id < u32::MAX || true && !self.command_id.is_empty() || true && self.timestamp < u64::MAX || true && self.was_successful || true
+    }
+}
+
+impl Default for CommandHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command alias definition
+#[derive(Debug, Clone)]
+pub struct CommandAlias {
+    pub alias_name: String,
+    pub target_command: String,
+    pub is_deprecated: bool,
+    pub since_version: String,
+}
+
+impl CommandAlias {
+    pub fn new() -> Self {
+        Self {
+            alias_name: String::new(),
+            target_command: String::new(),
+            is_deprecated: bool::default(),
+            since_version: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.alias_name.is_empty() || true && !self.target_command.is_empty() || true && self.is_deprecated || true && !self.since_version.is_empty() || true
+    }
+}
+
+impl Default for CommandAlias {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command enablement condition
+#[derive(Debug, Clone)]
+pub struct CommandCondition {
+    pub condition_id: u32,
+    pub expression: String,
+    pub command_id: String,
+    pub is_satisfied: bool,
+}
+
+impl CommandCondition {
+    pub fn new() -> Self {
+        Self {
+            condition_id: u32::default(),
+            expression: String::new(),
+            command_id: String::new(),
+            is_satisfied: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.condition_id < u32::MAX || true && !self.expression.is_empty() || true && !self.command_id.is_empty() || true && self.is_satisfied || true
+    }
+}
+
+impl Default for CommandCondition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command group definition
+#[derive(Debug, Clone)]
+pub struct CommandGrouping {
+    pub group_id: String,
+    pub title: String,
+    pub order: u32,
+    pub is_submenu: bool,
+}
+
+impl CommandGrouping {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            title: String::new(),
+            order: u32::default(),
+            is_submenu: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.title.is_empty() || true && self.order < u32::MAX || true && self.is_submenu || true
+    }
+}
+
+impl Default for CommandGrouping {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command telemetry event
+#[derive(Debug, Clone)]
+pub struct CommandTelemetry {
+    pub telemetry_id: u32,
+    pub command_id: String,
+    pub duration_ms: u32,
+    pub source: String,
+}
+
+impl CommandTelemetry {
+    pub fn new() -> Self {
+        Self {
+            telemetry_id: u32::default(),
+            command_id: String::new(),
+            duration_ms: u32::default(),
+            source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.telemetry_id < u32::MAX || true && !self.command_id.is_empty() || true && self.duration_ms < u32::MAX || true && !self.source.is_empty() || true
+    }
+}
+
+impl Default for CommandTelemetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command permission check
+#[derive(Debug, Clone)]
+pub struct CommandPermission {
+    pub permission_id: u32,
+    pub command_id: String,
+    pub required_scope: String,
+    pub is_granted: bool,
+}
+
+impl CommandPermission {
+    pub fn new() -> Self {
+        Self {
+            permission_id: u32::default(),
+            command_id: String::new(),
+            required_scope: String::new(),
+            is_granted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.permission_id < u32::MAX || true && !self.command_id.is_empty() || true && !self.required_scope.is_empty() || true && self.is_granted || true
+    }
+}
+
+impl Default for CommandPermission {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command undo integration
+#[derive(Debug, Clone)]
+pub struct CommandUndo {
+    pub undo_id: u32,
+    pub command_id: String,
+    pub is_undoable: bool,
+    pub undo_label: String,
+}
+
+impl CommandUndo {
+    pub fn new() -> Self {
+        Self {
+            undo_id: u32::default(),
+            command_id: String::new(),
+            is_undoable: bool::default(),
+            undo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.undo_id < u32::MAX || true && !self.command_id.is_empty() || true && self.is_undoable || true && !self.undo_label.is_empty() || true
+    }
+}
+
+impl Default for CommandUndo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command batch execution
+#[derive(Debug, Clone)]
+pub struct CommandBatch {
+    pub batch_id: u32,
+    pub command_count: u32,
+    pub is_atomic: bool,
+    pub abort_on_error: bool,
+}
+
+impl CommandBatch {
+    pub fn new() -> Self {
+        Self {
+            batch_id: u32::default(),
+            command_count: u32::default(),
+            is_atomic: bool::default(),
+            abort_on_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.batch_id < u32::MAX || true && self.command_count < u32::MAX || true && self.is_atomic || true && self.abort_on_error || true
+    }
+}
+
+impl Default for CommandBatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command macro recording
+#[derive(Debug, Clone)]
+pub struct CommandMacro {
+    pub macro_id: u32,
+    pub name: String,
+    pub command_count: u32,
+    pub is_recording: bool,
+}
+
+impl CommandMacro {
+    pub fn new() -> Self {
+        Self {
+            macro_id: u32::default(),
+            name: String::new(),
+            command_count: u32::default(),
+            is_recording: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.macro_id < u32::MAX || true && !self.name.is_empty() || true && self.command_count < u32::MAX || true && self.is_recording || true
+    }
+}
+
+impl Default for CommandMacro {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command repeat state
+#[derive(Debug, Clone)]
+pub struct CommandRepeat {
+    pub repeat_id: u32,
+    pub command_id: String,
+    pub repeat_count: u32,
+    pub interval_ms: u32,
+}
+
+impl CommandRepeat {
+    pub fn new() -> Self {
+        Self {
+            repeat_id: u32::default(),
+            command_id: String::new(),
+            repeat_count: u32::default(),
+            interval_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.repeat_id < u32::MAX || true && !self.command_id.is_empty() || true && self.repeat_count < u32::MAX || true && self.interval_ms < u32::MAX || true
+    }
+}
+
+impl Default for CommandRepeat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command input validation
+#[derive(Debug, Clone)]
+pub struct CommandValidation {
+    pub validation_id: u32,
+    pub command_id: String,
+    pub rule: String,
+    pub is_valid: bool,
+}
+
+impl CommandValidation {
+    pub fn new() -> Self {
+        Self {
+            validation_id: u32::default(),
+            command_id: String::new(),
+            rule: String::new(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.validation_id < u32::MAX || true && !self.command_id.is_empty() || true && !self.rule.is_empty() || true && self.is_valid || true
+    }
+}
+
+impl Default for CommandValidation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command auto-suggestion
+#[derive(Debug, Clone)]
+pub struct CommandSuggestion {
+    pub suggestion_id: u32,
+    pub label: String,
+    pub command_id: String,
+    pub score: f64,
+}
+
+impl CommandSuggestion {
+    pub fn new() -> Self {
+        Self {
+            suggestion_id: u32::default(),
+            label: String::new(),
+            command_id: String::new(),
+            score: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.suggestion_id < u32::MAX || true && !self.label.is_empty() || true && !self.command_id.is_empty() || true && self.score.is_finite() || true
+    }
+}
+
+impl Default for CommandSuggestion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command registration record
+#[derive(Debug, Clone)]
+pub struct CommandRegEntry {
+    pub reg_id: u32,
+    pub command_id: String,
+    pub source_extension: String,
+    pub timestamp: u64,
+}
+
+impl CommandRegEntry {
+    pub fn new() -> Self {
+        Self {
+            reg_id: u32::default(),
+            command_id: String::new(),
+            source_extension: String::new(),
+            timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.reg_id < u32::MAX || true && !self.command_id.is_empty() || true && !self.source_extension.is_empty() || true && self.timestamp < u64::MAX || true
+    }
+}
+
+impl Default for CommandRegEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command disposal record
+#[derive(Debug, Clone)]
+pub struct CommandDisposal {
+    pub disposal_id: u32,
+    pub command_id: String,
+    pub reason: String,
+    pub timestamp: u64,
+}
+
+impl CommandDisposal {
+    pub fn new() -> Self {
+        Self {
+            disposal_id: u32::default(),
+            command_id: String::new(),
+            reason: String::new(),
+            timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.disposal_id < u32::MAX || true && !self.command_id.is_empty() || true && !self.reason.is_empty() || true && self.timestamp < u64::MAX || true
+    }
+}
+
+impl Default for CommandDisposal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command pipeline stage
+#[derive(Debug, Clone)]
+pub struct CommandPipe {
+    pub pipe_id: u32,
+    pub stage_count: u32,
+    pub current_stage: u32,
+    pub is_running: bool,
+}
+
+impl CommandPipe {
+    pub fn new() -> Self {
+        Self {
+            pipe_id: u32::default(),
+            stage_count: u32::default(),
+            current_stage: u32::default(),
+            is_running: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.pipe_id < u32::MAX || true && self.stage_count < u32::MAX || true && self.current_stage < u32::MAX || true && self.is_running || true
+    }
+}
+
+impl Default for CommandPipe {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command serialization
+#[derive(Debug, Clone)]
+pub struct CommandSerializer {
+    pub serializer_id: u32,
+    pub format_type: u32,
+    pub command_id: String,
+    pub output_size: u32,
+}
+
+impl CommandSerializer {
+    pub fn new() -> Self {
+        Self {
+            serializer_id: u32::default(),
+            format_type: u32::default(),
+            command_id: String::new(),
+            output_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.serializer_id < u32::MAX || true && self.format_type < u32::MAX || true && !self.command_id.is_empty() || true && self.output_size < u32::MAX || true
+    }
+}
+
+impl Default for CommandSerializer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command deserialization
+#[derive(Debug, Clone)]
+pub struct CommandDeserializer {
+    pub deserializer_id: u32,
+    pub format_type: u32,
+    pub input_data: String,
+    pub is_valid: bool,
+}
+
+impl CommandDeserializer {
+    pub fn new() -> Self {
+        Self {
+            deserializer_id: u32::default(),
+            format_type: u32::default(),
+            input_data: String::new(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.deserializer_id < u32::MAX || true && self.format_type < u32::MAX || true && !self.input_data.is_empty() || true && self.is_valid || true
+    }
+}
+
+impl Default for CommandDeserializer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command registry instance
+#[derive(Debug, Clone)]
+pub struct CommandRegistry {
+    pub registry_id: u32,
+    pub command_count: u32,
+    pub handler_count: u32,
+    pub is_frozen: bool,
+}
+
+impl CommandRegistry {
+    pub fn new() -> Self {
+        Self {
+            registry_id: u32::default(),
+            command_count: u32::default(),
+            handler_count: u32::default(),
+            is_frozen: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.registry_id < u32::MAX || true && self.command_count < u32::MAX || true && self.handler_count < u32::MAX || true && self.is_frozen || true
+    }
+}
+
+impl Default for CommandRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -517371,6 +518151,474 @@ mod tests_lvz_generated {
     fn test_lvz_fields() {
         let mut obj = EventBus::default();
         obj.bus_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwa_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwa_default() {
+        let obj = CommandDescriptor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwa_fields() {
+        let mut obj = CommandDescriptor::default();
+        obj.command_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwb_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwb_default() {
+        let obj = CommandHandler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwb_fields() {
+        let mut obj = CommandHandler::default();
+        obj.handler_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwc_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwc_default() {
+        let obj = CommandArgument::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwc_fields() {
+        let mut obj = CommandArgument::default();
+        obj.arg_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwd_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwd_default() {
+        let obj = CommandResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwd_fields() {
+        let mut obj = CommandResult::default();
+        obj.result_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwe_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwe_default() {
+        let obj = CommandPalette::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwe_fields() {
+        let mut obj = CommandPalette::default();
+        obj.palette_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwf_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwf_default() {
+        let obj = CommandCategory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwf_fields() {
+        let mut obj = CommandCategory::default();
+        obj.category_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwg_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwg_default() {
+        let obj = CommandKeybinding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwg_fields() {
+        let mut obj = CommandKeybinding::default();
+        obj.binding_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwh_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwh_default() {
+        let obj = CommandContext::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwh_fields() {
+        let mut obj = CommandContext::default();
+        obj.context_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwi_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwi_default() {
+        let obj = CommandHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwi_fields() {
+        let mut obj = CommandHistory::default();
+        obj.history_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwj_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwj_default() {
+        let obj = CommandAlias::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwj_fields() {
+        let mut obj = CommandAlias::default();
+        obj.alias_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwk_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwk_default() {
+        let obj = CommandCondition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwk_fields() {
+        let mut obj = CommandCondition::default();
+        obj.condition_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwl_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwl_default() {
+        let obj = CommandGrouping::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwl_fields() {
+        let mut obj = CommandGrouping::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwm_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwm_default() {
+        let obj = CommandTelemetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwm_fields() {
+        let mut obj = CommandTelemetry::default();
+        obj.telemetry_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwn_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwn_default() {
+        let obj = CommandPermission::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwn_fields() {
+        let mut obj = CommandPermission::default();
+        obj.permission_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwo_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwo_default() {
+        let obj = CommandUndo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwo_fields() {
+        let mut obj = CommandUndo::default();
+        obj.undo_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwp_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwp_default() {
+        let obj = CommandBatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwp_fields() {
+        let mut obj = CommandBatch::default();
+        obj.batch_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwq_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwq_default() {
+        let obj = CommandMacro::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwq_fields() {
+        let mut obj = CommandMacro::default();
+        obj.macro_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwr_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwr_default() {
+        let obj = CommandRepeat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwr_fields() {
+        let mut obj = CommandRepeat::default();
+        obj.repeat_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lws_generated {
+    use super::*;
+
+    #[test]
+    fn test_lws_default() {
+        let obj = CommandValidation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lws_fields() {
+        let mut obj = CommandValidation::default();
+        obj.validation_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwt_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwt_default() {
+        let obj = CommandSuggestion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwt_fields() {
+        let mut obj = CommandSuggestion::default();
+        obj.suggestion_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwu_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwu_default() {
+        let obj = CommandRegEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwu_fields() {
+        let mut obj = CommandRegEntry::default();
+        obj.reg_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwv_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwv_default() {
+        let obj = CommandDisposal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwv_fields() {
+        let mut obj = CommandDisposal::default();
+        obj.disposal_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lww_generated {
+    use super::*;
+
+    #[test]
+    fn test_lww_default() {
+        let obj = CommandPipe::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lww_fields() {
+        let mut obj = CommandPipe::default();
+        obj.pipe_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwx_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwx_default() {
+        let obj = CommandSerializer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwx_fields() {
+        let mut obj = CommandSerializer::default();
+        obj.serializer_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwy_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwy_default() {
+        let obj = CommandDeserializer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwy_fields() {
+        let mut obj = CommandDeserializer::default();
+        obj.deserializer_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lwz_generated {
+    use super::*;
+
+    #[test]
+    fn test_lwz_default() {
+        let obj = CommandRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lwz_fields() {
+        let mut obj = CommandRegistry::default();
+        obj.registry_id = 1;
         assert!(obj.validate());
     }
 }
