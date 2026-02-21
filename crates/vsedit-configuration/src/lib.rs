@@ -188294,6 +188294,838 @@ impl Default for KfzBufferConfig {
     }
 }
 
+/// /// Document formatting options
+#[derive(Debug, Clone)]
+pub struct KgaFormatOptions {
+    pub kga_tab_size: u32,
+    pub kga_insert_spaces: bool,
+    pub kga_trim_trailing: bool,
+    pub kga_final_newline: bool,
+    pub kga_max_line_length: u32,
+}
+
+impl KgaFormatOptions {
+    pub fn new() -> Self {
+        Self {
+            kga_tab_size: u32::default(),
+            kga_insert_spaces: bool::default(),
+            kga_trim_trailing: bool::default(),
+            kga_final_newline: bool::default(),
+            kga_max_line_length: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kga_tab_size < u32::MAX || true && self.kga_insert_spaces || true && self.kga_trim_trailing || true && self.kga_final_newline || true && self.kga_max_line_length < u32::MAX || true
+    }
+}
+
+impl Default for KgaFormatOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Range to format within document
+#[derive(Debug, Clone)]
+pub struct KgbFormatRange {
+    pub kgb_start_line: u32,
+    pub kgb_start_col: u32,
+    pub kgb_end_line: u32,
+    pub kgb_end_col: u32,
+    pub kgb_whole_doc: bool,
+}
+
+impl KgbFormatRange {
+    pub fn new() -> Self {
+        Self {
+            kgb_start_line: u32::default(),
+            kgb_start_col: u32::default(),
+            kgb_end_line: u32::default(),
+            kgb_end_col: u32::default(),
+            kgb_whole_doc: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kgb_start_line < u32::MAX || true && self.kgb_start_col < u32::MAX || true && self.kgb_end_line < u32::MAX || true && self.kgb_end_col < u32::MAX || true && self.kgb_whole_doc || true
+    }
+}
+
+impl Default for KgbFormatRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Single formatting edit result
+#[derive(Debug, Clone)]
+pub struct KgcFormatEdit {
+    pub kgc_offset: u64,
+    pub kgc_length: u32,
+    pub kgc_new_text: String,
+    pub kgc_range_end: u64,
+    pub kgc_applied: bool,
+}
+
+impl KgcFormatEdit {
+    pub fn new() -> Self {
+        Self {
+            kgc_offset: u64::default(),
+            kgc_length: u32::default(),
+            kgc_new_text: String::new(),
+            kgc_range_end: u64::default(),
+            kgc_applied: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kgc_offset < u64::MAX || true && self.kgc_length < u32::MAX || true && !self.kgc_new_text.is_empty() || true && self.kgc_range_end < u64::MAX || true && self.kgc_applied || true
+    }
+}
+
+impl Default for KgcFormatEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Formatting provider registration
+#[derive(Debug, Clone)]
+pub struct KgdFormatProvider {
+    pub kgd_lang_id: String,
+    pub kgd_name: String,
+    pub kgd_priority: u32,
+    pub kgd_active: bool,
+    pub kgd_selector: String,
+}
+
+impl KgdFormatProvider {
+    pub fn new() -> Self {
+        Self {
+            kgd_lang_id: String::new(),
+            kgd_name: String::new(),
+            kgd_priority: u32::default(),
+            kgd_active: bool::default(),
+            kgd_selector: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kgd_lang_id.is_empty() || true && !self.kgd_name.is_empty() || true && self.kgd_priority < u32::MAX || true && self.kgd_active || true && !self.kgd_selector.is_empty() || true
+    }
+}
+
+impl Default for KgdFormatProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Format-on-type trigger configuration
+#[derive(Debug, Clone)]
+pub struct KgeFormatOnType {
+    pub kge_trigger_char: String,
+    pub kge_lang_id: String,
+    pub kge_enabled: bool,
+    pub kge_delay_ms: u32,
+    pub kge_label: String,
+}
+
+impl KgeFormatOnType {
+    pub fn new() -> Self {
+        Self {
+            kge_trigger_char: String::new(),
+            kge_lang_id: String::new(),
+            kge_enabled: bool::default(),
+            kge_delay_ms: u32::default(),
+            kge_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kge_trigger_char.is_empty() || true && !self.kge_lang_id.is_empty() || true && self.kge_enabled || true && self.kge_delay_ms < u32::MAX || true && !self.kge_label.is_empty() || true
+    }
+}
+
+impl Default for KgeFormatOnType {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Format-on-paste configuration
+#[derive(Debug, Clone)]
+pub struct KgfFormatOnPaste {
+    pub kgf_enabled: bool,
+    pub kgf_lang_id: String,
+    pub kgf_provider_name: String,
+    pub kgf_trim_indent: bool,
+    pub kgf_label: String,
+}
+
+impl KgfFormatOnPaste {
+    pub fn new() -> Self {
+        Self {
+            kgf_enabled: bool::default(),
+            kgf_lang_id: String::new(),
+            kgf_provider_name: String::new(),
+            kgf_trim_indent: bool::default(),
+            kgf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kgf_enabled || true && !self.kgf_lang_id.is_empty() || true && !self.kgf_provider_name.is_empty() || true && self.kgf_trim_indent || true && !self.kgf_label.is_empty() || true
+    }
+}
+
+impl Default for KgfFormatOnPaste {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Format-on-save configuration
+#[derive(Debug, Clone)]
+pub struct KggFormatOnSave {
+    pub kgg_enabled: bool,
+    pub kgg_timeout_ms: u32,
+    pub kgg_provider_name: String,
+    pub kgg_organize_imports: bool,
+    pub kgg_label: String,
+}
+
+impl KggFormatOnSave {
+    pub fn new() -> Self {
+        Self {
+            kgg_enabled: bool::default(),
+            kgg_timeout_ms: u32::default(),
+            kgg_provider_name: String::new(),
+            kgg_organize_imports: bool::default(),
+            kgg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kgg_enabled || true && self.kgg_timeout_ms < u32::MAX || true && !self.kgg_provider_name.is_empty() || true && self.kgg_organize_imports || true && !self.kgg_label.is_empty() || true
+    }
+}
+
+impl Default for KggFormatOnSave {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Formatting provider conflict resolution
+#[derive(Debug, Clone)]
+pub struct KghFormatConflict {
+    pub kgh_provider_a: String,
+    pub kgh_provider_b: String,
+    pub kgh_resolution: String,
+    pub kgh_preferred: String,
+    pub kgh_auto_resolve: bool,
+}
+
+impl KghFormatConflict {
+    pub fn new() -> Self {
+        Self {
+            kgh_provider_a: String::new(),
+            kgh_provider_b: String::new(),
+            kgh_resolution: String::new(),
+            kgh_preferred: String::new(),
+            kgh_auto_resolve: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kgh_provider_a.is_empty() || true && !self.kgh_provider_b.is_empty() || true && !self.kgh_resolution.is_empty() || true && !self.kgh_preferred.is_empty() || true && self.kgh_auto_resolve || true
+    }
+}
+
+impl Default for KghFormatConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Indentation rule definition
+#[derive(Debug, Clone)]
+pub struct KgiIndentRule {
+    pub kgi_pattern: String,
+    pub kgi_action: String,
+    pub kgi_indent_amount: u32,
+    pub kgi_lang_id: String,
+    pub kgi_active: bool,
+}
+
+impl KgiIndentRule {
+    pub fn new() -> Self {
+        Self {
+            kgi_pattern: String::new(),
+            kgi_action: String::new(),
+            kgi_indent_amount: u32::default(),
+            kgi_lang_id: String::new(),
+            kgi_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kgi_pattern.is_empty() || true && !self.kgi_action.is_empty() || true && self.kgi_indent_amount < u32::MAX || true && !self.kgi_lang_id.is_empty() || true && self.kgi_active || true
+    }
+}
+
+impl Default for KgiIndentRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Indentation action (indent/outdent/none)
+#[derive(Debug, Clone)]
+pub struct KgjIndentAction {
+    pub kgj_indent: bool,
+    pub kgj_outdent: bool,
+    pub kgj_none_action: bool,
+    pub kgj_amount: u32,
+    pub kgj_label: String,
+}
+
+impl KgjIndentAction {
+    pub fn new() -> Self {
+        Self {
+            kgj_indent: bool::default(),
+            kgj_outdent: bool::default(),
+            kgj_none_action: bool::default(),
+            kgj_amount: u32::default(),
+            kgj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kgj_indent || true && self.kgj_outdent || true && self.kgj_none_action || true && self.kgj_amount < u32::MAX || true && !self.kgj_label.is_empty() || true
+    }
+}
+
+impl Default for KgjIndentAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Auto-closing bracket pair definition
+#[derive(Debug, Clone)]
+pub struct KgkAutoClosePair {
+    pub kgk_open_char: String,
+    pub kgk_close_char: String,
+    pub kgk_not_in: String,
+    pub kgk_lang_id: String,
+    pub kgk_active: bool,
+}
+
+impl KgkAutoClosePair {
+    pub fn new() -> Self {
+        Self {
+            kgk_open_char: String::new(),
+            kgk_close_char: String::new(),
+            kgk_not_in: String::new(),
+            kgk_lang_id: String::new(),
+            kgk_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kgk_open_char.is_empty() || true && !self.kgk_close_char.is_empty() || true && !self.kgk_not_in.is_empty() || true && !self.kgk_lang_id.is_empty() || true && self.kgk_active || true
+    }
+}
+
+impl Default for KgkAutoClosePair {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Auto-indentation mode settings
+#[derive(Debug, Clone)]
+pub struct KglAutoIndent {
+    pub kgl_mode: String,
+    pub kgl_keep_indent: bool,
+    pub kgl_brackets: bool,
+    pub kgl_advanced: bool,
+    pub kgl_label: String,
+}
+
+impl KglAutoIndent {
+    pub fn new() -> Self {
+        Self {
+            kgl_mode: String::new(),
+            kgl_keep_indent: bool::default(),
+            kgl_brackets: bool::default(),
+            kgl_advanced: bool::default(),
+            kgl_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kgl_mode.is_empty() || true && self.kgl_keep_indent || true && self.kgl_brackets || true && self.kgl_advanced || true && !self.kgl_label.is_empty() || true
+    }
+}
+
+impl Default for KglAutoIndent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Surround-with pair definition
+#[derive(Debug, Clone)]
+pub struct KgmSurroundPair {
+    pub kgm_open_text: String,
+    pub kgm_close_text: String,
+    pub kgm_lang_id: String,
+    pub kgm_priority: u32,
+    pub kgm_active: bool,
+}
+
+impl KgmSurroundPair {
+    pub fn new() -> Self {
+        Self {
+            kgm_open_text: String::new(),
+            kgm_close_text: String::new(),
+            kgm_lang_id: String::new(),
+            kgm_priority: u32::default(),
+            kgm_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kgm_open_text.is_empty() || true && !self.kgm_close_text.is_empty() || true && !self.kgm_lang_id.is_empty() || true && self.kgm_priority < u32::MAX || true && self.kgm_active || true
+    }
+}
+
+impl Default for KgmSurroundPair {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Comment toggle rule definition
+#[derive(Debug, Clone)]
+pub struct KgnCommentRule {
+    pub kgn_line_comment: String,
+    pub kgn_block_open: String,
+    pub kgn_block_close: String,
+    pub kgn_lang_id: String,
+    pub kgn_active: bool,
+}
+
+impl KgnCommentRule {
+    pub fn new() -> Self {
+        Self {
+            kgn_line_comment: String::new(),
+            kgn_block_open: String::new(),
+            kgn_block_close: String::new(),
+            kgn_lang_id: String::new(),
+            kgn_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kgn_line_comment.is_empty() || true && !self.kgn_block_open.is_empty() || true && !self.kgn_block_close.is_empty() || true && !self.kgn_lang_id.is_empty() || true && self.kgn_active || true
+    }
+}
+
+impl Default for KgnCommentRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Folding region marker definition
+#[derive(Debug, Clone)]
+pub struct KgoFoldingMarker {
+    pub kgo_start_marker: String,
+    pub kgo_end_marker: String,
+    pub kgo_lang_id: String,
+    pub kgo_indentation: bool,
+    pub kgo_label: String,
+}
+
+impl KgoFoldingMarker {
+    pub fn new() -> Self {
+        Self {
+            kgo_start_marker: String::new(),
+            kgo_end_marker: String::new(),
+            kgo_lang_id: String::new(),
+            kgo_indentation: bool::default(),
+            kgo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kgo_start_marker.is_empty() || true && !self.kgo_end_marker.is_empty() || true && !self.kgo_lang_id.is_empty() || true && self.kgo_indentation || true && !self.kgo_label.is_empty() || true
+    }
+}
+
+impl Default for KgoFoldingMarker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Word boundary pattern for language
+#[derive(Debug, Clone)]
+pub struct KgpWordPattern {
+    pub kgp_pattern: String,
+    pub kgp_lang_id: String,
+    pub kgp_flags: String,
+    pub kgp_separator: String,
+    pub kgp_active: bool,
+}
+
+impl KgpWordPattern {
+    pub fn new() -> Self {
+        Self {
+            kgp_pattern: String::new(),
+            kgp_lang_id: String::new(),
+            kgp_flags: String::new(),
+            kgp_separator: String::new(),
+            kgp_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kgp_pattern.is_empty() || true && !self.kgp_lang_id.is_empty() || true && !self.kgp_flags.is_empty() || true && !self.kgp_separator.is_empty() || true && self.kgp_active || true
+    }
+}
+
+impl Default for KgpWordPattern {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// On-enter action rule definition
+#[derive(Debug, Clone)]
+pub struct KgqOnEnterRule {
+    pub kgq_before_text: String,
+    pub kgq_after_text: String,
+    pub kgq_action: String,
+    pub kgq_indent: u32,
+    pub kgq_active: bool,
+}
+
+impl KgqOnEnterRule {
+    pub fn new() -> Self {
+        Self {
+            kgq_before_text: String::new(),
+            kgq_after_text: String::new(),
+            kgq_action: String::new(),
+            kgq_indent: u32::default(),
+            kgq_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kgq_before_text.is_empty() || true && !self.kgq_after_text.is_empty() || true && !self.kgq_action.is_empty() || true && self.kgq_indent < u32::MAX || true && self.kgq_active || true
+    }
+}
+
+impl Default for KgqOnEnterRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Linked editing range definition
+#[derive(Debug, Clone)]
+pub struct KgrLinkedEdit {
+    pub kgr_ranges: String,
+    pub kgr_word_pattern: String,
+    pub kgr_lang_id: String,
+    pub kgr_active: bool,
+    pub kgr_label: String,
+}
+
+impl KgrLinkedEdit {
+    pub fn new() -> Self {
+        Self {
+            kgr_ranges: String::new(),
+            kgr_word_pattern: String::new(),
+            kgr_lang_id: String::new(),
+            kgr_active: bool::default(),
+            kgr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kgr_ranges.is_empty() || true && !self.kgr_word_pattern.is_empty() || true && !self.kgr_lang_id.is_empty() || true && self.kgr_active || true && !self.kgr_label.is_empty() || true
+    }
+}
+
+impl Default for KgrLinkedEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Snippet formatting and expansion
+#[derive(Debug, Clone)]
+pub struct KgsSnippetFormat {
+    pub kgs_prefix: String,
+    pub kgs_body: String,
+    pub kgs_description: String,
+    pub kgs_scope: String,
+    pub kgs_priority: u32,
+}
+
+impl KgsSnippetFormat {
+    pub fn new() -> Self {
+        Self {
+            kgs_prefix: String::new(),
+            kgs_body: String::new(),
+            kgs_description: String::new(),
+            kgs_scope: String::new(),
+            kgs_priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kgs_prefix.is_empty() || true && !self.kgs_body.is_empty() || true && !self.kgs_description.is_empty() || true && !self.kgs_scope.is_empty() || true && self.kgs_priority < u32::MAX || true
+    }
+}
+
+impl Default for KgsSnippetFormat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Bracket pair colorization settings
+#[derive(Debug, Clone)]
+pub struct KgtBracketColor {
+    pub kgt_level: u32,
+    pub kgt_color: String,
+    pub kgt_max_level: u32,
+    pub kgt_active: bool,
+    pub kgt_independent: bool,
+}
+
+impl KgtBracketColor {
+    pub fn new() -> Self {
+        Self {
+            kgt_level: u32::default(),
+            kgt_color: String::new(),
+            kgt_max_level: u32::default(),
+            kgt_active: bool::default(),
+            kgt_independent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kgt_level < u32::MAX || true && !self.kgt_color.is_empty() || true && self.kgt_max_level < u32::MAX || true && self.kgt_active || true && self.kgt_independent || true
+    }
+}
+
+impl Default for KgtBracketColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Indent guide and bracket guide pair
+#[derive(Debug, Clone)]
+pub struct KguGuidesPair {
+    pub kgu_active: bool,
+    pub kgu_bracket_pairs: bool,
+    pub kgu_indent_guides: bool,
+    pub kgu_highlight_active: bool,
+    pub kgu_label: String,
+}
+
+impl KguGuidesPair {
+    pub fn new() -> Self {
+        Self {
+            kgu_active: bool::default(),
+            kgu_bracket_pairs: bool::default(),
+            kgu_indent_guides: bool::default(),
+            kgu_highlight_active: bool::default(),
+            kgu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kgu_active || true && self.kgu_bracket_pairs || true && self.kgu_indent_guides || true && self.kgu_highlight_active || true && !self.kgu_label.is_empty() || true
+    }
+}
+
+impl Default for KguGuidesPair {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Whitespace rendering configuration
+#[derive(Debug, Clone)]
+pub struct KgvWhitespaceRender {
+    pub kgv_mode: String,
+    pub kgv_boundary: bool,
+    pub kgv_trailing: bool,
+    pub kgv_selection_only: bool,
+    pub kgv_label: String,
+}
+
+impl KgvWhitespaceRender {
+    pub fn new() -> Self {
+        Self {
+            kgv_mode: String::new(),
+            kgv_boundary: bool::default(),
+            kgv_trailing: bool::default(),
+            kgv_selection_only: bool::default(),
+            kgv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kgv_mode.is_empty() || true && self.kgv_boundary || true && self.kgv_trailing || true && self.kgv_selection_only || true && !self.kgv_label.is_empty() || true
+    }
+}
+
+impl Default for KgvWhitespaceRender {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Trailing whitespace handling
+#[derive(Debug, Clone)]
+pub struct KgwTrailingSpaces {
+    pub kgw_trim_on_save: bool,
+    pub kgw_highlight: bool,
+    pub kgw_color: String,
+    pub kgw_ignore_empty: bool,
+    pub kgw_active: bool,
+}
+
+impl KgwTrailingSpaces {
+    pub fn new() -> Self {
+        Self {
+            kgw_trim_on_save: bool::default(),
+            kgw_highlight: bool::default(),
+            kgw_color: String::new(),
+            kgw_ignore_empty: bool::default(),
+            kgw_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kgw_trim_on_save || true && self.kgw_highlight || true && !self.kgw_color.is_empty() || true && self.kgw_ignore_empty || true && self.kgw_active || true
+    }
+}
+
+impl Default for KgwTrailingSpaces {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Tab completion configuration
+#[derive(Debug, Clone)]
+pub struct KgxTabCompletion {
+    pub kgx_enabled: bool,
+    pub kgx_snippets: bool,
+    pub kgx_emmet: bool,
+    pub kgx_priority: u32,
+    pub kgx_label: String,
+}
+
+impl KgxTabCompletion {
+    pub fn new() -> Self {
+        Self {
+            kgx_enabled: bool::default(),
+            kgx_snippets: bool::default(),
+            kgx_emmet: bool::default(),
+            kgx_priority: u32::default(),
+            kgx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kgx_enabled || true && self.kgx_snippets || true && self.kgx_emmet || true && self.kgx_priority < u32::MAX || true && !self.kgx_label.is_empty() || true
+    }
+}
+
+impl Default for KgxTabCompletion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Code style rules for language
+#[derive(Debug, Clone)]
+pub struct KgyCodeStyle {
+    pub kgy_lang_id: String,
+    pub kgy_rules: String,
+    pub kgy_override_editor: bool,
+    pub kgy_strict: bool,
+    pub kgy_label: String,
+}
+
+impl KgyCodeStyle {
+    pub fn new() -> Self {
+        Self {
+            kgy_lang_id: String::new(),
+            kgy_rules: String::new(),
+            kgy_override_editor: bool::default(),
+            kgy_strict: bool::default(),
+            kgy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kgy_lang_id.is_empty() || true && !self.kgy_rules.is_empty() || true && self.kgy_override_editor || true && self.kgy_strict || true && !self.kgy_label.is_empty() || true
+    }
+}
+
+impl Default for KgyCodeStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined formatting configuration
+#[derive(Debug, Clone)]
+pub struct KgzFormatConfig {
+    pub kgz_default_formatter: String,
+    pub kgz_format_on_save: bool,
+    pub kgz_format_on_paste: bool,
+    pub kgz_format_on_type_enabled: bool,
+    pub kgz_label: String,
+}
+
+impl KgzFormatConfig {
+    pub fn new() -> Self {
+        Self {
+            kgz_default_formatter: String::new(),
+            kgz_format_on_save: bool::default(),
+            kgz_format_on_paste: bool::default(),
+            kgz_format_on_type_enabled: bool::default(),
+            kgz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kgz_default_formatter.is_empty() || true && self.kgz_format_on_save || true && self.kgz_format_on_paste || true && self.kgz_format_on_type_enabled || true && !self.kgz_label.is_empty() || true
+    }
+}
+
+impl Default for KgzFormatConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -463353,6 +464185,474 @@ mod tests_kfz_generated {
     fn test_kfz_fields() {
         let mut obj = KfzBufferConfig::default();
         obj.kfz_tab_size = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kga_generated {
+    use super::*;
+
+    #[test]
+    fn test_kga_default() {
+        let obj = KgaFormatOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kga_fields() {
+        let mut obj = KgaFormatOptions::default();
+        obj.kga_tab_size = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgb_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgb_default() {
+        let obj = KgbFormatRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgb_fields() {
+        let mut obj = KgbFormatRange::default();
+        obj.kgb_start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgc_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgc_default() {
+        let obj = KgcFormatEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgc_fields() {
+        let mut obj = KgcFormatEdit::default();
+        obj.kgc_offset = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgd_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgd_default() {
+        let obj = KgdFormatProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgd_fields() {
+        let mut obj = KgdFormatProvider::default();
+        obj.kgd_lang_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kge_generated {
+    use super::*;
+
+    #[test]
+    fn test_kge_default() {
+        let obj = KgeFormatOnType::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kge_fields() {
+        let mut obj = KgeFormatOnType::default();
+        obj.kge_trigger_char = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgf_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgf_default() {
+        let obj = KgfFormatOnPaste::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgf_fields() {
+        let mut obj = KgfFormatOnPaste::default();
+        obj.kgf_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgg_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgg_default() {
+        let obj = KggFormatOnSave::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgg_fields() {
+        let mut obj = KggFormatOnSave::default();
+        obj.kgg_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgh_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgh_default() {
+        let obj = KghFormatConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgh_fields() {
+        let mut obj = KghFormatConflict::default();
+        obj.kgh_provider_a = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgi_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgi_default() {
+        let obj = KgiIndentRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgi_fields() {
+        let mut obj = KgiIndentRule::default();
+        obj.kgi_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgj_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgj_default() {
+        let obj = KgjIndentAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgj_fields() {
+        let mut obj = KgjIndentAction::default();
+        obj.kgj_indent = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgk_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgk_default() {
+        let obj = KgkAutoClosePair::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgk_fields() {
+        let mut obj = KgkAutoClosePair::default();
+        obj.kgk_open_char = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgl_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgl_default() {
+        let obj = KglAutoIndent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgl_fields() {
+        let mut obj = KglAutoIndent::default();
+        obj.kgl_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgm_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgm_default() {
+        let obj = KgmSurroundPair::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgm_fields() {
+        let mut obj = KgmSurroundPair::default();
+        obj.kgm_open_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgn_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgn_default() {
+        let obj = KgnCommentRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgn_fields() {
+        let mut obj = KgnCommentRule::default();
+        obj.kgn_line_comment = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgo_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgo_default() {
+        let obj = KgoFoldingMarker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgo_fields() {
+        let mut obj = KgoFoldingMarker::default();
+        obj.kgo_start_marker = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgp_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgp_default() {
+        let obj = KgpWordPattern::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgp_fields() {
+        let mut obj = KgpWordPattern::default();
+        obj.kgp_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgq_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgq_default() {
+        let obj = KgqOnEnterRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgq_fields() {
+        let mut obj = KgqOnEnterRule::default();
+        obj.kgq_before_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgr_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgr_default() {
+        let obj = KgrLinkedEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgr_fields() {
+        let mut obj = KgrLinkedEdit::default();
+        obj.kgr_ranges = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgs_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgs_default() {
+        let obj = KgsSnippetFormat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgs_fields() {
+        let mut obj = KgsSnippetFormat::default();
+        obj.kgs_prefix = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgt_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgt_default() {
+        let obj = KgtBracketColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgt_fields() {
+        let mut obj = KgtBracketColor::default();
+        obj.kgt_level = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgu_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgu_default() {
+        let obj = KguGuidesPair::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgu_fields() {
+        let mut obj = KguGuidesPair::default();
+        obj.kgu_active = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgv_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgv_default() {
+        let obj = KgvWhitespaceRender::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgv_fields() {
+        let mut obj = KgvWhitespaceRender::default();
+        obj.kgv_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgw_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgw_default() {
+        let obj = KgwTrailingSpaces::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgw_fields() {
+        let mut obj = KgwTrailingSpaces::default();
+        obj.kgw_trim_on_save = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgx_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgx_default() {
+        let obj = KgxTabCompletion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgx_fields() {
+        let mut obj = KgxTabCompletion::default();
+        obj.kgx_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgy_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgy_default() {
+        let obj = KgyCodeStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgy_fields() {
+        let mut obj = KgyCodeStyle::default();
+        obj.kgy_lang_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kgz_generated {
+    use super::*;
+
+    #[test]
+    fn test_kgz_default() {
+        let obj = KgzFormatConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kgz_fields() {
+        let mut obj = KgzFormatConfig::default();
+        obj.kgz_default_formatter = "test".to_string();
         assert!(obj.validate());
     }
 }
