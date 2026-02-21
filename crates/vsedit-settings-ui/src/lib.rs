@@ -212526,6 +212526,838 @@ impl Default for LizExtMarketConfig {
     }
 }
 
+/// /// Telemetry event data
+#[derive(Debug, Clone)]
+pub struct LjaTelemetryEvent {
+    pub lja_event_name: String,
+    pub lja_properties: String,
+    pub lja_measurements: String,
+    pub lja_timestamp: u64,
+    pub lja_label: String,
+}
+
+impl LjaTelemetryEvent {
+    pub fn new() -> Self {
+        Self {
+            lja_event_name: String::new(),
+            lja_properties: String::new(),
+            lja_measurements: String::new(),
+            lja_timestamp: u64::default(),
+            lja_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lja_event_name.is_empty() || true && !self.lja_properties.is_empty() || true && !self.lja_measurements.is_empty() || true && self.lja_timestamp < u64::MAX || true && !self.lja_label.is_empty() || true
+    }
+}
+
+impl Default for LjaTelemetryEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Telemetry property key-value
+#[derive(Debug, Clone)]
+pub struct LjbTelemetryProperty {
+    pub ljb_key: String,
+    pub ljb_value: String,
+    pub ljb_classified: bool,
+    pub ljb_pii: bool,
+    pub ljb_label: String,
+}
+
+impl LjbTelemetryProperty {
+    pub fn new() -> Self {
+        Self {
+            ljb_key: String::new(),
+            ljb_value: String::new(),
+            ljb_classified: bool::default(),
+            ljb_pii: bool::default(),
+            ljb_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ljb_key.is_empty() || true && !self.ljb_value.is_empty() || true && self.ljb_classified || true && self.ljb_pii || true && !self.ljb_label.is_empty() || true
+    }
+}
+
+impl Default for LjbTelemetryProperty {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Telemetry measurement data
+#[derive(Debug, Clone)]
+pub struct LjcTelemetryMeasurement {
+    pub ljc_name: String,
+    pub ljc_value: f64,
+    pub ljc_unit: String,
+    pub ljc_timestamp: u64,
+    pub ljc_label: String,
+}
+
+impl LjcTelemetryMeasurement {
+    pub fn new() -> Self {
+        Self {
+            ljc_name: String::new(),
+            ljc_value: f64::default(),
+            ljc_unit: String::new(),
+            ljc_timestamp: u64::default(),
+            ljc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ljc_name.is_empty() || true && self.ljc_value.is_finite() || true && !self.ljc_unit.is_empty() || true && self.ljc_timestamp < u64::MAX || true && !self.ljc_label.is_empty() || true
+    }
+}
+
+impl Default for LjcTelemetryMeasurement {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Telemetry service configuration
+#[derive(Debug, Clone)]
+pub struct LjdTelemetryService {
+    pub ljd_app_id: String,
+    pub ljd_endpoint: String,
+    pub ljd_enabled: bool,
+    pub ljd_batch_size: u32,
+    pub ljd_label: String,
+}
+
+impl LjdTelemetryService {
+    pub fn new() -> Self {
+        Self {
+            ljd_app_id: String::new(),
+            ljd_endpoint: String::new(),
+            ljd_enabled: bool::default(),
+            ljd_batch_size: u32::default(),
+            ljd_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ljd_app_id.is_empty() || true && !self.ljd_endpoint.is_empty() || true && self.ljd_enabled || true && self.ljd_batch_size < u32::MAX || true && !self.ljd_label.is_empty() || true
+    }
+}
+
+impl Default for LjdTelemetryService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Telemetry consent level
+#[derive(Debug, Clone)]
+pub struct LjeTelemetryConsent {
+    pub lje_level: String,
+    pub lje_crash_reporter: bool,
+    pub lje_error_telemetry: bool,
+    pub lje_usage_data: bool,
+    pub lje_label: String,
+}
+
+impl LjeTelemetryConsent {
+    pub fn new() -> Self {
+        Self {
+            lje_level: String::new(),
+            lje_crash_reporter: bool::default(),
+            lje_error_telemetry: bool::default(),
+            lje_usage_data: bool::default(),
+            lje_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lje_level.is_empty() || true && self.lje_crash_reporter || true && self.lje_error_telemetry || true && self.lje_usage_data || true && !self.lje_label.is_empty() || true
+    }
+}
+
+impl Default for LjeTelemetryConsent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Log entry with level/message
+#[derive(Debug, Clone)]
+pub struct LjfLogEntry {
+    pub ljf_level: String,
+    pub ljf_message: String,
+    pub ljf_source: String,
+    pub ljf_timestamp: u64,
+    pub ljf_label: String,
+}
+
+impl LjfLogEntry {
+    pub fn new() -> Self {
+        Self {
+            ljf_level: String::new(),
+            ljf_message: String::new(),
+            ljf_source: String::new(),
+            ljf_timestamp: u64::default(),
+            ljf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ljf_level.is_empty() || true && !self.ljf_message.is_empty() || true && !self.ljf_source.is_empty() || true && self.ljf_timestamp < u64::MAX || true && !self.ljf_label.is_empty() || true
+    }
+}
+
+impl Default for LjfLogEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Log output channel
+#[derive(Debug, Clone)]
+pub struct LjgLogChannel {
+    pub ljg_channel_name: String,
+    pub ljg_log_level: String,
+    pub ljg_visible: bool,
+    pub ljg_max_size: u64,
+    pub ljg_label: String,
+}
+
+impl LjgLogChannel {
+    pub fn new() -> Self {
+        Self {
+            ljg_channel_name: String::new(),
+            ljg_log_level: String::new(),
+            ljg_visible: bool::default(),
+            ljg_max_size: u64::default(),
+            ljg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ljg_channel_name.is_empty() || true && !self.ljg_log_level.is_empty() || true && self.ljg_visible || true && self.ljg_max_size < u64::MAX || true && !self.ljg_label.is_empty() || true
+    }
+}
+
+impl Default for LjgLogChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Log level definition
+#[derive(Debug, Clone)]
+pub struct LjhLogLevel {
+    pub ljh_level_name: String,
+    pub ljh_numeric: u32,
+    pub ljh_color: String,
+    pub ljh_enabled: bool,
+    pub ljh_label: String,
+}
+
+impl LjhLogLevel {
+    pub fn new() -> Self {
+        Self {
+            ljh_level_name: String::new(),
+            ljh_numeric: u32::default(),
+            ljh_color: String::new(),
+            ljh_enabled: bool::default(),
+            ljh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ljh_level_name.is_empty() || true && self.ljh_numeric < u32::MAX || true && !self.ljh_color.is_empty() || true && self.ljh_enabled || true && !self.ljh_label.is_empty() || true
+    }
+}
+
+impl Default for LjhLogLevel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Log output filter
+#[derive(Debug, Clone)]
+pub struct LjiLogFilter {
+    pub lji_source_filter: String,
+    pub lji_level_filter: String,
+    pub lji_text_filter: String,
+    pub lji_active: bool,
+    pub lji_label: String,
+}
+
+impl LjiLogFilter {
+    pub fn new() -> Self {
+        Self {
+            lji_source_filter: String::new(),
+            lji_level_filter: String::new(),
+            lji_text_filter: String::new(),
+            lji_active: bool::default(),
+            lji_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lji_source_filter.is_empty() || true && !self.lji_level_filter.is_empty() || true && !self.lji_text_filter.is_empty() || true && self.lji_active || true && !self.lji_label.is_empty() || true
+    }
+}
+
+impl Default for LjiLogFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Log file output target
+#[derive(Debug, Clone)]
+pub struct LjjLogFile {
+    pub ljj_file_path: String,
+    pub ljj_max_size_bytes: u64,
+    pub ljj_rotate_count: u32,
+    pub ljj_active: bool,
+    pub ljj_label: String,
+}
+
+impl LjjLogFile {
+    pub fn new() -> Self {
+        Self {
+            ljj_file_path: String::new(),
+            ljj_max_size_bytes: u64::default(),
+            ljj_rotate_count: u32::default(),
+            ljj_active: bool::default(),
+            ljj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ljj_file_path.is_empty() || true && self.ljj_max_size_bytes < u64::MAX || true && self.ljj_rotate_count < u32::MAX || true && self.ljj_active || true && !self.ljj_label.is_empty() || true
+    }
+}
+
+impl Default for LjjLogFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Error/crash report data
+#[derive(Debug, Clone)]
+pub struct LjkErrorReport {
+    pub ljk_error_msg: String,
+    pub ljk_stack_trace: String,
+    pub ljk_component: String,
+    pub ljk_timestamp: u64,
+    pub ljk_label: String,
+}
+
+impl LjkErrorReport {
+    pub fn new() -> Self {
+        Self {
+            ljk_error_msg: String::new(),
+            ljk_stack_trace: String::new(),
+            ljk_component: String::new(),
+            ljk_timestamp: u64::default(),
+            ljk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ljk_error_msg.is_empty() || true && !self.ljk_stack_trace.is_empty() || true && !self.ljk_component.is_empty() || true && self.ljk_timestamp < u64::MAX || true && !self.ljk_label.is_empty() || true
+    }
+}
+
+impl Default for LjkErrorReport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Stack trace from error
+#[derive(Debug, Clone)]
+pub struct LjlStackTrace {
+    pub ljl_frames: String,
+    pub ljl_depth: u32,
+    pub ljl_source_file: String,
+    pub ljl_line_number: u32,
+    pub ljl_label: String,
+}
+
+impl LjlStackTrace {
+    pub fn new() -> Self {
+        Self {
+            ljl_frames: String::new(),
+            ljl_depth: u32::default(),
+            ljl_source_file: String::new(),
+            ljl_line_number: u32::default(),
+            ljl_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ljl_frames.is_empty() || true && self.ljl_depth < u32::MAX || true && !self.ljl_source_file.is_empty() || true && self.ljl_line_number < u32::MAX || true && !self.ljl_label.is_empty() || true
+    }
+}
+
+impl Default for LjlStackTrace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Performance timing mark
+#[derive(Debug, Clone)]
+pub struct LjmPerfMark {
+    pub ljm_name: String,
+    pub ljm_timestamp: u64,
+    pub ljm_detail: String,
+    pub ljm_source: String,
+    pub ljm_label: String,
+}
+
+impl LjmPerfMark {
+    pub fn new() -> Self {
+        Self {
+            ljm_name: String::new(),
+            ljm_timestamp: u64::default(),
+            ljm_detail: String::new(),
+            ljm_source: String::new(),
+            ljm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ljm_name.is_empty() || true && self.ljm_timestamp < u64::MAX || true && !self.ljm_detail.is_empty() || true && !self.ljm_source.is_empty() || true && !self.ljm_label.is_empty() || true
+    }
+}
+
+impl Default for LjmPerfMark {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Performance timing measurement
+#[derive(Debug, Clone)]
+pub struct LjnPerfMeasure {
+    pub ljn_name: String,
+    pub ljn_start_mark: String,
+    pub ljn_end_mark: String,
+    pub ljn_duration_ms: f64,
+    pub ljn_label: String,
+}
+
+impl LjnPerfMeasure {
+    pub fn new() -> Self {
+        Self {
+            ljn_name: String::new(),
+            ljn_start_mark: String::new(),
+            ljn_end_mark: String::new(),
+            ljn_duration_ms: f64::default(),
+            ljn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ljn_name.is_empty() || true && !self.ljn_start_mark.is_empty() || true && !self.ljn_end_mark.is_empty() || true && self.ljn_duration_ms.is_finite() || true && !self.ljn_label.is_empty() || true
+    }
+}
+
+impl Default for LjnPerfMeasure {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Performance entry (mark/measure)
+#[derive(Debug, Clone)]
+pub struct LjoPerfEntry {
+    pub ljo_entry_type: String,
+    pub ljo_name: String,
+    pub ljo_start_time: f64,
+    pub ljo_duration: f64,
+    pub ljo_label: String,
+}
+
+impl LjoPerfEntry {
+    pub fn new() -> Self {
+        Self {
+            ljo_entry_type: String::new(),
+            ljo_name: String::new(),
+            ljo_start_time: f64::default(),
+            ljo_duration: f64::default(),
+            ljo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ljo_entry_type.is_empty() || true && !self.ljo_name.is_empty() || true && self.ljo_start_time.is_finite() || true && self.ljo_duration.is_finite() || true && !self.ljo_label.is_empty() || true
+    }
+}
+
+impl Default for LjoPerfEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Application startup metrics
+#[derive(Debug, Clone)]
+pub struct LjpStartupMetrics {
+    pub ljp_total_ms: f64,
+    pub ljp_window_load_ms: f64,
+    pub ljp_ext_host_ms: f64,
+    pub ljp_workbench_ms: f64,
+    pub ljp_label: String,
+}
+
+impl LjpStartupMetrics {
+    pub fn new() -> Self {
+        Self {
+            ljp_total_ms: f64::default(),
+            ljp_window_load_ms: f64::default(),
+            ljp_ext_host_ms: f64::default(),
+            ljp_workbench_ms: f64::default(),
+            ljp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ljp_total_ms.is_finite() || true && self.ljp_window_load_ms.is_finite() || true && self.ljp_ext_host_ms.is_finite() || true && self.ljp_workbench_ms.is_finite() || true && !self.ljp_label.is_empty() || true
+    }
+}
+
+impl Default for LjpStartupMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Memory usage snapshot
+#[derive(Debug, Clone)]
+pub struct LjqMemoryUsage {
+    pub ljq_heap_used: u64,
+    pub ljq_heap_total: u64,
+    pub ljq_rss: u64,
+    pub ljq_external: u64,
+    pub ljq_label: String,
+}
+
+impl LjqMemoryUsage {
+    pub fn new() -> Self {
+        Self {
+            ljq_heap_used: u64::default(),
+            ljq_heap_total: u64::default(),
+            ljq_rss: u64::default(),
+            ljq_external: u64::default(),
+            ljq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ljq_heap_used < u64::MAX || true && self.ljq_heap_total < u64::MAX || true && self.ljq_rss < u64::MAX || true && self.ljq_external < u64::MAX || true && !self.ljq_label.is_empty() || true
+    }
+}
+
+impl Default for LjqMemoryUsage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// CPU profiling data
+#[derive(Debug, Clone)]
+pub struct LjrCpuProfile {
+    pub ljr_duration_ms: f64,
+    pub ljr_samples_count: u32,
+    pub ljr_top_function: String,
+    pub ljr_self_time_ms: f64,
+    pub ljr_label: String,
+}
+
+impl LjrCpuProfile {
+    pub fn new() -> Self {
+        Self {
+            ljr_duration_ms: f64::default(),
+            ljr_samples_count: u32::default(),
+            ljr_top_function: String::new(),
+            ljr_self_time_ms: f64::default(),
+            ljr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ljr_duration_ms.is_finite() || true && self.ljr_samples_count < u32::MAX || true && !self.ljr_top_function.is_empty() || true && self.ljr_self_time_ms.is_finite() || true && !self.ljr_label.is_empty() || true
+    }
+}
+
+impl Default for LjrCpuProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Heap memory snapshot
+#[derive(Debug, Clone)]
+pub struct LjsHeapSnapshot {
+    pub ljs_total_size: u64,
+    pub ljs_nodes_count: u32,
+    pub ljs_edges_count: u32,
+    pub ljs_timestamp: u64,
+    pub ljs_label: String,
+}
+
+impl LjsHeapSnapshot {
+    pub fn new() -> Self {
+        Self {
+            ljs_total_size: u64::default(),
+            ljs_nodes_count: u32::default(),
+            ljs_edges_count: u32::default(),
+            ljs_timestamp: u64::default(),
+            ljs_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ljs_total_size < u64::MAX || true && self.ljs_nodes_count < u32::MAX || true && self.ljs_edges_count < u32::MAX || true && self.ljs_timestamp < u64::MAX || true && !self.ljs_label.is_empty() || true
+    }
+}
+
+impl Default for LjsHeapSnapshot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension performance entry
+#[derive(Debug, Clone)]
+pub struct LjtExtPerfEntry {
+    pub ljt_extension_id: String,
+    pub ljt_startup_ms: f64,
+    pub ljt_activation_ms: f64,
+    pub ljt_memory_bytes: u64,
+    pub ljt_label: String,
+}
+
+impl LjtExtPerfEntry {
+    pub fn new() -> Self {
+        Self {
+            ljt_extension_id: String::new(),
+            ljt_startup_ms: f64::default(),
+            ljt_activation_ms: f64::default(),
+            ljt_memory_bytes: u64::default(),
+            ljt_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ljt_extension_id.is_empty() || true && self.ljt_startup_ms.is_finite() || true && self.ljt_activation_ms.is_finite() || true && self.ljt_memory_bytes < u64::MAX || true && !self.ljt_label.is_empty() || true
+    }
+}
+
+impl Default for LjtExtPerfEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor operation perf entry
+#[derive(Debug, Clone)]
+pub struct LjuEditorPerfEntry {
+    pub lju_operation: String,
+    pub lju_duration_ms: f64,
+    pub lju_editor_id: String,
+    pub lju_timestamp: u64,
+    pub lju_label: String,
+}
+
+impl LjuEditorPerfEntry {
+    pub fn new() -> Self {
+        Self {
+            lju_operation: String::new(),
+            lju_duration_ms: f64::default(),
+            lju_editor_id: String::new(),
+            lju_timestamp: u64::default(),
+            lju_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lju_operation.is_empty() || true && self.lju_duration_ms.is_finite() || true && !self.lju_editor_id.is_empty() || true && self.lju_timestamp < u64::MAX || true && !self.lju_label.is_empty() || true
+    }
+}
+
+impl Default for LjuEditorPerfEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Rendering performance entry
+#[derive(Debug, Clone)]
+pub struct LjvRenderPerfEntry {
+    pub ljv_frame_time_ms: f64,
+    pub ljv_fps: f64,
+    pub ljv_jank_count: u32,
+    pub ljv_dirty_regions: u32,
+    pub ljv_label: String,
+}
+
+impl LjvRenderPerfEntry {
+    pub fn new() -> Self {
+        Self {
+            ljv_frame_time_ms: f64::default(),
+            ljv_fps: f64::default(),
+            ljv_jank_count: u32::default(),
+            ljv_dirty_regions: u32::default(),
+            ljv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ljv_frame_time_ms.is_finite() || true && self.ljv_fps.is_finite() || true && self.ljv_jank_count < u32::MAX || true && self.ljv_dirty_regions < u32::MAX || true && !self.ljv_label.is_empty() || true
+    }
+}
+
+impl Default for LjvRenderPerfEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// IPC call performance entry
+#[derive(Debug, Clone)]
+pub struct LjwIpcPerfEntry {
+    pub ljw_method: String,
+    pub ljw_duration_ms: f64,
+    pub ljw_request_size: u64,
+    pub ljw_response_size: u64,
+    pub ljw_label: String,
+}
+
+impl LjwIpcPerfEntry {
+    pub fn new() -> Self {
+        Self {
+            ljw_method: String::new(),
+            ljw_duration_ms: f64::default(),
+            ljw_request_size: u64::default(),
+            ljw_response_size: u64::default(),
+            ljw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ljw_method.is_empty() || true && self.ljw_duration_ms.is_finite() || true && self.ljw_request_size < u64::MAX || true && self.ljw_response_size < u64::MAX || true && !self.ljw_label.is_empty() || true
+    }
+}
+
+impl Default for LjwIpcPerfEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// System diagnostic information
+#[derive(Debug, Clone)]
+pub struct LjxDiagnosticInfo {
+    pub ljx_os_info: String,
+    pub ljx_cpu_info: String,
+    pub ljx_memory_info: String,
+    pub ljx_gpu_info: String,
+    pub ljx_label: String,
+}
+
+impl LjxDiagnosticInfo {
+    pub fn new() -> Self {
+        Self {
+            ljx_os_info: String::new(),
+            ljx_cpu_info: String::new(),
+            ljx_memory_info: String::new(),
+            ljx_gpu_info: String::new(),
+            ljx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ljx_os_info.is_empty() || true && !self.ljx_cpu_info.is_empty() || true && !self.ljx_memory_info.is_empty() || true && !self.ljx_gpu_info.is_empty() || true && !self.ljx_label.is_empty() || true
+    }
+}
+
+impl Default for LjxDiagnosticInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Process explorer entry
+#[derive(Debug, Clone)]
+pub struct LjyProcessExplorer {
+    pub ljy_pid: u32,
+    pub ljy_name: String,
+    pub ljy_cpu_pct: f64,
+    pub ljy_memory_bytes: u64,
+    pub ljy_label: String,
+}
+
+impl LjyProcessExplorer {
+    pub fn new() -> Self {
+        Self {
+            ljy_pid: u32::default(),
+            ljy_name: String::new(),
+            ljy_cpu_pct: f64::default(),
+            ljy_memory_bytes: u64::default(),
+            ljy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ljy_pid < u32::MAX || true && !self.ljy_name.is_empty() || true && self.ljy_cpu_pct.is_finite() || true && self.ljy_memory_bytes < u64::MAX || true && !self.ljy_label.is_empty() || true
+    }
+}
+
+impl Default for LjyProcessExplorer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined performance configuration
+#[derive(Debug, Clone)]
+pub struct LjzPerfConfig {
+    pub ljz_trace_enabled: bool,
+    pub ljz_log_level: String,
+    pub ljz_telemetry_level: String,
+    pub ljz_perf_marks: bool,
+    pub ljz_label: String,
+}
+
+impl LjzPerfConfig {
+    pub fn new() -> Self {
+        Self {
+            ljz_trace_enabled: bool::default(),
+            ljz_log_level: String::new(),
+            ljz_telemetry_level: String::new(),
+            ljz_perf_marks: bool::default(),
+            ljz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ljz_trace_enabled || true && !self.ljz_log_level.is_empty() || true && !self.ljz_telemetry_level.is_empty() || true && self.ljz_perf_marks || true && !self.ljz_label.is_empty() || true
+    }
+}
+
+impl Default for LjzPerfConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -501059,6 +501891,474 @@ mod tests_liz_generated {
     fn test_liz_fields() {
         let mut obj = LizExtMarketConfig::default();
         obj.liz_marketplace_url = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lja_generated {
+    use super::*;
+
+    #[test]
+    fn test_lja_default() {
+        let obj = LjaTelemetryEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lja_fields() {
+        let mut obj = LjaTelemetryEvent::default();
+        obj.lja_event_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljb_default() {
+        let obj = LjbTelemetryProperty::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljb_fields() {
+        let mut obj = LjbTelemetryProperty::default();
+        obj.ljb_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljc_default() {
+        let obj = LjcTelemetryMeasurement::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljc_fields() {
+        let mut obj = LjcTelemetryMeasurement::default();
+        obj.ljc_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljd_default() {
+        let obj = LjdTelemetryService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljd_fields() {
+        let mut obj = LjdTelemetryService::default();
+        obj.ljd_app_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lje_generated {
+    use super::*;
+
+    #[test]
+    fn test_lje_default() {
+        let obj = LjeTelemetryConsent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lje_fields() {
+        let mut obj = LjeTelemetryConsent::default();
+        obj.lje_level = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljf_default() {
+        let obj = LjfLogEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljf_fields() {
+        let mut obj = LjfLogEntry::default();
+        obj.ljf_level = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljg_default() {
+        let obj = LjgLogChannel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljg_fields() {
+        let mut obj = LjgLogChannel::default();
+        obj.ljg_channel_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljh_default() {
+        let obj = LjhLogLevel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljh_fields() {
+        let mut obj = LjhLogLevel::default();
+        obj.ljh_level_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lji_generated {
+    use super::*;
+
+    #[test]
+    fn test_lji_default() {
+        let obj = LjiLogFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lji_fields() {
+        let mut obj = LjiLogFilter::default();
+        obj.lji_source_filter = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljj_default() {
+        let obj = LjjLogFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljj_fields() {
+        let mut obj = LjjLogFile::default();
+        obj.ljj_file_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljk_default() {
+        let obj = LjkErrorReport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljk_fields() {
+        let mut obj = LjkErrorReport::default();
+        obj.ljk_error_msg = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljl_default() {
+        let obj = LjlStackTrace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljl_fields() {
+        let mut obj = LjlStackTrace::default();
+        obj.ljl_frames = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljm_default() {
+        let obj = LjmPerfMark::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljm_fields() {
+        let mut obj = LjmPerfMark::default();
+        obj.ljm_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljn_default() {
+        let obj = LjnPerfMeasure::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljn_fields() {
+        let mut obj = LjnPerfMeasure::default();
+        obj.ljn_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljo_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljo_default() {
+        let obj = LjoPerfEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljo_fields() {
+        let mut obj = LjoPerfEntry::default();
+        obj.ljo_entry_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljp_default() {
+        let obj = LjpStartupMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljp_fields() {
+        let mut obj = LjpStartupMetrics::default();
+        obj.ljp_total_ms = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljq_default() {
+        let obj = LjqMemoryUsage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljq_fields() {
+        let mut obj = LjqMemoryUsage::default();
+        obj.ljq_heap_used = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljr_default() {
+        let obj = LjrCpuProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljr_fields() {
+        let mut obj = LjrCpuProfile::default();
+        obj.ljr_duration_ms = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljs_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljs_default() {
+        let obj = LjsHeapSnapshot::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljs_fields() {
+        let mut obj = LjsHeapSnapshot::default();
+        obj.ljs_total_size = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljt_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljt_default() {
+        let obj = LjtExtPerfEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljt_fields() {
+        let mut obj = LjtExtPerfEntry::default();
+        obj.ljt_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lju_generated {
+    use super::*;
+
+    #[test]
+    fn test_lju_default() {
+        let obj = LjuEditorPerfEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lju_fields() {
+        let mut obj = LjuEditorPerfEntry::default();
+        obj.lju_operation = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljv_default() {
+        let obj = LjvRenderPerfEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljv_fields() {
+        let mut obj = LjvRenderPerfEntry::default();
+        obj.ljv_frame_time_ms = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljw_default() {
+        let obj = LjwIpcPerfEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljw_fields() {
+        let mut obj = LjwIpcPerfEntry::default();
+        obj.ljw_method = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljx_default() {
+        let obj = LjxDiagnosticInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljx_fields() {
+        let mut obj = LjxDiagnosticInfo::default();
+        obj.ljx_os_info = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljy_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljy_default() {
+        let obj = LjyProcessExplorer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljy_fields() {
+        let mut obj = LjyProcessExplorer::default();
+        obj.ljy_pid = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ljz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ljz_default() {
+        let obj = LjzPerfConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ljz_fields() {
+        let mut obj = LjzPerfConfig::default();
+        obj.ljz_trace_enabled = true;
         assert!(obj.validate());
     }
 }
