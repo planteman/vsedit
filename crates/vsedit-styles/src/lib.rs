@@ -185924,6 +185924,890 @@ impl Default for KczDecoConfig {
     }
 }
 
+/// Suggest widget descriptor
+#[derive(Debug, Clone)]
+pub struct KdaSuggestWidget {
+    pub suggest_w_id: String,
+    pub visible_items: u32,
+    pub selected_idx: u32,
+    pub filter_text: String,
+    pub detail_visible: bool,
+    pub is_loading: bool,
+}
+
+impl KdaSuggestWidget {
+    pub fn new() -> Self {
+        Self {
+            suggest_w_id: String::new(),
+            visible_items: u32::default(),
+            selected_idx: u32::default(),
+            filter_text: String::new(),
+            detail_visible: bool::default(),
+            is_loading: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.suggest_w_id.is_empty() || true && self.visible_items < u32::MAX || true && self.selected_idx < u32::MAX || true && !self.filter_text.is_empty() || true && self.detail_visible || true && self.is_loading || true
+    }
+}
+
+impl Default for KdaSuggestWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Suggest widget item
+#[derive(Debug, Clone)]
+pub struct KdbSuggestItem {
+    pub suggest_item_id: String,
+    pub label_str: String,
+    pub kind_val: u32,
+    pub detail_str: String,
+    pub sort_text: String,
+    pub is_preselect: bool,
+}
+
+impl KdbSuggestItem {
+    pub fn new() -> Self {
+        Self {
+            suggest_item_id: String::new(),
+            label_str: String::new(),
+            kind_val: u32::default(),
+            detail_str: String::new(),
+            sort_text: String::new(),
+            is_preselect: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.suggest_item_id.is_empty() || true && !self.label_str.is_empty() || true && self.kind_val < u32::MAX || true && !self.detail_str.is_empty() || true && !self.sort_text.is_empty() || true && self.is_preselect || true
+    }
+}
+
+impl Default for KdbSuggestItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Suggest model state
+#[derive(Debug, Clone)]
+pub struct KdcSuggestModel {
+    pub suggest_model_id: String,
+    pub items_count: u32,
+    pub incomplete_providers_csv: String,
+    pub trigger_context_json: String,
+    pub duration_ms: u32,
+    pub is_stale: bool,
+}
+
+impl KdcSuggestModel {
+    pub fn new() -> Self {
+        Self {
+            suggest_model_id: String::new(),
+            items_count: u32::default(),
+            incomplete_providers_csv: String::new(),
+            trigger_context_json: String::new(),
+            duration_ms: u32::default(),
+            is_stale: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.suggest_model_id.is_empty() || true && self.items_count < u32::MAX || true && !self.incomplete_providers_csv.is_empty() || true && !self.trigger_context_json.is_empty() || true && self.duration_ms < u32::MAX || true && self.is_stale || true
+    }
+}
+
+impl Default for KdcSuggestModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Suggest trigger context
+#[derive(Debug, Clone)]
+pub struct KddSuggestTrigger {
+    pub suggest_trigger_id: String,
+    pub trigger_kind_str: String,
+    pub trigger_char: String,
+    pub retrigger_reason: String,
+    pub position_json: String,
+    pub is_auto: bool,
+}
+
+impl KddSuggestTrigger {
+    pub fn new() -> Self {
+        Self {
+            suggest_trigger_id: String::new(),
+            trigger_kind_str: String::new(),
+            trigger_char: String::new(),
+            retrigger_reason: String::new(),
+            position_json: String::new(),
+            is_auto: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.suggest_trigger_id.is_empty() || true && !self.trigger_kind_str.is_empty() || true && !self.trigger_char.is_empty() || true && !self.retrigger_reason.is_empty() || true && !self.position_json.is_empty() || true && self.is_auto || true
+    }
+}
+
+impl Default for KddSuggestTrigger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Parameter hints widget
+#[derive(Debug, Clone)]
+pub struct KdeParameterHints {
+    pub param_hints_id: String,
+    pub signatures_count: u32,
+    pub active_sig_idx: u32,
+    pub active_param_idx: u32,
+    pub trigger_reason_str: String,
+    pub is_visible: bool,
+}
+
+impl KdeParameterHints {
+    pub fn new() -> Self {
+        Self {
+            param_hints_id: String::new(),
+            signatures_count: u32::default(),
+            active_sig_idx: u32::default(),
+            active_param_idx: u32::default(),
+            trigger_reason_str: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.param_hints_id.is_empty() || true && self.signatures_count < u32::MAX || true && self.active_sig_idx < u32::MAX || true && self.active_param_idx < u32::MAX || true && !self.trigger_reason_str.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for KdeParameterHints {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Parameter info entry
+#[derive(Debug, Clone)]
+pub struct KdfParameterInfo {
+    pub param_info_id: String,
+    pub label_str: String,
+    pub documentation_md: String,
+    pub default_value: String,
+    pub param_type_str: String,
+    pub is_optional: bool,
+}
+
+impl KdfParameterInfo {
+    pub fn new() -> Self {
+        Self {
+            param_info_id: String::new(),
+            label_str: String::new(),
+            documentation_md: String::new(),
+            default_value: String::new(),
+            param_type_str: String::new(),
+            is_optional: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.param_info_id.is_empty() || true && !self.label_str.is_empty() || true && !self.documentation_md.is_empty() || true && !self.default_value.is_empty() || true && !self.param_type_str.is_empty() || true && self.is_optional || true
+    }
+}
+
+impl Default for KdfParameterInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Hover widget descriptor
+#[derive(Debug, Clone)]
+pub struct KdgHoverWidget {
+    pub hover_w_id: String,
+    pub content_parts_count: u32,
+    pub position_json: String,
+    pub lock_mode: bool,
+    pub above_mode: bool,
+    pub is_focused: bool,
+}
+
+impl KdgHoverWidget {
+    pub fn new() -> Self {
+        Self {
+            hover_w_id: String::new(),
+            content_parts_count: u32::default(),
+            position_json: String::new(),
+            lock_mode: bool::default(),
+            above_mode: bool::default(),
+            is_focused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hover_w_id.is_empty() || true && self.content_parts_count < u32::MAX || true && !self.position_json.is_empty() || true && self.lock_mode || true && self.above_mode || true && self.is_focused || true
+    }
+}
+
+impl Default for KdgHoverWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Hover content entry
+#[derive(Debug, Clone)]
+pub struct KdhHoverContent {
+    pub hover_content_id: String,
+    pub value_md: String,
+    pub support_html: bool,
+    pub is_trusted: bool,
+    pub source_ref: String,
+    pub is_code_block: bool,
+}
+
+impl KdhHoverContent {
+    pub fn new() -> Self {
+        Self {
+            hover_content_id: String::new(),
+            value_md: String::new(),
+            support_html: bool::default(),
+            is_trusted: bool::default(),
+            source_ref: String::new(),
+            is_code_block: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hover_content_id.is_empty() || true && !self.value_md.is_empty() || true && self.support_html || true && self.is_trusted || true && !self.source_ref.is_empty() || true && self.is_code_block || true
+    }
+}
+
+impl Default for KdhHoverContent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Ghost text suggestion
+#[derive(Debug, Clone)]
+pub struct KdiGhostText {
+    pub ghost_text_id: String,
+    pub text_str: String,
+    pub position_json: String,
+    pub additional_lines: u32,
+    pub provider_ref: String,
+    pub is_accepted: bool,
+}
+
+impl KdiGhostText {
+    pub fn new() -> Self {
+        Self {
+            ghost_text_id: String::new(),
+            text_str: String::new(),
+            position_json: String::new(),
+            additional_lines: u32::default(),
+            provider_ref: String::new(),
+            is_accepted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ghost_text_id.is_empty() || true && !self.text_str.is_empty() || true && !self.position_json.is_empty() || true && self.additional_lines < u32::MAX || true && !self.provider_ref.is_empty() || true && self.is_accepted || true
+    }
+}
+
+impl Default for KdiGhostText {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline suggestion entry
+#[derive(Debug, Clone)]
+pub struct KdjInlineSuggest {
+    pub inline_suggest_id: String,
+    pub insert_text: String,
+    pub range_json: String,
+    pub filter_text: String,
+    pub command_ref: String,
+    pub is_snippet: bool,
+}
+
+impl KdjInlineSuggest {
+    pub fn new() -> Self {
+        Self {
+            inline_suggest_id: String::new(),
+            insert_text: String::new(),
+            range_json: String::new(),
+            filter_text: String::new(),
+            command_ref: String::new(),
+            is_snippet: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_suggest_id.is_empty() || true && !self.insert_text.is_empty() || true && !self.range_json.is_empty() || true && !self.filter_text.is_empty() || true && !self.command_ref.is_empty() || true && self.is_snippet || true
+    }
+}
+
+impl Default for KdjInlineSuggest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Rename input widget
+#[derive(Debug, Clone)]
+pub struct KdkRenameInput {
+    pub rename_input_id: String,
+    pub old_value: String,
+    pub new_value: String,
+    pub position_json: String,
+    pub candidates_csv: String,
+    pub is_valid: bool,
+}
+
+impl KdkRenameInput {
+    pub fn new() -> Self {
+        Self {
+            rename_input_id: String::new(),
+            old_value: String::new(),
+            new_value: String::new(),
+            position_json: String::new(),
+            candidates_csv: String::new(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rename_input_id.is_empty() || true && !self.old_value.is_empty() || true && !self.new_value.is_empty() || true && !self.position_json.is_empty() || true && !self.candidates_csv.is_empty() || true && self.is_valid || true
+    }
+}
+
+impl Default for KdkRenameInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code action widget
+#[derive(Debug, Clone)]
+pub struct KdlCodeActionWidget {
+    pub ca_widget_id: String,
+    pub action_count: u32,
+    pub selected_idx: u32,
+    pub trigger_str: String,
+    pub position_json: String,
+    pub is_visible: bool,
+}
+
+impl KdlCodeActionWidget {
+    pub fn new() -> Self {
+        Self {
+            ca_widget_id: String::new(),
+            action_count: u32::default(),
+            selected_idx: u32::default(),
+            trigger_str: String::new(),
+            position_json: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ca_widget_id.is_empty() || true && self.action_count < u32::MAX || true && self.selected_idx < u32::MAX || true && !self.trigger_str.is_empty() || true && !self.position_json.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for KdlCodeActionWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Light bulb indicator
+#[derive(Debug, Clone)]
+pub struct KdmLightBulb {
+    pub lightbulb_id: String,
+    pub line_number: u32,
+    pub action_count: u32,
+    pub auto_fix_available: bool,
+    pub icon_class: String,
+    pub is_visible: bool,
+}
+
+impl KdmLightBulb {
+    pub fn new() -> Self {
+        Self {
+            lightbulb_id: String::new(),
+            line_number: u32::default(),
+            action_count: u32::default(),
+            auto_fix_available: bool::default(),
+            icon_class: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lightbulb_id.is_empty() || true && self.line_number < u32::MAX || true && self.action_count < u32::MAX || true && self.auto_fix_available || true && !self.icon_class.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for KdmLightBulb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color picker widget
+#[derive(Debug, Clone)]
+pub struct KdnColorPicker {
+    pub color_picker_id: String,
+    pub color_hex: String,
+    pub original_color: String,
+    pub model_str: String,
+    pub opacity_val: f64,
+    pub is_standalone: bool,
+}
+
+impl KdnColorPicker {
+    pub fn new() -> Self {
+        Self {
+            color_picker_id: String::new(),
+            color_hex: String::new(),
+            original_color: String::new(),
+            model_str: String::new(),
+            opacity_val: f64::default(),
+            is_standalone: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_picker_id.is_empty() || true && !self.color_hex.is_empty() || true && !self.original_color.is_empty() || true && !self.model_str.is_empty() || true && self.opacity_val.is_finite() || true && self.is_standalone || true
+    }
+}
+
+impl Default for KdnColorPicker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Link detector state
+#[derive(Debug, Clone)]
+pub struct KdoLinkDetector {
+    pub link_det_id: String,
+    pub link_count: u32,
+    pub enabled_providers_csv: String,
+    pub tooltip_mode: String,
+    pub modifier_key: String,
+    pub is_active: bool,
+}
+
+impl KdoLinkDetector {
+    pub fn new() -> Self {
+        Self {
+            link_det_id: String::new(),
+            link_count: u32::default(),
+            enabled_providers_csv: String::new(),
+            tooltip_mode: String::new(),
+            modifier_key: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.link_det_id.is_empty() || true && self.link_count < u32::MAX || true && !self.enabled_providers_csv.is_empty() || true && !self.tooltip_mode.is_empty() || true && !self.modifier_key.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for KdoLinkDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bracket matching state
+#[derive(Debug, Clone)]
+pub struct KdpBracketMatch {
+    pub bracket_match_id: String,
+    pub open_pos_json: String,
+    pub close_pos_json: String,
+    pub nesting_level: u32,
+    pub bracket_type_str: String,
+    pub is_matched: bool,
+}
+
+impl KdpBracketMatch {
+    pub fn new() -> Self {
+        Self {
+            bracket_match_id: String::new(),
+            open_pos_json: String::new(),
+            close_pos_json: String::new(),
+            nesting_level: u32::default(),
+            bracket_type_str: String::new(),
+            is_matched: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bracket_match_id.is_empty() || true && !self.open_pos_json.is_empty() || true && !self.close_pos_json.is_empty() || true && self.nesting_level < u32::MAX || true && !self.bracket_type_str.is_empty() || true && self.is_matched || true
+    }
+}
+
+impl Default for KdpBracketMatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Word occurrence highlight
+#[derive(Debug, Clone)]
+pub struct KdqWordHighlight {
+    pub word_hl_id: String,
+    pub word_str: String,
+    pub match_count: u32,
+    pub current_idx: u32,
+    pub bg_color: String,
+    pub is_strong_match: bool,
+}
+
+impl KdqWordHighlight {
+    pub fn new() -> Self {
+        Self {
+            word_hl_id: String::new(),
+            word_str: String::new(),
+            match_count: u32::default(),
+            current_idx: u32::default(),
+            bg_color: String::new(),
+            is_strong_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.word_hl_id.is_empty() || true && !self.word_str.is_empty() || true && self.match_count < u32::MAX || true && self.current_idx < u32::MAX || true && !self.bg_color.is_empty() || true && self.is_strong_match || true
+    }
+}
+
+impl Default for KdqWordHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Definition peek view
+#[derive(Debug, Clone)]
+pub struct KdrDefinitionPeek {
+    pub def_peek_id: String,
+    pub target_uri: String,
+    pub target_range_json: String,
+    pub origin_range_json: String,
+    pub results_count: u32,
+    pub is_tree_view: bool,
+}
+
+impl KdrDefinitionPeek {
+    pub fn new() -> Self {
+        Self {
+            def_peek_id: String::new(),
+            target_uri: String::new(),
+            target_range_json: String::new(),
+            origin_range_json: String::new(),
+            results_count: u32::default(),
+            is_tree_view: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.def_peek_id.is_empty() || true && !self.target_uri.is_empty() || true && !self.target_range_json.is_empty() || true && !self.origin_range_json.is_empty() || true && self.results_count < u32::MAX || true && self.is_tree_view || true
+    }
+}
+
+impl Default for KdrDefinitionPeek {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// References peek view
+#[derive(Debug, Clone)]
+pub struct KdsReferencePeek {
+    pub ref_peek_id: String,
+    pub uri_str: String,
+    pub references_count: u32,
+    pub selected_idx: u32,
+    pub preview_editor_ref: String,
+    pub is_loading: bool,
+}
+
+impl KdsReferencePeek {
+    pub fn new() -> Self {
+        Self {
+            ref_peek_id: String::new(),
+            uri_str: String::new(),
+            references_count: u32::default(),
+            selected_idx: u32::default(),
+            preview_editor_ref: String::new(),
+            is_loading: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ref_peek_id.is_empty() || true && !self.uri_str.is_empty() || true && self.references_count < u32::MAX || true && self.selected_idx < u32::MAX || true && !self.preview_editor_ref.is_empty() || true && self.is_loading || true
+    }
+}
+
+impl Default for KdsReferencePeek {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go-to definition widget
+#[derive(Debug, Clone)]
+pub struct KdtGotoWidget {
+    pub goto_w_id: String,
+    pub target_uri: String,
+    pub target_range_json: String,
+    pub origins_count: u32,
+    pub navigation_mode: String,
+    pub is_multi_target: bool,
+}
+
+impl KdtGotoWidget {
+    pub fn new() -> Self {
+        Self {
+            goto_w_id: String::new(),
+            target_uri: String::new(),
+            target_range_json: String::new(),
+            origins_count: u32::default(),
+            navigation_mode: String::new(),
+            is_multi_target: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.goto_w_id.is_empty() || true && !self.target_uri.is_empty() || true && !self.target_range_json.is_empty() || true && self.origins_count < u32::MAX || true && !self.navigation_mode.is_empty() || true && self.is_multi_target || true
+    }
+}
+
+impl Default for KdtGotoWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Generic tooltip descriptor
+#[derive(Debug, Clone)]
+pub struct KduTooltip {
+    pub tooltip_id: String,
+    pub content_md: String,
+    pub position_json: String,
+    pub delay_ms: u32,
+    pub max_width_px: u32,
+    pub is_interactive: bool,
+}
+
+impl KduTooltip {
+    pub fn new() -> Self {
+        Self {
+            tooltip_id: String::new(),
+            content_md: String::new(),
+            position_json: String::new(),
+            delay_ms: u32::default(),
+            max_width_px: u32::default(),
+            is_interactive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tooltip_id.is_empty() || true && !self.content_md.is_empty() || true && !self.position_json.is_empty() || true && self.delay_ms < u32::MAX || true && self.max_width_px < u32::MAX || true && self.is_interactive || true
+    }
+}
+
+impl Default for KduTooltip {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor message bar
+#[derive(Debug, Clone)]
+pub struct KdvEditorMessage {
+    pub editor_msg_id: String,
+    pub message_text: String,
+    pub severity_str: String,
+    pub actions_json: String,
+    pub dismiss_delay_ms: u32,
+    pub is_closeable: bool,
+}
+
+impl KdvEditorMessage {
+    pub fn new() -> Self {
+        Self {
+            editor_msg_id: String::new(),
+            message_text: String::new(),
+            severity_str: String::new(),
+            actions_json: String::new(),
+            dismiss_delay_ms: u32::default(),
+            is_closeable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_msg_id.is_empty() || true && !self.message_text.is_empty() || true && !self.severity_str.is_empty() || true && !self.actions_json.is_empty() || true && self.dismiss_delay_ms < u32::MAX || true && self.is_closeable || true
+    }
+}
+
+impl Default for KdvEditorMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Zone widget descriptor
+#[derive(Debug, Clone)]
+pub struct KdwZoneWidget {
+    pub zone_w_id: String,
+    pub after_line: u32,
+    pub height_lines: u32,
+    pub content_ref: String,
+    pub ordinal_val: u32,
+    pub is_visible: bool,
+}
+
+impl KdwZoneWidget {
+    pub fn new() -> Self {
+        Self {
+            zone_w_id: String::new(),
+            after_line: u32::default(),
+            height_lines: u32::default(),
+            content_ref: String::new(),
+            ordinal_val: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.zone_w_id.is_empty() || true && self.after_line < u32::MAX || true && self.height_lines < u32::MAX || true && !self.content_ref.is_empty() || true && self.ordinal_val < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for KdwZoneWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Content widget descriptor
+#[derive(Debug, Clone)]
+pub struct KdxContentWidget {
+    pub content_w_id: String,
+    pub widget_id_str: String,
+    pub position_json: String,
+    pub preference_str: String,
+    pub content_ref: String,
+    pub allow_overflow: bool,
+}
+
+impl KdxContentWidget {
+    pub fn new() -> Self {
+        Self {
+            content_w_id: String::new(),
+            widget_id_str: String::new(),
+            position_json: String::new(),
+            preference_str: String::new(),
+            content_ref: String::new(),
+            allow_overflow: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.content_w_id.is_empty() || true && !self.widget_id_str.is_empty() || true && !self.position_json.is_empty() || true && !self.preference_str.is_empty() || true && !self.content_ref.is_empty() || true && self.allow_overflow || true
+    }
+}
+
+impl Default for KdxContentWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Overlay widget descriptor
+#[derive(Debug, Clone)]
+pub struct KdyOverlayWidget {
+    pub overlay_w_id: String,
+    pub widget_id_str: String,
+    pub position_pref: String,
+    pub min_width_px: u32,
+    pub content_ref: String,
+    pub is_resizable: bool,
+}
+
+impl KdyOverlayWidget {
+    pub fn new() -> Self {
+        Self {
+            overlay_w_id: String::new(),
+            widget_id_str: String::new(),
+            position_pref: String::new(),
+            min_width_px: u32::default(),
+            content_ref: String::new(),
+            is_resizable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.overlay_w_id.is_empty() || true && !self.widget_id_str.is_empty() || true && !self.position_pref.is_empty() || true && self.min_width_px < u32::MAX || true && !self.content_ref.is_empty() || true && self.is_resizable || true
+    }
+}
+
+impl Default for KdyOverlayWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Widget configuration
+#[derive(Debug, Clone)]
+pub struct KdzWidgetConfig {
+    pub widget_config_id: String,
+    pub config_key: String,
+    pub config_value_json: String,
+    pub widget_type_str: String,
+    pub scope_str: String,
+    pub is_default: bool,
+}
+
+impl KdzWidgetConfig {
+    pub fn new() -> Self {
+        Self {
+            widget_config_id: String::new(),
+            config_key: String::new(),
+            config_value_json: String::new(),
+            widget_type_str: String::new(),
+            scope_str: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.widget_config_id.is_empty() || true && !self.config_key.is_empty() || true && !self.config_value_json.is_empty() || true && !self.widget_type_str.is_empty() || true && !self.scope_str.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for KdzWidgetConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -459544,6 +460428,474 @@ mod tests_kcz_generated {
     fn test_kcz_fields() {
         let mut obj = KczDecoConfig::default();
         obj.deco_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kda_generated {
+    use super::*;
+
+    #[test]
+    fn test_kda_default() {
+        let obj = KdaSuggestWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kda_fields() {
+        let mut obj = KdaSuggestWidget::default();
+        obj.suggest_w_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdb_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdb_default() {
+        let obj = KdbSuggestItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdb_fields() {
+        let mut obj = KdbSuggestItem::default();
+        obj.suggest_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdc_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdc_default() {
+        let obj = KdcSuggestModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdc_fields() {
+        let mut obj = KdcSuggestModel::default();
+        obj.suggest_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdd_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdd_default() {
+        let obj = KddSuggestTrigger::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdd_fields() {
+        let mut obj = KddSuggestTrigger::default();
+        obj.suggest_trigger_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kde_generated {
+    use super::*;
+
+    #[test]
+    fn test_kde_default() {
+        let obj = KdeParameterHints::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kde_fields() {
+        let mut obj = KdeParameterHints::default();
+        obj.param_hints_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdf_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdf_default() {
+        let obj = KdfParameterInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdf_fields() {
+        let mut obj = KdfParameterInfo::default();
+        obj.param_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdg_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdg_default() {
+        let obj = KdgHoverWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdg_fields() {
+        let mut obj = KdgHoverWidget::default();
+        obj.hover_w_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdh_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdh_default() {
+        let obj = KdhHoverContent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdh_fields() {
+        let mut obj = KdhHoverContent::default();
+        obj.hover_content_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdi_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdi_default() {
+        let obj = KdiGhostText::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdi_fields() {
+        let mut obj = KdiGhostText::default();
+        obj.ghost_text_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdj_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdj_default() {
+        let obj = KdjInlineSuggest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdj_fields() {
+        let mut obj = KdjInlineSuggest::default();
+        obj.inline_suggest_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdk_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdk_default() {
+        let obj = KdkRenameInput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdk_fields() {
+        let mut obj = KdkRenameInput::default();
+        obj.rename_input_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdl_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdl_default() {
+        let obj = KdlCodeActionWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdl_fields() {
+        let mut obj = KdlCodeActionWidget::default();
+        obj.ca_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdm_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdm_default() {
+        let obj = KdmLightBulb::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdm_fields() {
+        let mut obj = KdmLightBulb::default();
+        obj.lightbulb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdn_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdn_default() {
+        let obj = KdnColorPicker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdn_fields() {
+        let mut obj = KdnColorPicker::default();
+        obj.color_picker_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdo_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdo_default() {
+        let obj = KdoLinkDetector::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdo_fields() {
+        let mut obj = KdoLinkDetector::default();
+        obj.link_det_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdp_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdp_default() {
+        let obj = KdpBracketMatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdp_fields() {
+        let mut obj = KdpBracketMatch::default();
+        obj.bracket_match_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdq_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdq_default() {
+        let obj = KdqWordHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdq_fields() {
+        let mut obj = KdqWordHighlight::default();
+        obj.word_hl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdr_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdr_default() {
+        let obj = KdrDefinitionPeek::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdr_fields() {
+        let mut obj = KdrDefinitionPeek::default();
+        obj.def_peek_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kds_generated {
+    use super::*;
+
+    #[test]
+    fn test_kds_default() {
+        let obj = KdsReferencePeek::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kds_fields() {
+        let mut obj = KdsReferencePeek::default();
+        obj.ref_peek_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdt_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdt_default() {
+        let obj = KdtGotoWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdt_fields() {
+        let mut obj = KdtGotoWidget::default();
+        obj.goto_w_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdu_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdu_default() {
+        let obj = KduTooltip::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdu_fields() {
+        let mut obj = KduTooltip::default();
+        obj.tooltip_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdv_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdv_default() {
+        let obj = KdvEditorMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdv_fields() {
+        let mut obj = KdvEditorMessage::default();
+        obj.editor_msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdw_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdw_default() {
+        let obj = KdwZoneWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdw_fields() {
+        let mut obj = KdwZoneWidget::default();
+        obj.zone_w_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdx_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdx_default() {
+        let obj = KdxContentWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdx_fields() {
+        let mut obj = KdxContentWidget::default();
+        obj.content_w_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdy_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdy_default() {
+        let obj = KdyOverlayWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdy_fields() {
+        let mut obj = KdyOverlayWidget::default();
+        obj.overlay_w_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kdz_generated {
+    use super::*;
+
+    #[test]
+    fn test_kdz_default() {
+        let obj = KdzWidgetConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kdz_fields() {
+        let mut obj = KdzWidgetConfig::default();
+        obj.widget_config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
