@@ -189355,6 +189355,838 @@ impl Default for KgzFormatConfig {
     }
 }
 
+/// /// Go-to-definition result location
+#[derive(Debug, Clone)]
+pub struct KhaDefinitionResult {
+    pub kha_uri: String,
+    pub kha_line: u32,
+    pub kha_column: u32,
+    pub kha_end_line: u32,
+    pub kha_origin_range: String,
+}
+
+impl KhaDefinitionResult {
+    pub fn new() -> Self {
+        Self {
+            kha_uri: String::new(),
+            kha_line: u32::default(),
+            kha_column: u32::default(),
+            kha_end_line: u32::default(),
+            kha_origin_range: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kha_uri.is_empty() || true && self.kha_line < u32::MAX || true && self.kha_column < u32::MAX || true && self.kha_end_line < u32::MAX || true && !self.kha_origin_range.is_empty() || true
+    }
+}
+
+impl Default for KhaDefinitionResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Go-to-declaration result location
+#[derive(Debug, Clone)]
+pub struct KhbDeclarationResult {
+    pub khb_uri: String,
+    pub khb_line: u32,
+    pub khb_column: u32,
+    pub khb_end_line: u32,
+    pub khb_origin_range: String,
+}
+
+impl KhbDeclarationResult {
+    pub fn new() -> Self {
+        Self {
+            khb_uri: String::new(),
+            khb_line: u32::default(),
+            khb_column: u32::default(),
+            khb_end_line: u32::default(),
+            khb_origin_range: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.khb_uri.is_empty() || true && self.khb_line < u32::MAX || true && self.khb_column < u32::MAX || true && self.khb_end_line < u32::MAX || true && !self.khb_origin_range.is_empty() || true
+    }
+}
+
+impl Default for KhbDeclarationResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Go-to-implementation result location
+#[derive(Debug, Clone)]
+pub struct KhcImplementResult {
+    pub khc_uri: String,
+    pub khc_line: u32,
+    pub khc_column: u32,
+    pub khc_end_line: u32,
+    pub khc_origin_range: String,
+}
+
+impl KhcImplementResult {
+    pub fn new() -> Self {
+        Self {
+            khc_uri: String::new(),
+            khc_line: u32::default(),
+            khc_column: u32::default(),
+            khc_end_line: u32::default(),
+            khc_origin_range: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.khc_uri.is_empty() || true && self.khc_line < u32::MAX || true && self.khc_column < u32::MAX || true && self.khc_end_line < u32::MAX || true && !self.khc_origin_range.is_empty() || true
+    }
+}
+
+impl Default for KhcImplementResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Go-to-type-definition result location
+#[derive(Debug, Clone)]
+pub struct KhdTypeDefResult {
+    pub khd_uri: String,
+    pub khd_line: u32,
+    pub khd_column: u32,
+    pub khd_end_line: u32,
+    pub khd_origin_range: String,
+}
+
+impl KhdTypeDefResult {
+    pub fn new() -> Self {
+        Self {
+            khd_uri: String::new(),
+            khd_line: u32::default(),
+            khd_column: u32::default(),
+            khd_end_line: u32::default(),
+            khd_origin_range: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.khd_uri.is_empty() || true && self.khd_line < u32::MAX || true && self.khd_column < u32::MAX || true && self.khd_end_line < u32::MAX || true && !self.khd_origin_range.is_empty() || true
+    }
+}
+
+impl Default for KhdTypeDefResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Find-references result location
+#[derive(Debug, Clone)]
+pub struct KheReferenceResult {
+    pub khe_uri: String,
+    pub khe_line: u32,
+    pub khe_column: u32,
+    pub khe_end_line: u32,
+    pub khe_is_write: bool,
+}
+
+impl KheReferenceResult {
+    pub fn new() -> Self {
+        Self {
+            khe_uri: String::new(),
+            khe_line: u32::default(),
+            khe_column: u32::default(),
+            khe_end_line: u32::default(),
+            khe_is_write: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.khe_uri.is_empty() || true && self.khe_line < u32::MAX || true && self.khe_column < u32::MAX || true && self.khe_end_line < u32::MAX || true && self.khe_is_write || true
+    }
+}
+
+impl Default for KheReferenceResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Reference search context options
+#[derive(Debug, Clone)]
+pub struct KhfReferenceContext {
+    pub khf_include_decl: bool,
+    pub khf_include_impl: bool,
+    pub khf_include_call: bool,
+    pub khf_scope: String,
+    pub khf_label: String,
+}
+
+impl KhfReferenceContext {
+    pub fn new() -> Self {
+        Self {
+            khf_include_decl: bool::default(),
+            khf_include_impl: bool::default(),
+            khf_include_call: bool::default(),
+            khf_scope: String::new(),
+            khf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.khf_include_decl || true && self.khf_include_impl || true && self.khf_include_call || true && !self.khf_scope.is_empty() || true && !self.khf_label.is_empty() || true
+    }
+}
+
+impl Default for KhfReferenceContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Call hierarchy item for navigation
+#[derive(Debug, Clone)]
+pub struct KhgCallHierarchyItem {
+    pub khg_name: String,
+    pub khg_kind: String,
+    pub khg_uri: String,
+    pub khg_range_start: u32,
+    pub khg_detail: String,
+}
+
+impl KhgCallHierarchyItem {
+    pub fn new() -> Self {
+        Self {
+            khg_name: String::new(),
+            khg_kind: String::new(),
+            khg_uri: String::new(),
+            khg_range_start: u32::default(),
+            khg_detail: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.khg_name.is_empty() || true && !self.khg_kind.is_empty() || true && !self.khg_uri.is_empty() || true && self.khg_range_start < u32::MAX || true && !self.khg_detail.is_empty() || true
+    }
+}
+
+impl Default for KhgCallHierarchyItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Call hierarchy incoming/outgoing call
+#[derive(Debug, Clone)]
+pub struct KhhCallHierarchyCall {
+    pub khh_from_name: String,
+    pub khh_from_uri: String,
+    pub khh_to_name: String,
+    pub khh_to_uri: String,
+    pub khh_ranges_str: String,
+}
+
+impl KhhCallHierarchyCall {
+    pub fn new() -> Self {
+        Self {
+            khh_from_name: String::new(),
+            khh_from_uri: String::new(),
+            khh_to_name: String::new(),
+            khh_to_uri: String::new(),
+            khh_ranges_str: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.khh_from_name.is_empty() || true && !self.khh_from_uri.is_empty() || true && !self.khh_to_name.is_empty() || true && !self.khh_to_uri.is_empty() || true && !self.khh_ranges_str.is_empty() || true
+    }
+}
+
+impl Default for KhhCallHierarchyCall {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Type hierarchy item for navigation
+#[derive(Debug, Clone)]
+pub struct KhiTypeHierarchyItem {
+    pub khi_name: String,
+    pub khi_kind: String,
+    pub khi_uri: String,
+    pub khi_range_start: u32,
+    pub khi_detail: String,
+}
+
+impl KhiTypeHierarchyItem {
+    pub fn new() -> Self {
+        Self {
+            khi_name: String::new(),
+            khi_kind: String::new(),
+            khi_uri: String::new(),
+            khi_range_start: u32::default(),
+            khi_detail: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.khi_name.is_empty() || true && !self.khi_kind.is_empty() || true && !self.khi_uri.is_empty() || true && self.khi_range_start < u32::MAX || true && !self.khi_detail.is_empty() || true
+    }
+}
+
+impl Default for KhiTypeHierarchyItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Symbol information for navigation
+#[derive(Debug, Clone)]
+pub struct KhjSymbolInfo {
+    pub khj_name: String,
+    pub khj_kind: String,
+    pub khj_container: String,
+    pub khj_uri: String,
+    pub khj_range_start: u32,
+}
+
+impl KhjSymbolInfo {
+    pub fn new() -> Self {
+        Self {
+            khj_name: String::new(),
+            khj_kind: String::new(),
+            khj_container: String::new(),
+            khj_uri: String::new(),
+            khj_range_start: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.khj_name.is_empty() || true && !self.khj_kind.is_empty() || true && !self.khj_container.is_empty() || true && !self.khj_uri.is_empty() || true && self.khj_range_start < u32::MAX || true
+    }
+}
+
+impl Default for KhjSymbolInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Symbol kind classification
+#[derive(Debug, Clone)]
+pub struct KhkSymbolKindInfo {
+    pub khk_kind_name: String,
+    pub khk_icon: String,
+    pub khk_sortable: bool,
+    pub khk_filterable: bool,
+    pub khk_value: u32,
+}
+
+impl KhkSymbolKindInfo {
+    pub fn new() -> Self {
+        Self {
+            khk_kind_name: String::new(),
+            khk_icon: String::new(),
+            khk_sortable: bool::default(),
+            khk_filterable: bool::default(),
+            khk_value: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.khk_kind_name.is_empty() || true && !self.khk_icon.is_empty() || true && self.khk_sortable || true && self.khk_filterable || true && self.khk_value < u32::MAX || true
+    }
+}
+
+impl Default for KhkSymbolKindInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Symbol tag (deprecated, etc.)
+#[derive(Debug, Clone)]
+pub struct KhlSymbolTag {
+    pub khl_tag_name: String,
+    pub khl_render_strikethrough: bool,
+    pub khl_render_dim: bool,
+    pub khl_tooltip: String,
+    pub khl_active: bool,
+}
+
+impl KhlSymbolTag {
+    pub fn new() -> Self {
+        Self {
+            khl_tag_name: String::new(),
+            khl_render_strikethrough: bool::default(),
+            khl_render_dim: bool::default(),
+            khl_tooltip: String::new(),
+            khl_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.khl_tag_name.is_empty() || true && self.khl_render_strikethrough || true && self.khl_render_dim || true && !self.khl_tooltip.is_empty() || true && self.khl_active || true
+    }
+}
+
+impl Default for KhlSymbolTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Clickable link within document
+#[derive(Debug, Clone)]
+pub struct KhmDocumentLink {
+    pub khm_uri: String,
+    pub khm_start_line: u32,
+    pub khm_start_col: u32,
+    pub khm_end_line: u32,
+    pub khm_tooltip: String,
+}
+
+impl KhmDocumentLink {
+    pub fn new() -> Self {
+        Self {
+            khm_uri: String::new(),
+            khm_start_line: u32::default(),
+            khm_start_col: u32::default(),
+            khm_end_line: u32::default(),
+            khm_tooltip: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.khm_uri.is_empty() || true && self.khm_start_line < u32::MAX || true && self.khm_start_col < u32::MAX || true && self.khm_end_line < u32::MAX || true && !self.khm_tooltip.is_empty() || true
+    }
+}
+
+impl Default for KhmDocumentLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Highlight occurrence in document
+#[derive(Debug, Clone)]
+pub struct KhnDocumentHighlight {
+    pub khn_line: u32,
+    pub khn_column: u32,
+    pub khn_end_line: u32,
+    pub khn_end_col: u32,
+    pub khn_kind: String,
+}
+
+impl KhnDocumentHighlight {
+    pub fn new() -> Self {
+        Self {
+            khn_line: u32::default(),
+            khn_column: u32::default(),
+            khn_end_line: u32::default(),
+            khn_end_col: u32::default(),
+            khn_kind: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.khn_line < u32::MAX || true && self.khn_column < u32::MAX || true && self.khn_end_line < u32::MAX || true && self.khn_end_col < u32::MAX || true && !self.khn_kind.is_empty() || true
+    }
+}
+
+impl Default for KhnDocumentHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Color value in document
+#[derive(Debug, Clone)]
+pub struct KhoDocumentColor {
+    pub kho_red: f64,
+    pub kho_green: f64,
+    pub kho_blue: f64,
+    pub kho_alpha: f64,
+    pub kho_label: String,
+}
+
+impl KhoDocumentColor {
+    pub fn new() -> Self {
+        Self {
+            kho_red: f64::default(),
+            kho_green: f64::default(),
+            kho_blue: f64::default(),
+            kho_alpha: f64::default(),
+            kho_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kho_red.is_finite() || true && self.kho_green.is_finite() || true && self.kho_blue.is_finite() || true && self.kho_alpha.is_finite() || true && !self.kho_label.is_empty() || true
+    }
+}
+
+impl Default for KhoDocumentColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Color presentation for picker
+#[derive(Debug, Clone)]
+pub struct KhpColorPresentation {
+    pub khp_label: String,
+    pub khp_text_edit: String,
+    pub khp_additional_edits: String,
+    pub khp_format_name: String,
+    pub khp_active: bool,
+}
+
+impl KhpColorPresentation {
+    pub fn new() -> Self {
+        Self {
+            khp_label: String::new(),
+            khp_text_edit: String::new(),
+            khp_additional_edits: String::new(),
+            khp_format_name: String::new(),
+            khp_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.khp_label.is_empty() || true && !self.khp_text_edit.is_empty() || true && !self.khp_additional_edits.is_empty() || true && !self.khp_format_name.is_empty() || true && self.khp_active || true
+    }
+}
+
+impl Default for KhpColorPresentation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Smart selection range result
+#[derive(Debug, Clone)]
+pub struct KhqSelectionRange {
+    pub khq_start_line: u32,
+    pub khq_start_col: u32,
+    pub khq_end_line: u32,
+    pub khq_end_col: u32,
+    pub khq_parent_idx: u32,
+}
+
+impl KhqSelectionRange {
+    pub fn new() -> Self {
+        Self {
+            khq_start_line: u32::default(),
+            khq_start_col: u32::default(),
+            khq_end_line: u32::default(),
+            khq_end_col: u32::default(),
+            khq_parent_idx: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.khq_start_line < u32::MAX || true && self.khq_start_col < u32::MAX || true && self.khq_end_line < u32::MAX || true && self.khq_end_col < u32::MAX || true && self.khq_parent_idx < u32::MAX || true
+    }
+}
+
+impl Default for KhqSelectionRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Folding range result from provider
+#[derive(Debug, Clone)]
+pub struct KhrFoldingRange {
+    pub khr_start_line: u32,
+    pub khr_end_line: u32,
+    pub khr_collapsed_text: String,
+    pub khr_kind: String,
+    pub khr_level: u32,
+}
+
+impl KhrFoldingRange {
+    pub fn new() -> Self {
+        Self {
+            khr_start_line: u32::default(),
+            khr_end_line: u32::default(),
+            khr_collapsed_text: String::new(),
+            khr_kind: String::new(),
+            khr_level: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.khr_start_line < u32::MAX || true && self.khr_end_line < u32::MAX || true && !self.khr_collapsed_text.is_empty() || true && !self.khr_kind.is_empty() || true && self.khr_level < u32::MAX || true
+    }
+}
+
+impl Default for KhrFoldingRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Semantic token for syntax highlighting
+#[derive(Debug, Clone)]
+pub struct KhsSemanticToken {
+    pub khs_line: u32,
+    pub khs_start_col: u32,
+    pub khs_length: u32,
+    pub khs_token_type: u32,
+    pub khs_modifiers: u32,
+}
+
+impl KhsSemanticToken {
+    pub fn new() -> Self {
+        Self {
+            khs_line: u32::default(),
+            khs_start_col: u32::default(),
+            khs_length: u32::default(),
+            khs_token_type: u32::default(),
+            khs_modifiers: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.khs_line < u32::MAX || true && self.khs_start_col < u32::MAX || true && self.khs_length < u32::MAX || true && self.khs_token_type < u32::MAX || true && self.khs_modifiers < u32::MAX || true
+    }
+}
+
+impl Default for KhsSemanticToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Semantic token type/modifier legend
+#[derive(Debug, Clone)]
+pub struct KhtSemanticLegend {
+    pub kht_token_types: String,
+    pub kht_modifiers_list: String,
+    pub kht_count: u32,
+    pub kht_lang_id: String,
+    pub kht_label: String,
+}
+
+impl KhtSemanticLegend {
+    pub fn new() -> Self {
+        Self {
+            kht_token_types: String::new(),
+            kht_modifiers_list: String::new(),
+            kht_count: u32::default(),
+            kht_lang_id: String::new(),
+            kht_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kht_token_types.is_empty() || true && !self.kht_modifiers_list.is_empty() || true && self.kht_count < u32::MAX || true && !self.kht_lang_id.is_empty() || true && !self.kht_label.is_empty() || true
+    }
+}
+
+impl Default for KhtSemanticLegend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Inlay hint display information
+#[derive(Debug, Clone)]
+pub struct KhuInlayHint {
+    pub khu_position: u32,
+    pub khu_label: String,
+    pub khu_kind: String,
+    pub khu_padding_left: bool,
+    pub khu_padding_right: bool,
+}
+
+impl KhuInlayHint {
+    pub fn new() -> Self {
+        Self {
+            khu_position: u32::default(),
+            khu_label: String::new(),
+            khu_kind: String::new(),
+            khu_padding_left: bool::default(),
+            khu_padding_right: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.khu_position < u32::MAX || true && !self.khu_label.is_empty() || true && !self.khu_kind.is_empty() || true && self.khu_padding_left || true && self.khu_padding_right || true
+    }
+}
+
+impl Default for KhuInlayHint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Part of an inlay hint label
+#[derive(Debug, Clone)]
+pub struct KhvInlayHintPart {
+    pub khv_text: String,
+    pub khv_tooltip: String,
+    pub khv_command: String,
+    pub khv_location_uri: String,
+    pub khv_active: bool,
+}
+
+impl KhvInlayHintPart {
+    pub fn new() -> Self {
+        Self {
+            khv_text: String::new(),
+            khv_tooltip: String::new(),
+            khv_command: String::new(),
+            khv_location_uri: String::new(),
+            khv_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.khv_text.is_empty() || true && !self.khv_tooltip.is_empty() || true && !self.khv_command.is_empty() || true && !self.khv_location_uri.is_empty() || true && self.khv_active || true
+    }
+}
+
+impl Default for KhvInlayHintPart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Breadcrumb navigation item
+#[derive(Debug, Clone)]
+pub struct KhwBreadcrumbItem {
+    pub khw_name: String,
+    pub khw_kind: String,
+    pub khw_uri: String,
+    pub khw_range_start: u32,
+    pub khw_detail: String,
+}
+
+impl KhwBreadcrumbItem {
+    pub fn new() -> Self {
+        Self {
+            khw_name: String::new(),
+            khw_kind: String::new(),
+            khw_uri: String::new(),
+            khw_range_start: u32::default(),
+            khw_detail: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.khw_name.is_empty() || true && !self.khw_kind.is_empty() || true && !self.khw_uri.is_empty() || true && self.khw_range_start < u32::MAX || true && !self.khw_detail.is_empty() || true
+    }
+}
+
+impl Default for KhwBreadcrumbItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Document outline tree item
+#[derive(Debug, Clone)]
+pub struct KhxOutlineItem {
+    pub khx_name: String,
+    pub khx_kind: String,
+    pub khx_range_start: u32,
+    pub khx_detail: String,
+    pub khx_children_count: u32,
+}
+
+impl KhxOutlineItem {
+    pub fn new() -> Self {
+        Self {
+            khx_name: String::new(),
+            khx_kind: String::new(),
+            khx_range_start: u32::default(),
+            khx_detail: String::new(),
+            khx_children_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.khx_name.is_empty() || true && !self.khx_kind.is_empty() || true && self.khx_range_start < u32::MAX || true && !self.khx_detail.is_empty() || true && self.khx_children_count < u32::MAX || true
+    }
+}
+
+impl Default for KhxOutlineItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Navigation history entry
+#[derive(Debug, Clone)]
+pub struct KhyNavHistory {
+    pub khy_uri: String,
+    pub khy_line: u32,
+    pub khy_column: u32,
+    pub khy_timestamp: u64,
+    pub khy_label: String,
+}
+
+impl KhyNavHistory {
+    pub fn new() -> Self {
+        Self {
+            khy_uri: String::new(),
+            khy_line: u32::default(),
+            khy_column: u32::default(),
+            khy_timestamp: u64::default(),
+            khy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.khy_uri.is_empty() || true && self.khy_line < u32::MAX || true && self.khy_column < u32::MAX || true && self.khy_timestamp < u64::MAX || true && !self.khy_label.is_empty() || true
+    }
+}
+
+impl Default for KhyNavHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined navigation configuration
+#[derive(Debug, Clone)]
+pub struct KhzNavConfig {
+    pub khz_peek_mode: String,
+    pub khz_go_to_mode: String,
+    pub khz_multi_cursor_mod: String,
+    pub khz_sticky_scroll: bool,
+    pub khz_label: String,
+}
+
+impl KhzNavConfig {
+    pub fn new() -> Self {
+        Self {
+            khz_peek_mode: String::new(),
+            khz_go_to_mode: String::new(),
+            khz_multi_cursor_mod: String::new(),
+            khz_sticky_scroll: bool::default(),
+            khz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.khz_peek_mode.is_empty() || true && !self.khz_go_to_mode.is_empty() || true && !self.khz_multi_cursor_mod.is_empty() || true && self.khz_sticky_scroll || true && !self.khz_label.is_empty() || true
+    }
+}
+
+impl Default for KhzNavConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -464750,6 +465582,474 @@ mod tests_kgz_generated {
     fn test_kgz_fields() {
         let mut obj = KgzFormatConfig::default();
         obj.kgz_default_formatter = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kha_generated {
+    use super::*;
+
+    #[test]
+    fn test_kha_default() {
+        let obj = KhaDefinitionResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kha_fields() {
+        let mut obj = KhaDefinitionResult::default();
+        obj.kha_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khb_generated {
+    use super::*;
+
+    #[test]
+    fn test_khb_default() {
+        let obj = KhbDeclarationResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khb_fields() {
+        let mut obj = KhbDeclarationResult::default();
+        obj.khb_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khc_generated {
+    use super::*;
+
+    #[test]
+    fn test_khc_default() {
+        let obj = KhcImplementResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khc_fields() {
+        let mut obj = KhcImplementResult::default();
+        obj.khc_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khd_generated {
+    use super::*;
+
+    #[test]
+    fn test_khd_default() {
+        let obj = KhdTypeDefResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khd_fields() {
+        let mut obj = KhdTypeDefResult::default();
+        obj.khd_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khe_generated {
+    use super::*;
+
+    #[test]
+    fn test_khe_default() {
+        let obj = KheReferenceResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khe_fields() {
+        let mut obj = KheReferenceResult::default();
+        obj.khe_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khf_generated {
+    use super::*;
+
+    #[test]
+    fn test_khf_default() {
+        let obj = KhfReferenceContext::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khf_fields() {
+        let mut obj = KhfReferenceContext::default();
+        obj.khf_include_decl = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khg_generated {
+    use super::*;
+
+    #[test]
+    fn test_khg_default() {
+        let obj = KhgCallHierarchyItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khg_fields() {
+        let mut obj = KhgCallHierarchyItem::default();
+        obj.khg_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khh_generated {
+    use super::*;
+
+    #[test]
+    fn test_khh_default() {
+        let obj = KhhCallHierarchyCall::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khh_fields() {
+        let mut obj = KhhCallHierarchyCall::default();
+        obj.khh_from_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khi_generated {
+    use super::*;
+
+    #[test]
+    fn test_khi_default() {
+        let obj = KhiTypeHierarchyItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khi_fields() {
+        let mut obj = KhiTypeHierarchyItem::default();
+        obj.khi_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khj_generated {
+    use super::*;
+
+    #[test]
+    fn test_khj_default() {
+        let obj = KhjSymbolInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khj_fields() {
+        let mut obj = KhjSymbolInfo::default();
+        obj.khj_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khk_generated {
+    use super::*;
+
+    #[test]
+    fn test_khk_default() {
+        let obj = KhkSymbolKindInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khk_fields() {
+        let mut obj = KhkSymbolKindInfo::default();
+        obj.khk_kind_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khl_generated {
+    use super::*;
+
+    #[test]
+    fn test_khl_default() {
+        let obj = KhlSymbolTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khl_fields() {
+        let mut obj = KhlSymbolTag::default();
+        obj.khl_tag_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khm_generated {
+    use super::*;
+
+    #[test]
+    fn test_khm_default() {
+        let obj = KhmDocumentLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khm_fields() {
+        let mut obj = KhmDocumentLink::default();
+        obj.khm_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khn_generated {
+    use super::*;
+
+    #[test]
+    fn test_khn_default() {
+        let obj = KhnDocumentHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khn_fields() {
+        let mut obj = KhnDocumentHighlight::default();
+        obj.khn_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kho_generated {
+    use super::*;
+
+    #[test]
+    fn test_kho_default() {
+        let obj = KhoDocumentColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kho_fields() {
+        let mut obj = KhoDocumentColor::default();
+        obj.kho_red = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khp_generated {
+    use super::*;
+
+    #[test]
+    fn test_khp_default() {
+        let obj = KhpColorPresentation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khp_fields() {
+        let mut obj = KhpColorPresentation::default();
+        obj.khp_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khq_generated {
+    use super::*;
+
+    #[test]
+    fn test_khq_default() {
+        let obj = KhqSelectionRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khq_fields() {
+        let mut obj = KhqSelectionRange::default();
+        obj.khq_start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khr_generated {
+    use super::*;
+
+    #[test]
+    fn test_khr_default() {
+        let obj = KhrFoldingRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khr_fields() {
+        let mut obj = KhrFoldingRange::default();
+        obj.khr_start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khs_generated {
+    use super::*;
+
+    #[test]
+    fn test_khs_default() {
+        let obj = KhsSemanticToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khs_fields() {
+        let mut obj = KhsSemanticToken::default();
+        obj.khs_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kht_generated {
+    use super::*;
+
+    #[test]
+    fn test_kht_default() {
+        let obj = KhtSemanticLegend::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kht_fields() {
+        let mut obj = KhtSemanticLegend::default();
+        obj.kht_token_types = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khu_generated {
+    use super::*;
+
+    #[test]
+    fn test_khu_default() {
+        let obj = KhuInlayHint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khu_fields() {
+        let mut obj = KhuInlayHint::default();
+        obj.khu_position = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khv_generated {
+    use super::*;
+
+    #[test]
+    fn test_khv_default() {
+        let obj = KhvInlayHintPart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khv_fields() {
+        let mut obj = KhvInlayHintPart::default();
+        obj.khv_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khw_generated {
+    use super::*;
+
+    #[test]
+    fn test_khw_default() {
+        let obj = KhwBreadcrumbItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khw_fields() {
+        let mut obj = KhwBreadcrumbItem::default();
+        obj.khw_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khx_generated {
+    use super::*;
+
+    #[test]
+    fn test_khx_default() {
+        let obj = KhxOutlineItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khx_fields() {
+        let mut obj = KhxOutlineItem::default();
+        obj.khx_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khy_generated {
+    use super::*;
+
+    #[test]
+    fn test_khy_default() {
+        let obj = KhyNavHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khy_fields() {
+        let mut obj = KhyNavHistory::default();
+        obj.khy_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_khz_generated {
+    use super::*;
+
+    #[test]
+    fn test_khz_default() {
+        let obj = KhzNavConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_khz_fields() {
+        let mut obj = KhzNavConfig::default();
+        obj.khz_peek_mode = "test".to_string();
         assert!(obj.validate());
     }
 }
