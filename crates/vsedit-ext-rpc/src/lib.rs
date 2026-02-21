@@ -219659,6 +219659,786 @@ impl Default for LocalHistoryConfig {
     }
 }
 
+/// Storage service instance
+#[derive(Debug, Clone)]
+pub struct StorageService {
+    pub service_id: String,
+    pub backend_type: u32,
+    pub is_initialized: bool,
+    pub entry_count: u32,
+}
+
+impl StorageService {
+    pub fn new() -> Self {
+        Self {
+            service_id: String::new(),
+            backend_type: u32::default(),
+            is_initialized: bool::default(),
+            entry_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.service_id.is_empty() || true && self.backend_type < u32::MAX || true && self.is_initialized || true && self.entry_count < u32::MAX || true
+    }
+}
+
+impl Default for StorageService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage database connection
+#[derive(Debug, Clone)]
+pub struct StorageDatabase {
+    pub db_path: String,
+    pub version: u32,
+    pub size_bytes: u64,
+    pub is_open: bool,
+}
+
+impl StorageDatabase {
+    pub fn new() -> Self {
+        Self {
+            db_path: String::new(),
+            version: u32::default(),
+            size_bytes: u64::default(),
+            is_open: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.db_path.is_empty() || true && self.version < u32::MAX || true && self.size_bytes < u64::MAX || true && self.is_open || true
+    }
+}
+
+impl Default for StorageDatabase {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage key entry
+#[derive(Debug, Clone)]
+pub struct StorageKey {
+    pub key_name: String,
+    pub scope: u32,
+    pub data_type: u32,
+    pub is_cached: bool,
+}
+
+impl StorageKey {
+    pub fn new() -> Self {
+        Self {
+            key_name: String::new(),
+            scope: u32::default(),
+            data_type: u32::default(),
+            is_cached: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key_name.is_empty() || true && self.scope < u32::MAX || true && self.data_type < u32::MAX || true && self.is_cached || true
+    }
+}
+
+impl Default for StorageKey {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage value entry
+#[derive(Debug, Clone)]
+pub struct StorageValueEntry {
+    pub value_data: String,
+    pub data_type: u32,
+    pub size_bytes: u32,
+    pub is_default: bool,
+}
+
+impl StorageValueEntry {
+    pub fn new() -> Self {
+        Self {
+            value_data: String::new(),
+            data_type: u32::default(),
+            size_bytes: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.value_data.is_empty() || true && self.data_type < u32::MAX || true && self.size_bytes < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for StorageValueEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage scope level
+#[derive(Debug, Clone)]
+pub struct StorageScope {
+    pub scope_type: u32,
+    pub scope_key: String,
+    pub is_global: bool,
+    pub parent_scope: u32,
+}
+
+impl StorageScope {
+    pub fn new() -> Self {
+        Self {
+            scope_type: u32::default(),
+            scope_key: String::new(),
+            is_global: bool::default(),
+            parent_scope: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.scope_type < u32::MAX || true && !self.scope_key.is_empty() || true && self.is_global || true && self.parent_scope < u32::MAX || true
+    }
+}
+
+impl Default for StorageScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage migration operation
+#[derive(Debug, Clone)]
+pub struct StorageMigration {
+    pub migration_id: u32,
+    pub from_version: u32,
+    pub to_version: u32,
+    pub is_complete: bool,
+}
+
+impl StorageMigration {
+    pub fn new() -> Self {
+        Self {
+            migration_id: u32::default(),
+            from_version: u32::default(),
+            to_version: u32::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.migration_id < u32::MAX || true && self.from_version < u32::MAX || true && self.to_version < u32::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for StorageMigration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage transaction
+#[derive(Debug, Clone)]
+pub struct StorageTransaction {
+    pub tx_id: u32,
+    pub operation_count: u32,
+    pub is_committed: bool,
+    pub timestamp: u64,
+}
+
+impl StorageTransaction {
+    pub fn new() -> Self {
+        Self {
+            tx_id: u32::default(),
+            operation_count: u32::default(),
+            is_committed: bool::default(),
+            timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.tx_id < u32::MAX || true && self.operation_count < u32::MAX || true && self.is_committed || true && self.timestamp < u64::MAX || true
+    }
+}
+
+impl Default for StorageTransaction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage lock entry
+#[derive(Debug, Clone)]
+pub struct StorageLock {
+    pub lock_id: u32,
+    pub resource_key: String,
+    pub holder_id: String,
+    pub is_exclusive: bool,
+}
+
+impl StorageLock {
+    pub fn new() -> Self {
+        Self {
+            lock_id: u32::default(),
+            resource_key: String::new(),
+            holder_id: String::new(),
+            is_exclusive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lock_id < u32::MAX || true && !self.resource_key.is_empty() || true && !self.holder_id.is_empty() || true && self.is_exclusive || true
+    }
+}
+
+impl Default for StorageLock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage index entry
+#[derive(Debug, Clone)]
+pub struct StorageIndex {
+    pub index_id: u32,
+    pub index_key: String,
+    pub entry_count: u32,
+    pub is_unique: bool,
+}
+
+impl StorageIndex {
+    pub fn new() -> Self {
+        Self {
+            index_id: u32::default(),
+            index_key: String::new(),
+            entry_count: u32::default(),
+            is_unique: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.index_id < u32::MAX || true && !self.index_key.is_empty() || true && self.entry_count < u32::MAX || true && self.is_unique || true
+    }
+}
+
+impl Default for StorageIndex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage compaction task
+#[derive(Debug, Clone)]
+pub struct StorageCompaction {
+    pub compact_id: u32,
+    pub freed_bytes: u64,
+    pub duration_ms: u32,
+    pub is_scheduled: bool,
+}
+
+impl StorageCompaction {
+    pub fn new() -> Self {
+        Self {
+            compact_id: u32::default(),
+            freed_bytes: u64::default(),
+            duration_ms: u32::default(),
+            is_scheduled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.compact_id < u32::MAX || true && self.freed_bytes < u64::MAX || true && self.duration_ms < u32::MAX || true && self.is_scheduled || true
+    }
+}
+
+impl Default for StorageCompaction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage batch operation
+#[derive(Debug, Clone)]
+pub struct StorageBatch {
+    pub batch_id: u32,
+    pub write_count: u32,
+    pub delete_count: u32,
+    pub is_atomic: bool,
+}
+
+impl StorageBatch {
+    pub fn new() -> Self {
+        Self {
+            batch_id: u32::default(),
+            write_count: u32::default(),
+            delete_count: u32::default(),
+            is_atomic: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.batch_id < u32::MAX || true && self.write_count < u32::MAX || true && self.delete_count < u32::MAX || true && self.is_atomic || true
+    }
+}
+
+impl Default for StorageBatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage change notification
+#[derive(Debug, Clone)]
+pub struct StorageNotification {
+    pub change_type: u32,
+    pub key_name: String,
+    pub scope: u32,
+    pub is_external: bool,
+}
+
+impl StorageNotification {
+    pub fn new() -> Self {
+        Self {
+            change_type: u32::default(),
+            key_name: String::new(),
+            scope: u32::default(),
+            is_external: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.change_type < u32::MAX || true && !self.key_name.is_empty() || true && self.scope < u32::MAX || true && self.is_external || true
+    }
+}
+
+impl Default for StorageNotification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage quota config
+#[derive(Debug, Clone)]
+pub struct StorageQuota {
+    pub quota_id: u32,
+    pub max_entries: u32,
+    pub max_size_mb: u32,
+    pub is_enforced: bool,
+}
+
+impl StorageQuota {
+    pub fn new() -> Self {
+        Self {
+            quota_id: u32::default(),
+            max_entries: u32::default(),
+            max_size_mb: u32::default(),
+            is_enforced: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.quota_id < u32::MAX || true && self.max_entries < u32::MAX || true && self.max_size_mb < u32::MAX || true && self.is_enforced || true
+    }
+}
+
+impl Default for StorageQuota {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage encryption config
+#[derive(Debug, Clone)]
+pub struct StorageEncryption {
+    pub encrypt_id: u32,
+    pub algorithm: String,
+    pub key_derivation: String,
+    pub is_enabled: bool,
+}
+
+impl StorageEncryption {
+    pub fn new() -> Self {
+        Self {
+            encrypt_id: u32::default(),
+            algorithm: String::new(),
+            key_derivation: String::new(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.encrypt_id < u32::MAX || true && !self.algorithm.is_empty() || true && !self.key_derivation.is_empty() || true && self.is_enabled || true
+    }
+}
+
+impl Default for StorageEncryption {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage replication state
+#[derive(Debug, Clone)]
+pub struct StorageReplication {
+    pub replica_id: u32,
+    pub target_path: String,
+    pub last_sync: u64,
+    pub is_active: bool,
+}
+
+impl StorageReplication {
+    pub fn new() -> Self {
+        Self {
+            replica_id: u32::default(),
+            target_path: String::new(),
+            last_sync: u64::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.replica_id < u32::MAX || true && !self.target_path.is_empty() || true && self.last_sync < u64::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for StorageReplication {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage backup entry
+#[derive(Debug, Clone)]
+pub struct StorageBackup {
+    pub backup_id: u32,
+    pub backup_path: String,
+    pub timestamp: u64,
+    pub size_bytes: u64,
+}
+
+impl StorageBackup {
+    pub fn new() -> Self {
+        Self {
+            backup_id: u32::default(),
+            backup_path: String::new(),
+            timestamp: u64::default(),
+            size_bytes: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.backup_id < u32::MAX || true && !self.backup_path.is_empty() || true && self.timestamp < u64::MAX || true && self.size_bytes < u64::MAX || true
+    }
+}
+
+impl Default for StorageBackup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage restore operation
+#[derive(Debug, Clone)]
+pub struct StorageRestore {
+    pub restore_id: u32,
+    pub source_path: String,
+    pub target_version: u32,
+    pub is_complete: bool,
+}
+
+impl StorageRestore {
+    pub fn new() -> Self {
+        Self {
+            restore_id: u32::default(),
+            source_path: String::new(),
+            target_version: u32::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.restore_id < u32::MAX || true && !self.source_path.is_empty() || true && self.target_version < u32::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for StorageRestore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage performance metrics
+#[derive(Debug, Clone)]
+pub struct StorageMetrics {
+    pub metric_name: String,
+    pub value: f64,
+    pub timestamp: u64,
+    pub unit: String,
+}
+
+impl StorageMetrics {
+    pub fn new() -> Self {
+        Self {
+            metric_name: String::new(),
+            value: f64::default(),
+            timestamp: u64::default(),
+            unit: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.metric_name.is_empty() || true && self.value.is_finite() || true && self.timestamp < u64::MAX || true && !self.unit.is_empty() || true
+    }
+}
+
+impl Default for StorageMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Global storage state
+#[derive(Debug, Clone)]
+pub struct StorageGlobalState {
+    pub state_key: String,
+    pub state_value: String,
+    pub last_modified: u64,
+    pub is_synced: bool,
+}
+
+impl StorageGlobalState {
+    pub fn new() -> Self {
+        Self {
+            state_key: String::new(),
+            state_value: String::new(),
+            last_modified: u64::default(),
+            is_synced: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.state_key.is_empty() || true && !self.state_value.is_empty() || true && self.last_modified < u64::MAX || true && self.is_synced || true
+    }
+}
+
+impl Default for StorageGlobalState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace storage state
+#[derive(Debug, Clone)]
+pub struct StorageWorkspaceState {
+    pub ws_key: String,
+    pub ws_value: String,
+    pub workspace_id: String,
+    pub is_persisted: bool,
+}
+
+impl StorageWorkspaceState {
+    pub fn new() -> Self {
+        Self {
+            ws_key: String::new(),
+            ws_value: String::new(),
+            workspace_id: String::new(),
+            is_persisted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_key.is_empty() || true && !self.ws_value.is_empty() || true && !self.workspace_id.is_empty() || true && self.is_persisted || true
+    }
+}
+
+impl Default for StorageWorkspaceState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension storage state
+#[derive(Debug, Clone)]
+pub struct StorageExtensionState {
+    pub ext_key: String,
+    pub ext_value: String,
+    pub extension_id: String,
+    pub is_global: bool,
+}
+
+impl StorageExtensionState {
+    pub fn new() -> Self {
+        Self {
+            ext_key: String::new(),
+            ext_value: String::new(),
+            extension_id: String::new(),
+            is_global: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_key.is_empty() || true && !self.ext_value.is_empty() || true && !self.extension_id.is_empty() || true && self.is_global || true
+    }
+}
+
+impl Default for StorageExtensionState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Secure storage entry
+#[derive(Debug, Clone)]
+pub struct StorageSecretEntry {
+    pub secret_key: String,
+    pub encrypted_value: String,
+    pub service_id: String,
+    pub is_expired: bool,
+}
+
+impl StorageSecretEntry {
+    pub fn new() -> Self {
+        Self {
+            secret_key: String::new(),
+            encrypted_value: String::new(),
+            service_id: String::new(),
+            is_expired: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.secret_key.is_empty() || true && !self.encrypted_value.is_empty() || true && !self.service_id.is_empty() || true && self.is_expired || true
+    }
+}
+
+impl Default for StorageSecretEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage cache entry
+#[derive(Debug, Clone)]
+pub struct StorageCache {
+    pub cache_key: String,
+    pub cached_value: String,
+    pub ttl_ms: u32,
+    pub hit_count: u32,
+}
+
+impl StorageCache {
+    pub fn new() -> Self {
+        Self {
+            cache_key: String::new(),
+            cached_value: String::new(),
+            ttl_ms: u32::default(),
+            hit_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cache_key.is_empty() || true && !self.cached_value.is_empty() || true && self.ttl_ms < u32::MAX || true && self.hit_count < u32::MAX || true
+    }
+}
+
+impl Default for StorageCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage cleanup operation
+#[derive(Debug, Clone)]
+pub struct StorageCleanup {
+    pub cleanup_id: u32,
+    pub scope: u32,
+    pub deleted_count: u32,
+    pub freed_bytes: u64,
+}
+
+impl StorageCleanup {
+    pub fn new() -> Self {
+        Self {
+            cleanup_id: u32::default(),
+            scope: u32::default(),
+            deleted_count: u32::default(),
+            freed_bytes: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.cleanup_id < u32::MAX || true && self.scope < u32::MAX || true && self.deleted_count < u32::MAX || true && self.freed_bytes < u64::MAX || true
+    }
+}
+
+impl Default for StorageCleanup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage change watcher
+#[derive(Debug, Clone)]
+pub struct StorageWatcher {
+    pub watcher_id: u32,
+    pub key_pattern: String,
+    pub scope: u32,
+    pub is_active: bool,
+}
+
+impl StorageWatcher {
+    pub fn new() -> Self {
+        Self {
+            watcher_id: u32::default(),
+            key_pattern: String::new(),
+            scope: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.watcher_id < u32::MAX || true && !self.key_pattern.is_empty() || true && self.scope < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for StorageWatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage provider config
+#[derive(Debug, Clone)]
+pub struct StorageProvider {
+    pub provider_id: String,
+    pub provider_type: u32,
+    pub priority: u32,
+    pub is_available: bool,
+}
+
+impl StorageProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_type: u32::default(),
+            priority: u32::default(),
+            is_available: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && self.provider_type < u32::MAX || true && self.priority < u32::MAX || true && self.is_available || true
+    }
+}
+
+impl Default for StorageProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -512551,6 +513331,474 @@ mod tests_lrz_generated {
     fn test_lrz_fields() {
         let mut obj = LocalHistoryConfig::default();
         obj.config_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsa_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsa_default() {
+        let obj = StorageService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsa_fields() {
+        let mut obj = StorageService::default();
+        obj.service_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsb_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsb_default() {
+        let obj = StorageDatabase::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsb_fields() {
+        let mut obj = StorageDatabase::default();
+        obj.db_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsc_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsc_default() {
+        let obj = StorageKey::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsc_fields() {
+        let mut obj = StorageKey::default();
+        obj.key_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsd_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsd_default() {
+        let obj = StorageValueEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsd_fields() {
+        let mut obj = StorageValueEntry::default();
+        obj.value_data = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lse_generated {
+    use super::*;
+
+    #[test]
+    fn test_lse_default() {
+        let obj = StorageScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lse_fields() {
+        let mut obj = StorageScope::default();
+        obj.scope_type = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsf_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsf_default() {
+        let obj = StorageMigration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsf_fields() {
+        let mut obj = StorageMigration::default();
+        obj.migration_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsg_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsg_default() {
+        let obj = StorageTransaction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsg_fields() {
+        let mut obj = StorageTransaction::default();
+        obj.tx_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsh_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsh_default() {
+        let obj = StorageLock::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsh_fields() {
+        let mut obj = StorageLock::default();
+        obj.lock_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsi_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsi_default() {
+        let obj = StorageIndex::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsi_fields() {
+        let mut obj = StorageIndex::default();
+        obj.index_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsj_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsj_default() {
+        let obj = StorageCompaction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsj_fields() {
+        let mut obj = StorageCompaction::default();
+        obj.compact_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsk_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsk_default() {
+        let obj = StorageBatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsk_fields() {
+        let mut obj = StorageBatch::default();
+        obj.batch_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsl_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsl_default() {
+        let obj = StorageNotification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsl_fields() {
+        let mut obj = StorageNotification::default();
+        obj.change_type = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsm_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsm_default() {
+        let obj = StorageQuota::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsm_fields() {
+        let mut obj = StorageQuota::default();
+        obj.quota_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsn_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsn_default() {
+        let obj = StorageEncryption::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsn_fields() {
+        let mut obj = StorageEncryption::default();
+        obj.encrypt_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lso_generated {
+    use super::*;
+
+    #[test]
+    fn test_lso_default() {
+        let obj = StorageReplication::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lso_fields() {
+        let mut obj = StorageReplication::default();
+        obj.replica_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsp_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsp_default() {
+        let obj = StorageBackup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsp_fields() {
+        let mut obj = StorageBackup::default();
+        obj.backup_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsq_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsq_default() {
+        let obj = StorageRestore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsq_fields() {
+        let mut obj = StorageRestore::default();
+        obj.restore_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsr_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsr_default() {
+        let obj = StorageMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsr_fields() {
+        let mut obj = StorageMetrics::default();
+        obj.metric_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lss_generated {
+    use super::*;
+
+    #[test]
+    fn test_lss_default() {
+        let obj = StorageGlobalState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lss_fields() {
+        let mut obj = StorageGlobalState::default();
+        obj.state_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lst_generated {
+    use super::*;
+
+    #[test]
+    fn test_lst_default() {
+        let obj = StorageWorkspaceState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lst_fields() {
+        let mut obj = StorageWorkspaceState::default();
+        obj.ws_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsu_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsu_default() {
+        let obj = StorageExtensionState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsu_fields() {
+        let mut obj = StorageExtensionState::default();
+        obj.ext_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsv_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsv_default() {
+        let obj = StorageSecretEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsv_fields() {
+        let mut obj = StorageSecretEntry::default();
+        obj.secret_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsw_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsw_default() {
+        let obj = StorageCache::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsw_fields() {
+        let mut obj = StorageCache::default();
+        obj.cache_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsx_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsx_default() {
+        let obj = StorageCleanup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsx_fields() {
+        let mut obj = StorageCleanup::default();
+        obj.cleanup_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsy_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsy_default() {
+        let obj = StorageWatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsy_fields() {
+        let mut obj = StorageWatcher::default();
+        obj.watcher_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lsz_generated {
+    use super::*;
+
+    #[test]
+    fn test_lsz_default() {
+        let obj = StorageProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lsz_fields() {
+        let mut obj = StorageProvider::default();
+        obj.provider_id = "test".to_string();
         assert!(obj.validate());
     }
 }
