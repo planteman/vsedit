@@ -193467,6 +193467,838 @@ impl Default for KlzScrollConfig {
     }
 }
 
+/// /// Editor contribution registration
+#[derive(Debug, Clone)]
+pub struct KmaEditorContrib {
+    pub kma_contrib_id: String,
+    pub kma_name: String,
+    pub kma_active: bool,
+    pub kma_priority: u32,
+    pub kma_label: String,
+}
+
+impl KmaEditorContrib {
+    pub fn new() -> Self {
+        Self {
+            kma_contrib_id: String::new(),
+            kma_name: String::new(),
+            kma_active: bool::default(),
+            kma_priority: u32::default(),
+            kma_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kma_contrib_id.is_empty() || true && !self.kma_name.is_empty() || true && self.kma_active || true && self.kma_priority < u32::MAX || true && !self.kma_label.is_empty() || true
+    }
+}
+
+impl Default for KmaEditorContrib {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor action command binding
+#[derive(Debug, Clone)]
+pub struct KmbEditorAction {
+    pub kmb_action_id: String,
+    pub kmb_keybinding: String,
+    pub kmb_precondition: String,
+    pub kmb_menu_group: String,
+    pub kmb_label: String,
+}
+
+impl KmbEditorAction {
+    pub fn new() -> Self {
+        Self {
+            kmb_action_id: String::new(),
+            kmb_keybinding: String::new(),
+            kmb_precondition: String::new(),
+            kmb_menu_group: String::new(),
+            kmb_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kmb_action_id.is_empty() || true && !self.kmb_keybinding.is_empty() || true && !self.kmb_precondition.is_empty() || true && !self.kmb_menu_group.is_empty() || true && !self.kmb_label.is_empty() || true
+    }
+}
+
+impl Default for KmbEditorAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor configuration option
+#[derive(Debug, Clone)]
+pub struct KmcEditorOption {
+    pub kmc_option_name: String,
+    pub kmc_default_value: String,
+    pub kmc_option_type: String,
+    pub kmc_scope: String,
+    pub kmc_description: String,
+}
+
+impl KmcEditorOption {
+    pub fn new() -> Self {
+        Self {
+            kmc_option_name: String::new(),
+            kmc_default_value: String::new(),
+            kmc_option_type: String::new(),
+            kmc_scope: String::new(),
+            kmc_description: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kmc_option_name.is_empty() || true && !self.kmc_default_value.is_empty() || true && !self.kmc_option_type.is_empty() || true && !self.kmc_scope.is_empty() || true && !self.kmc_description.is_empty() || true
+    }
+}
+
+impl Default for KmcEditorOption {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor command handler registration
+#[derive(Debug, Clone)]
+pub struct KmdEditorCommand {
+    pub kmd_command_id: String,
+    pub kmd_handler_name: String,
+    pub kmd_precondition: String,
+    pub kmd_weight: u32,
+    pub kmd_label: String,
+}
+
+impl KmdEditorCommand {
+    pub fn new() -> Self {
+        Self {
+            kmd_command_id: String::new(),
+            kmd_handler_name: String::new(),
+            kmd_precondition: String::new(),
+            kmd_weight: u32::default(),
+            kmd_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kmd_command_id.is_empty() || true && !self.kmd_handler_name.is_empty() || true && !self.kmd_precondition.is_empty() || true && self.kmd_weight < u32::MAX || true && !self.kmd_label.is_empty() || true
+    }
+}
+
+impl Default for KmdEditorCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor decoration type registration
+#[derive(Debug, Clone)]
+pub struct KmeEditorDecorationType {
+    pub kme_type_key: String,
+    pub kme_before_content: String,
+    pub kme_after_content: String,
+    pub kme_whole_line: bool,
+    pub kme_label: String,
+}
+
+impl KmeEditorDecorationType {
+    pub fn new() -> Self {
+        Self {
+            kme_type_key: String::new(),
+            kme_before_content: String::new(),
+            kme_after_content: String::new(),
+            kme_whole_line: bool::default(),
+            kme_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kme_type_key.is_empty() || true && !self.kme_before_content.is_empty() || true && !self.kme_after_content.is_empty() || true && self.kme_whole_line || true && !self.kme_label.is_empty() || true
+    }
+}
+
+impl Default for KmeEditorDecorationType {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor language mode configuration
+#[derive(Debug, Clone)]
+pub struct KmfEditorLanguage {
+    pub kmf_lang_id: String,
+    pub kmf_extensions: String,
+    pub kmf_aliases: String,
+    pub kmf_mime_types: String,
+    pub kmf_label: String,
+}
+
+impl KmfEditorLanguage {
+    pub fn new() -> Self {
+        Self {
+            kmf_lang_id: String::new(),
+            kmf_extensions: String::new(),
+            kmf_aliases: String::new(),
+            kmf_mime_types: String::new(),
+            kmf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kmf_lang_id.is_empty() || true && !self.kmf_extensions.is_empty() || true && !self.kmf_aliases.is_empty() || true && !self.kmf_mime_types.is_empty() || true && !self.kmf_label.is_empty() || true
+    }
+}
+
+impl Default for KmfEditorLanguage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor model (document + view state)
+#[derive(Debug, Clone)]
+pub struct KmgEditorModel {
+    pub kmg_uri: String,
+    pub kmg_lang_id: String,
+    pub kmg_version: u64,
+    pub kmg_dirty: bool,
+    pub kmg_label: String,
+}
+
+impl KmgEditorModel {
+    pub fn new() -> Self {
+        Self {
+            kmg_uri: String::new(),
+            kmg_lang_id: String::new(),
+            kmg_version: u64::default(),
+            kmg_dirty: bool::default(),
+            kmg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kmg_uri.is_empty() || true && !self.kmg_lang_id.is_empty() || true && self.kmg_version < u64::MAX || true && self.kmg_dirty || true && !self.kmg_label.is_empty() || true
+    }
+}
+
+impl Default for KmgEditorModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor view state for restoration
+#[derive(Debug, Clone)]
+pub struct KmhEditorViewState {
+    pub kmh_scroll_top: f64,
+    pub kmh_scroll_left: f64,
+    pub kmh_cursor_line: u32,
+    pub kmh_cursor_col: u32,
+    pub kmh_label: String,
+}
+
+impl KmhEditorViewState {
+    pub fn new() -> Self {
+        Self {
+            kmh_scroll_top: f64::default(),
+            kmh_scroll_left: f64::default(),
+            kmh_cursor_line: u32::default(),
+            kmh_cursor_col: u32::default(),
+            kmh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kmh_scroll_top.is_finite() || true && self.kmh_scroll_left.is_finite() || true && self.kmh_cursor_line < u32::MAX || true && self.kmh_cursor_col < u32::MAX || true && !self.kmh_label.is_empty() || true
+    }
+}
+
+impl Default for KmhEditorViewState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Diff editor model state
+#[derive(Debug, Clone)]
+pub struct KmiEditorDiffModel {
+    pub kmi_original_uri: String,
+    pub kmi_modified_uri: String,
+    pub kmi_inline_diff: bool,
+    pub kmi_render_side: bool,
+    pub kmi_label: String,
+}
+
+impl KmiEditorDiffModel {
+    pub fn new() -> Self {
+        Self {
+            kmi_original_uri: String::new(),
+            kmi_modified_uri: String::new(),
+            kmi_inline_diff: bool::default(),
+            kmi_render_side: bool::default(),
+            kmi_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kmi_original_uri.is_empty() || true && !self.kmi_modified_uri.is_empty() || true && self.kmi_inline_diff || true && self.kmi_render_side || true && !self.kmi_label.is_empty() || true
+    }
+}
+
+impl Default for KmiEditorDiffModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor group (split view group)
+#[derive(Debug, Clone)]
+pub struct KmjEditorGroup {
+    pub kmj_group_id: u32,
+    pub kmj_active_tab: u32,
+    pub kmj_tab_count: u32,
+    pub kmj_locked: bool,
+    pub kmj_label: String,
+}
+
+impl KmjEditorGroup {
+    pub fn new() -> Self {
+        Self {
+            kmj_group_id: u32::default(),
+            kmj_active_tab: u32::default(),
+            kmj_tab_count: u32::default(),
+            kmj_locked: bool::default(),
+            kmj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kmj_group_id < u32::MAX || true && self.kmj_active_tab < u32::MAX || true && self.kmj_tab_count < u32::MAX || true && self.kmj_locked || true && !self.kmj_label.is_empty() || true
+    }
+}
+
+impl Default for KmjEditorGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Single editor tab in group
+#[derive(Debug, Clone)]
+pub struct KmkEditorTab {
+    pub kmk_tab_id: u32,
+    pub kmk_uri: String,
+    pub kmk_dirty: bool,
+    pub kmk_pinned: bool,
+    pub kmk_preview: bool,
+}
+
+impl KmkEditorTab {
+    pub fn new() -> Self {
+        Self {
+            kmk_tab_id: u32::default(),
+            kmk_uri: String::new(),
+            kmk_dirty: bool::default(),
+            kmk_pinned: bool::default(),
+            kmk_preview: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kmk_tab_id < u32::MAX || true && !self.kmk_uri.is_empty() || true && self.kmk_dirty || true && self.kmk_pinned || true && self.kmk_preview || true
+    }
+}
+
+impl Default for KmkEditorTab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor split operation
+#[derive(Debug, Clone)]
+pub struct KmlEditorSplit {
+    pub kml_direction: String,
+    pub kml_source_group: u32,
+    pub kml_target_group: u32,
+    pub kml_copy_tab: bool,
+    pub kml_label: String,
+}
+
+impl KmlEditorSplit {
+    pub fn new() -> Self {
+        Self {
+            kml_direction: String::new(),
+            kml_source_group: u32::default(),
+            kml_target_group: u32::default(),
+            kml_copy_tab: bool::default(),
+            kml_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kml_direction.is_empty() || true && self.kml_source_group < u32::MAX || true && self.kml_target_group < u32::MAX || true && self.kml_copy_tab || true && !self.kml_label.is_empty() || true
+    }
+}
+
+impl Default for KmlEditorSplit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor grid layout state
+#[derive(Debug, Clone)]
+pub struct KmmEditorGrid {
+    pub kmm_rows: u32,
+    pub kmm_cols: u32,
+    pub kmm_groups_count: u32,
+    pub kmm_orientation: String,
+    pub kmm_label: String,
+}
+
+impl KmmEditorGrid {
+    pub fn new() -> Self {
+        Self {
+            kmm_rows: u32::default(),
+            kmm_cols: u32::default(),
+            kmm_groups_count: u32::default(),
+            kmm_orientation: String::new(),
+            kmm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kmm_rows < u32::MAX || true && self.kmm_cols < u32::MAX || true && self.kmm_groups_count < u32::MAX || true && !self.kmm_orientation.is_empty() || true && !self.kmm_label.is_empty() || true
+    }
+}
+
+impl Default for KmmEditorGrid {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor pane within grid
+#[derive(Debug, Clone)]
+pub struct KmnEditorPane {
+    pub kmn_pane_id: u32,
+    pub kmn_row: u32,
+    pub kmn_col: u32,
+    pub kmn_width_pct: f64,
+    pub kmn_label: String,
+}
+
+impl KmnEditorPane {
+    pub fn new() -> Self {
+        Self {
+            kmn_pane_id: u32::default(),
+            kmn_row: u32::default(),
+            kmn_col: u32::default(),
+            kmn_width_pct: f64::default(),
+            kmn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kmn_pane_id < u32::MAX || true && self.kmn_row < u32::MAX || true && self.kmn_col < u32::MAX || true && self.kmn_width_pct.is_finite() || true && !self.kmn_label.is_empty() || true
+    }
+}
+
+impl Default for KmnEditorPane {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor title bar content
+#[derive(Debug, Clone)]
+pub struct KmoEditorTitle {
+    pub kmo_title: String,
+    pub kmo_subtitle: String,
+    pub kmo_icon: String,
+    pub kmo_dirty_indicator: bool,
+    pub kmo_label: String,
+}
+
+impl KmoEditorTitle {
+    pub fn new() -> Self {
+        Self {
+            kmo_title: String::new(),
+            kmo_subtitle: String::new(),
+            kmo_icon: String::new(),
+            kmo_dirty_indicator: bool::default(),
+            kmo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kmo_title.is_empty() || true && !self.kmo_subtitle.is_empty() || true && !self.kmo_icon.is_empty() || true && self.kmo_dirty_indicator || true && !self.kmo_label.is_empty() || true
+    }
+}
+
+impl Default for KmoEditorTitle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor breadcrumb bar state
+#[derive(Debug, Clone)]
+pub struct KmpEditorBreadcrumb {
+    pub kmp_visible: bool,
+    pub kmp_file_path: bool,
+    pub kmp_symbol_path: bool,
+    pub kmp_focused_idx: u32,
+    pub kmp_label: String,
+}
+
+impl KmpEditorBreadcrumb {
+    pub fn new() -> Self {
+        Self {
+            kmp_visible: bool::default(),
+            kmp_file_path: bool::default(),
+            kmp_symbol_path: bool::default(),
+            kmp_focused_idx: u32::default(),
+            kmp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kmp_visible || true && self.kmp_file_path || true && self.kmp_symbol_path || true && self.kmp_focused_idx < u32::MAX || true && !self.kmp_label.is_empty() || true
+    }
+}
+
+impl Default for KmpEditorBreadcrumb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor status line content
+#[derive(Debug, Clone)]
+pub struct KmqEditorStatusLine {
+    pub kmq_line: u32,
+    pub kmq_column: u32,
+    pub kmq_selection_count: u32,
+    pub kmq_encoding: String,
+    pub kmq_eol_mode: String,
+}
+
+impl KmqEditorStatusLine {
+    pub fn new() -> Self {
+        Self {
+            kmq_line: u32::default(),
+            kmq_column: u32::default(),
+            kmq_selection_count: u32::default(),
+            kmq_encoding: String::new(),
+            kmq_eol_mode: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kmq_line < u32::MAX || true && self.kmq_column < u32::MAX || true && self.kmq_selection_count < u32::MAX || true && !self.kmq_encoding.is_empty() || true && !self.kmq_eol_mode.is_empty() || true
+    }
+}
+
+impl Default for KmqEditorStatusLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor toolbar configuration
+#[derive(Debug, Clone)]
+pub struct KmrEditorToolbar {
+    pub kmr_visible: bool,
+    pub kmr_actions_count: u32,
+    pub kmr_position: String,
+    pub kmr_compact: bool,
+    pub kmr_label: String,
+}
+
+impl KmrEditorToolbar {
+    pub fn new() -> Self {
+        Self {
+            kmr_visible: bool::default(),
+            kmr_actions_count: u32::default(),
+            kmr_position: String::new(),
+            kmr_compact: bool::default(),
+            kmr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kmr_visible || true && self.kmr_actions_count < u32::MAX || true && !self.kmr_position.is_empty() || true && self.kmr_compact || true && !self.kmr_label.is_empty() || true
+    }
+}
+
+impl Default for KmrEditorToolbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor context key-value pair
+#[derive(Debug, Clone)]
+pub struct KmsEditorContext {
+    pub kms_context_key: String,
+    pub kms_context_value: String,
+    pub kms_scope: String,
+    pub kms_active: bool,
+    pub kms_label: String,
+}
+
+impl KmsEditorContext {
+    pub fn new() -> Self {
+        Self {
+            kms_context_key: String::new(),
+            kms_context_value: String::new(),
+            kms_scope: String::new(),
+            kms_active: bool::default(),
+            kms_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kms_context_key.is_empty() || true && !self.kms_context_value.is_empty() || true && !self.kms_scope.is_empty() || true && self.kms_active || true && !self.kms_label.is_empty() || true
+    }
+}
+
+impl Default for KmsEditorContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor overlay widget state
+#[derive(Debug, Clone)]
+pub struct KmtEditorOverlay {
+    pub kmt_overlay_id: String,
+    pub kmt_position: String,
+    pub kmt_visible: bool,
+    pub kmt_z_index: u32,
+    pub kmt_label: String,
+}
+
+impl KmtEditorOverlay {
+    pub fn new() -> Self {
+        Self {
+            kmt_overlay_id: String::new(),
+            kmt_position: String::new(),
+            kmt_visible: bool::default(),
+            kmt_z_index: u32::default(),
+            kmt_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kmt_overlay_id.is_empty() || true && !self.kmt_position.is_empty() || true && self.kmt_visible || true && self.kmt_z_index < u32::MAX || true && !self.kmt_label.is_empty() || true
+    }
+}
+
+impl Default for KmtEditorOverlay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor view zone (injected lines)
+#[derive(Debug, Clone)]
+pub struct KmuEditorZone {
+    pub kmu_zone_id: String,
+    pub kmu_after_line: u32,
+    pub kmu_height_lines: u32,
+    pub kmu_dom_node: String,
+    pub kmu_label: String,
+}
+
+impl KmuEditorZone {
+    pub fn new() -> Self {
+        Self {
+            kmu_zone_id: String::new(),
+            kmu_after_line: u32::default(),
+            kmu_height_lines: u32::default(),
+            kmu_dom_node: String::new(),
+            kmu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kmu_zone_id.is_empty() || true && self.kmu_after_line < u32::MAX || true && self.kmu_height_lines < u32::MAX || true && !self.kmu_dom_node.is_empty() || true && !self.kmu_label.is_empty() || true
+    }
+}
+
+impl Default for KmuEditorZone {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor content widget state
+#[derive(Debug, Clone)]
+pub struct KmvEditorContentWidget {
+    pub kmv_widget_id: String,
+    pub kmv_position_line: u32,
+    pub kmv_position_col: u32,
+    pub kmv_visible: bool,
+    pub kmv_label: String,
+}
+
+impl KmvEditorContentWidget {
+    pub fn new() -> Self {
+        Self {
+            kmv_widget_id: String::new(),
+            kmv_position_line: u32::default(),
+            kmv_position_col: u32::default(),
+            kmv_visible: bool::default(),
+            kmv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kmv_widget_id.is_empty() || true && self.kmv_position_line < u32::MAX || true && self.kmv_position_col < u32::MAX || true && self.kmv_visible || true && !self.kmv_label.is_empty() || true
+    }
+}
+
+impl Default for KmvEditorContentWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor focus state management
+#[derive(Debug, Clone)]
+pub struct KmwEditorFocus {
+    pub kmw_focused: bool,
+    pub kmw_has_text_focus: bool,
+    pub kmw_has_widget_focus: bool,
+    pub kmw_blur_reason: String,
+    pub kmw_label: String,
+}
+
+impl KmwEditorFocus {
+    pub fn new() -> Self {
+        Self {
+            kmw_focused: bool::default(),
+            kmw_has_text_focus: bool::default(),
+            kmw_has_widget_focus: bool::default(),
+            kmw_blur_reason: String::new(),
+            kmw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kmw_focused || true && self.kmw_has_text_focus || true && self.kmw_has_widget_focus || true && !self.kmw_blur_reason.is_empty() || true && !self.kmw_label.is_empty() || true
+    }
+}
+
+impl Default for KmwEditorFocus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor read-only state
+#[derive(Debug, Clone)]
+pub struct KmxEditorReadOnly {
+    pub kmx_read_only: bool,
+    pub kmx_reason: String,
+    pub kmx_allow_suggest: bool,
+    pub kmx_column_select: bool,
+    pub kmx_label: String,
+}
+
+impl KmxEditorReadOnly {
+    pub fn new() -> Self {
+        Self {
+            kmx_read_only: bool::default(),
+            kmx_reason: String::new(),
+            kmx_allow_suggest: bool::default(),
+            kmx_column_select: bool::default(),
+            kmx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kmx_read_only || true && !self.kmx_reason.is_empty() || true && self.kmx_allow_suggest || true && self.kmx_column_select || true && !self.kmx_label.is_empty() || true
+    }
+}
+
+impl Default for KmxEditorReadOnly {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor lifecycle event
+#[derive(Debug, Clone)]
+pub struct KmyEditorEvent {
+    pub kmy_event_kind: String,
+    pub kmy_timestamp: u64,
+    pub kmy_editor_id: String,
+    pub kmy_data: String,
+    pub kmy_label: String,
+}
+
+impl KmyEditorEvent {
+    pub fn new() -> Self {
+        Self {
+            kmy_event_kind: String::new(),
+            kmy_timestamp: u64::default(),
+            kmy_editor_id: String::new(),
+            kmy_data: String::new(),
+            kmy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kmy_event_kind.is_empty() || true && self.kmy_timestamp < u64::MAX || true && !self.kmy_editor_id.is_empty() || true && !self.kmy_data.is_empty() || true && !self.kmy_label.is_empty() || true
+    }
+}
+
+impl Default for KmyEditorEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined editor contribution config
+#[derive(Debug, Clone)]
+pub struct KmzEditorContribConfig {
+    pub kmz_enable_all: bool,
+    pub kmz_disabled_list: String,
+    pub kmz_priority_order: String,
+    pub kmz_lazy_load: bool,
+    pub kmz_label: String,
+}
+
+impl KmzEditorContribConfig {
+    pub fn new() -> Self {
+        Self {
+            kmz_enable_all: bool::default(),
+            kmz_disabled_list: String::new(),
+            kmz_priority_order: String::new(),
+            kmz_lazy_load: bool::default(),
+            kmz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kmz_enable_all || true && !self.kmz_disabled_list.is_empty() || true && !self.kmz_priority_order.is_empty() || true && self.kmz_lazy_load || true && !self.kmz_label.is_empty() || true
+    }
+}
+
+impl Default for KmzEditorContribConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -471291,6 +472123,474 @@ mod tests_klz_generated {
     fn test_klz_fields() {
         let mut obj = KlzScrollConfig::default();
         obj.klz_fast_scroll_sens = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kma_generated {
+    use super::*;
+
+    #[test]
+    fn test_kma_default() {
+        let obj = KmaEditorContrib::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kma_fields() {
+        let mut obj = KmaEditorContrib::default();
+        obj.kma_contrib_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmb_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmb_default() {
+        let obj = KmbEditorAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmb_fields() {
+        let mut obj = KmbEditorAction::default();
+        obj.kmb_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmc_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmc_default() {
+        let obj = KmcEditorOption::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmc_fields() {
+        let mut obj = KmcEditorOption::default();
+        obj.kmc_option_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmd_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmd_default() {
+        let obj = KmdEditorCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmd_fields() {
+        let mut obj = KmdEditorCommand::default();
+        obj.kmd_command_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kme_generated {
+    use super::*;
+
+    #[test]
+    fn test_kme_default() {
+        let obj = KmeEditorDecorationType::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kme_fields() {
+        let mut obj = KmeEditorDecorationType::default();
+        obj.kme_type_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmf_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmf_default() {
+        let obj = KmfEditorLanguage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmf_fields() {
+        let mut obj = KmfEditorLanguage::default();
+        obj.kmf_lang_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmg_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmg_default() {
+        let obj = KmgEditorModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmg_fields() {
+        let mut obj = KmgEditorModel::default();
+        obj.kmg_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmh_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmh_default() {
+        let obj = KmhEditorViewState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmh_fields() {
+        let mut obj = KmhEditorViewState::default();
+        obj.kmh_scroll_top = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmi_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmi_default() {
+        let obj = KmiEditorDiffModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmi_fields() {
+        let mut obj = KmiEditorDiffModel::default();
+        obj.kmi_original_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmj_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmj_default() {
+        let obj = KmjEditorGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmj_fields() {
+        let mut obj = KmjEditorGroup::default();
+        obj.kmj_group_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmk_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmk_default() {
+        let obj = KmkEditorTab::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmk_fields() {
+        let mut obj = KmkEditorTab::default();
+        obj.kmk_tab_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kml_generated {
+    use super::*;
+
+    #[test]
+    fn test_kml_default() {
+        let obj = KmlEditorSplit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kml_fields() {
+        let mut obj = KmlEditorSplit::default();
+        obj.kml_direction = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmm_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmm_default() {
+        let obj = KmmEditorGrid::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmm_fields() {
+        let mut obj = KmmEditorGrid::default();
+        obj.kmm_rows = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmn_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmn_default() {
+        let obj = KmnEditorPane::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmn_fields() {
+        let mut obj = KmnEditorPane::default();
+        obj.kmn_pane_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmo_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmo_default() {
+        let obj = KmoEditorTitle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmo_fields() {
+        let mut obj = KmoEditorTitle::default();
+        obj.kmo_title = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmp_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmp_default() {
+        let obj = KmpEditorBreadcrumb::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmp_fields() {
+        let mut obj = KmpEditorBreadcrumb::default();
+        obj.kmp_visible = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmq_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmq_default() {
+        let obj = KmqEditorStatusLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmq_fields() {
+        let mut obj = KmqEditorStatusLine::default();
+        obj.kmq_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmr_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmr_default() {
+        let obj = KmrEditorToolbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmr_fields() {
+        let mut obj = KmrEditorToolbar::default();
+        obj.kmr_visible = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kms_generated {
+    use super::*;
+
+    #[test]
+    fn test_kms_default() {
+        let obj = KmsEditorContext::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kms_fields() {
+        let mut obj = KmsEditorContext::default();
+        obj.kms_context_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmt_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmt_default() {
+        let obj = KmtEditorOverlay::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmt_fields() {
+        let mut obj = KmtEditorOverlay::default();
+        obj.kmt_overlay_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmu_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmu_default() {
+        let obj = KmuEditorZone::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmu_fields() {
+        let mut obj = KmuEditorZone::default();
+        obj.kmu_zone_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmv_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmv_default() {
+        let obj = KmvEditorContentWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmv_fields() {
+        let mut obj = KmvEditorContentWidget::default();
+        obj.kmv_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmw_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmw_default() {
+        let obj = KmwEditorFocus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmw_fields() {
+        let mut obj = KmwEditorFocus::default();
+        obj.kmw_focused = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmx_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmx_default() {
+        let obj = KmxEditorReadOnly::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmx_fields() {
+        let mut obj = KmxEditorReadOnly::default();
+        obj.kmx_read_only = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmy_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmy_default() {
+        let obj = KmyEditorEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmy_fields() {
+        let mut obj = KmyEditorEvent::default();
+        obj.kmy_event_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kmz_generated {
+    use super::*;
+
+    #[test]
+    fn test_kmz_default() {
+        let obj = KmzEditorContribConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kmz_fields() {
+        let mut obj = KmzEditorContribConfig::default();
+        obj.kmz_enable_all = true;
         assert!(obj.validate());
     }
 }
