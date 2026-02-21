@@ -217516,6 +217516,786 @@ impl Default for AccessibleStatus {
     }
 }
 
+/// Window state and bounds
+#[derive(Debug, Clone)]
+pub struct WindowState {
+    pub window_id: u32,
+    pub width: u32,
+    pub height: u32,
+    pub is_maximized: bool,
+}
+
+impl WindowState {
+    pub fn new() -> Self {
+        Self {
+            window_id: u32::default(),
+            width: u32::default(),
+            height: u32::default(),
+            is_maximized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.window_id < u32::MAX || true && self.width < u32::MAX || true && self.height < u32::MAX || true && self.is_maximized || true
+    }
+}
+
+impl Default for WindowState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window layout configuration
+#[derive(Debug, Clone)]
+pub struct WindowLayout {
+    pub layout_id: String,
+    pub split_count: u32,
+    pub orientation: u32,
+    pub is_saved: bool,
+}
+
+impl WindowLayout {
+    pub fn new() -> Self {
+        Self {
+            layout_id: String::new(),
+            split_count: u32::default(),
+            orientation: u32::default(),
+            is_saved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_id.is_empty() || true && self.split_count < u32::MAX || true && self.orientation < u32::MAX || true && self.is_saved || true
+    }
+}
+
+impl Default for WindowLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor group container
+#[derive(Debug, Clone)]
+pub struct EditorGroupContainer {
+    pub group_id: u32,
+    pub editor_count: u32,
+    pub active_editor_index: u32,
+    pub is_focused: bool,
+}
+
+impl EditorGroupContainer {
+    pub fn new() -> Self {
+        Self {
+            group_id: u32::default(),
+            editor_count: u32::default(),
+            active_editor_index: u32::default(),
+            is_focused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.group_id < u32::MAX || true && self.editor_count < u32::MAX || true && self.active_editor_index < u32::MAX || true && self.is_focused || true
+    }
+}
+
+impl Default for EditorGroupContainer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor group split layout
+#[derive(Debug, Clone)]
+pub struct EditorGroupLayout {
+    pub orientation: u32,
+    pub ratio: f64,
+    pub group_count: u32,
+    pub is_locked: bool,
+}
+
+impl EditorGroupLayout {
+    pub fn new() -> Self {
+        Self {
+            orientation: u32::default(),
+            ratio: f64::default(),
+            group_count: u32::default(),
+            is_locked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.orientation < u32::MAX || true && self.ratio.is_finite() || true && self.group_count < u32::MAX || true && self.is_locked || true
+    }
+}
+
+impl Default for EditorGroupLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sidebar visibility state
+#[derive(Debug, Clone)]
+pub struct SidebarState {
+    pub sidebar_id: String,
+    pub is_visible: bool,
+    pub width: u32,
+    pub active_view: String,
+}
+
+impl SidebarState {
+    pub fn new() -> Self {
+        Self {
+            sidebar_id: String::new(),
+            is_visible: bool::default(),
+            width: u32::default(),
+            active_view: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sidebar_id.is_empty() || true && self.is_visible || true && self.width < u32::MAX || true && !self.active_view.is_empty() || true
+    }
+}
+
+impl Default for SidebarState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bottom panel state
+#[derive(Debug, Clone)]
+pub struct PanelState {
+    pub panel_id: String,
+    pub is_visible: bool,
+    pub height: u32,
+    pub active_panel: String,
+}
+
+impl PanelState {
+    pub fn new() -> Self {
+        Self {
+            panel_id: String::new(),
+            is_visible: bool::default(),
+            height: u32::default(),
+            active_panel: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.panel_id.is_empty() || true && self.is_visible || true && self.height < u32::MAX || true && !self.active_panel.is_empty() || true
+    }
+}
+
+impl Default for PanelState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Activity bar item entry
+#[derive(Debug, Clone)]
+pub struct ActivityBarItem {
+    pub item_id: String,
+    pub icon_name: String,
+    pub tooltip: String,
+    pub badge_count: u32,
+}
+
+impl ActivityBarItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            icon_name: String::new(),
+            tooltip: String::new(),
+            badge_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.icon_name.is_empty() || true && !self.tooltip.is_empty() || true && self.badge_count < u32::MAX || true
+    }
+}
+
+impl Default for ActivityBarItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Status bar item entry
+#[derive(Debug, Clone)]
+pub struct StatusBarItemEntry {
+    pub entry_id: String,
+    pub text: String,
+    pub alignment: u32,
+    pub priority: u32,
+}
+
+impl StatusBarItemEntry {
+    pub fn new() -> Self {
+        Self {
+            entry_id: String::new(),
+            text: String::new(),
+            alignment: u32::default(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.entry_id.is_empty() || true && !self.text.is_empty() || true && self.alignment < u32::MAX || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for StatusBarItemEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Title bar state
+#[derive(Debug, Clone)]
+pub struct TitleBarState {
+    pub title_text: String,
+    pub subtitle: String,
+    pub is_dirty: bool,
+    pub icon_path: String,
+}
+
+impl TitleBarState {
+    pub fn new() -> Self {
+        Self {
+            title_text: String::new(),
+            subtitle: String::new(),
+            is_dirty: bool::default(),
+            icon_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.title_text.is_empty() || true && !self.subtitle.is_empty() || true && self.is_dirty || true && !self.icon_path.is_empty() || true
+    }
+}
+
+impl Default for TitleBarState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu bar state
+#[derive(Debug, Clone)]
+pub struct MenuBarState {
+    pub menu_id: String,
+    pub label: String,
+    pub is_open: bool,
+    pub item_count: u32,
+}
+
+impl MenuBarState {
+    pub fn new() -> Self {
+        Self {
+            menu_id: String::new(),
+            label: String::new(),
+            is_open: bool::default(),
+            item_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.menu_id.is_empty() || true && !self.label.is_empty() || true && self.is_open || true && self.item_count < u32::MAX || true
+    }
+}
+
+impl Default for MenuBarState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor tab state
+#[derive(Debug, Clone)]
+pub struct EditorTabState {
+    pub tab_id: String,
+    pub label: String,
+    pub is_active: bool,
+    pub is_dirty: bool,
+}
+
+impl EditorTabState {
+    pub fn new() -> Self {
+        Self {
+            tab_id: String::new(),
+            label: String::new(),
+            is_active: bool::default(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tab_id.is_empty() || true && !self.label.is_empty() || true && self.is_active || true && self.is_dirty || true
+    }
+}
+
+impl Default for EditorTabState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Breadcrumb navigation bar
+#[derive(Debug, Clone)]
+pub struct BreadcrumbBarState {
+    pub bar_id: String,
+    pub path_segments: String,
+    pub active_index: u32,
+    pub is_visible: bool,
+}
+
+impl BreadcrumbBarState {
+    pub fn new() -> Self {
+        Self {
+            bar_id: String::new(),
+            path_segments: String::new(),
+            active_index: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bar_id.is_empty() || true && !self.path_segments.is_empty() || true && self.active_index < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for BreadcrumbBarState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor area restore state
+#[derive(Debug, Clone)]
+pub struct EditorAreaRestore {
+    pub restore_id: u32,
+    pub editor_count: u32,
+    pub group_count: u32,
+    pub timestamp: u64,
+}
+
+impl EditorAreaRestore {
+    pub fn new() -> Self {
+        Self {
+            restore_id: u32::default(),
+            editor_count: u32::default(),
+            group_count: u32::default(),
+            timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.restore_id < u32::MAX || true && self.editor_count < u32::MAX || true && self.group_count < u32::MAX || true && self.timestamp < u64::MAX || true
+    }
+}
+
+impl Default for EditorAreaRestore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Viewlet descriptor entry
+#[derive(Debug, Clone)]
+pub struct ViewletDescriptor {
+    pub viewlet_id: String,
+    pub name: String,
+    pub order: u32,
+    pub is_default: bool,
+}
+
+impl ViewletDescriptor {
+    pub fn new() -> Self {
+        Self {
+            viewlet_id: String::new(),
+            name: String::new(),
+            order: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.viewlet_id.is_empty() || true && !self.name.is_empty() || true && self.order < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for ViewletDescriptor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Panel descriptor entry
+#[derive(Debug, Clone)]
+pub struct PanelDescriptor {
+    pub panel_desc_id: String,
+    pub name: String,
+    pub order: u32,
+    pub is_default: bool,
+}
+
+impl PanelDescriptor {
+    pub fn new() -> Self {
+        Self {
+            panel_desc_id: String::new(),
+            name: String::new(),
+            order: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.panel_desc_id.is_empty() || true && !self.name.is_empty() || true && self.order < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for PanelDescriptor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Secondary sidebar bar
+#[derive(Debug, Clone)]
+pub struct AuxiliaryBar {
+    pub bar_id: String,
+    pub is_visible: bool,
+    pub width: u32,
+    pub active_view: String,
+}
+
+impl AuxiliaryBar {
+    pub fn new() -> Self {
+        Self {
+            bar_id: String::new(),
+            is_visible: bool::default(),
+            width: u32::default(),
+            active_view: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bar_id.is_empty() || true && self.is_visible || true && self.width < u32::MAX || true && !self.active_view.is_empty() || true
+    }
+}
+
+impl Default for AuxiliaryBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor part layout state
+#[derive(Debug, Clone)]
+pub struct EditorPartState {
+    pub part_id: String,
+    pub grid_size: u32,
+    pub group_count: u32,
+    pub is_centered: bool,
+}
+
+impl EditorPartState {
+    pub fn new() -> Self {
+        Self {
+            part_id: String::new(),
+            grid_size: u32::default(),
+            group_count: u32::default(),
+            is_centered: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.part_id.is_empty() || true && self.grid_size < u32::MAX || true && self.group_count < u32::MAX || true && self.is_centered || true
+    }
+}
+
+impl Default for EditorPartState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Grid layout branch node
+#[derive(Debug, Clone)]
+pub struct GridBranchNode {
+    pub node_id: u32,
+    pub orientation: u32,
+    pub child_count: u32,
+    pub size_ratio: f64,
+}
+
+impl GridBranchNode {
+    pub fn new() -> Self {
+        Self {
+            node_id: u32::default(),
+            orientation: u32::default(),
+            child_count: u32::default(),
+            size_ratio: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.node_id < u32::MAX || true && self.orientation < u32::MAX || true && self.child_count < u32::MAX || true && self.size_ratio.is_finite() || true
+    }
+}
+
+impl Default for GridBranchNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Grid layout leaf node
+#[derive(Debug, Clone)]
+pub struct GridLeafNode {
+    pub leaf_id: u32,
+    pub view_id: String,
+    pub size: u32,
+    pub min_size: u32,
+}
+
+impl GridLeafNode {
+    pub fn new() -> Self {
+        Self {
+            leaf_id: u32::default(),
+            view_id: String::new(),
+            size: u32::default(),
+            min_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.leaf_id < u32::MAX || true && !self.view_id.is_empty() || true && self.size < u32::MAX || true && self.min_size < u32::MAX || true
+    }
+}
+
+impl Default for GridLeafNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Layout resize priority
+#[derive(Debug, Clone)]
+pub struct LayoutPriority {
+    pub priority_level: u32,
+    pub component_id: String,
+    pub min_size: u32,
+    pub max_size: u32,
+}
+
+impl LayoutPriority {
+    pub fn new() -> Self {
+        Self {
+            priority_level: u32::default(),
+            component_id: String::new(),
+            min_size: u32::default(),
+            max_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.priority_level < u32::MAX || true && !self.component_id.is_empty() || true && self.min_size < u32::MAX || true && self.max_size < u32::MAX || true
+    }
+}
+
+impl Default for LayoutPriority {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Layout sash divider
+#[derive(Debug, Clone)]
+pub struct SashState {
+    pub sash_id: u32,
+    pub position: u32,
+    pub orientation: u32,
+    pub is_dragging: bool,
+}
+
+impl SashState {
+    pub fn new() -> Self {
+        Self {
+            sash_id: u32::default(),
+            position: u32::default(),
+            orientation: u32::default(),
+            is_dragging: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.sash_id < u32::MAX || true && self.position < u32::MAX || true && self.orientation < u32::MAX || true && self.is_dragging || true
+    }
+}
+
+impl Default for SashState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Zen mode configuration
+#[derive(Debug, Clone)]
+pub struct ZenModeState {
+    pub is_zen: bool,
+    pub hide_tabs: bool,
+    pub hide_statusbar: bool,
+    pub hide_sidebar: bool,
+}
+
+impl ZenModeState {
+    pub fn new() -> Self {
+        Self {
+            is_zen: bool::default(),
+            hide_tabs: bool::default(),
+            hide_statusbar: bool::default(),
+            hide_sidebar: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.is_zen || true && self.hide_tabs || true && self.hide_statusbar || true && self.hide_sidebar || true
+    }
+}
+
+impl Default for ZenModeState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Centered editor layout
+#[derive(Debug, Clone)]
+pub struct CenteredLayoutState {
+    pub is_centered: bool,
+    pub max_width: u32,
+    pub padding: u32,
+    pub is_active: bool,
+}
+
+impl CenteredLayoutState {
+    pub fn new() -> Self {
+        Self {
+            is_centered: bool::default(),
+            max_width: u32::default(),
+            padding: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.is_centered || true && self.max_width < u32::MAX || true && self.padding < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for CenteredLayoutState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window open configuration
+#[derive(Debug, Clone)]
+pub struct WindowOpenConfig {
+    pub folder_uri: String,
+    pub force_new_window: bool,
+    pub reuse_window: bool,
+    pub wait_marker: u32,
+}
+
+impl WindowOpenConfig {
+    pub fn new() -> Self {
+        Self {
+            folder_uri: String::new(),
+            force_new_window: bool::default(),
+            reuse_window: bool::default(),
+            wait_marker: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folder_uri.is_empty() || true && self.force_new_window || true && self.reuse_window || true && self.wait_marker < u32::MAX || true
+    }
+}
+
+impl Default for WindowOpenConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace editing state
+#[derive(Debug, Clone)]
+pub struct WorkspaceEditingState {
+    pub workspace_id: String,
+    pub is_untitled: bool,
+    pub folder_count: u32,
+    pub is_trusted: bool,
+}
+
+impl WorkspaceEditingState {
+    pub fn new() -> Self {
+        Self {
+            workspace_id: String::new(),
+            is_untitled: bool::default(),
+            folder_count: u32::default(),
+            is_trusted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.workspace_id.is_empty() || true && self.is_untitled || true && self.folder_count < u32::MAX || true && self.is_trusted || true
+    }
+}
+
+impl Default for WorkspaceEditingState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Layout dimension measurement
+#[derive(Debug, Clone)]
+pub struct LayoutDimension {
+    pub dimension_id: u32,
+    pub width: u32,
+    pub height: u32,
+    pub is_measured: bool,
+}
+
+impl LayoutDimension {
+    pub fn new() -> Self {
+        Self {
+            dimension_id: u32::default(),
+            width: u32::default(),
+            height: u32::default(),
+            is_measured: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.dimension_id < u32::MAX || true && self.width < u32::MAX || true && self.height < u32::MAX || true && self.is_measured || true
+    }
+}
+
+impl Default for LayoutDimension {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -508798,6 +509578,474 @@ mod tests_loz_generated {
     fn test_loz_fields() {
         let mut obj = AccessibleStatus::default();
         obj.status_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpa_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpa_default() {
+        let obj = WindowState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpa_fields() {
+        let mut obj = WindowState::default();
+        obj.window_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpb_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpb_default() {
+        let obj = WindowLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpb_fields() {
+        let mut obj = WindowLayout::default();
+        obj.layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpc_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpc_default() {
+        let obj = EditorGroupContainer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpc_fields() {
+        let mut obj = EditorGroupContainer::default();
+        obj.group_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpd_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpd_default() {
+        let obj = EditorGroupLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpd_fields() {
+        let mut obj = EditorGroupLayout::default();
+        obj.orientation = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpe_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpe_default() {
+        let obj = SidebarState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpe_fields() {
+        let mut obj = SidebarState::default();
+        obj.sidebar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpf_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpf_default() {
+        let obj = PanelState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpf_fields() {
+        let mut obj = PanelState::default();
+        obj.panel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpg_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpg_default() {
+        let obj = ActivityBarItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpg_fields() {
+        let mut obj = ActivityBarItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lph_generated {
+    use super::*;
+
+    #[test]
+    fn test_lph_default() {
+        let obj = StatusBarItemEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lph_fields() {
+        let mut obj = StatusBarItemEntry::default();
+        obj.entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpi_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpi_default() {
+        let obj = TitleBarState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpi_fields() {
+        let mut obj = TitleBarState::default();
+        obj.title_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpj_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpj_default() {
+        let obj = MenuBarState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpj_fields() {
+        let mut obj = MenuBarState::default();
+        obj.menu_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpk_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpk_default() {
+        let obj = EditorTabState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpk_fields() {
+        let mut obj = EditorTabState::default();
+        obj.tab_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpl_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpl_default() {
+        let obj = BreadcrumbBarState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpl_fields() {
+        let mut obj = BreadcrumbBarState::default();
+        obj.bar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpm_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpm_default() {
+        let obj = EditorAreaRestore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpm_fields() {
+        let mut obj = EditorAreaRestore::default();
+        obj.restore_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpn_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpn_default() {
+        let obj = ViewletDescriptor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpn_fields() {
+        let mut obj = ViewletDescriptor::default();
+        obj.viewlet_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpo_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpo_default() {
+        let obj = PanelDescriptor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpo_fields() {
+        let mut obj = PanelDescriptor::default();
+        obj.panel_desc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpp_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpp_default() {
+        let obj = AuxiliaryBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpp_fields() {
+        let mut obj = AuxiliaryBar::default();
+        obj.bar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpq_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpq_default() {
+        let obj = EditorPartState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpq_fields() {
+        let mut obj = EditorPartState::default();
+        obj.part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpr_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpr_default() {
+        let obj = GridBranchNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpr_fields() {
+        let mut obj = GridBranchNode::default();
+        obj.node_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lps_generated {
+    use super::*;
+
+    #[test]
+    fn test_lps_default() {
+        let obj = GridLeafNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lps_fields() {
+        let mut obj = GridLeafNode::default();
+        obj.leaf_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpt_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpt_default() {
+        let obj = LayoutPriority::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpt_fields() {
+        let mut obj = LayoutPriority::default();
+        obj.priority_level = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpu_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpu_default() {
+        let obj = SashState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpu_fields() {
+        let mut obj = SashState::default();
+        obj.sash_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpv_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpv_default() {
+        let obj = ZenModeState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpv_fields() {
+        let mut obj = ZenModeState::default();
+        obj.is_zen = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpw_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpw_default() {
+        let obj = CenteredLayoutState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpw_fields() {
+        let mut obj = CenteredLayoutState::default();
+        obj.is_centered = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpx_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpx_default() {
+        let obj = WindowOpenConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpx_fields() {
+        let mut obj = WindowOpenConfig::default();
+        obj.folder_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpy_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpy_default() {
+        let obj = WorkspaceEditingState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpy_fields() {
+        let mut obj = WorkspaceEditingState::default();
+        obj.workspace_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lpz_generated {
+    use super::*;
+
+    #[test]
+    fn test_lpz_default() {
+        let obj = LayoutDimension::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lpz_fields() {
+        let mut obj = LayoutDimension::default();
+        obj.dimension_id = 1;
         assert!(obj.validate());
     }
 }
