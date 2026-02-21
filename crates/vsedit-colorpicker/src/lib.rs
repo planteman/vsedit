@@ -191679,6 +191679,838 @@ impl Default for KjzSymbolConfig {
     }
 }
 
+/// /// Foldable region in editor
+#[derive(Debug, Clone)]
+pub struct KkaFoldRegion {
+    pub kka_start_line: u32,
+    pub kka_end_line: u32,
+    pub kka_kind: String,
+    pub kka_collapsed_text: String,
+    pub kka_level: u32,
+}
+
+impl KkaFoldRegion {
+    pub fn new() -> Self {
+        Self {
+            kka_start_line: u32::default(),
+            kka_end_line: u32::default(),
+            kka_kind: String::new(),
+            kka_collapsed_text: String::new(),
+            kka_level: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kka_start_line < u32::MAX || true && self.kka_end_line < u32::MAX || true && !self.kka_kind.is_empty() || true && !self.kka_collapsed_text.is_empty() || true && self.kka_level < u32::MAX || true
+    }
+}
+
+impl Default for KkaFoldRegion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Fold state for a region
+#[derive(Debug, Clone)]
+pub struct KkbFoldState {
+    pub kkb_collapsed: bool,
+    pub kkb_manually_set: bool,
+    pub kkb_region_id: u32,
+    pub kkb_timestamp: u64,
+    pub kkb_label: String,
+}
+
+impl KkbFoldState {
+    pub fn new() -> Self {
+        Self {
+            kkb_collapsed: bool::default(),
+            kkb_manually_set: bool::default(),
+            kkb_region_id: u32::default(),
+            kkb_timestamp: u64::default(),
+            kkb_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kkb_collapsed || true && self.kkb_manually_set || true && self.kkb_region_id < u32::MAX || true && self.kkb_timestamp < u64::MAX || true && !self.kkb_label.is_empty() || true
+    }
+}
+
+impl Default for KkbFoldState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Folding range provider registration
+#[derive(Debug, Clone)]
+pub struct KkcFoldProvider {
+    pub kkc_lang_id: String,
+    pub kkc_provider_name: String,
+    pub kkc_priority: u32,
+    pub kkc_active: bool,
+    pub kkc_label: String,
+}
+
+impl KkcFoldProvider {
+    pub fn new() -> Self {
+        Self {
+            kkc_lang_id: String::new(),
+            kkc_provider_name: String::new(),
+            kkc_priority: u32::default(),
+            kkc_active: bool::default(),
+            kkc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kkc_lang_id.is_empty() || true && !self.kkc_provider_name.is_empty() || true && self.kkc_priority < u32::MAX || true && self.kkc_active || true && !self.kkc_label.is_empty() || true
+    }
+}
+
+impl Default for KkcFoldProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Folding strategy (indentation/markers)
+#[derive(Debug, Clone)]
+pub struct KkdFoldStrategy {
+    pub kkd_strategy_name: String,
+    pub kkd_indentation: bool,
+    pub kkd_markers: bool,
+    pub kkd_syntax: bool,
+    pub kkd_label: String,
+}
+
+impl KkdFoldStrategy {
+    pub fn new() -> Self {
+        Self {
+            kkd_strategy_name: String::new(),
+            kkd_indentation: bool::default(),
+            kkd_markers: bool::default(),
+            kkd_syntax: bool::default(),
+            kkd_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kkd_strategy_name.is_empty() || true && self.kkd_indentation || true && self.kkd_markers || true && self.kkd_syntax || true && !self.kkd_label.is_empty() || true
+    }
+}
+
+impl Default for KkdFoldStrategy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Fold/unfold action command
+#[derive(Debug, Clone)]
+pub struct KkeFoldAction {
+    pub kke_action_kind: String,
+    pub kke_target_line: u32,
+    pub kke_recursive: bool,
+    pub kke_level: u32,
+    pub kke_label: String,
+}
+
+impl KkeFoldAction {
+    pub fn new() -> Self {
+        Self {
+            kke_action_kind: String::new(),
+            kke_target_line: u32::default(),
+            kke_recursive: bool::default(),
+            kke_level: u32::default(),
+            kke_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kke_action_kind.is_empty() || true && self.kke_target_line < u32::MAX || true && self.kke_recursive || true && self.kke_level < u32::MAX || true && !self.kke_label.is_empty() || true
+    }
+}
+
+impl Default for KkeFoldAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Folding level for toggle operations
+#[derive(Debug, Clone)]
+pub struct KkfFoldLevel {
+    pub kkf_level: u32,
+    pub kkf_fold_all: bool,
+    pub kkf_unfold_all: bool,
+    pub kkf_toggle: bool,
+    pub kkf_label: String,
+}
+
+impl KkfFoldLevel {
+    pub fn new() -> Self {
+        Self {
+            kkf_level: u32::default(),
+            kkf_fold_all: bool::default(),
+            kkf_unfold_all: bool::default(),
+            kkf_toggle: bool::default(),
+            kkf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kkf_level < u32::MAX || true && self.kkf_fold_all || true && self.kkf_unfold_all || true && self.kkf_toggle || true && !self.kkf_label.is_empty() || true
+    }
+}
+
+impl Default for KkfFoldLevel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Sticky scroll header configuration
+#[derive(Debug, Clone)]
+pub struct KkgStickyScroll {
+    pub kkg_enabled: bool,
+    pub kkg_max_lines: u32,
+    pub kkg_mode: String,
+    pub kkg_scroll_with: bool,
+    pub kkg_label: String,
+}
+
+impl KkgStickyScroll {
+    pub fn new() -> Self {
+        Self {
+            kkg_enabled: bool::default(),
+            kkg_max_lines: u32::default(),
+            kkg_mode: String::new(),
+            kkg_scroll_with: bool::default(),
+            kkg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kkg_enabled || true && self.kkg_max_lines < u32::MAX || true && !self.kkg_mode.is_empty() || true && self.kkg_scroll_with || true && !self.kkg_label.is_empty() || true
+    }
+}
+
+impl Default for KkgStickyScroll {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Single sticky scroll line entry
+#[derive(Debug, Clone)]
+pub struct KkhStickyLine {
+    pub kkh_line_number: u32,
+    pub kkh_content: String,
+    pub kkh_depth: u32,
+    pub kkh_symbol_kind: String,
+    pub kkh_active: bool,
+}
+
+impl KkhStickyLine {
+    pub fn new() -> Self {
+        Self {
+            kkh_line_number: u32::default(),
+            kkh_content: String::new(),
+            kkh_depth: u32::default(),
+            kkh_symbol_kind: String::new(),
+            kkh_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kkh_line_number < u32::MAX || true && !self.kkh_content.is_empty() || true && self.kkh_depth < u32::MAX || true && !self.kkh_symbol_kind.is_empty() || true && self.kkh_active || true
+    }
+}
+
+impl Default for KkhStickyLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Named region (#region) tag
+#[derive(Debug, Clone)]
+pub struct KkiRegionTag {
+    pub kki_tag_name: String,
+    pub kki_start_line: u32,
+    pub kki_end_line: u32,
+    pub kki_description: String,
+    pub kki_collapsed: bool,
+}
+
+impl KkiRegionTag {
+    pub fn new() -> Self {
+        Self {
+            kki_tag_name: String::new(),
+            kki_start_line: u32::default(),
+            kki_end_line: u32::default(),
+            kki_description: String::new(),
+            kki_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kki_tag_name.is_empty() || true && self.kki_start_line < u32::MAX || true && self.kki_end_line < u32::MAX || true && !self.kki_description.is_empty() || true && self.kki_collapsed || true
+    }
+}
+
+impl Default for KkiRegionTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Import statement folding state
+#[derive(Debug, Clone)]
+pub struct KkjFoldImport {
+    pub kkj_collapsed: bool,
+    pub kkj_start_line: u32,
+    pub kkj_end_line: u32,
+    pub kkj_count: u32,
+    pub kkj_label: String,
+}
+
+impl KkjFoldImport {
+    pub fn new() -> Self {
+        Self {
+            kkj_collapsed: bool::default(),
+            kkj_start_line: u32::default(),
+            kkj_end_line: u32::default(),
+            kkj_count: u32::default(),
+            kkj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kkj_collapsed || true && self.kkj_start_line < u32::MAX || true && self.kkj_end_line < u32::MAX || true && self.kkj_count < u32::MAX || true && !self.kkj_label.is_empty() || true
+    }
+}
+
+impl Default for KkjFoldImport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Comment block folding state
+#[derive(Debug, Clone)]
+pub struct KkkFoldComment {
+    pub kkk_collapsed: bool,
+    pub kkk_start_line: u32,
+    pub kkk_end_line: u32,
+    pub kkk_kind: String,
+    pub kkk_label: String,
+}
+
+impl KkkFoldComment {
+    pub fn new() -> Self {
+        Self {
+            kkk_collapsed: bool::default(),
+            kkk_start_line: u32::default(),
+            kkk_end_line: u32::default(),
+            kkk_kind: String::new(),
+            kkk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kkk_collapsed || true && self.kkk_start_line < u32::MAX || true && self.kkk_end_line < u32::MAX || true && !self.kkk_kind.is_empty() || true && !self.kkk_label.is_empty() || true
+    }
+}
+
+impl Default for KkkFoldComment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Custom fold marker pair definition
+#[derive(Debug, Clone)]
+pub struct KklFoldMarkerPair {
+    pub kkl_start_marker: String,
+    pub kkl_end_marker: String,
+    pub kkl_lang_id: String,
+    pub kkl_case_sensitive: bool,
+    pub kkl_label: String,
+}
+
+impl KklFoldMarkerPair {
+    pub fn new() -> Self {
+        Self {
+            kkl_start_marker: String::new(),
+            kkl_end_marker: String::new(),
+            kkl_lang_id: String::new(),
+            kkl_case_sensitive: bool::default(),
+            kkl_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kkl_start_marker.is_empty() || true && !self.kkl_end_marker.is_empty() || true && !self.kkl_lang_id.is_empty() || true && self.kkl_case_sensitive || true && !self.kkl_label.is_empty() || true
+    }
+}
+
+impl Default for KklFoldMarkerPair {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Multi-cursor editing state
+#[derive(Debug, Clone)]
+pub struct KkmMultiCursorState {
+    pub kkm_count: u32,
+    pub kkm_primary_idx: u32,
+    pub kkm_sorted: bool,
+    pub kkm_merged: bool,
+    pub kkm_label: String,
+}
+
+impl KkmMultiCursorState {
+    pub fn new() -> Self {
+        Self {
+            kkm_count: u32::default(),
+            kkm_primary_idx: u32::default(),
+            kkm_sorted: bool::default(),
+            kkm_merged: bool::default(),
+            kkm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kkm_count < u32::MAX || true && self.kkm_primary_idx < u32::MAX || true && self.kkm_sorted || true && self.kkm_merged || true && !self.kkm_label.is_empty() || true
+    }
+}
+
+impl Default for KkmMultiCursorState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Single cursor in multi-cursor set
+#[derive(Debug, Clone)]
+pub struct KknMultiCursorEntry {
+    pub kkn_line: u32,
+    pub kkn_column: u32,
+    pub kkn_selection_start: u32,
+    pub kkn_selection_end: u32,
+    pub kkn_primary: bool,
+}
+
+impl KknMultiCursorEntry {
+    pub fn new() -> Self {
+        Self {
+            kkn_line: u32::default(),
+            kkn_column: u32::default(),
+            kkn_selection_start: u32::default(),
+            kkn_selection_end: u32::default(),
+            kkn_primary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kkn_line < u32::MAX || true && self.kkn_column < u32::MAX || true && self.kkn_selection_start < u32::MAX || true && self.kkn_selection_end < u32::MAX || true && self.kkn_primary || true
+    }
+}
+
+impl Default for KknMultiCursorEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Add cursor command parameters
+#[derive(Debug, Clone)]
+pub struct KkoMultiCursorAdd {
+    pub kko_direction: String,
+    pub kko_skip_next: bool,
+    pub kko_at_position: bool,
+    pub kko_line: u32,
+    pub kko_label: String,
+}
+
+impl KkoMultiCursorAdd {
+    pub fn new() -> Self {
+        Self {
+            kko_direction: String::new(),
+            kko_skip_next: bool::default(),
+            kko_at_position: bool::default(),
+            kko_line: u32::default(),
+            kko_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kko_direction.is_empty() || true && self.kko_skip_next || true && self.kko_at_position || true && self.kko_line < u32::MAX || true && !self.kko_label.is_empty() || true
+    }
+}
+
+impl Default for KkoMultiCursorAdd {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Select all occurrences for cursors
+#[derive(Debug, Clone)]
+pub struct KkpMultiCursorSelect {
+    pub kkp_pattern: String,
+    pub kkp_case_sensitive: bool,
+    pub kkp_whole_word: bool,
+    pub kkp_count: u32,
+    pub kkp_label: String,
+}
+
+impl KkpMultiCursorSelect {
+    pub fn new() -> Self {
+        Self {
+            kkp_pattern: String::new(),
+            kkp_case_sensitive: bool::default(),
+            kkp_whole_word: bool::default(),
+            kkp_count: u32::default(),
+            kkp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kkp_pattern.is_empty() || true && self.kkp_case_sensitive || true && self.kkp_whole_word || true && self.kkp_count < u32::MAX || true && !self.kkp_label.is_empty() || true
+    }
+}
+
+impl Default for KkpMultiCursorSelect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Multi-cursor paste behavior
+#[derive(Debug, Clone)]
+pub struct KkqMultiCursorPaste {
+    pub kkq_per_cursor: bool,
+    pub kkq_round_robin: bool,
+    pub kkq_trim: bool,
+    pub kkq_clipboard: String,
+    pub kkq_label: String,
+}
+
+impl KkqMultiCursorPaste {
+    pub fn new() -> Self {
+        Self {
+            kkq_per_cursor: bool::default(),
+            kkq_round_robin: bool::default(),
+            kkq_trim: bool::default(),
+            kkq_clipboard: String::new(),
+            kkq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kkq_per_cursor || true && self.kkq_round_robin || true && self.kkq_trim || true && !self.kkq_clipboard.is_empty() || true && !self.kkq_label.is_empty() || true
+    }
+}
+
+impl Default for KkqMultiCursorPaste {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Text edit applied to all cursors
+#[derive(Debug, Clone)]
+pub struct KkrMultiCursorEdit {
+    pub kkr_text: String,
+    pub kkr_insert_mode: bool,
+    pub kkr_overtype: bool,
+    pub kkr_count: u32,
+    pub kkr_label: String,
+}
+
+impl KkrMultiCursorEdit {
+    pub fn new() -> Self {
+        Self {
+            kkr_text: String::new(),
+            kkr_insert_mode: bool::default(),
+            kkr_overtype: bool::default(),
+            kkr_count: u32::default(),
+            kkr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kkr_text.is_empty() || true && self.kkr_insert_mode || true && self.kkr_overtype || true && self.kkr_count < u32::MAX || true && !self.kkr_label.is_empty() || true
+    }
+}
+
+impl Default for KkrMultiCursorEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Clipboard entry with metadata
+#[derive(Debug, Clone)]
+pub struct KksClipboardItem {
+    pub kks_text: String,
+    pub kks_mime_type: String,
+    pub kks_timestamp: u64,
+    pub kks_source_uri: String,
+    pub kks_truncated: bool,
+}
+
+impl KksClipboardItem {
+    pub fn new() -> Self {
+        Self {
+            kks_text: String::new(),
+            kks_mime_type: String::new(),
+            kks_timestamp: u64::default(),
+            kks_source_uri: String::new(),
+            kks_truncated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kks_text.is_empty() || true && !self.kks_mime_type.is_empty() || true && self.kks_timestamp < u64::MAX || true && !self.kks_source_uri.is_empty() || true && self.kks_truncated || true
+    }
+}
+
+impl Default for KksClipboardItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Clipboard ring buffer state
+#[derive(Debug, Clone)]
+pub struct KktClipboardRing {
+    pub kkt_capacity: u32,
+    pub kkt_count: u32,
+    pub kkt_current_idx: u32,
+    pub kkt_enabled: bool,
+    pub kkt_label: String,
+}
+
+impl KktClipboardRing {
+    pub fn new() -> Self {
+        Self {
+            kkt_capacity: u32::default(),
+            kkt_count: u32::default(),
+            kkt_current_idx: u32::default(),
+            kkt_enabled: bool::default(),
+            kkt_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kkt_capacity < u32::MAX || true && self.kkt_count < u32::MAX || true && self.kkt_current_idx < u32::MAX || true && self.kkt_enabled || true && !self.kkt_label.is_empty() || true
+    }
+}
+
+impl Default for KktClipboardRing {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Paste action parameters
+#[derive(Debug, Clone)]
+pub struct KkuPasteAction {
+    pub kku_text: String,
+    pub kku_format_on_paste: bool,
+    pub kku_multi_cursor: bool,
+    pub kku_source: String,
+    pub kku_label: String,
+}
+
+impl KkuPasteAction {
+    pub fn new() -> Self {
+        Self {
+            kku_text: String::new(),
+            kku_format_on_paste: bool::default(),
+            kku_multi_cursor: bool::default(),
+            kku_source: String::new(),
+            kku_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kku_text.is_empty() || true && self.kku_format_on_paste || true && self.kku_multi_cursor || true && !self.kku_source.is_empty() || true && !self.kku_label.is_empty() || true
+    }
+}
+
+impl Default for KkuPasteAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Copy action parameters
+#[derive(Debug, Clone)]
+pub struct KkvCopyAction {
+    pub kkv_text: String,
+    pub kkv_line_copy: bool,
+    pub kkv_syntax_highlight: bool,
+    pub kkv_uri: String,
+    pub kkv_label: String,
+}
+
+impl KkvCopyAction {
+    pub fn new() -> Self {
+        Self {
+            kkv_text: String::new(),
+            kkv_line_copy: bool::default(),
+            kkv_syntax_highlight: bool::default(),
+            kkv_uri: String::new(),
+            kkv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kkv_text.is_empty() || true && self.kkv_line_copy || true && self.kkv_syntax_highlight || true && !self.kkv_uri.is_empty() || true && !self.kkv_label.is_empty() || true
+    }
+}
+
+impl Default for KkvCopyAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Cut action parameters
+#[derive(Debug, Clone)]
+pub struct KkwCutAction {
+    pub kkw_line_cut: bool,
+    pub kkw_text: String,
+    pub kkw_empty_selection: bool,
+    pub kkw_uri: String,
+    pub kkw_label: String,
+}
+
+impl KkwCutAction {
+    pub fn new() -> Self {
+        Self {
+            kkw_line_cut: bool::default(),
+            kkw_text: String::new(),
+            kkw_empty_selection: bool::default(),
+            kkw_uri: String::new(),
+            kkw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kkw_line_cut || true && !self.kkw_text.is_empty() || true && self.kkw_empty_selection || true && !self.kkw_uri.is_empty() || true && !self.kkw_label.is_empty() || true
+    }
+}
+
+impl Default for KkwCutAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Drag and drop operation in editor
+#[derive(Debug, Clone)]
+pub struct KkxDragDropOp {
+    pub kkx_source_uri: String,
+    pub kkx_target_uri: String,
+    pub kkx_copy_mode: bool,
+    pub kkx_position: u32,
+    pub kkx_label: String,
+}
+
+impl KkxDragDropOp {
+    pub fn new() -> Self {
+        Self {
+            kkx_source_uri: String::new(),
+            kkx_target_uri: String::new(),
+            kkx_copy_mode: bool::default(),
+            kkx_position: u32::default(),
+            kkx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kkx_source_uri.is_empty() || true && !self.kkx_target_uri.is_empty() || true && self.kkx_copy_mode || true && self.kkx_position < u32::MAX || true && !self.kkx_label.is_empty() || true
+    }
+}
+
+impl Default for KkxDragDropOp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Drop into editor operation
+#[derive(Debug, Clone)]
+pub struct KkyDropIntoEditor {
+    pub kky_position: u32,
+    pub kky_uri: String,
+    pub kky_data_transfer: String,
+    pub kky_handled: bool,
+    pub kky_label: String,
+}
+
+impl KkyDropIntoEditor {
+    pub fn new() -> Self {
+        Self {
+            kky_position: u32::default(),
+            kky_uri: String::new(),
+            kky_data_transfer: String::new(),
+            kky_handled: bool::default(),
+            kky_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kky_position < u32::MAX || true && !self.kky_uri.is_empty() || true && !self.kky_data_transfer.is_empty() || true && self.kky_handled || true && !self.kky_label.is_empty() || true
+    }
+}
+
+impl Default for KkyDropIntoEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined clipboard configuration
+#[derive(Debug, Clone)]
+pub struct KkzClipboardConfig {
+    pub kkz_ring_size: u32,
+    pub kkz_trim_final_newline: bool,
+    pub kkz_copy_with_syntax: bool,
+    pub kkz_paste_format: bool,
+    pub kkz_label: String,
+}
+
+impl KkzClipboardConfig {
+    pub fn new() -> Self {
+        Self {
+            kkz_ring_size: u32::default(),
+            kkz_trim_final_newline: bool::default(),
+            kkz_copy_with_syntax: bool::default(),
+            kkz_paste_format: bool::default(),
+            kkz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kkz_ring_size < u32::MAX || true && self.kkz_trim_final_newline || true && self.kkz_copy_with_syntax || true && self.kkz_paste_format || true && !self.kkz_label.is_empty() || true
+    }
+}
+
+impl Default for KkzClipboardConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -468561,6 +469393,474 @@ mod tests_kjz_generated {
     fn test_kjz_fields() {
         let mut obj = KjzSymbolConfig::default();
         obj.kjz_sort_by = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kka_generated {
+    use super::*;
+
+    #[test]
+    fn test_kka_default() {
+        let obj = KkaFoldRegion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kka_fields() {
+        let mut obj = KkaFoldRegion::default();
+        obj.kka_start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkb_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkb_default() {
+        let obj = KkbFoldState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkb_fields() {
+        let mut obj = KkbFoldState::default();
+        obj.kkb_collapsed = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkc_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkc_default() {
+        let obj = KkcFoldProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkc_fields() {
+        let mut obj = KkcFoldProvider::default();
+        obj.kkc_lang_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkd_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkd_default() {
+        let obj = KkdFoldStrategy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkd_fields() {
+        let mut obj = KkdFoldStrategy::default();
+        obj.kkd_strategy_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kke_generated {
+    use super::*;
+
+    #[test]
+    fn test_kke_default() {
+        let obj = KkeFoldAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kke_fields() {
+        let mut obj = KkeFoldAction::default();
+        obj.kke_action_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkf_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkf_default() {
+        let obj = KkfFoldLevel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkf_fields() {
+        let mut obj = KkfFoldLevel::default();
+        obj.kkf_level = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkg_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkg_default() {
+        let obj = KkgStickyScroll::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkg_fields() {
+        let mut obj = KkgStickyScroll::default();
+        obj.kkg_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkh_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkh_default() {
+        let obj = KkhStickyLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkh_fields() {
+        let mut obj = KkhStickyLine::default();
+        obj.kkh_line_number = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kki_generated {
+    use super::*;
+
+    #[test]
+    fn test_kki_default() {
+        let obj = KkiRegionTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kki_fields() {
+        let mut obj = KkiRegionTag::default();
+        obj.kki_tag_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkj_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkj_default() {
+        let obj = KkjFoldImport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkj_fields() {
+        let mut obj = KkjFoldImport::default();
+        obj.kkj_collapsed = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkk_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkk_default() {
+        let obj = KkkFoldComment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkk_fields() {
+        let mut obj = KkkFoldComment::default();
+        obj.kkk_collapsed = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkl_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkl_default() {
+        let obj = KklFoldMarkerPair::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkl_fields() {
+        let mut obj = KklFoldMarkerPair::default();
+        obj.kkl_start_marker = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkm_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkm_default() {
+        let obj = KkmMultiCursorState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkm_fields() {
+        let mut obj = KkmMultiCursorState::default();
+        obj.kkm_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkn_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkn_default() {
+        let obj = KknMultiCursorEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkn_fields() {
+        let mut obj = KknMultiCursorEntry::default();
+        obj.kkn_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kko_generated {
+    use super::*;
+
+    #[test]
+    fn test_kko_default() {
+        let obj = KkoMultiCursorAdd::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kko_fields() {
+        let mut obj = KkoMultiCursorAdd::default();
+        obj.kko_direction = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkp_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkp_default() {
+        let obj = KkpMultiCursorSelect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkp_fields() {
+        let mut obj = KkpMultiCursorSelect::default();
+        obj.kkp_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkq_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkq_default() {
+        let obj = KkqMultiCursorPaste::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkq_fields() {
+        let mut obj = KkqMultiCursorPaste::default();
+        obj.kkq_per_cursor = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkr_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkr_default() {
+        let obj = KkrMultiCursorEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkr_fields() {
+        let mut obj = KkrMultiCursorEdit::default();
+        obj.kkr_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kks_generated {
+    use super::*;
+
+    #[test]
+    fn test_kks_default() {
+        let obj = KksClipboardItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kks_fields() {
+        let mut obj = KksClipboardItem::default();
+        obj.kks_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkt_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkt_default() {
+        let obj = KktClipboardRing::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkt_fields() {
+        let mut obj = KktClipboardRing::default();
+        obj.kkt_capacity = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kku_generated {
+    use super::*;
+
+    #[test]
+    fn test_kku_default() {
+        let obj = KkuPasteAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kku_fields() {
+        let mut obj = KkuPasteAction::default();
+        obj.kku_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkv_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkv_default() {
+        let obj = KkvCopyAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkv_fields() {
+        let mut obj = KkvCopyAction::default();
+        obj.kkv_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkw_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkw_default() {
+        let obj = KkwCutAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkw_fields() {
+        let mut obj = KkwCutAction::default();
+        obj.kkw_line_cut = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkx_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkx_default() {
+        let obj = KkxDragDropOp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkx_fields() {
+        let mut obj = KkxDragDropOp::default();
+        obj.kkx_source_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kky_generated {
+    use super::*;
+
+    #[test]
+    fn test_kky_default() {
+        let obj = KkyDropIntoEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kky_fields() {
+        let mut obj = KkyDropIntoEditor::default();
+        obj.kky_position = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kkz_generated {
+    use super::*;
+
+    #[test]
+    fn test_kkz_default() {
+        let obj = KkzClipboardConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kkz_fields() {
+        let mut obj = KkzClipboardConfig::default();
+        obj.kkz_ring_size = 1;
         assert!(obj.validate());
     }
 }
