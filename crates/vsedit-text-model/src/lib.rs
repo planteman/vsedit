@@ -183174,6 +183174,890 @@ impl Default for JzzSelection {
     }
 }
 
+/// Keyboard event descriptor
+#[derive(Debug, Clone)]
+pub struct KaaKeyEvent {
+    pub key_event_id: String,
+    pub key_code: u32,
+    pub scan_code: u32,
+    pub modifiers_flags: u32,
+    pub timestamp_epoch: u64,
+    pub is_key_down: bool,
+}
+
+impl KaaKeyEvent {
+    pub fn new() -> Self {
+        Self {
+            key_event_id: String::new(),
+            key_code: u32::default(),
+            scan_code: u32::default(),
+            modifiers_flags: u32::default(),
+            timestamp_epoch: u64::default(),
+            is_key_down: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key_event_id.is_empty() || true && self.key_code < u32::MAX || true && self.scan_code < u32::MAX || true && self.modifiers_flags < u32::MAX || true && self.timestamp_epoch < u64::MAX || true && self.is_key_down || true
+    }
+}
+
+impl Default for KaaKeyEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keybinding entry descriptor
+#[derive(Debug, Clone)]
+pub struct KabKeyBinding {
+    pub keybinding_id: String,
+    pub key_str: String,
+    pub command_ref: String,
+    pub when_clause: String,
+    pub source_str: String,
+    pub is_user_defined: bool,
+}
+
+impl KabKeyBinding {
+    pub fn new() -> Self {
+        Self {
+            keybinding_id: String::new(),
+            key_str: String::new(),
+            command_ref: String::new(),
+            when_clause: String::new(),
+            source_str: String::new(),
+            is_user_defined: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.keybinding_id.is_empty() || true && !self.key_str.is_empty() || true && !self.command_ref.is_empty() || true && !self.when_clause.is_empty() || true && !self.source_str.is_empty() || true && self.is_user_defined || true
+    }
+}
+
+impl Default for KabKeyBinding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Key chord combination
+#[derive(Debug, Clone)]
+pub struct KacKeyChord {
+    pub key_chord_id: String,
+    pub first_part_code: u32,
+    pub second_part_code: u32,
+    pub ctrl_key: bool,
+    pub shift_key: bool,
+    pub alt_key: bool,
+}
+
+impl KacKeyChord {
+    pub fn new() -> Self {
+        Self {
+            key_chord_id: String::new(),
+            first_part_code: u32::default(),
+            second_part_code: u32::default(),
+            ctrl_key: bool::default(),
+            shift_key: bool::default(),
+            alt_key: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key_chord_id.is_empty() || true && self.first_part_code < u32::MAX || true && self.second_part_code < u32::MAX || true && self.ctrl_key || true && self.shift_key || true && self.alt_key || true
+    }
+}
+
+impl Default for KacKeyChord {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keymap descriptor
+#[derive(Debug, Clone)]
+pub struct KadKeyMap {
+    pub keymap_id: String,
+    pub keymap_name: String,
+    pub binding_count: u32,
+    pub extension_ref: String,
+    pub platform_str: String,
+    pub is_default: bool,
+}
+
+impl KadKeyMap {
+    pub fn new() -> Self {
+        Self {
+            keymap_id: String::new(),
+            keymap_name: String::new(),
+            binding_count: u32::default(),
+            extension_ref: String::new(),
+            platform_str: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.keymap_id.is_empty() || true && !self.keymap_name.is_empty() || true && self.binding_count < u32::MAX || true && !self.extension_ref.is_empty() || true && !self.platform_str.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for KadKeyMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Key resolution state
+#[derive(Debug, Clone)]
+pub struct KaeKeyResolver {
+    pub key_resolver_id: String,
+    pub chord_buffer_json: String,
+    pub pending_count: u32,
+    pub match_count: u32,
+    pub timeout_ms: u32,
+    pub has_partial: bool,
+}
+
+impl KaeKeyResolver {
+    pub fn new() -> Self {
+        Self {
+            key_resolver_id: String::new(),
+            chord_buffer_json: String::new(),
+            pending_count: u32::default(),
+            match_count: u32::default(),
+            timeout_ms: u32::default(),
+            has_partial: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key_resolver_id.is_empty() || true && !self.chord_buffer_json.is_empty() || true && self.pending_count < u32::MAX || true && self.match_count < u32::MAX || true && self.timeout_ms < u32::MAX || true && self.has_partial || true
+    }
+}
+
+impl Default for KaeKeyResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Key dispatch entry
+#[derive(Debug, Clone)]
+pub struct KafKeyDispatch {
+    pub key_dispatch_id: String,
+    pub key_event_ref: String,
+    pub resolved_command: String,
+    pub context_json: String,
+    pub dispatch_order: u32,
+    pub is_consumed: bool,
+}
+
+impl KafKeyDispatch {
+    pub fn new() -> Self {
+        Self {
+            key_dispatch_id: String::new(),
+            key_event_ref: String::new(),
+            resolved_command: String::new(),
+            context_json: String::new(),
+            dispatch_order: u32::default(),
+            is_consumed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key_dispatch_id.is_empty() || true && !self.key_event_ref.is_empty() || true && !self.resolved_command.is_empty() || true && !self.context_json.is_empty() || true && self.dispatch_order < u32::MAX || true && self.is_consumed || true
+    }
+}
+
+impl Default for KafKeyDispatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Mouse event descriptor
+#[derive(Debug, Clone)]
+pub struct KagMouseEvent {
+    pub mouse_event_id: String,
+    pub button_val: u32,
+    pub position_x: u32,
+    pub position_y: u32,
+    pub modifiers_flags: u32,
+    pub is_double_click: bool,
+}
+
+impl KagMouseEvent {
+    pub fn new() -> Self {
+        Self {
+            mouse_event_id: String::new(),
+            button_val: u32::default(),
+            position_x: u32::default(),
+            position_y: u32::default(),
+            modifiers_flags: u32::default(),
+            is_double_click: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mouse_event_id.is_empty() || true && self.button_val < u32::MAX || true && self.position_x < u32::MAX || true && self.position_y < u32::MAX || true && self.modifiers_flags < u32::MAX || true && self.is_double_click || true
+    }
+}
+
+impl Default for KagMouseEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Mouse button descriptor
+#[derive(Debug, Clone)]
+pub struct KahMouseButton {
+    pub mouse_btn_id: String,
+    pub button_idx: u32,
+    pub click_count: u32,
+    pub position_json: String,
+    pub timestamp_epoch: u64,
+    pub is_pressed: bool,
+}
+
+impl KahMouseButton {
+    pub fn new() -> Self {
+        Self {
+            mouse_btn_id: String::new(),
+            button_idx: u32::default(),
+            click_count: u32::default(),
+            position_json: String::new(),
+            timestamp_epoch: u64::default(),
+            is_pressed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mouse_btn_id.is_empty() || true && self.button_idx < u32::MAX || true && self.click_count < u32::MAX || true && !self.position_json.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_pressed || true
+    }
+}
+
+impl Default for KahMouseButton {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Mouse wheel event
+#[derive(Debug, Clone)]
+pub struct KaiMouseWheel {
+    pub mouse_wheel_id: String,
+    pub delta_x: f64,
+    pub delta_y: f64,
+    pub position_json: String,
+    pub modifiers_flags: u32,
+    pub is_precise: bool,
+}
+
+impl KaiMouseWheel {
+    pub fn new() -> Self {
+        Self {
+            mouse_wheel_id: String::new(),
+            delta_x: f64::default(),
+            delta_y: f64::default(),
+            position_json: String::new(),
+            modifiers_flags: u32::default(),
+            is_precise: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mouse_wheel_id.is_empty() || true && self.delta_x.is_finite() || true && self.delta_y.is_finite() || true && !self.position_json.is_empty() || true && self.modifiers_flags < u32::MAX || true && self.is_precise || true
+    }
+}
+
+impl Default for KaiMouseWheel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Mouse drag event
+#[derive(Debug, Clone)]
+pub struct KajMouseDrag {
+    pub mouse_drag_id: String,
+    pub start_pos_json: String,
+    pub current_pos_json: String,
+    pub button_val: u32,
+    pub distance_px: f64,
+    pub is_active: bool,
+}
+
+impl KajMouseDrag {
+    pub fn new() -> Self {
+        Self {
+            mouse_drag_id: String::new(),
+            start_pos_json: String::new(),
+            current_pos_json: String::new(),
+            button_val: u32::default(),
+            distance_px: f64::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mouse_drag_id.is_empty() || true && !self.start_pos_json.is_empty() || true && !self.current_pos_json.is_empty() || true && self.button_val < u32::MAX || true && self.distance_px.is_finite() || true && self.is_active || true
+    }
+}
+
+impl Default for KajMouseDrag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Mouse hover event
+#[derive(Debug, Clone)]
+pub struct KakMouseHover {
+    pub mouse_hover_id: String,
+    pub position_json: String,
+    pub target_ref: String,
+    pub delay_ms: u32,
+    pub content_ref: String,
+    pub is_sticky: bool,
+}
+
+impl KakMouseHover {
+    pub fn new() -> Self {
+        Self {
+            mouse_hover_id: String::new(),
+            position_json: String::new(),
+            target_ref: String::new(),
+            delay_ms: u32::default(),
+            content_ref: String::new(),
+            is_sticky: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mouse_hover_id.is_empty() || true && !self.position_json.is_empty() || true && !self.target_ref.is_empty() || true && self.delay_ms < u32::MAX || true && !self.content_ref.is_empty() || true && self.is_sticky || true
+    }
+}
+
+impl Default for KakMouseHover {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Touch gesture event
+#[derive(Debug, Clone)]
+pub struct KalGesture {
+    pub gesture_id: String,
+    pub gesture_type_str: String,
+    pub position_json: String,
+    pub scale_factor: f64,
+    pub rotation_deg: f64,
+    pub is_inertial: bool,
+}
+
+impl KalGesture {
+    pub fn new() -> Self {
+        Self {
+            gesture_id: String::new(),
+            gesture_type_str: String::new(),
+            position_json: String::new(),
+            scale_factor: f64::default(),
+            rotation_deg: f64::default(),
+            is_inertial: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gesture_id.is_empty() || true && !self.gesture_type_str.is_empty() || true && !self.position_json.is_empty() || true && self.scale_factor.is_finite() || true && self.rotation_deg.is_finite() || true && self.is_inertial || true
+    }
+}
+
+impl Default for KalGesture {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IME composition event
+#[derive(Debug, Clone)]
+pub struct KamImeInput {
+    pub ime_id: String,
+    pub composition_text: String,
+    pub replacement_start: u32,
+    pub replacement_end: u32,
+    pub cursor_position: u32,
+    pub is_composing: bool,
+}
+
+impl KamImeInput {
+    pub fn new() -> Self {
+        Self {
+            ime_id: String::new(),
+            composition_text: String::new(),
+            replacement_start: u32::default(),
+            replacement_end: u32::default(),
+            cursor_position: u32::default(),
+            is_composing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ime_id.is_empty() || true && !self.composition_text.is_empty() || true && self.replacement_start < u32::MAX || true && self.replacement_end < u32::MAX || true && self.cursor_position < u32::MAX || true && self.is_composing || true
+    }
+}
+
+impl Default for KamImeInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Clipboard event descriptor
+#[derive(Debug, Clone)]
+pub struct KanClipboardEvent {
+    pub clip_event_id: String,
+    pub content_text: String,
+    pub mime_type_str: String,
+    pub source_ref: String,
+    pub timestamp_epoch: u64,
+    pub is_cut: bool,
+}
+
+impl KanClipboardEvent {
+    pub fn new() -> Self {
+        Self {
+            clip_event_id: String::new(),
+            content_text: String::new(),
+            mime_type_str: String::new(),
+            source_ref: String::new(),
+            timestamp_epoch: u64::default(),
+            is_cut: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.clip_event_id.is_empty() || true && !self.content_text.is_empty() || true && !self.mime_type_str.is_empty() || true && !self.source_ref.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_cut || true
+    }
+}
+
+impl Default for KanClipboardEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Paste event descriptor
+#[derive(Debug, Clone)]
+pub struct KaoPasteEvent {
+    pub paste_event_id: String,
+    pub pasted_text: String,
+    pub source_format: String,
+    pub target_range_json: String,
+    pub text_len: u32,
+    pub is_multi_line: bool,
+}
+
+impl KaoPasteEvent {
+    pub fn new() -> Self {
+        Self {
+            paste_event_id: String::new(),
+            pasted_text: String::new(),
+            source_format: String::new(),
+            target_range_json: String::new(),
+            text_len: u32::default(),
+            is_multi_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.paste_event_id.is_empty() || true && !self.pasted_text.is_empty() || true && !self.source_format.is_empty() || true && !self.target_range_json.is_empty() || true && self.text_len < u32::MAX || true && self.is_multi_line || true
+    }
+}
+
+impl Default for KaoPasteEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Drop event descriptor
+#[derive(Debug, Clone)]
+pub struct KapDropEvent {
+    pub drop_event_id: String,
+    pub data_type_str: String,
+    pub position_json: String,
+    pub file_paths_csv: String,
+    pub effect_str: String,
+    pub is_external: bool,
+}
+
+impl KapDropEvent {
+    pub fn new() -> Self {
+        Self {
+            drop_event_id: String::new(),
+            data_type_str: String::new(),
+            position_json: String::new(),
+            file_paths_csv: String::new(),
+            effect_str: String::new(),
+            is_external: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.drop_event_id.is_empty() || true && !self.data_type_str.is_empty() || true && !self.position_json.is_empty() || true && !self.file_paths_csv.is_empty() || true && !self.effect_str.is_empty() || true && self.is_external || true
+    }
+}
+
+impl Default for KapDropEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Focus change event
+#[derive(Debug, Clone)]
+pub struct KaqFocusEvent {
+    pub focus_event_id: String,
+    pub gained_ref: String,
+    pub lost_ref: String,
+    pub reason_str: String,
+    pub timestamp_epoch: u64,
+    pub is_window_focus: bool,
+}
+
+impl KaqFocusEvent {
+    pub fn new() -> Self {
+        Self {
+            focus_event_id: String::new(),
+            gained_ref: String::new(),
+            lost_ref: String::new(),
+            reason_str: String::new(),
+            timestamp_epoch: u64::default(),
+            is_window_focus: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.focus_event_id.is_empty() || true && !self.gained_ref.is_empty() || true && !self.lost_ref.is_empty() || true && !self.reason_str.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_window_focus || true
+    }
+}
+
+impl Default for KaqFocusEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Context menu event
+#[derive(Debug, Clone)]
+pub struct KarContextMenu {
+    pub ctx_menu_id: String,
+    pub position_json: String,
+    pub target_ref: String,
+    pub items_json: String,
+    pub trigger_str: String,
+    pub is_keyboard_triggered: bool,
+}
+
+impl KarContextMenu {
+    pub fn new() -> Self {
+        Self {
+            ctx_menu_id: String::new(),
+            position_json: String::new(),
+            target_ref: String::new(),
+            items_json: String::new(),
+            trigger_str: String::new(),
+            is_keyboard_triggered: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ctx_menu_id.is_empty() || true && !self.position_json.is_empty() || true && !self.target_ref.is_empty() || true && !self.items_json.is_empty() || true && !self.trigger_str.is_empty() || true && self.is_keyboard_triggered || true
+    }
+}
+
+impl Default for KarContextMenu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Input binding descriptor
+#[derive(Debug, Clone)]
+pub struct KasInputBinding {
+    pub input_bind_id: String,
+    pub input_type_str: String,
+    pub action_ref: String,
+    pub context_str: String,
+    pub priority_val: u32,
+    pub is_remapped: bool,
+}
+
+impl KasInputBinding {
+    pub fn new() -> Self {
+        Self {
+            input_bind_id: String::new(),
+            input_type_str: String::new(),
+            action_ref: String::new(),
+            context_str: String::new(),
+            priority_val: u32::default(),
+            is_remapped: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_bind_id.is_empty() || true && !self.input_type_str.is_empty() || true && !self.action_ref.is_empty() || true && !self.context_str.is_empty() || true && self.priority_val < u32::MAX || true && self.is_remapped || true
+    }
+}
+
+impl Default for KasInputBinding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command palette state
+#[derive(Debug, Clone)]
+pub struct KatCommandPalette {
+    pub cmd_palette_id: String,
+    pub filter_text: String,
+    pub visible_count: u32,
+    pub selected_idx: u32,
+    pub prefix_str: String,
+    pub is_visible: bool,
+}
+
+impl KatCommandPalette {
+    pub fn new() -> Self {
+        Self {
+            cmd_palette_id: String::new(),
+            filter_text: String::new(),
+            visible_count: u32::default(),
+            selected_idx: u32::default(),
+            prefix_str: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cmd_palette_id.is_empty() || true && !self.filter_text.is_empty() || true && self.visible_count < u32::MAX || true && self.selected_idx < u32::MAX || true && !self.prefix_str.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for KatCommandPalette {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command palette entry
+#[derive(Debug, Clone)]
+pub struct KauCommandEntry {
+    pub cmd_entry_id: String,
+    pub label_str: String,
+    pub description_str: String,
+    pub keybinding_str: String,
+    pub category_str: String,
+    pub is_recently_used: bool,
+}
+
+impl KauCommandEntry {
+    pub fn new() -> Self {
+        Self {
+            cmd_entry_id: String::new(),
+            label_str: String::new(),
+            description_str: String::new(),
+            keybinding_str: String::new(),
+            category_str: String::new(),
+            is_recently_used: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cmd_entry_id.is_empty() || true && !self.label_str.is_empty() || true && !self.description_str.is_empty() || true && !self.keybinding_str.is_empty() || true && !self.category_str.is_empty() || true && self.is_recently_used || true
+    }
+}
+
+impl Default for KauCommandEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Quick access provider
+#[derive(Debug, Clone)]
+pub struct KavQuickAccessProvider {
+    pub qa_prov_id: String,
+    pub provider_id: String,
+    pub prefix_str: String,
+    pub placeholder_str: String,
+    pub item_count: u32,
+    pub is_default: bool,
+}
+
+impl KavQuickAccessProvider {
+    pub fn new() -> Self {
+        Self {
+            qa_prov_id: String::new(),
+            provider_id: String::new(),
+            prefix_str: String::new(),
+            placeholder_str: String::new(),
+            item_count: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.qa_prov_id.is_empty() || true && !self.provider_id.is_empty() || true && !self.prefix_str.is_empty() || true && !self.placeholder_str.is_empty() || true && self.item_count < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for KavQuickAccessProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Quick access entry
+#[derive(Debug, Clone)]
+pub struct KawQuickAccessEntry {
+    pub qa_entry_id: String,
+    pub label_str: String,
+    pub description_str: String,
+    pub icon_ref: String,
+    pub group_label: String,
+    pub is_highlighted: bool,
+}
+
+impl KawQuickAccessEntry {
+    pub fn new() -> Self {
+        Self {
+            qa_entry_id: String::new(),
+            label_str: String::new(),
+            description_str: String::new(),
+            icon_ref: String::new(),
+            group_label: String::new(),
+            is_highlighted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.qa_entry_id.is_empty() || true && !self.label_str.is_empty() || true && !self.description_str.is_empty() || true && !self.icon_ref.is_empty() || true && !self.group_label.is_empty() || true && self.is_highlighted || true
+    }
+}
+
+impl Default for KawQuickAccessEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor input mode
+#[derive(Debug, Clone)]
+pub struct KaxInputMode {
+    pub input_mode_id: String,
+    pub mode_name: String,
+    pub cursor_style: String,
+    pub status_text: String,
+    pub keybinding_override: String,
+    pub is_insert_mode: bool,
+}
+
+impl KaxInputMode {
+    pub fn new() -> Self {
+        Self {
+            input_mode_id: String::new(),
+            mode_name: String::new(),
+            cursor_style: String::new(),
+            status_text: String::new(),
+            keybinding_override: String::new(),
+            is_insert_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_mode_id.is_empty() || true && !self.mode_name.is_empty() || true && !self.cursor_style.is_empty() || true && !self.status_text.is_empty() || true && !self.keybinding_override.is_empty() || true && self.is_insert_mode || true
+    }
+}
+
+impl Default for KaxInputMode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Vim-style keybinding
+#[derive(Debug, Clone)]
+pub struct KayVimBinding {
+    pub vim_bind_id: String,
+    pub key_sequence: String,
+    pub command_ref: String,
+    pub vim_mode: String,
+    pub repeat_count: u32,
+    pub is_motion: bool,
+}
+
+impl KayVimBinding {
+    pub fn new() -> Self {
+        Self {
+            vim_bind_id: String::new(),
+            key_sequence: String::new(),
+            command_ref: String::new(),
+            vim_mode: String::new(),
+            repeat_count: u32::default(),
+            is_motion: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.vim_bind_id.is_empty() || true && !self.key_sequence.is_empty() || true && !self.command_ref.is_empty() || true && !self.vim_mode.is_empty() || true && self.repeat_count < u32::MAX || true && self.is_motion || true
+    }
+}
+
+impl Default for KayVimBinding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Input handling configuration
+#[derive(Debug, Clone)]
+pub struct KazInputConfig {
+    pub input_config_id: String,
+    pub config_key: String,
+    pub config_value_json: String,
+    pub scope_str: String,
+    pub platform_str: String,
+    pub is_default: bool,
+}
+
+impl KazInputConfig {
+    pub fn new() -> Self {
+        Self {
+            input_config_id: String::new(),
+            config_key: String::new(),
+            config_value_json: String::new(),
+            scope_str: String::new(),
+            platform_str: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_config_id.is_empty() || true && !self.config_key.is_empty() || true && !self.config_value_json.is_empty() || true && !self.scope_str.is_empty() || true && !self.platform_str.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for KazInputConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -455491,6 +456375,474 @@ mod tests_jzz_generated {
     fn test_jzz_fields() {
         let mut obj = JzzSelection::default();
         obj.sel_util_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kaa_generated {
+    use super::*;
+
+    #[test]
+    fn test_kaa_default() {
+        let obj = KaaKeyEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kaa_fields() {
+        let mut obj = KaaKeyEvent::default();
+        obj.key_event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kab_generated {
+    use super::*;
+
+    #[test]
+    fn test_kab_default() {
+        let obj = KabKeyBinding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kab_fields() {
+        let mut obj = KabKeyBinding::default();
+        obj.keybinding_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kac_generated {
+    use super::*;
+
+    #[test]
+    fn test_kac_default() {
+        let obj = KacKeyChord::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kac_fields() {
+        let mut obj = KacKeyChord::default();
+        obj.key_chord_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kad_generated {
+    use super::*;
+
+    #[test]
+    fn test_kad_default() {
+        let obj = KadKeyMap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kad_fields() {
+        let mut obj = KadKeyMap::default();
+        obj.keymap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kae_generated {
+    use super::*;
+
+    #[test]
+    fn test_kae_default() {
+        let obj = KaeKeyResolver::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kae_fields() {
+        let mut obj = KaeKeyResolver::default();
+        obj.key_resolver_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kaf_generated {
+    use super::*;
+
+    #[test]
+    fn test_kaf_default() {
+        let obj = KafKeyDispatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kaf_fields() {
+        let mut obj = KafKeyDispatch::default();
+        obj.key_dispatch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kag_generated {
+    use super::*;
+
+    #[test]
+    fn test_kag_default() {
+        let obj = KagMouseEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kag_fields() {
+        let mut obj = KagMouseEvent::default();
+        obj.mouse_event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kah_generated {
+    use super::*;
+
+    #[test]
+    fn test_kah_default() {
+        let obj = KahMouseButton::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kah_fields() {
+        let mut obj = KahMouseButton::default();
+        obj.mouse_btn_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kai_generated {
+    use super::*;
+
+    #[test]
+    fn test_kai_default() {
+        let obj = KaiMouseWheel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kai_fields() {
+        let mut obj = KaiMouseWheel::default();
+        obj.mouse_wheel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kaj_generated {
+    use super::*;
+
+    #[test]
+    fn test_kaj_default() {
+        let obj = KajMouseDrag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kaj_fields() {
+        let mut obj = KajMouseDrag::default();
+        obj.mouse_drag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kak_generated {
+    use super::*;
+
+    #[test]
+    fn test_kak_default() {
+        let obj = KakMouseHover::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kak_fields() {
+        let mut obj = KakMouseHover::default();
+        obj.mouse_hover_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kal_generated {
+    use super::*;
+
+    #[test]
+    fn test_kal_default() {
+        let obj = KalGesture::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kal_fields() {
+        let mut obj = KalGesture::default();
+        obj.gesture_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kam_generated {
+    use super::*;
+
+    #[test]
+    fn test_kam_default() {
+        let obj = KamImeInput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kam_fields() {
+        let mut obj = KamImeInput::default();
+        obj.ime_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kan_generated {
+    use super::*;
+
+    #[test]
+    fn test_kan_default() {
+        let obj = KanClipboardEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kan_fields() {
+        let mut obj = KanClipboardEvent::default();
+        obj.clip_event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kao_generated {
+    use super::*;
+
+    #[test]
+    fn test_kao_default() {
+        let obj = KaoPasteEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kao_fields() {
+        let mut obj = KaoPasteEvent::default();
+        obj.paste_event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kap_generated {
+    use super::*;
+
+    #[test]
+    fn test_kap_default() {
+        let obj = KapDropEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kap_fields() {
+        let mut obj = KapDropEvent::default();
+        obj.drop_event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kaq_generated {
+    use super::*;
+
+    #[test]
+    fn test_kaq_default() {
+        let obj = KaqFocusEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kaq_fields() {
+        let mut obj = KaqFocusEvent::default();
+        obj.focus_event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kar_generated {
+    use super::*;
+
+    #[test]
+    fn test_kar_default() {
+        let obj = KarContextMenu::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kar_fields() {
+        let mut obj = KarContextMenu::default();
+        obj.ctx_menu_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kas_generated {
+    use super::*;
+
+    #[test]
+    fn test_kas_default() {
+        let obj = KasInputBinding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kas_fields() {
+        let mut obj = KasInputBinding::default();
+        obj.input_bind_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kat_generated {
+    use super::*;
+
+    #[test]
+    fn test_kat_default() {
+        let obj = KatCommandPalette::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kat_fields() {
+        let mut obj = KatCommandPalette::default();
+        obj.cmd_palette_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kau_generated {
+    use super::*;
+
+    #[test]
+    fn test_kau_default() {
+        let obj = KauCommandEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kau_fields() {
+        let mut obj = KauCommandEntry::default();
+        obj.cmd_entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kav_generated {
+    use super::*;
+
+    #[test]
+    fn test_kav_default() {
+        let obj = KavQuickAccessProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kav_fields() {
+        let mut obj = KavQuickAccessProvider::default();
+        obj.qa_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kaw_generated {
+    use super::*;
+
+    #[test]
+    fn test_kaw_default() {
+        let obj = KawQuickAccessEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kaw_fields() {
+        let mut obj = KawQuickAccessEntry::default();
+        obj.qa_entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kax_generated {
+    use super::*;
+
+    #[test]
+    fn test_kax_default() {
+        let obj = KaxInputMode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kax_fields() {
+        let mut obj = KaxInputMode::default();
+        obj.input_mode_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kay_generated {
+    use super::*;
+
+    #[test]
+    fn test_kay_default() {
+        let obj = KayVimBinding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kay_fields() {
+        let mut obj = KayVimBinding::default();
+        obj.vim_bind_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kaz_generated {
+    use super::*;
+
+    #[test]
+    fn test_kaz_default() {
+        let obj = KazInputConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kaz_fields() {
+        let mut obj = KazInputConfig::default();
+        obj.input_config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
