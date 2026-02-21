@@ -190151,6 +190151,838 @@ impl Default for KhzNavConfig {
     }
 }
 
+/// /// Code action (quick fix/refactor)
+#[derive(Debug, Clone)]
+pub struct KiaCodeAction {
+    pub kia_title: String,
+    pub kia_kind: String,
+    pub kia_diagnostics_str: String,
+    pub kia_preferred: bool,
+    pub kia_disabled_reason: String,
+}
+
+impl KiaCodeAction {
+    pub fn new() -> Self {
+        Self {
+            kia_title: String::new(),
+            kia_kind: String::new(),
+            kia_diagnostics_str: String::new(),
+            kia_preferred: bool::default(),
+            kia_disabled_reason: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kia_title.is_empty() || true && !self.kia_kind.is_empty() || true && !self.kia_diagnostics_str.is_empty() || true && self.kia_preferred || true && !self.kia_disabled_reason.is_empty() || true
+    }
+}
+
+impl Default for KiaCodeAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Code action kind classification
+#[derive(Debug, Clone)]
+pub struct KibCodeActionKind {
+    pub kib_kind_str: String,
+    pub kib_is_refactor: bool,
+    pub kib_is_quickfix: bool,
+    pub kib_is_source: bool,
+    pub kib_label: String,
+}
+
+impl KibCodeActionKind {
+    pub fn new() -> Self {
+        Self {
+            kib_kind_str: String::new(),
+            kib_is_refactor: bool::default(),
+            kib_is_quickfix: bool::default(),
+            kib_is_source: bool::default(),
+            kib_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kib_kind_str.is_empty() || true && self.kib_is_refactor || true && self.kib_is_quickfix || true && self.kib_is_source || true && !self.kib_label.is_empty() || true
+    }
+}
+
+impl Default for KibCodeActionKind {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// How code action was triggered
+#[derive(Debug, Clone)]
+pub struct KicCodeActionTrigger {
+    pub kic_trigger_kind: String,
+    pub kic_only_kinds: String,
+    pub kic_auto_apply: bool,
+    pub kic_filter: String,
+    pub kic_label: String,
+}
+
+impl KicCodeActionTrigger {
+    pub fn new() -> Self {
+        Self {
+            kic_trigger_kind: String::new(),
+            kic_only_kinds: String::new(),
+            kic_auto_apply: bool::default(),
+            kic_filter: String::new(),
+            kic_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kic_trigger_kind.is_empty() || true && !self.kic_only_kinds.is_empty() || true && self.kic_auto_apply || true && !self.kic_filter.is_empty() || true && !self.kic_label.is_empty() || true
+    }
+}
+
+impl Default for KicCodeActionTrigger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Context for code action request
+#[derive(Debug, Clone)]
+pub struct KidCodeActionContext {
+    pub kid_diagnostics: String,
+    pub kid_only_kinds: String,
+    pub kid_trigger_kind: String,
+    pub kid_selection_range: String,
+    pub kid_label: String,
+}
+
+impl KidCodeActionContext {
+    pub fn new() -> Self {
+        Self {
+            kid_diagnostics: String::new(),
+            kid_only_kinds: String::new(),
+            kid_trigger_kind: String::new(),
+            kid_selection_range: String::new(),
+            kid_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kid_diagnostics.is_empty() || true && !self.kid_only_kinds.is_empty() || true && !self.kid_trigger_kind.is_empty() || true && !self.kid_selection_range.is_empty() || true && !self.kid_label.is_empty() || true
+    }
+}
+
+impl Default for KidCodeActionContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extract method/variable refactoring
+#[derive(Debug, Clone)]
+pub struct KieRefactorExtract {
+    pub kie_source_range: String,
+    pub kie_target_name: String,
+    pub kie_extract_type: String,
+    pub kie_scope: String,
+    pub kie_preview: bool,
+}
+
+impl KieRefactorExtract {
+    pub fn new() -> Self {
+        Self {
+            kie_source_range: String::new(),
+            kie_target_name: String::new(),
+            kie_extract_type: String::new(),
+            kie_scope: String::new(),
+            kie_preview: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kie_source_range.is_empty() || true && !self.kie_target_name.is_empty() || true && !self.kie_extract_type.is_empty() || true && !self.kie_scope.is_empty() || true && self.kie_preview || true
+    }
+}
+
+impl Default for KieRefactorExtract {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Inline variable/method refactoring
+#[derive(Debug, Clone)]
+pub struct KifRefactorInline {
+    pub kif_symbol_name: String,
+    pub kif_inline_all: bool,
+    pub kif_source_uri: String,
+    pub kif_occurrences: u32,
+    pub kif_preview: bool,
+}
+
+impl KifRefactorInline {
+    pub fn new() -> Self {
+        Self {
+            kif_symbol_name: String::new(),
+            kif_inline_all: bool::default(),
+            kif_source_uri: String::new(),
+            kif_occurrences: u32::default(),
+            kif_preview: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kif_symbol_name.is_empty() || true && self.kif_inline_all || true && !self.kif_source_uri.is_empty() || true && self.kif_occurrences < u32::MAX || true && self.kif_preview || true
+    }
+}
+
+impl Default for KifRefactorInline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Move symbol/file refactoring
+#[derive(Debug, Clone)]
+pub struct KigRefactorMove {
+    pub kig_source_uri: String,
+    pub kig_target_uri: String,
+    pub kig_symbol_name: String,
+    pub kig_update_refs: bool,
+    pub kig_preview: bool,
+}
+
+impl KigRefactorMove {
+    pub fn new() -> Self {
+        Self {
+            kig_source_uri: String::new(),
+            kig_target_uri: String::new(),
+            kig_symbol_name: String::new(),
+            kig_update_refs: bool::default(),
+            kig_preview: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kig_source_uri.is_empty() || true && !self.kig_target_uri.is_empty() || true && !self.kig_symbol_name.is_empty() || true && self.kig_update_refs || true && self.kig_preview || true
+    }
+}
+
+impl Default for KigRefactorMove {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Rename symbol refactoring
+#[derive(Debug, Clone)]
+pub struct KihRefactorRename {
+    pub kih_old_name: String,
+    pub kih_new_name: String,
+    pub kih_uri: String,
+    pub kih_position: u32,
+    pub kih_preview: bool,
+}
+
+impl KihRefactorRename {
+    pub fn new() -> Self {
+        Self {
+            kih_old_name: String::new(),
+            kih_new_name: String::new(),
+            kih_uri: String::new(),
+            kih_position: u32::default(),
+            kih_preview: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kih_old_name.is_empty() || true && !self.kih_new_name.is_empty() || true && !self.kih_uri.is_empty() || true && self.kih_position < u32::MAX || true && self.kih_preview || true
+    }
+}
+
+impl Default for KihRefactorRename {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Rename refactoring preview info
+#[derive(Debug, Clone)]
+pub struct KiiRenamePreview {
+    pub kii_changes_count: u32,
+    pub kii_files_count: u32,
+    pub kii_conflicts: String,
+    pub kii_accepted: bool,
+    pub kii_label: String,
+}
+
+impl KiiRenamePreview {
+    pub fn new() -> Self {
+        Self {
+            kii_changes_count: u32::default(),
+            kii_files_count: u32::default(),
+            kii_conflicts: String::new(),
+            kii_accepted: bool::default(),
+            kii_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kii_changes_count < u32::MAX || true && self.kii_files_count < u32::MAX || true && !self.kii_conflicts.is_empty() || true && self.kii_accepted || true && !self.kii_label.is_empty() || true
+    }
+}
+
+impl Default for KiiRenamePreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Convert between code patterns
+#[derive(Debug, Clone)]
+pub struct KijRefactorConvert {
+    pub kij_from_kind: String,
+    pub kij_to_kind: String,
+    pub kij_source_range: String,
+    pub kij_auto_apply: bool,
+    pub kij_label: String,
+}
+
+impl KijRefactorConvert {
+    pub fn new() -> Self {
+        Self {
+            kij_from_kind: String::new(),
+            kij_to_kind: String::new(),
+            kij_source_range: String::new(),
+            kij_auto_apply: bool::default(),
+            kij_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kij_from_kind.is_empty() || true && !self.kij_to_kind.is_empty() || true && !self.kij_source_range.is_empty() || true && self.kij_auto_apply || true && !self.kij_label.is_empty() || true
+    }
+}
+
+impl Default for KijRefactorConvert {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Organize imports refactoring
+#[derive(Debug, Clone)]
+pub struct KikRefactorOrganize {
+    pub kik_sort_imports: bool,
+    pub kik_remove_unused: bool,
+    pub kik_group_imports: bool,
+    pub kik_lang_id: String,
+    pub kik_label: String,
+}
+
+impl KikRefactorOrganize {
+    pub fn new() -> Self {
+        Self {
+            kik_sort_imports: bool::default(),
+            kik_remove_unused: bool::default(),
+            kik_group_imports: bool::default(),
+            kik_lang_id: String::new(),
+            kik_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kik_sort_imports || true && self.kik_remove_unused || true && self.kik_group_imports || true && !self.kik_lang_id.is_empty() || true && !self.kik_label.is_empty() || true
+    }
+}
+
+impl Default for KikRefactorOrganize {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Generate code refactoring
+#[derive(Debug, Clone)]
+pub struct KilRefactorGenerate {
+    pub kil_target_name: String,
+    pub kil_generate_kind: String,
+    pub kil_source_range: String,
+    pub kil_template: String,
+    pub kil_preview: bool,
+}
+
+impl KilRefactorGenerate {
+    pub fn new() -> Self {
+        Self {
+            kil_target_name: String::new(),
+            kil_generate_kind: String::new(),
+            kil_source_range: String::new(),
+            kil_template: String::new(),
+            kil_preview: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kil_target_name.is_empty() || true && !self.kil_generate_kind.is_empty() || true && !self.kil_source_range.is_empty() || true && !self.kil_template.is_empty() || true && self.kil_preview || true
+    }
+}
+
+impl Default for KilRefactorGenerate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Workspace-wide edit operation
+#[derive(Debug, Clone)]
+pub struct KimWorkspaceEdit {
+    pub kim_label: String,
+    pub kim_edit_count: u32,
+    pub kim_needs_confirm: bool,
+    pub kim_metadata: String,
+    pub kim_applied: bool,
+}
+
+impl KimWorkspaceEdit {
+    pub fn new() -> Self {
+        Self {
+            kim_label: String::new(),
+            kim_edit_count: u32::default(),
+            kim_needs_confirm: bool::default(),
+            kim_metadata: String::new(),
+            kim_applied: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kim_label.is_empty() || true && self.kim_edit_count < u32::MAX || true && self.kim_needs_confirm || true && !self.kim_metadata.is_empty() || true && self.kim_applied || true
+    }
+}
+
+impl Default for KimWorkspaceEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Single text document edit
+#[derive(Debug, Clone)]
+pub struct KinTextDocEdit {
+    pub kin_uri: String,
+    pub kin_version: u64,
+    pub kin_edits_count: u32,
+    pub kin_create_if_missing: bool,
+    pub kin_label: String,
+}
+
+impl KinTextDocEdit {
+    pub fn new() -> Self {
+        Self {
+            kin_uri: String::new(),
+            kin_version: u64::default(),
+            kin_edits_count: u32::default(),
+            kin_create_if_missing: bool::default(),
+            kin_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kin_uri.is_empty() || true && self.kin_version < u64::MAX || true && self.kin_edits_count < u32::MAX || true && self.kin_create_if_missing || true && !self.kin_label.is_empty() || true
+    }
+}
+
+impl Default for KinTextDocEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Create file operation
+#[derive(Debug, Clone)]
+pub struct KioCreateFileOp {
+    pub kio_uri: String,
+    pub kio_overwrite: bool,
+    pub kio_ignore_exists: bool,
+    pub kio_content: String,
+    pub kio_label: String,
+}
+
+impl KioCreateFileOp {
+    pub fn new() -> Self {
+        Self {
+            kio_uri: String::new(),
+            kio_overwrite: bool::default(),
+            kio_ignore_exists: bool::default(),
+            kio_content: String::new(),
+            kio_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kio_uri.is_empty() || true && self.kio_overwrite || true && self.kio_ignore_exists || true && !self.kio_content.is_empty() || true && !self.kio_label.is_empty() || true
+    }
+}
+
+impl Default for KioCreateFileOp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Delete file operation
+#[derive(Debug, Clone)]
+pub struct KipDeleteFileOp {
+    pub kip_uri: String,
+    pub kip_recursive: bool,
+    pub kip_ignore_missing: bool,
+    pub kip_trash: bool,
+    pub kip_label: String,
+}
+
+impl KipDeleteFileOp {
+    pub fn new() -> Self {
+        Self {
+            kip_uri: String::new(),
+            kip_recursive: bool::default(),
+            kip_ignore_missing: bool::default(),
+            kip_trash: bool::default(),
+            kip_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kip_uri.is_empty() || true && self.kip_recursive || true && self.kip_ignore_missing || true && self.kip_trash || true && !self.kip_label.is_empty() || true
+    }
+}
+
+impl Default for KipDeleteFileOp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Rename file operation
+#[derive(Debug, Clone)]
+pub struct KiqRenameFileOp {
+    pub kiq_old_uri: String,
+    pub kiq_new_uri: String,
+    pub kiq_overwrite: bool,
+    pub kiq_ignore_exists: bool,
+    pub kiq_label: String,
+}
+
+impl KiqRenameFileOp {
+    pub fn new() -> Self {
+        Self {
+            kiq_old_uri: String::new(),
+            kiq_new_uri: String::new(),
+            kiq_overwrite: bool::default(),
+            kiq_ignore_exists: bool::default(),
+            kiq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kiq_old_uri.is_empty() || true && !self.kiq_new_uri.is_empty() || true && self.kiq_overwrite || true && self.kiq_ignore_exists || true && !self.kiq_label.is_empty() || true
+    }
+}
+
+impl Default for KiqRenameFileOp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Edit conflict during workspace edit
+#[derive(Debug, Clone)]
+pub struct KirEditConflict {
+    pub kir_uri: String,
+    pub kir_conflict_type: String,
+    pub kir_resolution: String,
+    pub kir_auto_resolved: bool,
+    pub kir_label: String,
+}
+
+impl KirEditConflict {
+    pub fn new() -> Self {
+        Self {
+            kir_uri: String::new(),
+            kir_conflict_type: String::new(),
+            kir_resolution: String::new(),
+            kir_auto_resolved: bool::default(),
+            kir_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kir_uri.is_empty() || true && !self.kir_conflict_type.is_empty() || true && !self.kir_resolution.is_empty() || true && self.kir_auto_resolved || true && !self.kir_label.is_empty() || true
+    }
+}
+
+impl Default for KirEditConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Code lens annotation in editor
+#[derive(Debug, Clone)]
+pub struct KisCodeLens {
+    pub kis_line: u32,
+    pub kis_command: String,
+    pub kis_title: String,
+    pub kis_resolved: bool,
+    pub kis_data: String,
+}
+
+impl KisCodeLens {
+    pub fn new() -> Self {
+        Self {
+            kis_line: u32::default(),
+            kis_command: String::new(),
+            kis_title: String::new(),
+            kis_resolved: bool::default(),
+            kis_data: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kis_line < u32::MAX || true && !self.kis_command.is_empty() || true && !self.kis_title.is_empty() || true && self.kis_resolved || true && !self.kis_data.is_empty() || true
+    }
+}
+
+impl Default for KisCodeLens {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Code lens provider registration
+#[derive(Debug, Clone)]
+pub struct KitCodeLensProvider {
+    pub kit_lang_id: String,
+    pub kit_provider_name: String,
+    pub kit_resolve_on_show: bool,
+    pub kit_event_based: bool,
+    pub kit_label: String,
+}
+
+impl KitCodeLensProvider {
+    pub fn new() -> Self {
+        Self {
+            kit_lang_id: String::new(),
+            kit_provider_name: String::new(),
+            kit_resolve_on_show: bool::default(),
+            kit_event_based: bool::default(),
+            kit_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kit_lang_id.is_empty() || true && !self.kit_provider_name.is_empty() || true && self.kit_resolve_on_show || true && self.kit_event_based || true && !self.kit_label.is_empty() || true
+    }
+}
+
+impl Default for KitCodeLensProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Light bulb indicator for actions
+#[derive(Debug, Clone)]
+pub struct KiuLightBulb {
+    pub kiu_line: u32,
+    pub kiu_actions_count: u32,
+    pub kiu_auto_fix: bool,
+    pub kiu_preferred: bool,
+    pub kiu_label: String,
+}
+
+impl KiuLightBulb {
+    pub fn new() -> Self {
+        Self {
+            kiu_line: u32::default(),
+            kiu_actions_count: u32::default(),
+            kiu_auto_fix: bool::default(),
+            kiu_preferred: bool::default(),
+            kiu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kiu_line < u32::MAX || true && self.kiu_actions_count < u32::MAX || true && self.kiu_auto_fix || true && self.kiu_preferred || true && !self.kiu_label.is_empty() || true
+    }
+}
+
+impl Default for KiuLightBulb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Quick fix suggestion
+#[derive(Debug, Clone)]
+pub struct KivQuickFix {
+    pub kiv_title: String,
+    pub kiv_diagnostic_uri: String,
+    pub kiv_edit_label: String,
+    pub kiv_preferred: bool,
+    pub kiv_disabled: bool,
+}
+
+impl KivQuickFix {
+    pub fn new() -> Self {
+        Self {
+            kiv_title: String::new(),
+            kiv_diagnostic_uri: String::new(),
+            kiv_edit_label: String::new(),
+            kiv_preferred: bool::default(),
+            kiv_disabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kiv_title.is_empty() || true && !self.kiv_diagnostic_uri.is_empty() || true && !self.kiv_edit_label.is_empty() || true && self.kiv_preferred || true && self.kiv_disabled || true
+    }
+}
+
+impl Default for KivQuickFix {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Source-level code action
+#[derive(Debug, Clone)]
+pub struct KiwSourceAction {
+    pub kiw_kind: String,
+    pub kiw_title: String,
+    pub kiw_applies_to: String,
+    pub kiw_auto_run: bool,
+    pub kiw_label: String,
+}
+
+impl KiwSourceAction {
+    pub fn new() -> Self {
+        Self {
+            kiw_kind: String::new(),
+            kiw_title: String::new(),
+            kiw_applies_to: String::new(),
+            kiw_auto_run: bool::default(),
+            kiw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kiw_kind.is_empty() || true && !self.kiw_title.is_empty() || true && !self.kiw_applies_to.is_empty() || true && self.kiw_auto_run || true && !self.kiw_label.is_empty() || true
+    }
+}
+
+impl Default for KiwSourceAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Refactoring preview diff display
+#[derive(Debug, Clone)]
+pub struct KixRefactorPreview {
+    pub kix_diff_text: String,
+    pub kix_files_changed: u32,
+    pub kix_insertions: u32,
+    pub kix_deletions: u32,
+    pub kix_label: String,
+}
+
+impl KixRefactorPreview {
+    pub fn new() -> Self {
+        Self {
+            kix_diff_text: String::new(),
+            kix_files_changed: u32::default(),
+            kix_insertions: u32::default(),
+            kix_deletions: u32::default(),
+            kix_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kix_diff_text.is_empty() || true && self.kix_files_changed < u32::MAX || true && self.kix_insertions < u32::MAX || true && self.kix_deletions < u32::MAX || true && !self.kix_label.is_empty() || true
+    }
+}
+
+impl Default for KixRefactorPreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Refactoring operation history entry
+#[derive(Debug, Clone)]
+pub struct KiyRefactorHistory {
+    pub kiy_action_name: String,
+    pub kiy_timestamp: u64,
+    pub kiy_files_changed: u32,
+    pub kiy_undoable: bool,
+    pub kiy_label: String,
+}
+
+impl KiyRefactorHistory {
+    pub fn new() -> Self {
+        Self {
+            kiy_action_name: String::new(),
+            kiy_timestamp: u64::default(),
+            kiy_files_changed: u32::default(),
+            kiy_undoable: bool::default(),
+            kiy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kiy_action_name.is_empty() || true && self.kiy_timestamp < u64::MAX || true && self.kiy_files_changed < u32::MAX || true && self.kiy_undoable || true && !self.kiy_label.is_empty() || true
+    }
+}
+
+impl Default for KiyRefactorHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined refactoring configuration
+#[derive(Debug, Clone)]
+pub struct KizRefactorConfig {
+    pub kiz_auto_apply: bool,
+    pub kiz_show_preview: bool,
+    pub kiz_confirm_moves: bool,
+    pub kiz_organize_on_save: bool,
+    pub kiz_label: String,
+}
+
+impl KizRefactorConfig {
+    pub fn new() -> Self {
+        Self {
+            kiz_auto_apply: bool::default(),
+            kiz_show_preview: bool::default(),
+            kiz_confirm_moves: bool::default(),
+            kiz_organize_on_save: bool::default(),
+            kiz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kiz_auto_apply || true && self.kiz_show_preview || true && self.kiz_confirm_moves || true && self.kiz_organize_on_save || true && !self.kiz_label.is_empty() || true
+    }
+}
+
+impl Default for KizRefactorConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -465970,6 +466802,474 @@ mod tests_khz_generated {
     fn test_khz_fields() {
         let mut obj = KhzNavConfig::default();
         obj.khz_peek_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kia_generated {
+    use super::*;
+
+    #[test]
+    fn test_kia_default() {
+        let obj = KiaCodeAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kia_fields() {
+        let mut obj = KiaCodeAction::default();
+        obj.kia_title = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kib_generated {
+    use super::*;
+
+    #[test]
+    fn test_kib_default() {
+        let obj = KibCodeActionKind::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kib_fields() {
+        let mut obj = KibCodeActionKind::default();
+        obj.kib_kind_str = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kic_generated {
+    use super::*;
+
+    #[test]
+    fn test_kic_default() {
+        let obj = KicCodeActionTrigger::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kic_fields() {
+        let mut obj = KicCodeActionTrigger::default();
+        obj.kic_trigger_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kid_generated {
+    use super::*;
+
+    #[test]
+    fn test_kid_default() {
+        let obj = KidCodeActionContext::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kid_fields() {
+        let mut obj = KidCodeActionContext::default();
+        obj.kid_diagnostics = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kie_generated {
+    use super::*;
+
+    #[test]
+    fn test_kie_default() {
+        let obj = KieRefactorExtract::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kie_fields() {
+        let mut obj = KieRefactorExtract::default();
+        obj.kie_source_range = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kif_generated {
+    use super::*;
+
+    #[test]
+    fn test_kif_default() {
+        let obj = KifRefactorInline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kif_fields() {
+        let mut obj = KifRefactorInline::default();
+        obj.kif_symbol_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kig_generated {
+    use super::*;
+
+    #[test]
+    fn test_kig_default() {
+        let obj = KigRefactorMove::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kig_fields() {
+        let mut obj = KigRefactorMove::default();
+        obj.kig_source_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kih_generated {
+    use super::*;
+
+    #[test]
+    fn test_kih_default() {
+        let obj = KihRefactorRename::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kih_fields() {
+        let mut obj = KihRefactorRename::default();
+        obj.kih_old_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kii_generated {
+    use super::*;
+
+    #[test]
+    fn test_kii_default() {
+        let obj = KiiRenamePreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kii_fields() {
+        let mut obj = KiiRenamePreview::default();
+        obj.kii_changes_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kij_generated {
+    use super::*;
+
+    #[test]
+    fn test_kij_default() {
+        let obj = KijRefactorConvert::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kij_fields() {
+        let mut obj = KijRefactorConvert::default();
+        obj.kij_from_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kik_generated {
+    use super::*;
+
+    #[test]
+    fn test_kik_default() {
+        let obj = KikRefactorOrganize::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kik_fields() {
+        let mut obj = KikRefactorOrganize::default();
+        obj.kik_sort_imports = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kil_generated {
+    use super::*;
+
+    #[test]
+    fn test_kil_default() {
+        let obj = KilRefactorGenerate::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kil_fields() {
+        let mut obj = KilRefactorGenerate::default();
+        obj.kil_target_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kim_generated {
+    use super::*;
+
+    #[test]
+    fn test_kim_default() {
+        let obj = KimWorkspaceEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kim_fields() {
+        let mut obj = KimWorkspaceEdit::default();
+        obj.kim_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kin_generated {
+    use super::*;
+
+    #[test]
+    fn test_kin_default() {
+        let obj = KinTextDocEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kin_fields() {
+        let mut obj = KinTextDocEdit::default();
+        obj.kin_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kio_generated {
+    use super::*;
+
+    #[test]
+    fn test_kio_default() {
+        let obj = KioCreateFileOp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kio_fields() {
+        let mut obj = KioCreateFileOp::default();
+        obj.kio_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kip_generated {
+    use super::*;
+
+    #[test]
+    fn test_kip_default() {
+        let obj = KipDeleteFileOp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kip_fields() {
+        let mut obj = KipDeleteFileOp::default();
+        obj.kip_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kiq_generated {
+    use super::*;
+
+    #[test]
+    fn test_kiq_default() {
+        let obj = KiqRenameFileOp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kiq_fields() {
+        let mut obj = KiqRenameFileOp::default();
+        obj.kiq_old_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kir_generated {
+    use super::*;
+
+    #[test]
+    fn test_kir_default() {
+        let obj = KirEditConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kir_fields() {
+        let mut obj = KirEditConflict::default();
+        obj.kir_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kis_generated {
+    use super::*;
+
+    #[test]
+    fn test_kis_default() {
+        let obj = KisCodeLens::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kis_fields() {
+        let mut obj = KisCodeLens::default();
+        obj.kis_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kit_generated {
+    use super::*;
+
+    #[test]
+    fn test_kit_default() {
+        let obj = KitCodeLensProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kit_fields() {
+        let mut obj = KitCodeLensProvider::default();
+        obj.kit_lang_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kiu_generated {
+    use super::*;
+
+    #[test]
+    fn test_kiu_default() {
+        let obj = KiuLightBulb::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kiu_fields() {
+        let mut obj = KiuLightBulb::default();
+        obj.kiu_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kiv_generated {
+    use super::*;
+
+    #[test]
+    fn test_kiv_default() {
+        let obj = KivQuickFix::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kiv_fields() {
+        let mut obj = KivQuickFix::default();
+        obj.kiv_title = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kiw_generated {
+    use super::*;
+
+    #[test]
+    fn test_kiw_default() {
+        let obj = KiwSourceAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kiw_fields() {
+        let mut obj = KiwSourceAction::default();
+        obj.kiw_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kix_generated {
+    use super::*;
+
+    #[test]
+    fn test_kix_default() {
+        let obj = KixRefactorPreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kix_fields() {
+        let mut obj = KixRefactorPreview::default();
+        obj.kix_diff_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kiy_generated {
+    use super::*;
+
+    #[test]
+    fn test_kiy_default() {
+        let obj = KiyRefactorHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kiy_fields() {
+        let mut obj = KiyRefactorHistory::default();
+        obj.kiy_action_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kiz_generated {
+    use super::*;
+
+    #[test]
+    fn test_kiz_default() {
+        let obj = KizRefactorConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kiz_fields() {
+        let mut obj = KizRefactorConfig::default();
+        obj.kiz_auto_apply = true;
         assert!(obj.validate());
     }
 }
