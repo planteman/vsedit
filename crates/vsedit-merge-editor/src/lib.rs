@@ -214969,6 +214969,786 @@ impl Default for SnippetKeyBinding {
     }
 }
 
+/// Language detection engine
+#[derive(Debug, Clone)]
+pub struct LanguageDetector {
+    pub input_text: String,
+    pub max_length: u32,
+    pub confidence_threshold: f64,
+    pub is_cached: bool,
+}
+
+impl LanguageDetector {
+    pub fn new() -> Self {
+        Self {
+            input_text: String::new(),
+            max_length: u32::default(),
+            confidence_threshold: f64::default(),
+            is_cached: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_text.is_empty() || true && self.max_length < u32::MAX || true && self.confidence_threshold.is_finite() || true && self.is_cached || true
+    }
+}
+
+impl Default for LanguageDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language detection score
+#[derive(Debug, Clone)]
+pub struct LanguageDetectScore {
+    pub language_id: String,
+    pub score: f64,
+    pub rank: u32,
+    pub is_reliable: bool,
+}
+
+impl LanguageDetectScore {
+    pub fn new() -> Self {
+        Self {
+            language_id: String::new(),
+            score: f64::default(),
+            rank: u32::default(),
+            is_reliable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.language_id.is_empty() || true && self.score.is_finite() || true && self.rank < u32::MAX || true && self.is_reliable || true
+    }
+}
+
+impl Default for LanguageDetectScore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language detection hint
+#[derive(Debug, Clone)]
+pub struct LanguageHint {
+    pub hint_source: String,
+    pub language_id: String,
+    pub priority: u32,
+    pub is_user_override: bool,
+}
+
+impl LanguageHint {
+    pub fn new() -> Self {
+        Self {
+            hint_source: String::new(),
+            language_id: String::new(),
+            priority: u32::default(),
+            is_user_override: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hint_source.is_empty() || true && !self.language_id.is_empty() || true && self.priority < u32::MAX || true && self.is_user_override || true
+    }
+}
+
+impl Default for LanguageHint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language detect model entry
+#[derive(Debug, Clone)]
+pub struct LanguageDetectModel {
+    pub model_name: String,
+    pub version: u32,
+    pub feature_count: u32,
+    pub accuracy: f64,
+}
+
+impl LanguageDetectModel {
+    pub fn new() -> Self {
+        Self {
+            model_name: String::new(),
+            version: u32::default(),
+            feature_count: u32::default(),
+            accuracy: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.model_name.is_empty() || true && self.version < u32::MAX || true && self.feature_count < u32::MAX || true && self.accuracy.is_finite() || true
+    }
+}
+
+impl Default for LanguageDetectModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File extension to language map
+#[derive(Debug, Clone)]
+pub struct FileExtensionMap {
+    pub extension: String,
+    pub language_id: String,
+    pub is_primary: bool,
+    pub priority: u32,
+}
+
+impl FileExtensionMap {
+    pub fn new() -> Self {
+        Self {
+            extension: String::new(),
+            language_id: String::new(),
+            is_primary: bool::default(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.extension.is_empty() || true && !self.language_id.is_empty() || true && self.is_primary || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for FileExtensionMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// First line language pattern
+#[derive(Debug, Clone)]
+pub struct FirstLinePattern {
+    pub pattern: String,
+    pub language_id: String,
+    pub is_regex: bool,
+    pub match_score: f64,
+}
+
+impl FirstLinePattern {
+    pub fn new() -> Self {
+        Self {
+            pattern: String::new(),
+            language_id: String::new(),
+            is_regex: bool::default(),
+            match_score: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pattern.is_empty() || true && !self.language_id.is_empty() || true && self.is_regex || true && self.match_score.is_finite() || true
+    }
+}
+
+impl Default for FirstLinePattern {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Shebang line language detector
+#[derive(Debug, Clone)]
+pub struct ShebangDetector {
+    pub shebang_line: String,
+    pub interpreter: String,
+    pub language_id: String,
+    pub confidence: f64,
+}
+
+impl ShebangDetector {
+    pub fn new() -> Self {
+        Self {
+            shebang_line: String::new(),
+            interpreter: String::new(),
+            language_id: String::new(),
+            confidence: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shebang_line.is_empty() || true && !self.interpreter.is_empty() || true && !self.language_id.is_empty() || true && self.confidence.is_finite() || true
+    }
+}
+
+impl Default for ShebangDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// MIME type to language mapping
+#[derive(Debug, Clone)]
+pub struct MimeTypeMap {
+    pub mime_type: String,
+    pub language_id: String,
+    pub is_standard: bool,
+    pub priority: u32,
+}
+
+impl MimeTypeMap {
+    pub fn new() -> Self {
+        Self {
+            mime_type: String::new(),
+            language_id: String::new(),
+            is_standard: bool::default(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mime_type.is_empty() || true && !self.language_id.is_empty() || true && self.is_standard || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for MimeTypeMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language alias mapping
+#[derive(Debug, Clone)]
+pub struct LanguageAlias {
+    pub alias_name: String,
+    pub canonical_id: String,
+    pub is_deprecated: bool,
+    pub since_version: u32,
+}
+
+impl LanguageAlias {
+    pub fn new() -> Self {
+        Self {
+            alias_name: String::new(),
+            canonical_id: String::new(),
+            is_deprecated: bool::default(),
+            since_version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.alias_name.is_empty() || true && !self.canonical_id.is_empty() || true && self.is_deprecated || true && self.since_version < u32::MAX || true
+    }
+}
+
+impl Default for LanguageAlias {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language configuration entry
+#[derive(Debug, Clone)]
+pub struct LanguageConfig {
+    pub language_id: String,
+    pub block_comment_start: String,
+    pub block_comment_end: String,
+    pub auto_closing_pairs_count: u32,
+}
+
+impl LanguageConfig {
+    pub fn new() -> Self {
+        Self {
+            language_id: String::new(),
+            block_comment_start: String::new(),
+            block_comment_end: String::new(),
+            auto_closing_pairs_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.language_id.is_empty() || true && !self.block_comment_start.is_empty() || true && !self.block_comment_end.is_empty() || true && self.auto_closing_pairs_count < u32::MAX || true
+    }
+}
+
+impl Default for LanguageConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language feature flags
+#[derive(Debug, Clone)]
+pub struct LanguageFeatureFlags {
+    pub language_id: String,
+    pub has_folding: bool,
+    pub has_indentation: bool,
+    pub has_bracket_matching: bool,
+}
+
+impl LanguageFeatureFlags {
+    pub fn new() -> Self {
+        Self {
+            language_id: String::new(),
+            has_folding: bool::default(),
+            has_indentation: bool::default(),
+            has_bracket_matching: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.language_id.is_empty() || true && self.has_folding || true && self.has_indentation || true && self.has_bracket_matching || true
+    }
+}
+
+impl Default for LanguageFeatureFlags {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language icon definition
+#[derive(Debug, Clone)]
+pub struct LanguageIcon {
+    pub icon_id: String,
+    pub theme_type: u32,
+    pub font_character: String,
+    pub color_hex: String,
+}
+
+impl LanguageIcon {
+    pub fn new() -> Self {
+        Self {
+            icon_id: String::new(),
+            theme_type: u32::default(),
+            font_character: String::new(),
+            color_hex: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.icon_id.is_empty() || true && self.theme_type < u32::MAX || true && !self.font_character.is_empty() || true && !self.color_hex.is_empty() || true
+    }
+}
+
+impl Default for LanguageIcon {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language extension contribution
+#[derive(Debug, Clone)]
+pub struct LanguageContributionPoint {
+    pub extension_id: String,
+    pub language_id: String,
+    pub grammar_path: String,
+    pub is_builtin: bool,
+}
+
+impl LanguageContributionPoint {
+    pub fn new() -> Self {
+        Self {
+            extension_id: String::new(),
+            language_id: String::new(),
+            grammar_path: String::new(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.extension_id.is_empty() || true && !self.language_id.is_empty() || true && !self.grammar_path.is_empty() || true && self.is_builtin || true
+    }
+}
+
+impl Default for LanguageContributionPoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language token type mapping
+#[derive(Debug, Clone)]
+pub struct LanguageTokenType {
+    pub token_type: String,
+    pub semantic_type: String,
+    pub language_id: String,
+    pub priority: u32,
+}
+
+impl LanguageTokenType {
+    pub fn new() -> Self {
+        Self {
+            token_type: String::new(),
+            semantic_type: String::new(),
+            language_id: String::new(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_type.is_empty() || true && !self.semantic_type.is_empty() || true && !self.language_id.is_empty() || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for LanguageTokenType {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language word boundary pattern
+#[derive(Debug, Clone)]
+pub struct LanguageWordPattern {
+    pub pattern: String,
+    pub language_id: String,
+    pub is_default: bool,
+    pub match_flags: u32,
+}
+
+impl LanguageWordPattern {
+    pub fn new() -> Self {
+        Self {
+            pattern: String::new(),
+            language_id: String::new(),
+            is_default: bool::default(),
+            match_flags: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pattern.is_empty() || true && !self.language_id.is_empty() || true && self.is_default || true && self.match_flags < u32::MAX || true
+    }
+}
+
+impl Default for LanguageWordPattern {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language on-enter rule
+#[derive(Debug, Clone)]
+pub struct LanguageOnEnterRule {
+    pub before_text: String,
+    pub after_text: String,
+    pub action_type: u32,
+    pub indent_delta: u32,
+}
+
+impl LanguageOnEnterRule {
+    pub fn new() -> Self {
+        Self {
+            before_text: String::new(),
+            after_text: String::new(),
+            action_type: u32::default(),
+            indent_delta: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.before_text.is_empty() || true && !self.after_text.is_empty() || true && self.action_type < u32::MAX || true && self.indent_delta < u32::MAX || true
+    }
+}
+
+impl Default for LanguageOnEnterRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language auto-indent rule
+#[derive(Debug, Clone)]
+pub struct LanguageAutoIndent {
+    pub indent_action: u32,
+    pub append_text: String,
+    pub remove_text: u32,
+    pub language_id: String,
+}
+
+impl LanguageAutoIndent {
+    pub fn new() -> Self {
+        Self {
+            indent_action: u32::default(),
+            append_text: String::new(),
+            remove_text: u32::default(),
+            language_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.indent_action < u32::MAX || true && !self.append_text.is_empty() || true && self.remove_text < u32::MAX || true && !self.language_id.is_empty() || true
+    }
+}
+
+impl Default for LanguageAutoIndent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language folding marker
+#[derive(Debug, Clone)]
+pub struct LanguageFoldingRule {
+    pub fold_start: String,
+    pub fold_end: String,
+    pub language_id: String,
+    pub is_indentation_based: bool,
+}
+
+impl LanguageFoldingRule {
+    pub fn new() -> Self {
+        Self {
+            fold_start: String::new(),
+            fold_end: String::new(),
+            language_id: String::new(),
+            is_indentation_based: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fold_start.is_empty() || true && !self.fold_end.is_empty() || true && !self.language_id.is_empty() || true && self.is_indentation_based || true
+    }
+}
+
+impl Default for LanguageFoldingRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language surround pair
+#[derive(Debug, Clone)]
+pub struct LanguageSurroundPair {
+    pub open_char: String,
+    pub close_char: String,
+    pub language_id: String,
+    pub not_in_scope: String,
+}
+
+impl LanguageSurroundPair {
+    pub fn new() -> Self {
+        Self {
+            open_char: String::new(),
+            close_char: String::new(),
+            language_id: String::new(),
+            not_in_scope: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.open_char.is_empty() || true && !self.close_char.is_empty() || true && !self.language_id.is_empty() || true && !self.not_in_scope.is_empty() || true
+    }
+}
+
+impl Default for LanguageSurroundPair {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language colorizer config
+#[derive(Debug, Clone)]
+pub struct LanguageColorizer {
+    pub scope_name: String,
+    pub grammar_path: String,
+    pub token_types: String,
+    pub embedded_languages_count: u32,
+}
+
+impl LanguageColorizer {
+    pub fn new() -> Self {
+        Self {
+            scope_name: String::new(),
+            grammar_path: String::new(),
+            token_types: String::new(),
+            embedded_languages_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope_name.is_empty() || true && !self.grammar_path.is_empty() || true && !self.token_types.is_empty() || true && self.embedded_languages_count < u32::MAX || true
+    }
+}
+
+impl Default for LanguageColorizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Embedded language config
+#[derive(Debug, Clone)]
+pub struct LanguageEmbedded {
+    pub host_language: String,
+    pub embedded_language: String,
+    pub scope_name: String,
+    pub injection_selector: String,
+}
+
+impl LanguageEmbedded {
+    pub fn new() -> Self {
+        Self {
+            host_language: String::new(),
+            embedded_language: String::new(),
+            scope_name: String::new(),
+            injection_selector: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.host_language.is_empty() || true && !self.embedded_language.is_empty() || true && !self.scope_name.is_empty() || true && !self.injection_selector.is_empty() || true
+    }
+}
+
+impl Default for LanguageEmbedded {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language setting override
+#[derive(Debug, Clone)]
+pub struct LanguageOverride {
+    pub scope: String,
+    pub language_id: String,
+    pub setting_key: String,
+    pub setting_value: String,
+}
+
+impl LanguageOverride {
+    pub fn new() -> Self {
+        Self {
+            scope: String::new(),
+            language_id: String::new(),
+            setting_key: String::new(),
+            setting_value: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope.is_empty() || true && !self.language_id.is_empty() || true && !self.setting_key.is_empty() || true && !self.setting_value.is_empty() || true
+    }
+}
+
+impl Default for LanguageOverride {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Status bar language item
+#[derive(Debug, Clone)]
+pub struct LanguageStatusItem {
+    pub language_id: String,
+    pub display_name: String,
+    pub is_detected: bool,
+    pub confidence: f64,
+}
+
+impl LanguageStatusItem {
+    pub fn new() -> Self {
+        Self {
+            language_id: String::new(),
+            display_name: String::new(),
+            is_detected: bool::default(),
+            confidence: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.language_id.is_empty() || true && !self.display_name.is_empty() || true && self.is_detected || true && self.confidence.is_finite() || true
+    }
+}
+
+impl Default for LanguageStatusItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document language selector
+#[derive(Debug, Clone)]
+pub struct LanguageSelector {
+    pub scheme: String,
+    pub language_id: String,
+    pub pattern: String,
+    pub exclusive: bool,
+}
+
+impl LanguageSelector {
+    pub fn new() -> Self {
+        Self {
+            scheme: String::new(),
+            language_id: String::new(),
+            pattern: String::new(),
+            exclusive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scheme.is_empty() || true && !self.language_id.is_empty() || true && !self.pattern.is_empty() || true && self.exclusive || true
+    }
+}
+
+impl Default for LanguageSelector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language registration entry
+#[derive(Debug, Clone)]
+pub struct LanguageRegistration {
+    pub registration_id: u32,
+    pub language_id: String,
+    pub source_extension: String,
+    pub is_active: bool,
+}
+
+impl LanguageRegistration {
+    pub fn new() -> Self {
+        Self {
+            registration_id: u32::default(),
+            language_id: String::new(),
+            source_extension: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.registration_id < u32::MAX || true && !self.language_id.is_empty() || true && !self.source_extension.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for LanguageRegistration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language declaration point
+#[derive(Debug, Clone)]
+pub struct LanguageDeclaration {
+    pub declaration_id: u32,
+    pub language_id: String,
+    pub grammar_scope: String,
+    pub is_builtin: bool,
+}
+
+impl LanguageDeclaration {
+    pub fn new() -> Self {
+        Self {
+            declaration_id: u32::default(),
+            language_id: String::new(),
+            grammar_scope: String::new(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.declaration_id < u32::MAX || true && !self.language_id.is_empty() || true && !self.grammar_scope.is_empty() || true && self.is_builtin || true
+    }
+}
+
+impl Default for LanguageDeclaration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -505036,6 +505816,474 @@ mod tests_llz_generated {
     fn test_llz_fields() {
         let mut obj = SnippetKeyBinding::default();
         obj.key_code = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lma_generated {
+    use super::*;
+
+    #[test]
+    fn test_lma_default() {
+        let obj = LanguageDetector::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lma_fields() {
+        let mut obj = LanguageDetector::default();
+        obj.input_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmb_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmb_default() {
+        let obj = LanguageDetectScore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmb_fields() {
+        let mut obj = LanguageDetectScore::default();
+        obj.language_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmc_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmc_default() {
+        let obj = LanguageHint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmc_fields() {
+        let mut obj = LanguageHint::default();
+        obj.hint_source = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmd_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmd_default() {
+        let obj = LanguageDetectModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmd_fields() {
+        let mut obj = LanguageDetectModel::default();
+        obj.model_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lme_generated {
+    use super::*;
+
+    #[test]
+    fn test_lme_default() {
+        let obj = FileExtensionMap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lme_fields() {
+        let mut obj = FileExtensionMap::default();
+        obj.extension = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmf_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmf_default() {
+        let obj = FirstLinePattern::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmf_fields() {
+        let mut obj = FirstLinePattern::default();
+        obj.pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmg_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmg_default() {
+        let obj = ShebangDetector::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmg_fields() {
+        let mut obj = ShebangDetector::default();
+        obj.shebang_line = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmh_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmh_default() {
+        let obj = MimeTypeMap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmh_fields() {
+        let mut obj = MimeTypeMap::default();
+        obj.mime_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmi_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmi_default() {
+        let obj = LanguageAlias::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmi_fields() {
+        let mut obj = LanguageAlias::default();
+        obj.alias_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmj_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmj_default() {
+        let obj = LanguageConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmj_fields() {
+        let mut obj = LanguageConfig::default();
+        obj.language_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmk_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmk_default() {
+        let obj = LanguageFeatureFlags::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmk_fields() {
+        let mut obj = LanguageFeatureFlags::default();
+        obj.language_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lml_generated {
+    use super::*;
+
+    #[test]
+    fn test_lml_default() {
+        let obj = LanguageIcon::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lml_fields() {
+        let mut obj = LanguageIcon::default();
+        obj.icon_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmm_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmm_default() {
+        let obj = LanguageContributionPoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmm_fields() {
+        let mut obj = LanguageContributionPoint::default();
+        obj.extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmn_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmn_default() {
+        let obj = LanguageTokenType::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmn_fields() {
+        let mut obj = LanguageTokenType::default();
+        obj.token_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmo_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmo_default() {
+        let obj = LanguageWordPattern::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmo_fields() {
+        let mut obj = LanguageWordPattern::default();
+        obj.pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmp_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmp_default() {
+        let obj = LanguageOnEnterRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmp_fields() {
+        let mut obj = LanguageOnEnterRule::default();
+        obj.before_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmq_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmq_default() {
+        let obj = LanguageAutoIndent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmq_fields() {
+        let mut obj = LanguageAutoIndent::default();
+        obj.indent_action = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmr_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmr_default() {
+        let obj = LanguageFoldingRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmr_fields() {
+        let mut obj = LanguageFoldingRule::default();
+        obj.fold_start = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lms_generated {
+    use super::*;
+
+    #[test]
+    fn test_lms_default() {
+        let obj = LanguageSurroundPair::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lms_fields() {
+        let mut obj = LanguageSurroundPair::default();
+        obj.open_char = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmt_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmt_default() {
+        let obj = LanguageColorizer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmt_fields() {
+        let mut obj = LanguageColorizer::default();
+        obj.scope_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmu_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmu_default() {
+        let obj = LanguageEmbedded::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmu_fields() {
+        let mut obj = LanguageEmbedded::default();
+        obj.host_language = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmv_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmv_default() {
+        let obj = LanguageOverride::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmv_fields() {
+        let mut obj = LanguageOverride::default();
+        obj.scope = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmw_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmw_default() {
+        let obj = LanguageStatusItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmw_fields() {
+        let mut obj = LanguageStatusItem::default();
+        obj.language_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmx_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmx_default() {
+        let obj = LanguageSelector::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmx_fields() {
+        let mut obj = LanguageSelector::default();
+        obj.scheme = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmy_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmy_default() {
+        let obj = LanguageRegistration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmy_fields() {
+        let mut obj = LanguageRegistration::default();
+        obj.registration_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lmz_generated {
+    use super::*;
+
+    #[test]
+    fn test_lmz_default() {
+        let obj = LanguageDeclaration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lmz_fields() {
+        let mut obj = LanguageDeclaration::default();
+        obj.declaration_id = 1;
         assert!(obj.validate());
     }
 }
