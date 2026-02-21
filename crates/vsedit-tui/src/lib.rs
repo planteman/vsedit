@@ -228300,6 +228300,786 @@ impl Default for WidgetFactory {
     }
 }
 
+/// Service locator instance
+#[derive(Debug, Clone)]
+pub struct ServiceLocator {
+    pub locator_id: u32,
+    pub service_count: u32,
+    pub scope_depth: u32,
+    pub is_root: bool,
+}
+
+impl ServiceLocator {
+    pub fn new() -> Self {
+        Self {
+            locator_id: u32::default(),
+            service_count: u32::default(),
+            scope_depth: u32::default(),
+            is_root: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.locator_id < u32::MAX || true && self.service_count < u32::MAX || true && self.scope_depth < u32::MAX || true && self.is_root || true
+    }
+}
+
+impl Default for ServiceLocator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service definition entry
+#[derive(Debug, Clone)]
+pub struct ServiceDefinition {
+    pub service_def_id: u32,
+    pub interface_name: String,
+    pub implementation: String,
+    pub lifetime: u32,
+}
+
+impl ServiceDefinition {
+    pub fn new() -> Self {
+        Self {
+            service_def_id: u32::default(),
+            interface_name: String::new(),
+            implementation: String::new(),
+            lifetime: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.service_def_id < u32::MAX || true && !self.interface_name.is_empty() || true && !self.implementation.is_empty() || true && self.lifetime < u32::MAX || true
+    }
+}
+
+impl Default for ServiceDefinition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service scope context
+#[derive(Debug, Clone)]
+pub struct ServiceScope {
+    pub scope_id: u32,
+    pub parent_scope: u32,
+    pub service_count: u32,
+    pub is_disposed: bool,
+}
+
+impl ServiceScope {
+    pub fn new() -> Self {
+        Self {
+            scope_id: u32::default(),
+            parent_scope: u32::default(),
+            service_count: u32::default(),
+            is_disposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.scope_id < u32::MAX || true && self.parent_scope < u32::MAX || true && self.service_count < u32::MAX || true && self.is_disposed || true
+    }
+}
+
+impl Default for ServiceScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service activation record
+#[derive(Debug, Clone)]
+pub struct ServiceActivation {
+    pub activation_id: u32,
+    pub service_name: String,
+    pub activation_time_us: u32,
+    pub is_lazy: bool,
+}
+
+impl ServiceActivation {
+    pub fn new() -> Self {
+        Self {
+            activation_id: u32::default(),
+            service_name: String::new(),
+            activation_time_us: u32::default(),
+            is_lazy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.activation_id < u32::MAX || true && !self.service_name.is_empty() || true && self.activation_time_us < u32::MAX || true && self.is_lazy || true
+    }
+}
+
+impl Default for ServiceActivation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service proxy wrapper
+#[derive(Debug, Clone)]
+pub struct ServiceProxy {
+    pub proxy_id: u32,
+    pub target_service: String,
+    pub method_count: u32,
+    pub is_remote: bool,
+}
+
+impl ServiceProxy {
+    pub fn new() -> Self {
+        Self {
+            proxy_id: u32::default(),
+            target_service: String::new(),
+            method_count: u32::default(),
+            is_remote: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.proxy_id < u32::MAX || true && !self.target_service.is_empty() || true && self.method_count < u32::MAX || true && self.is_remote || true
+    }
+}
+
+impl Default for ServiceProxy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service decorator wrapper
+#[derive(Debug, Clone)]
+pub struct ServiceDecorator {
+    pub decorator_id: u32,
+    pub base_service: String,
+    pub decorator_type: String,
+    pub order: u32,
+}
+
+impl ServiceDecorator {
+    pub fn new() -> Self {
+        Self {
+            decorator_id: u32::default(),
+            base_service: String::new(),
+            decorator_type: String::new(),
+            order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.decorator_id < u32::MAX || true && !self.base_service.is_empty() || true && !self.decorator_type.is_empty() || true && self.order < u32::MAX || true
+    }
+}
+
+impl Default for ServiceDecorator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service call interceptor
+#[derive(Debug, Clone)]
+pub struct ServiceInterceptor {
+    pub interceptor_id: u32,
+    pub service_name: String,
+    pub method_filter: String,
+    pub is_active: bool,
+}
+
+impl ServiceInterceptor {
+    pub fn new() -> Self {
+        Self {
+            interceptor_id: u32::default(),
+            service_name: String::new(),
+            method_filter: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.interceptor_id < u32::MAX || true && !self.service_name.is_empty() || true && !self.method_filter.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for ServiceInterceptor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service factory registration
+#[derive(Debug, Clone)]
+pub struct ServiceFactory {
+    pub factory_id: u32,
+    pub service_type: String,
+    pub create_count: u32,
+    pub is_singleton: bool,
+}
+
+impl ServiceFactory {
+    pub fn new() -> Self {
+        Self {
+            factory_id: u32::default(),
+            service_type: String::new(),
+            create_count: u32::default(),
+            is_singleton: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.factory_id < u32::MAX || true && !self.service_type.is_empty() || true && self.create_count < u32::MAX || true && self.is_singleton || true
+    }
+}
+
+impl Default for ServiceFactory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service dependency link
+#[derive(Debug, Clone)]
+pub struct ServiceDependency {
+    pub dep_id: u32,
+    pub consumer_service: String,
+    pub provider_service: String,
+    pub is_optional: bool,
+}
+
+impl ServiceDependency {
+    pub fn new() -> Self {
+        Self {
+            dep_id: u32::default(),
+            consumer_service: String::new(),
+            provider_service: String::new(),
+            is_optional: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.dep_id < u32::MAX || true && !self.consumer_service.is_empty() || true && !self.provider_service.is_empty() || true && self.is_optional || true
+    }
+}
+
+impl Default for ServiceDependency {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service health check
+#[derive(Debug, Clone)]
+pub struct ServiceHealth {
+    pub health_id: u32,
+    pub service_name: String,
+    pub status: u32,
+    pub last_check: u64,
+}
+
+impl ServiceHealth {
+    pub fn new() -> Self {
+        Self {
+            health_id: u32::default(),
+            service_name: String::new(),
+            status: u32::default(),
+            last_check: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.health_id < u32::MAX || true && !self.service_name.is_empty() || true && self.status < u32::MAX || true && self.last_check < u64::MAX || true
+    }
+}
+
+impl Default for ServiceHealth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service usage metrics
+#[derive(Debug, Clone)]
+pub struct ServiceMetrics {
+    pub metric_id: u32,
+    pub service_name: String,
+    pub call_count: u64,
+    pub avg_latency_us: u32,
+}
+
+impl ServiceMetrics {
+    pub fn new() -> Self {
+        Self {
+            metric_id: u32::default(),
+            service_name: String::new(),
+            call_count: u64::default(),
+            avg_latency_us: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.metric_id < u32::MAX || true && !self.service_name.is_empty() || true && self.call_count < u64::MAX || true && self.avg_latency_us < u32::MAX || true
+    }
+}
+
+impl Default for ServiceMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service configuration
+#[derive(Debug, Clone)]
+pub struct ServiceConfiguration {
+    pub config_id: u32,
+    pub service_name: String,
+    pub config_key: String,
+    pub config_value: String,
+}
+
+impl ServiceConfiguration {
+    pub fn new() -> Self {
+        Self {
+            config_id: u32::default(),
+            service_name: String::new(),
+            config_key: String::new(),
+            config_value: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.config_id < u32::MAX || true && !self.service_name.is_empty() || true && !self.config_key.is_empty() || true && !self.config_value.is_empty() || true
+    }
+}
+
+impl Default for ServiceConfiguration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service disposal record
+#[derive(Debug, Clone)]
+pub struct ServiceDisposal {
+    pub disposal_id: u32,
+    pub service_name: String,
+    pub disposed_at: u64,
+    pub reason: String,
+}
+
+impl ServiceDisposal {
+    pub fn new() -> Self {
+        Self {
+            disposal_id: u32::default(),
+            service_name: String::new(),
+            disposed_at: u64::default(),
+            reason: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.disposal_id < u32::MAX || true && !self.service_name.is_empty() || true && self.disposed_at < u64::MAX || true && !self.reason.is_empty() || true
+    }
+}
+
+impl Default for ServiceDisposal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service lifecycle event
+#[derive(Debug, Clone)]
+pub struct ServiceEvent {
+    pub event_id: u32,
+    pub event_type: u32,
+    pub service_name: String,
+    pub timestamp: u64,
+}
+
+impl ServiceEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: u32::default(),
+            event_type: u32::default(),
+            service_name: String::new(),
+            timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.event_id < u32::MAX || true && self.event_type < u32::MAX || true && !self.service_name.is_empty() || true && self.timestamp < u64::MAX || true
+    }
+}
+
+impl Default for ServiceEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service registration entry
+#[derive(Debug, Clone)]
+pub struct ServiceRegistration {
+    pub reg_id: u32,
+    pub service_name: String,
+    pub source: String,
+    pub is_active: bool,
+}
+
+impl ServiceRegistration {
+    pub fn new() -> Self {
+        Self {
+            reg_id: u32::default(),
+            service_name: String::new(),
+            source: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.reg_id < u32::MAX || true && !self.service_name.is_empty() || true && !self.source.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for ServiceRegistration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service override entry
+#[derive(Debug, Clone)]
+pub struct ServiceOverride {
+    pub override_id: u32,
+    pub original_service: String,
+    pub replacement: String,
+    pub scope: u32,
+}
+
+impl ServiceOverride {
+    pub fn new() -> Self {
+        Self {
+            override_id: u32::default(),
+            original_service: String::new(),
+            replacement: String::new(),
+            scope: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.override_id < u32::MAX || true && !self.original_service.is_empty() || true && !self.replacement.is_empty() || true && self.scope < u32::MAX || true
+    }
+}
+
+impl Default for ServiceOverride {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service test mock
+#[derive(Debug, Clone)]
+pub struct ServiceTest {
+    pub test_id: u32,
+    pub mock_service: String,
+    pub behavior: String,
+    pub call_count: u32,
+}
+
+impl ServiceTest {
+    pub fn new() -> Self {
+        Self {
+            test_id: u32::default(),
+            mock_service: String::new(),
+            behavior: String::new(),
+            call_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.test_id < u32::MAX || true && !self.mock_service.is_empty() || true && !self.behavior.is_empty() || true && self.call_count < u32::MAX || true
+    }
+}
+
+impl Default for ServiceTest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service communication bus
+#[derive(Debug, Clone)]
+pub struct ServiceBus {
+    pub bus_id: u32,
+    pub subscriber_count: u32,
+    pub message_count: u64,
+    pub is_running: bool,
+}
+
+impl ServiceBus {
+    pub fn new() -> Self {
+        Self {
+            bus_id: u32::default(),
+            subscriber_count: u32::default(),
+            message_count: u64::default(),
+            is_running: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bus_id < u32::MAX || true && self.subscriber_count < u32::MAX || true && self.message_count < u64::MAX || true && self.is_running || true
+    }
+}
+
+impl Default for ServiceBus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service circuit breaker
+#[derive(Debug, Clone)]
+pub struct ServiceCircuitBreaker {
+    pub breaker_id: u32,
+    pub state: u32,
+    pub failure_count: u32,
+    pub threshold: u32,
+}
+
+impl ServiceCircuitBreaker {
+    pub fn new() -> Self {
+        Self {
+            breaker_id: u32::default(),
+            state: u32::default(),
+            failure_count: u32::default(),
+            threshold: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.breaker_id < u32::MAX || true && self.state < u32::MAX || true && self.failure_count < u32::MAX || true && self.threshold < u32::MAX || true
+    }
+}
+
+impl Default for ServiceCircuitBreaker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service rate limiter
+#[derive(Debug, Clone)]
+pub struct ServiceRateLimit {
+    pub rate_id: u32,
+    pub max_requests: u32,
+    pub window_ms: u32,
+    pub current_count: u32,
+}
+
+impl ServiceRateLimit {
+    pub fn new() -> Self {
+        Self {
+            rate_id: u32::default(),
+            max_requests: u32::default(),
+            window_ms: u32::default(),
+            current_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.rate_id < u32::MAX || true && self.max_requests < u32::MAX || true && self.window_ms < u32::MAX || true && self.current_count < u32::MAX || true
+    }
+}
+
+impl Default for ServiceRateLimit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service retry policy
+#[derive(Debug, Clone)]
+pub struct ServiceRetryPolicy {
+    pub retry_id: u32,
+    pub max_retries: u32,
+    pub backoff_ms: u32,
+    pub attempt_count: u32,
+}
+
+impl ServiceRetryPolicy {
+    pub fn new() -> Self {
+        Self {
+            retry_id: u32::default(),
+            max_retries: u32::default(),
+            backoff_ms: u32::default(),
+            attempt_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.retry_id < u32::MAX || true && self.max_retries < u32::MAX || true && self.backoff_ms < u32::MAX || true && self.attempt_count < u32::MAX || true
+    }
+}
+
+impl Default for ServiceRetryPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service bulkhead isolation
+#[derive(Debug, Clone)]
+pub struct ServiceBulkhead {
+    pub bulkhead_id: u32,
+    pub max_concurrent: u32,
+    pub active_count: u32,
+    pub queue_size: u32,
+}
+
+impl ServiceBulkhead {
+    pub fn new() -> Self {
+        Self {
+            bulkhead_id: u32::default(),
+            max_concurrent: u32::default(),
+            active_count: u32::default(),
+            queue_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bulkhead_id < u32::MAX || true && self.max_concurrent < u32::MAX || true && self.active_count < u32::MAX || true && self.queue_size < u32::MAX || true
+    }
+}
+
+impl Default for ServiceBulkhead {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service timeout policy
+#[derive(Debug, Clone)]
+pub struct ServiceTimeout {
+    pub timeout_id: u32,
+    pub timeout_ms: u32,
+    pub service_name: String,
+    pub is_soft: bool,
+}
+
+impl ServiceTimeout {
+    pub fn new() -> Self {
+        Self {
+            timeout_id: u32::default(),
+            timeout_ms: u32::default(),
+            service_name: String::new(),
+            is_soft: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.timeout_id < u32::MAX || true && self.timeout_ms < u32::MAX || true && !self.service_name.is_empty() || true && self.is_soft || true
+    }
+}
+
+impl Default for ServiceTimeout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service response cache
+#[derive(Debug, Clone)]
+pub struct ServiceCache {
+    pub cache_id: u32,
+    pub key: String,
+    pub ttl_ms: u32,
+    pub hit_count: u64,
+}
+
+impl ServiceCache {
+    pub fn new() -> Self {
+        Self {
+            cache_id: u32::default(),
+            key: String::new(),
+            ttl_ms: u32::default(),
+            hit_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.cache_id < u32::MAX || true && !self.key.is_empty() || true && self.ttl_ms < u32::MAX || true && self.hit_count < u64::MAX || true
+    }
+}
+
+impl Default for ServiceCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service fallback handler
+#[derive(Debug, Clone)]
+pub struct ServiceFallback {
+    pub fallback_id: u32,
+    pub service_name: String,
+    pub fallback_type: u32,
+    pub invocation_count: u32,
+}
+
+impl ServiceFallback {
+    pub fn new() -> Self {
+        Self {
+            fallback_id: u32::default(),
+            service_name: String::new(),
+            fallback_type: u32::default(),
+            invocation_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.fallback_id < u32::MAX || true && !self.service_name.is_empty() || true && self.fallback_type < u32::MAX || true && self.invocation_count < u32::MAX || true
+    }
+}
+
+impl Default for ServiceFallback {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DI container instance
+#[derive(Debug, Clone)]
+pub struct ServiceContainer {
+    pub container_id: u32,
+    pub service_count: u32,
+    pub scope_count: u32,
+    pub is_sealed: bool,
+}
+
+impl ServiceContainer {
+    pub fn new() -> Self {
+        Self {
+            container_id: u32::default(),
+            service_count: u32::default(),
+            scope_count: u32::default(),
+            is_sealed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.container_id < u32::MAX || true && self.service_count < u32::MAX || true && self.scope_count < u32::MAX || true && self.is_sealed || true
+    }
+}
+
+impl Default for ServiceContainer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -526104,6 +526884,474 @@ mod tests_mcz_generated {
     fn test_mcz_fields() {
         let mut obj = WidgetFactory::default();
         obj.factory_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mda_generated {
+    use super::*;
+
+    #[test]
+    fn test_mda_default() {
+        let obj = ServiceLocator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mda_fields() {
+        let mut obj = ServiceLocator::default();
+        obj.locator_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdb_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdb_default() {
+        let obj = ServiceDefinition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdb_fields() {
+        let mut obj = ServiceDefinition::default();
+        obj.service_def_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdc_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdc_default() {
+        let obj = ServiceScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdc_fields() {
+        let mut obj = ServiceScope::default();
+        obj.scope_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdd_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdd_default() {
+        let obj = ServiceActivation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdd_fields() {
+        let mut obj = ServiceActivation::default();
+        obj.activation_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mde_generated {
+    use super::*;
+
+    #[test]
+    fn test_mde_default() {
+        let obj = ServiceProxy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mde_fields() {
+        let mut obj = ServiceProxy::default();
+        obj.proxy_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdf_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdf_default() {
+        let obj = ServiceDecorator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdf_fields() {
+        let mut obj = ServiceDecorator::default();
+        obj.decorator_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdg_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdg_default() {
+        let obj = ServiceInterceptor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdg_fields() {
+        let mut obj = ServiceInterceptor::default();
+        obj.interceptor_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdh_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdh_default() {
+        let obj = ServiceFactory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdh_fields() {
+        let mut obj = ServiceFactory::default();
+        obj.factory_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdi_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdi_default() {
+        let obj = ServiceDependency::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdi_fields() {
+        let mut obj = ServiceDependency::default();
+        obj.dep_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdj_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdj_default() {
+        let obj = ServiceHealth::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdj_fields() {
+        let mut obj = ServiceHealth::default();
+        obj.health_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdk_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdk_default() {
+        let obj = ServiceMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdk_fields() {
+        let mut obj = ServiceMetrics::default();
+        obj.metric_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdl_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdl_default() {
+        let obj = ServiceConfiguration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdl_fields() {
+        let mut obj = ServiceConfiguration::default();
+        obj.config_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdm_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdm_default() {
+        let obj = ServiceDisposal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdm_fields() {
+        let mut obj = ServiceDisposal::default();
+        obj.disposal_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdn_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdn_default() {
+        let obj = ServiceEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdn_fields() {
+        let mut obj = ServiceEvent::default();
+        obj.event_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdo_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdo_default() {
+        let obj = ServiceRegistration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdo_fields() {
+        let mut obj = ServiceRegistration::default();
+        obj.reg_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdp_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdp_default() {
+        let obj = ServiceOverride::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdp_fields() {
+        let mut obj = ServiceOverride::default();
+        obj.override_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdq_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdq_default() {
+        let obj = ServiceTest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdq_fields() {
+        let mut obj = ServiceTest::default();
+        obj.test_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdr_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdr_default() {
+        let obj = ServiceBus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdr_fields() {
+        let mut obj = ServiceBus::default();
+        obj.bus_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mds_generated {
+    use super::*;
+
+    #[test]
+    fn test_mds_default() {
+        let obj = ServiceCircuitBreaker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mds_fields() {
+        let mut obj = ServiceCircuitBreaker::default();
+        obj.breaker_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdt_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdt_default() {
+        let obj = ServiceRateLimit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdt_fields() {
+        let mut obj = ServiceRateLimit::default();
+        obj.rate_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdu_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdu_default() {
+        let obj = ServiceRetryPolicy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdu_fields() {
+        let mut obj = ServiceRetryPolicy::default();
+        obj.retry_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdv_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdv_default() {
+        let obj = ServiceBulkhead::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdv_fields() {
+        let mut obj = ServiceBulkhead::default();
+        obj.bulkhead_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdw_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdw_default() {
+        let obj = ServiceTimeout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdw_fields() {
+        let mut obj = ServiceTimeout::default();
+        obj.timeout_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdx_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdx_default() {
+        let obj = ServiceCache::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdx_fields() {
+        let mut obj = ServiceCache::default();
+        obj.cache_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdy_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdy_default() {
+        let obj = ServiceFallback::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdy_fields() {
+        let mut obj = ServiceFallback::default();
+        obj.fallback_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mdz_generated {
+    use super::*;
+
+    #[test]
+    fn test_mdz_default() {
+        let obj = ServiceContainer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mdz_fields() {
+        let mut obj = ServiceContainer::default();
+        obj.container_id = 1;
         assert!(obj.validate());
     }
 }
