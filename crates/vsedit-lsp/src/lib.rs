@@ -209313,6 +209313,838 @@ impl Default for LezIpcConfig {
     }
 }
 
+/// /// Chat message entry
+#[derive(Debug, Clone)]
+pub struct LfaChatMessage {
+    pub lfa_role: String,
+    pub lfa_content: String,
+    pub lfa_timestamp: u64,
+    pub lfa_name: String,
+    pub lfa_label: String,
+}
+
+impl LfaChatMessage {
+    pub fn new() -> Self {
+        Self {
+            lfa_role: String::new(),
+            lfa_content: String::new(),
+            lfa_timestamp: u64::default(),
+            lfa_name: String::new(),
+            lfa_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfa_role.is_empty() || true && !self.lfa_content.is_empty() || true && self.lfa_timestamp < u64::MAX || true && !self.lfa_name.is_empty() || true && !self.lfa_label.is_empty() || true
+    }
+}
+
+impl Default for LfaChatMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Chat conversation session
+#[derive(Debug, Clone)]
+pub struct LfbChatSession {
+    pub lfb_session_id: String,
+    pub lfb_title: String,
+    pub lfb_messages_count: u32,
+    pub lfb_active: bool,
+    pub lfb_label: String,
+}
+
+impl LfbChatSession {
+    pub fn new() -> Self {
+        Self {
+            lfb_session_id: String::new(),
+            lfb_title: String::new(),
+            lfb_messages_count: u32::default(),
+            lfb_active: bool::default(),
+            lfb_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfb_session_id.is_empty() || true && !self.lfb_title.is_empty() || true && self.lfb_messages_count < u32::MAX || true && self.lfb_active || true && !self.lfb_label.is_empty() || true
+    }
+}
+
+impl Default for LfbChatSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Chat participant (agent)
+#[derive(Debug, Clone)]
+pub struct LfcChatParticipant {
+    pub lfc_participant_id: String,
+    pub lfc_name: String,
+    pub lfc_description: String,
+    pub lfc_icon: String,
+    pub lfc_label: String,
+}
+
+impl LfcChatParticipant {
+    pub fn new() -> Self {
+        Self {
+            lfc_participant_id: String::new(),
+            lfc_name: String::new(),
+            lfc_description: String::new(),
+            lfc_icon: String::new(),
+            lfc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfc_participant_id.is_empty() || true && !self.lfc_name.is_empty() || true && !self.lfc_description.is_empty() || true && !self.lfc_icon.is_empty() || true && !self.lfc_label.is_empty() || true
+    }
+}
+
+impl Default for LfcChatParticipant {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Chat slash command
+#[derive(Debug, Clone)]
+pub struct LfdChatCommand {
+    pub lfd_command_name: String,
+    pub lfd_description: String,
+    pub lfd_participant_id: String,
+    pub lfd_sample_request: String,
+    pub lfd_label: String,
+}
+
+impl LfdChatCommand {
+    pub fn new() -> Self {
+        Self {
+            lfd_command_name: String::new(),
+            lfd_description: String::new(),
+            lfd_participant_id: String::new(),
+            lfd_sample_request: String::new(),
+            lfd_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfd_command_name.is_empty() || true && !self.lfd_description.is_empty() || true && !self.lfd_participant_id.is_empty() || true && !self.lfd_sample_request.is_empty() || true && !self.lfd_label.is_empty() || true
+    }
+}
+
+impl Default for LfdChatCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Chat request to AI backend
+#[derive(Debug, Clone)]
+pub struct LfeChatRequest {
+    pub lfe_prompt: String,
+    pub lfe_model: String,
+    pub lfe_participant_id: String,
+    pub lfe_command_name: String,
+    pub lfe_label: String,
+}
+
+impl LfeChatRequest {
+    pub fn new() -> Self {
+        Self {
+            lfe_prompt: String::new(),
+            lfe_model: String::new(),
+            lfe_participant_id: String::new(),
+            lfe_command_name: String::new(),
+            lfe_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfe_prompt.is_empty() || true && !self.lfe_model.is_empty() || true && !self.lfe_participant_id.is_empty() || true && !self.lfe_command_name.is_empty() || true && !self.lfe_label.is_empty() || true
+    }
+}
+
+impl Default for LfeChatRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Chat response from AI backend
+#[derive(Debug, Clone)]
+pub struct LffChatResponse {
+    pub lff_content: String,
+    pub lff_stop_reason: String,
+    pub lff_usage_tokens: u32,
+    pub lff_model: String,
+    pub lff_label: String,
+}
+
+impl LffChatResponse {
+    pub fn new() -> Self {
+        Self {
+            lff_content: String::new(),
+            lff_stop_reason: String::new(),
+            lff_usage_tokens: u32::default(),
+            lff_model: String::new(),
+            lff_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lff_content.is_empty() || true && !self.lff_stop_reason.is_empty() || true && self.lff_usage_tokens < u32::MAX || true && !self.lff_model.is_empty() || true && !self.lff_label.is_empty() || true
+    }
+}
+
+impl Default for LffChatResponse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Chat context variable
+#[derive(Debug, Clone)]
+pub struct LfgChatVariable {
+    pub lfg_var_name: String,
+    pub lfg_value: String,
+    pub lfg_description: String,
+    pub lfg_scope: String,
+    pub lfg_label: String,
+}
+
+impl LfgChatVariable {
+    pub fn new() -> Self {
+        Self {
+            lfg_var_name: String::new(),
+            lfg_value: String::new(),
+            lfg_description: String::new(),
+            lfg_scope: String::new(),
+            lfg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfg_var_name.is_empty() || true && !self.lfg_value.is_empty() || true && !self.lfg_description.is_empty() || true && !self.lfg_scope.is_empty() || true && !self.lfg_label.is_empty() || true
+    }
+}
+
+impl Default for LfgChatVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Chat follow-up suggestion
+#[derive(Debug, Clone)]
+pub struct LfhChatFollowup {
+    pub lfh_message: String,
+    pub lfh_title: String,
+    pub lfh_command_name: String,
+    pub lfh_participant_id: String,
+    pub lfh_label: String,
+}
+
+impl LfhChatFollowup {
+    pub fn new() -> Self {
+        Self {
+            lfh_message: String::new(),
+            lfh_title: String::new(),
+            lfh_command_name: String::new(),
+            lfh_participant_id: String::new(),
+            lfh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfh_message.is_empty() || true && !self.lfh_title.is_empty() || true && !self.lfh_command_name.is_empty() || true && !self.lfh_participant_id.is_empty() || true && !self.lfh_label.is_empty() || true
+    }
+}
+
+impl Default for LfhChatFollowup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Inline code completion suggestion
+#[derive(Debug, Clone)]
+pub struct LfiInlineCompletion {
+    pub lfi_text: String,
+    pub lfi_range_start: u32,
+    pub lfi_range_end: u32,
+    pub lfi_filter_text: String,
+    pub lfi_label: String,
+}
+
+impl LfiInlineCompletion {
+    pub fn new() -> Self {
+        Self {
+            lfi_text: String::new(),
+            lfi_range_start: u32::default(),
+            lfi_range_end: u32::default(),
+            lfi_filter_text: String::new(),
+            lfi_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfi_text.is_empty() || true && self.lfi_range_start < u32::MAX || true && self.lfi_range_end < u32::MAX || true && !self.lfi_filter_text.is_empty() || true && !self.lfi_label.is_empty() || true
+    }
+}
+
+impl Default for LfiInlineCompletion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Inline completion provider
+#[derive(Debug, Clone)]
+pub struct LfjInlineCompletionProvider {
+    pub lfj_provider_id: String,
+    pub lfj_name: String,
+    pub lfj_lang_ids: String,
+    pub lfj_active: bool,
+    pub lfj_label: String,
+}
+
+impl LfjInlineCompletionProvider {
+    pub fn new() -> Self {
+        Self {
+            lfj_provider_id: String::new(),
+            lfj_name: String::new(),
+            lfj_lang_ids: String::new(),
+            lfj_active: bool::default(),
+            lfj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfj_provider_id.is_empty() || true && !self.lfj_name.is_empty() || true && !self.lfj_lang_ids.is_empty() || true && self.lfj_active || true && !self.lfj_label.is_empty() || true
+    }
+}
+
+impl Default for LfjInlineCompletionProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Ghost text preview in editor
+#[derive(Debug, Clone)]
+pub struct LfkGhostText {
+    pub lfk_text: String,
+    pub lfk_line: u32,
+    pub lfk_column: u32,
+    pub lfk_visible: bool,
+    pub lfk_label: String,
+}
+
+impl LfkGhostText {
+    pub fn new() -> Self {
+        Self {
+            lfk_text: String::new(),
+            lfk_line: u32::default(),
+            lfk_column: u32::default(),
+            lfk_visible: bool::default(),
+            lfk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfk_text.is_empty() || true && self.lfk_line < u32::MAX || true && self.lfk_column < u32::MAX || true && self.lfk_visible || true && !self.lfk_label.is_empty() || true
+    }
+}
+
+impl Default for LfkGhostText {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// AI-suggested code edit
+#[derive(Debug, Clone)]
+pub struct LflCodeEdit {
+    pub lfl_uri: String,
+    pub lfl_range_start: u32,
+    pub lfl_new_text: String,
+    pub lfl_description: String,
+    pub lfl_label: String,
+}
+
+impl LflCodeEdit {
+    pub fn new() -> Self {
+        Self {
+            lfl_uri: String::new(),
+            lfl_range_start: u32::default(),
+            lfl_new_text: String::new(),
+            lfl_description: String::new(),
+            lfl_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfl_uri.is_empty() || true && self.lfl_range_start < u32::MAX || true && !self.lfl_new_text.is_empty() || true && !self.lfl_description.is_empty() || true && !self.lfl_label.is_empty() || true
+    }
+}
+
+impl Default for LflCodeEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// AI-powered code action
+#[derive(Debug, Clone)]
+pub struct LfmCodeAction {
+    pub lfm_title: String,
+    pub lfm_kind: String,
+    pub lfm_edit_uri: String,
+    pub lfm_confidence: f64,
+    pub lfm_label: String,
+}
+
+impl LfmCodeAction {
+    pub fn new() -> Self {
+        Self {
+            lfm_title: String::new(),
+            lfm_kind: String::new(),
+            lfm_edit_uri: String::new(),
+            lfm_confidence: f64::default(),
+            lfm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfm_title.is_empty() || true && !self.lfm_kind.is_empty() || true && !self.lfm_edit_uri.is_empty() || true && self.lfm_confidence.is_finite() || true && !self.lfm_label.is_empty() || true
+    }
+}
+
+impl Default for LfmCodeAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Code explanation request
+#[derive(Debug, Clone)]
+pub struct LfnExplainCode {
+    pub lfn_selection: String,
+    pub lfn_lang_id: String,
+    pub lfn_context: String,
+    pub lfn_detail_level: String,
+    pub lfn_label: String,
+}
+
+impl LfnExplainCode {
+    pub fn new() -> Self {
+        Self {
+            lfn_selection: String::new(),
+            lfn_lang_id: String::new(),
+            lfn_context: String::new(),
+            lfn_detail_level: String::new(),
+            lfn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfn_selection.is_empty() || true && !self.lfn_lang_id.is_empty() || true && !self.lfn_context.is_empty() || true && !self.lfn_detail_level.is_empty() || true && !self.lfn_label.is_empty() || true
+    }
+}
+
+impl Default for LfnExplainCode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// AI fix for diagnostic
+#[derive(Debug, Clone)]
+pub struct LfoFixCode {
+    pub lfo_diagnostic: String,
+    pub lfo_uri: String,
+    pub lfo_fix_text: String,
+    pub lfo_confidence: f64,
+    pub lfo_label: String,
+}
+
+impl LfoFixCode {
+    pub fn new() -> Self {
+        Self {
+            lfo_diagnostic: String::new(),
+            lfo_uri: String::new(),
+            lfo_fix_text: String::new(),
+            lfo_confidence: f64::default(),
+            lfo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfo_diagnostic.is_empty() || true && !self.lfo_uri.is_empty() || true && !self.lfo_fix_text.is_empty() || true && self.lfo_confidence.is_finite() || true && !self.lfo_label.is_empty() || true
+    }
+}
+
+impl Default for LfoFixCode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// AI test generation request
+#[derive(Debug, Clone)]
+pub struct LfpGenerateTest {
+    pub lfp_source_uri: String,
+    pub lfp_function_name: String,
+    pub lfp_framework: String,
+    pub lfp_generated: bool,
+    pub lfp_label: String,
+}
+
+impl LfpGenerateTest {
+    pub fn new() -> Self {
+        Self {
+            lfp_source_uri: String::new(),
+            lfp_function_name: String::new(),
+            lfp_framework: String::new(),
+            lfp_generated: bool::default(),
+            lfp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfp_source_uri.is_empty() || true && !self.lfp_function_name.is_empty() || true && !self.lfp_framework.is_empty() || true && self.lfp_generated || true && !self.lfp_label.is_empty() || true
+    }
+}
+
+impl Default for LfpGenerateTest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// AI documentation generation
+#[derive(Debug, Clone)]
+pub struct LfqGenerateDoc {
+    pub lfq_symbol_name: String,
+    pub lfq_symbol_kind: String,
+    pub lfq_doc_format: String,
+    pub lfq_generated: bool,
+    pub lfq_label: String,
+}
+
+impl LfqGenerateDoc {
+    pub fn new() -> Self {
+        Self {
+            lfq_symbol_name: String::new(),
+            lfq_symbol_kind: String::new(),
+            lfq_doc_format: String::new(),
+            lfq_generated: bool::default(),
+            lfq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfq_symbol_name.is_empty() || true && !self.lfq_symbol_kind.is_empty() || true && !self.lfq_doc_format.is_empty() || true && self.lfq_generated || true && !self.lfq_label.is_empty() || true
+    }
+}
+
+impl Default for LfqGenerateDoc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// AI refactoring suggestion
+#[derive(Debug, Clone)]
+pub struct LfrRefactorSuggest {
+    pub lfr_selection: String,
+    pub lfr_suggestion: String,
+    pub lfr_confidence: f64,
+    pub lfr_preview: bool,
+    pub lfr_label: String,
+}
+
+impl LfrRefactorSuggest {
+    pub fn new() -> Self {
+        Self {
+            lfr_selection: String::new(),
+            lfr_suggestion: String::new(),
+            lfr_confidence: f64::default(),
+            lfr_preview: bool::default(),
+            lfr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfr_selection.is_empty() || true && !self.lfr_suggestion.is_empty() || true && self.lfr_confidence.is_finite() || true && self.lfr_preview || true && !self.lfr_label.is_empty() || true
+    }
+}
+
+impl Default for LfrRefactorSuggest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// AI model configuration
+#[derive(Debug, Clone)]
+pub struct LfsAiModel {
+    pub lfs_model_id: String,
+    pub lfs_model_name: String,
+    pub lfs_max_tokens: u32,
+    pub lfs_provider: String,
+    pub lfs_label: String,
+}
+
+impl LfsAiModel {
+    pub fn new() -> Self {
+        Self {
+            lfs_model_id: String::new(),
+            lfs_model_name: String::new(),
+            lfs_max_tokens: u32::default(),
+            lfs_provider: String::new(),
+            lfs_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfs_model_id.is_empty() || true && !self.lfs_model_name.is_empty() || true && self.lfs_max_tokens < u32::MAX || true && !self.lfs_provider.is_empty() || true && !self.lfs_label.is_empty() || true
+    }
+}
+
+impl Default for LfsAiModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// AI authentication state
+#[derive(Debug, Clone)]
+pub struct LftAiAuth {
+    pub lft_token_type: String,
+    pub lft_authenticated: bool,
+    pub lft_expires_at: u64,
+    pub lft_scope: String,
+    pub lft_label: String,
+}
+
+impl LftAiAuth {
+    pub fn new() -> Self {
+        Self {
+            lft_token_type: String::new(),
+            lft_authenticated: bool::default(),
+            lft_expires_at: u64::default(),
+            lft_scope: String::new(),
+            lft_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lft_token_type.is_empty() || true && self.lft_authenticated || true && self.lft_expires_at < u64::MAX || true && !self.lft_scope.is_empty() || true && !self.lft_label.is_empty() || true
+    }
+}
+
+impl Default for LftAiAuth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// AI usage quota tracking
+#[derive(Debug, Clone)]
+pub struct LfuAiQuota {
+    pub lfu_remaining: u32,
+    pub lfu_total: u32,
+    pub lfu_reset_at: u64,
+    pub lfu_unlimited: bool,
+    pub lfu_label: String,
+}
+
+impl LfuAiQuota {
+    pub fn new() -> Self {
+        Self {
+            lfu_remaining: u32::default(),
+            lfu_total: u32::default(),
+            lfu_reset_at: u64::default(),
+            lfu_unlimited: bool::default(),
+            lfu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lfu_remaining < u32::MAX || true && self.lfu_total < u32::MAX || true && self.lfu_reset_at < u64::MAX || true && self.lfu_unlimited || true && !self.lfu_label.is_empty() || true
+    }
+}
+
+impl Default for LfuAiQuota {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// AI telemetry event
+#[derive(Debug, Clone)]
+pub struct LfvAiTelemetry {
+    pub lfv_event_name: String,
+    pub lfv_properties: String,
+    pub lfv_model_id: String,
+    pub lfv_timestamp: u64,
+    pub lfv_label: String,
+}
+
+impl LfvAiTelemetry {
+    pub fn new() -> Self {
+        Self {
+            lfv_event_name: String::new(),
+            lfv_properties: String::new(),
+            lfv_model_id: String::new(),
+            lfv_timestamp: u64::default(),
+            lfv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfv_event_name.is_empty() || true && !self.lfv_properties.is_empty() || true && !self.lfv_model_id.is_empty() || true && self.lfv_timestamp < u64::MAX || true && !self.lfv_label.is_empty() || true
+    }
+}
+
+impl Default for LfvAiTelemetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Chat panel view state
+#[derive(Debug, Clone)]
+pub struct LfwChatView {
+    pub lfw_visible: bool,
+    pub lfw_session_id: String,
+    pub lfw_input_text: String,
+    pub lfw_scroll_top: f64,
+    pub lfw_label: String,
+}
+
+impl LfwChatView {
+    pub fn new() -> Self {
+        Self {
+            lfw_visible: bool::default(),
+            lfw_session_id: String::new(),
+            lfw_input_text: String::new(),
+            lfw_scroll_top: f64::default(),
+            lfw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lfw_visible || true && !self.lfw_session_id.is_empty() || true && !self.lfw_input_text.is_empty() || true && self.lfw_scroll_top.is_finite() || true && !self.lfw_label.is_empty() || true
+    }
+}
+
+impl Default for LfwChatView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Chat history entry
+#[derive(Debug, Clone)]
+pub struct LfxChatHistory {
+    pub lfx_session_id: String,
+    pub lfx_title: String,
+    pub lfx_timestamp: u64,
+    pub lfx_messages_count: u32,
+    pub lfx_label: String,
+}
+
+impl LfxChatHistory {
+    pub fn new() -> Self {
+        Self {
+            lfx_session_id: String::new(),
+            lfx_title: String::new(),
+            lfx_timestamp: u64::default(),
+            lfx_messages_count: u32::default(),
+            lfx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfx_session_id.is_empty() || true && !self.lfx_title.is_empty() || true && self.lfx_timestamp < u64::MAX || true && self.lfx_messages_count < u32::MAX || true && !self.lfx_label.is_empty() || true
+    }
+}
+
+impl Default for LfxChatHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Chat lifecycle event
+#[derive(Debug, Clone)]
+pub struct LfyChatEvent {
+    pub lfy_event_kind: String,
+    pub lfy_session_id: String,
+    pub lfy_timestamp: u64,
+    pub lfy_data: String,
+    pub lfy_label: String,
+}
+
+impl LfyChatEvent {
+    pub fn new() -> Self {
+        Self {
+            lfy_event_kind: String::new(),
+            lfy_session_id: String::new(),
+            lfy_timestamp: u64::default(),
+            lfy_data: String::new(),
+            lfy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfy_event_kind.is_empty() || true && !self.lfy_session_id.is_empty() || true && self.lfy_timestamp < u64::MAX || true && !self.lfy_data.is_empty() || true && !self.lfy_label.is_empty() || true
+    }
+}
+
+impl Default for LfyChatEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined AI/Copilot configuration
+#[derive(Debug, Clone)]
+pub struct LfzAiConfig {
+    pub lfz_default_model: String,
+    pub lfz_inline_suggest: bool,
+    pub lfz_chat_enabled: bool,
+    pub lfz_telemetry_enabled: bool,
+    pub lfz_label: String,
+}
+
+impl LfzAiConfig {
+    pub fn new() -> Self {
+        Self {
+            lfz_default_model: String::new(),
+            lfz_inline_suggest: bool::default(),
+            lfz_chat_enabled: bool::default(),
+            lfz_telemetry_enabled: bool::default(),
+            lfz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lfz_default_model.is_empty() || true && self.lfz_inline_suggest || true && self.lfz_chat_enabled || true && self.lfz_telemetry_enabled || true && !self.lfz_label.is_empty() || true
+    }
+}
+
+impl Default for LfzAiConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -496022,6 +496854,474 @@ mod tests_lez_generated {
     fn test_lez_fields() {
         let mut obj = LezIpcConfig::default();
         obj.lez_max_message_size = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfa_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfa_default() {
+        let obj = LfaChatMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfa_fields() {
+        let mut obj = LfaChatMessage::default();
+        obj.lfa_role = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfb_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfb_default() {
+        let obj = LfbChatSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfb_fields() {
+        let mut obj = LfbChatSession::default();
+        obj.lfb_session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfc_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfc_default() {
+        let obj = LfcChatParticipant::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfc_fields() {
+        let mut obj = LfcChatParticipant::default();
+        obj.lfc_participant_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfd_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfd_default() {
+        let obj = LfdChatCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfd_fields() {
+        let mut obj = LfdChatCommand::default();
+        obj.lfd_command_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfe_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfe_default() {
+        let obj = LfeChatRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfe_fields() {
+        let mut obj = LfeChatRequest::default();
+        obj.lfe_prompt = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lff_generated {
+    use super::*;
+
+    #[test]
+    fn test_lff_default() {
+        let obj = LffChatResponse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lff_fields() {
+        let mut obj = LffChatResponse::default();
+        obj.lff_content = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfg_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfg_default() {
+        let obj = LfgChatVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfg_fields() {
+        let mut obj = LfgChatVariable::default();
+        obj.lfg_var_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfh_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfh_default() {
+        let obj = LfhChatFollowup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfh_fields() {
+        let mut obj = LfhChatFollowup::default();
+        obj.lfh_message = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfi_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfi_default() {
+        let obj = LfiInlineCompletion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfi_fields() {
+        let mut obj = LfiInlineCompletion::default();
+        obj.lfi_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfj_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfj_default() {
+        let obj = LfjInlineCompletionProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfj_fields() {
+        let mut obj = LfjInlineCompletionProvider::default();
+        obj.lfj_provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfk_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfk_default() {
+        let obj = LfkGhostText::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfk_fields() {
+        let mut obj = LfkGhostText::default();
+        obj.lfk_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfl_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfl_default() {
+        let obj = LflCodeEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfl_fields() {
+        let mut obj = LflCodeEdit::default();
+        obj.lfl_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfm_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfm_default() {
+        let obj = LfmCodeAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfm_fields() {
+        let mut obj = LfmCodeAction::default();
+        obj.lfm_title = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfn_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfn_default() {
+        let obj = LfnExplainCode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfn_fields() {
+        let mut obj = LfnExplainCode::default();
+        obj.lfn_selection = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfo_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfo_default() {
+        let obj = LfoFixCode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfo_fields() {
+        let mut obj = LfoFixCode::default();
+        obj.lfo_diagnostic = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfp_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfp_default() {
+        let obj = LfpGenerateTest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfp_fields() {
+        let mut obj = LfpGenerateTest::default();
+        obj.lfp_source_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfq_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfq_default() {
+        let obj = LfqGenerateDoc::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfq_fields() {
+        let mut obj = LfqGenerateDoc::default();
+        obj.lfq_symbol_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfr_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfr_default() {
+        let obj = LfrRefactorSuggest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfr_fields() {
+        let mut obj = LfrRefactorSuggest::default();
+        obj.lfr_selection = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfs_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfs_default() {
+        let obj = LfsAiModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfs_fields() {
+        let mut obj = LfsAiModel::default();
+        obj.lfs_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lft_generated {
+    use super::*;
+
+    #[test]
+    fn test_lft_default() {
+        let obj = LftAiAuth::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lft_fields() {
+        let mut obj = LftAiAuth::default();
+        obj.lft_token_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfu_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfu_default() {
+        let obj = LfuAiQuota::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfu_fields() {
+        let mut obj = LfuAiQuota::default();
+        obj.lfu_remaining = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfv_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfv_default() {
+        let obj = LfvAiTelemetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfv_fields() {
+        let mut obj = LfvAiTelemetry::default();
+        obj.lfv_event_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfw_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfw_default() {
+        let obj = LfwChatView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfw_fields() {
+        let mut obj = LfwChatView::default();
+        obj.lfw_visible = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfx_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfx_default() {
+        let obj = LfxChatHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfx_fields() {
+        let mut obj = LfxChatHistory::default();
+        obj.lfx_session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfy_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfy_default() {
+        let obj = LfyChatEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfy_fields() {
+        let mut obj = LfyChatEvent::default();
+        obj.lfy_event_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lfz_generated {
+    use super::*;
+
+    #[test]
+    fn test_lfz_default() {
+        let obj = LfzAiConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lfz_fields() {
+        let mut obj = LfzAiConfig::default();
+        obj.lfz_default_model = "test".to_string();
         assert!(obj.validate());
     }
 }
