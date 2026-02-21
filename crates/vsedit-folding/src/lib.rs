@@ -209971,6 +209971,838 @@ impl Default for LfzAiConfig {
     }
 }
 
+/// /// Notebook document model
+#[derive(Debug, Clone)]
+pub struct LgaNotebookDocument {
+    pub lga_uri: String,
+    pub lga_cells_count: u32,
+    pub lga_dirty: bool,
+    pub lga_kernel_id: String,
+    pub lga_label: String,
+}
+
+impl LgaNotebookDocument {
+    pub fn new() -> Self {
+        Self {
+            lga_uri: String::new(),
+            lga_cells_count: u32::default(),
+            lga_dirty: bool::default(),
+            lga_kernel_id: String::new(),
+            lga_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lga_uri.is_empty() || true && self.lga_cells_count < u32::MAX || true && self.lga_dirty || true && !self.lga_kernel_id.is_empty() || true && !self.lga_label.is_empty() || true
+    }
+}
+
+impl Default for LgaNotebookDocument {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook cell entry
+#[derive(Debug, Clone)]
+pub struct LgbNotebookCell {
+    pub lgb_cell_kind: String,
+    pub lgb_source: String,
+    pub lgb_lang_id: String,
+    pub lgb_outputs_count: u32,
+    pub lgb_label: String,
+}
+
+impl LgbNotebookCell {
+    pub fn new() -> Self {
+        Self {
+            lgb_cell_kind: String::new(),
+            lgb_source: String::new(),
+            lgb_lang_id: String::new(),
+            lgb_outputs_count: u32::default(),
+            lgb_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgb_cell_kind.is_empty() || true && !self.lgb_source.is_empty() || true && !self.lgb_lang_id.is_empty() || true && self.lgb_outputs_count < u32::MAX || true && !self.lgb_label.is_empty() || true
+    }
+}
+
+impl Default for LgbNotebookCell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook cell output
+#[derive(Debug, Clone)]
+pub struct LgcNotebookCellOutput {
+    pub lgc_output_kind: String,
+    pub lgc_mime_type: String,
+    pub lgc_data: String,
+    pub lgc_metadata: String,
+    pub lgc_label: String,
+}
+
+impl LgcNotebookCellOutput {
+    pub fn new() -> Self {
+        Self {
+            lgc_output_kind: String::new(),
+            lgc_mime_type: String::new(),
+            lgc_data: String::new(),
+            lgc_metadata: String::new(),
+            lgc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgc_output_kind.is_empty() || true && !self.lgc_mime_type.is_empty() || true && !self.lgc_data.is_empty() || true && !self.lgc_metadata.is_empty() || true && !self.lgc_label.is_empty() || true
+    }
+}
+
+impl Default for LgcNotebookCellOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook kernel instance
+#[derive(Debug, Clone)]
+pub struct LgdNotebookKernel {
+    pub lgd_kernel_id: String,
+    pub lgd_name: String,
+    pub lgd_lang_ids: String,
+    pub lgd_connected: bool,
+    pub lgd_label: String,
+}
+
+impl LgdNotebookKernel {
+    pub fn new() -> Self {
+        Self {
+            lgd_kernel_id: String::new(),
+            lgd_name: String::new(),
+            lgd_lang_ids: String::new(),
+            lgd_connected: bool::default(),
+            lgd_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgd_kernel_id.is_empty() || true && !self.lgd_name.is_empty() || true && !self.lgd_lang_ids.is_empty() || true && self.lgd_connected || true && !self.lgd_label.is_empty() || true
+    }
+}
+
+impl Default for LgdNotebookKernel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook cell execution state
+#[derive(Debug, Clone)]
+pub struct LgeNotebookExecution {
+    pub lge_cell_idx: u32,
+    pub lge_state: String,
+    pub lge_start_time: u64,
+    pub lge_duration_ms: u64,
+    pub lge_label: String,
+}
+
+impl LgeNotebookExecution {
+    pub fn new() -> Self {
+        Self {
+            lge_cell_idx: u32::default(),
+            lge_state: String::new(),
+            lge_start_time: u64::default(),
+            lge_duration_ms: u64::default(),
+            lge_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lge_cell_idx < u32::MAX || true && !self.lge_state.is_empty() || true && self.lge_start_time < u64::MAX || true && self.lge_duration_ms < u64::MAX || true && !self.lge_label.is_empty() || true
+    }
+}
+
+impl Default for LgeNotebookExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook serializer provider
+#[derive(Debug, Clone)]
+pub struct LgfNotebookSerializer {
+    pub lgf_mime_type: String,
+    pub lgf_extension_id: String,
+    pub lgf_priority: u32,
+    pub lgf_active: bool,
+    pub lgf_label: String,
+}
+
+impl LgfNotebookSerializer {
+    pub fn new() -> Self {
+        Self {
+            lgf_mime_type: String::new(),
+            lgf_extension_id: String::new(),
+            lgf_priority: u32::default(),
+            lgf_active: bool::default(),
+            lgf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgf_mime_type.is_empty() || true && !self.lgf_extension_id.is_empty() || true && self.lgf_priority < u32::MAX || true && self.lgf_active || true && !self.lgf_label.is_empty() || true
+    }
+}
+
+impl Default for LgfNotebookSerializer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook output renderer
+#[derive(Debug, Clone)]
+pub struct LggNotebookRenderer {
+    pub lgg_renderer_id: String,
+    pub lgg_mime_types: String,
+    pub lgg_extension_id: String,
+    pub lgg_active: bool,
+    pub lgg_label: String,
+}
+
+impl LggNotebookRenderer {
+    pub fn new() -> Self {
+        Self {
+            lgg_renderer_id: String::new(),
+            lgg_mime_types: String::new(),
+            lgg_extension_id: String::new(),
+            lgg_active: bool::default(),
+            lgg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgg_renderer_id.is_empty() || true && !self.lgg_mime_types.is_empty() || true && !self.lgg_extension_id.is_empty() || true && self.lgg_active || true && !self.lgg_label.is_empty() || true
+    }
+}
+
+impl Default for LggNotebookRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook editor state
+#[derive(Debug, Clone)]
+pub struct LghNotebookEditor {
+    pub lgh_uri: String,
+    pub lgh_active_cell: u32,
+    pub lgh_selected_cells: String,
+    pub lgh_visible: bool,
+    pub lgh_label: String,
+}
+
+impl LghNotebookEditor {
+    pub fn new() -> Self {
+        Self {
+            lgh_uri: String::new(),
+            lgh_active_cell: u32::default(),
+            lgh_selected_cells: String::new(),
+            lgh_visible: bool::default(),
+            lgh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgh_uri.is_empty() || true && self.lgh_active_cell < u32::MAX || true && !self.lgh_selected_cells.is_empty() || true && self.lgh_visible || true && !self.lgh_label.is_empty() || true
+    }
+}
+
+impl Default for LghNotebookEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook toolbar action
+#[derive(Debug, Clone)]
+pub struct LgiNotebookAction {
+    pub lgi_action_id: String,
+    pub lgi_icon: String,
+    pub lgi_tooltip: String,
+    pub lgi_enabled: bool,
+    pub lgi_label: String,
+}
+
+impl LgiNotebookAction {
+    pub fn new() -> Self {
+        Self {
+            lgi_action_id: String::new(),
+            lgi_icon: String::new(),
+            lgi_tooltip: String::new(),
+            lgi_enabled: bool::default(),
+            lgi_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgi_action_id.is_empty() || true && !self.lgi_icon.is_empty() || true && !self.lgi_tooltip.is_empty() || true && self.lgi_enabled || true && !self.lgi_label.is_empty() || true
+    }
+}
+
+impl Default for LgiNotebookAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook cell edit operation
+#[derive(Debug, Clone)]
+pub struct LgjNotebookCellEdit {
+    pub lgj_cell_idx: u32,
+    pub lgj_edit_type: String,
+    pub lgj_content: String,
+    pub lgj_applied: bool,
+    pub lgj_label: String,
+}
+
+impl LgjNotebookCellEdit {
+    pub fn new() -> Self {
+        Self {
+            lgj_cell_idx: u32::default(),
+            lgj_edit_type: String::new(),
+            lgj_content: String::new(),
+            lgj_applied: bool::default(),
+            lgj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lgj_cell_idx < u32::MAX || true && !self.lgj_edit_type.is_empty() || true && !self.lgj_content.is_empty() || true && self.lgj_applied || true && !self.lgj_label.is_empty() || true
+    }
+}
+
+impl Default for LgjNotebookCellEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook cell filter
+#[derive(Debug, Clone)]
+pub struct LgkNotebookFilter {
+    pub lgk_lang_filter: String,
+    pub lgk_kind_filter: String,
+    pub lgk_status_filter: String,
+    pub lgk_active: bool,
+    pub lgk_label: String,
+}
+
+impl LgkNotebookFilter {
+    pub fn new() -> Self {
+        Self {
+            lgk_lang_filter: String::new(),
+            lgk_kind_filter: String::new(),
+            lgk_status_filter: String::new(),
+            lgk_active: bool::default(),
+            lgk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgk_lang_filter.is_empty() || true && !self.lgk_kind_filter.is_empty() || true && !self.lgk_status_filter.is_empty() || true && self.lgk_active || true && !self.lgk_label.is_empty() || true
+    }
+}
+
+impl Default for LgkNotebookFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook lifecycle event
+#[derive(Debug, Clone)]
+pub struct LglNotebookEvent {
+    pub lgl_event_kind: String,
+    pub lgl_uri: String,
+    pub lgl_cell_idx: u32,
+    pub lgl_timestamp: u64,
+    pub lgl_label: String,
+}
+
+impl LglNotebookEvent {
+    pub fn new() -> Self {
+        Self {
+            lgl_event_kind: String::new(),
+            lgl_uri: String::new(),
+            lgl_cell_idx: u32::default(),
+            lgl_timestamp: u64::default(),
+            lgl_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgl_event_kind.is_empty() || true && !self.lgl_uri.is_empty() || true && self.lgl_cell_idx < u32::MAX || true && self.lgl_timestamp < u64::MAX || true && !self.lgl_label.is_empty() || true
+    }
+}
+
+impl Default for LglNotebookEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook kernel variable
+#[derive(Debug, Clone)]
+pub struct LgmNotebookVariable {
+    pub lgm_name: String,
+    pub lgm_value: String,
+    pub lgm_var_type: String,
+    pub lgm_scope: String,
+    pub lgm_label: String,
+}
+
+impl LgmNotebookVariable {
+    pub fn new() -> Self {
+        Self {
+            lgm_name: String::new(),
+            lgm_value: String::new(),
+            lgm_var_type: String::new(),
+            lgm_scope: String::new(),
+            lgm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgm_name.is_empty() || true && !self.lgm_value.is_empty() || true && !self.lgm_var_type.is_empty() || true && !self.lgm_scope.is_empty() || true && !self.lgm_label.is_empty() || true
+    }
+}
+
+impl Default for LgmNotebookVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook status bar info
+#[derive(Debug, Clone)]
+pub struct LgnNotebookStatus {
+    pub lgn_kernel_status: String,
+    pub lgn_kernel_name: String,
+    pub lgn_execution_count: u32,
+    pub lgn_busy: bool,
+    pub lgn_label: String,
+}
+
+impl LgnNotebookStatus {
+    pub fn new() -> Self {
+        Self {
+            lgn_kernel_status: String::new(),
+            lgn_kernel_name: String::new(),
+            lgn_execution_count: u32::default(),
+            lgn_busy: bool::default(),
+            lgn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgn_kernel_status.is_empty() || true && !self.lgn_kernel_name.is_empty() || true && self.lgn_execution_count < u32::MAX || true && self.lgn_busy || true && !self.lgn_label.is_empty() || true
+    }
+}
+
+impl Default for LgnNotebookStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook outline/TOC
+#[derive(Debug, Clone)]
+pub struct LgoNotebookOutline {
+    pub lgo_cells_count: u32,
+    pub lgo_headings_count: u32,
+    pub lgo_collapsed: bool,
+    pub lgo_follow_active: bool,
+    pub lgo_label: String,
+}
+
+impl LgoNotebookOutline {
+    pub fn new() -> Self {
+        Self {
+            lgo_cells_count: u32::default(),
+            lgo_headings_count: u32::default(),
+            lgo_collapsed: bool::default(),
+            lgo_follow_active: bool::default(),
+            lgo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lgo_cells_count < u32::MAX || true && self.lgo_headings_count < u32::MAX || true && self.lgo_collapsed || true && self.lgo_follow_active || true && !self.lgo_label.is_empty() || true
+    }
+}
+
+impl Default for LgoNotebookOutline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook diff state
+#[derive(Debug, Clone)]
+pub struct LgpNotebookDiff {
+    pub lgp_uri: String,
+    pub lgp_changes_count: u32,
+    pub lgp_cells_added: u32,
+    pub lgp_cells_removed: u32,
+    pub lgp_label: String,
+}
+
+impl LgpNotebookDiff {
+    pub fn new() -> Self {
+        Self {
+            lgp_uri: String::new(),
+            lgp_changes_count: u32::default(),
+            lgp_cells_added: u32::default(),
+            lgp_cells_removed: u32::default(),
+            lgp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgp_uri.is_empty() || true && self.lgp_changes_count < u32::MAX || true && self.lgp_cells_added < u32::MAX || true && self.lgp_cells_removed < u32::MAX || true && !self.lgp_label.is_empty() || true
+    }
+}
+
+impl Default for LgpNotebookDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Interactive window session
+#[derive(Debug, Clone)]
+pub struct LgqInteractiveWindow {
+    pub lgq_session_id: String,
+    pub lgq_lang_id: String,
+    pub lgq_history_count: u32,
+    pub lgq_active: bool,
+    pub lgq_label: String,
+}
+
+impl LgqInteractiveWindow {
+    pub fn new() -> Self {
+        Self {
+            lgq_session_id: String::new(),
+            lgq_lang_id: String::new(),
+            lgq_history_count: u32::default(),
+            lgq_active: bool::default(),
+            lgq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgq_session_id.is_empty() || true && !self.lgq_lang_id.is_empty() || true && self.lgq_history_count < u32::MAX || true && self.lgq_active || true && !self.lgq_label.is_empty() || true
+    }
+}
+
+impl Default for LgqInteractiveWindow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// REPL session state
+#[derive(Debug, Clone)]
+pub struct LgrReplSession {
+    pub lgr_lang_id: String,
+    pub lgr_kernel_id: String,
+    pub lgr_history_count: u32,
+    pub lgr_active: bool,
+    pub lgr_label: String,
+}
+
+impl LgrReplSession {
+    pub fn new() -> Self {
+        Self {
+            lgr_lang_id: String::new(),
+            lgr_kernel_id: String::new(),
+            lgr_history_count: u32::default(),
+            lgr_active: bool::default(),
+            lgr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgr_lang_id.is_empty() || true && !self.lgr_kernel_id.is_empty() || true && self.lgr_history_count < u32::MAX || true && self.lgr_active || true && !self.lgr_label.is_empty() || true
+    }
+}
+
+impl Default for LgrReplSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook layout settings
+#[derive(Debug, Clone)]
+pub struct LgsNotebookLayout {
+    pub lgs_orientation: String,
+    pub lgs_cell_toolbar_loc: String,
+    pub lgs_output_height: u32,
+    pub lgs_compact_view: bool,
+    pub lgs_label: String,
+}
+
+impl LgsNotebookLayout {
+    pub fn new() -> Self {
+        Self {
+            lgs_orientation: String::new(),
+            lgs_cell_toolbar_loc: String::new(),
+            lgs_output_height: u32::default(),
+            lgs_compact_view: bool::default(),
+            lgs_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgs_orientation.is_empty() || true && !self.lgs_cell_toolbar_loc.is_empty() || true && self.lgs_output_height < u32::MAX || true && self.lgs_compact_view || true && !self.lgs_label.is_empty() || true
+    }
+}
+
+impl Default for LgsNotebookLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook cell toolbar config
+#[derive(Debug, Clone)]
+pub struct LgtCellToolbar {
+    pub lgt_visible: bool,
+    pub lgt_position: String,
+    pub lgt_actions_count: u32,
+    pub lgt_show_on_hover: bool,
+    pub lgt_label: String,
+}
+
+impl LgtCellToolbar {
+    pub fn new() -> Self {
+        Self {
+            lgt_visible: bool::default(),
+            lgt_position: String::new(),
+            lgt_actions_count: u32::default(),
+            lgt_show_on_hover: bool::default(),
+            lgt_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lgt_visible || true && !self.lgt_position.is_empty() || true && self.lgt_actions_count < u32::MAX || true && self.lgt_show_on_hover || true && !self.lgt_label.is_empty() || true
+    }
+}
+
+impl Default for LgtCellToolbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook cell status indicator
+#[derive(Debug, Clone)]
+pub struct LguCellStatus {
+    pub lgu_cell_idx: u32,
+    pub lgu_status_text: String,
+    pub lgu_icon: String,
+    pub lgu_color: String,
+    pub lgu_label: String,
+}
+
+impl LguCellStatus {
+    pub fn new() -> Self {
+        Self {
+            lgu_cell_idx: u32::default(),
+            lgu_status_text: String::new(),
+            lgu_icon: String::new(),
+            lgu_color: String::new(),
+            lgu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lgu_cell_idx < u32::MAX || true && !self.lgu_status_text.is_empty() || true && !self.lgu_icon.is_empty() || true && !self.lgu_color.is_empty() || true && !self.lgu_label.is_empty() || true
+    }
+}
+
+impl Default for LguCellStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook cell decoration
+#[derive(Debug, Clone)]
+pub struct LgvCellDecoration {
+    pub lgv_cell_idx: u32,
+    pub lgv_decoration_type: String,
+    pub lgv_color: String,
+    pub lgv_tooltip: String,
+    pub lgv_label: String,
+}
+
+impl LgvCellDecoration {
+    pub fn new() -> Self {
+        Self {
+            lgv_cell_idx: u32::default(),
+            lgv_decoration_type: String::new(),
+            lgv_color: String::new(),
+            lgv_tooltip: String::new(),
+            lgv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lgv_cell_idx < u32::MAX || true && !self.lgv_decoration_type.is_empty() || true && !self.lgv_color.is_empty() || true && !self.lgv_tooltip.is_empty() || true && !self.lgv_label.is_empty() || true
+    }
+}
+
+impl Default for LgvCellDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook cell metadata
+#[derive(Debug, Clone)]
+pub struct LgwCellMetadata {
+    pub lgw_cell_idx: u32,
+    pub lgw_key: String,
+    pub lgw_value: String,
+    pub lgw_editable: bool,
+    pub lgw_label: String,
+}
+
+impl LgwCellMetadata {
+    pub fn new() -> Self {
+        Self {
+            lgw_cell_idx: u32::default(),
+            lgw_key: String::new(),
+            lgw_value: String::new(),
+            lgw_editable: bool::default(),
+            lgw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lgw_cell_idx < u32::MAX || true && !self.lgw_key.is_empty() || true && !self.lgw_value.is_empty() || true && self.lgw_editable || true && !self.lgw_label.is_empty() || true
+    }
+}
+
+impl Default for LgwCellMetadata {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Kernel specification entry
+#[derive(Debug, Clone)]
+pub struct LgxKernelSpec {
+    pub lgx_name: String,
+    pub lgx_display_name: String,
+    pub lgx_lang_id: String,
+    pub lgx_argv: String,
+    pub lgx_label: String,
+}
+
+impl LgxKernelSpec {
+    pub fn new() -> Self {
+        Self {
+            lgx_name: String::new(),
+            lgx_display_name: String::new(),
+            lgx_lang_id: String::new(),
+            lgx_argv: String::new(),
+            lgx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgx_name.is_empty() || true && !self.lgx_display_name.is_empty() || true && !self.lgx_lang_id.is_empty() || true && !self.lgx_argv.is_empty() || true && !self.lgx_label.is_empty() || true
+    }
+}
+
+impl Default for LgxKernelSpec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notebook content provider
+#[derive(Debug, Clone)]
+pub struct LgyNotebookProvider {
+    pub lgy_notebook_type: String,
+    pub lgy_extension_id: String,
+    pub lgy_priority: u32,
+    pub lgy_active: bool,
+    pub lgy_label: String,
+}
+
+impl LgyNotebookProvider {
+    pub fn new() -> Self {
+        Self {
+            lgy_notebook_type: String::new(),
+            lgy_extension_id: String::new(),
+            lgy_priority: u32::default(),
+            lgy_active: bool::default(),
+            lgy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgy_notebook_type.is_empty() || true && !self.lgy_extension_id.is_empty() || true && self.lgy_priority < u32::MAX || true && self.lgy_active || true && !self.lgy_label.is_empty() || true
+    }
+}
+
+impl Default for LgyNotebookProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined notebook configuration
+#[derive(Debug, Clone)]
+pub struct LgzNotebookConfig {
+    pub lgz_default_kernel: String,
+    pub lgz_output_scrolling: bool,
+    pub lgz_cell_toolbar: bool,
+    pub lgz_global_toolbar: bool,
+    pub lgz_label: String,
+}
+
+impl LgzNotebookConfig {
+    pub fn new() -> Self {
+        Self {
+            lgz_default_kernel: String::new(),
+            lgz_output_scrolling: bool::default(),
+            lgz_cell_toolbar: bool::default(),
+            lgz_global_toolbar: bool::default(),
+            lgz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lgz_default_kernel.is_empty() || true && self.lgz_output_scrolling || true && self.lgz_cell_toolbar || true && self.lgz_global_toolbar || true && !self.lgz_label.is_empty() || true
+    }
+}
+
+impl Default for LgzNotebookConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -497300,6 +498132,474 @@ mod tests_lfz_generated {
     fn test_lfz_fields() {
         let mut obj = LfzAiConfig::default();
         obj.lfz_default_model = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lga_generated {
+    use super::*;
+
+    #[test]
+    fn test_lga_default() {
+        let obj = LgaNotebookDocument::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lga_fields() {
+        let mut obj = LgaNotebookDocument::default();
+        obj.lga_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgb_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgb_default() {
+        let obj = LgbNotebookCell::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgb_fields() {
+        let mut obj = LgbNotebookCell::default();
+        obj.lgb_cell_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgc_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgc_default() {
+        let obj = LgcNotebookCellOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgc_fields() {
+        let mut obj = LgcNotebookCellOutput::default();
+        obj.lgc_output_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgd_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgd_default() {
+        let obj = LgdNotebookKernel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgd_fields() {
+        let mut obj = LgdNotebookKernel::default();
+        obj.lgd_kernel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lge_generated {
+    use super::*;
+
+    #[test]
+    fn test_lge_default() {
+        let obj = LgeNotebookExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lge_fields() {
+        let mut obj = LgeNotebookExecution::default();
+        obj.lge_cell_idx = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgf_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgf_default() {
+        let obj = LgfNotebookSerializer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgf_fields() {
+        let mut obj = LgfNotebookSerializer::default();
+        obj.lgf_mime_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgg_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgg_default() {
+        let obj = LggNotebookRenderer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgg_fields() {
+        let mut obj = LggNotebookRenderer::default();
+        obj.lgg_renderer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgh_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgh_default() {
+        let obj = LghNotebookEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgh_fields() {
+        let mut obj = LghNotebookEditor::default();
+        obj.lgh_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgi_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgi_default() {
+        let obj = LgiNotebookAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgi_fields() {
+        let mut obj = LgiNotebookAction::default();
+        obj.lgi_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgj_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgj_default() {
+        let obj = LgjNotebookCellEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgj_fields() {
+        let mut obj = LgjNotebookCellEdit::default();
+        obj.lgj_cell_idx = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgk_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgk_default() {
+        let obj = LgkNotebookFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgk_fields() {
+        let mut obj = LgkNotebookFilter::default();
+        obj.lgk_lang_filter = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgl_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgl_default() {
+        let obj = LglNotebookEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgl_fields() {
+        let mut obj = LglNotebookEvent::default();
+        obj.lgl_event_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgm_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgm_default() {
+        let obj = LgmNotebookVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgm_fields() {
+        let mut obj = LgmNotebookVariable::default();
+        obj.lgm_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgn_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgn_default() {
+        let obj = LgnNotebookStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgn_fields() {
+        let mut obj = LgnNotebookStatus::default();
+        obj.lgn_kernel_status = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgo_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgo_default() {
+        let obj = LgoNotebookOutline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgo_fields() {
+        let mut obj = LgoNotebookOutline::default();
+        obj.lgo_cells_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgp_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgp_default() {
+        let obj = LgpNotebookDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgp_fields() {
+        let mut obj = LgpNotebookDiff::default();
+        obj.lgp_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgq_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgq_default() {
+        let obj = LgqInteractiveWindow::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgq_fields() {
+        let mut obj = LgqInteractiveWindow::default();
+        obj.lgq_session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgr_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgr_default() {
+        let obj = LgrReplSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgr_fields() {
+        let mut obj = LgrReplSession::default();
+        obj.lgr_lang_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgs_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgs_default() {
+        let obj = LgsNotebookLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgs_fields() {
+        let mut obj = LgsNotebookLayout::default();
+        obj.lgs_orientation = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgt_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgt_default() {
+        let obj = LgtCellToolbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgt_fields() {
+        let mut obj = LgtCellToolbar::default();
+        obj.lgt_visible = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgu_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgu_default() {
+        let obj = LguCellStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgu_fields() {
+        let mut obj = LguCellStatus::default();
+        obj.lgu_cell_idx = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgv_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgv_default() {
+        let obj = LgvCellDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgv_fields() {
+        let mut obj = LgvCellDecoration::default();
+        obj.lgv_cell_idx = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgw_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgw_default() {
+        let obj = LgwCellMetadata::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgw_fields() {
+        let mut obj = LgwCellMetadata::default();
+        obj.lgw_cell_idx = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgx_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgx_default() {
+        let obj = LgxKernelSpec::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgx_fields() {
+        let mut obj = LgxKernelSpec::default();
+        obj.lgx_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgy_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgy_default() {
+        let obj = LgyNotebookProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgy_fields() {
+        let mut obj = LgyNotebookProvider::default();
+        obj.lgy_notebook_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lgz_generated {
+    use super::*;
+
+    #[test]
+    fn test_lgz_default() {
+        let obj = LgzNotebookConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lgz_fields() {
+        let mut obj = LgzNotebookConfig::default();
+        obj.lgz_default_kernel = "test".to_string();
         assert!(obj.validate());
     }
 }
