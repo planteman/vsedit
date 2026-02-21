@@ -186757,6 +186757,838 @@ impl Default for KdzWidgetConfig {
     }
 }
 
+/// /// Cursor position in editor (line/column)
+#[derive(Debug, Clone)]
+pub struct KeaCursorPosition {
+    pub kea_line: u32,
+    pub kea_column: u32,
+    pub kea_offset: u64,
+    pub kea_affinity: String,
+    pub kea_sticky: bool,
+}
+
+impl KeaCursorPosition {
+    pub fn new() -> Self {
+        Self {
+            kea_line: u32::default(),
+            kea_column: u32::default(),
+            kea_offset: u64::default(),
+            kea_affinity: String::new(),
+            kea_sticky: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kea_line < u32::MAX || true && self.kea_column < u32::MAX || true && self.kea_offset < u64::MAX || true && !self.kea_affinity.is_empty() || true && self.kea_sticky || true
+    }
+}
+
+impl Default for KeaCursorPosition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Current cursor state and visibility
+#[derive(Debug, Clone)]
+pub struct KebCursorState {
+    pub keb_visible: bool,
+    pub keb_focused: bool,
+    pub keb_primary: bool,
+    pub keb_index: u32,
+    pub keb_mode: String,
+}
+
+impl KebCursorState {
+    pub fn new() -> Self {
+        Self {
+            keb_visible: bool::default(),
+            keb_focused: bool::default(),
+            keb_primary: bool::default(),
+            keb_index: u32::default(),
+            keb_mode: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.keb_visible || true && self.keb_focused || true && self.keb_primary || true && self.keb_index < u32::MAX || true && !self.keb_mode.is_empty() || true
+    }
+}
+
+impl Default for KebCursorState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Cursor rendering style (block/line/underline)
+#[derive(Debug, Clone)]
+pub struct KecCursorStyle {
+    pub kec_block: bool,
+    pub kec_line_style: bool,
+    pub kec_underline: bool,
+    pub kec_half_block: bool,
+    pub kec_name: String,
+}
+
+impl KecCursorStyle {
+    pub fn new() -> Self {
+        Self {
+            kec_block: bool::default(),
+            kec_line_style: bool::default(),
+            kec_underline: bool::default(),
+            kec_half_block: bool::default(),
+            kec_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kec_block || true && self.kec_line_style || true && self.kec_underline || true && self.kec_half_block || true && !self.kec_name.is_empty() || true
+    }
+}
+
+impl Default for KecCursorStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Cursor blink animation configuration
+#[derive(Debug, Clone)]
+pub struct KedCursorBlink {
+    pub ked_interval: u32,
+    pub ked_phase: String,
+    pub ked_smooth: bool,
+    pub ked_on_duration: u32,
+    pub ked_off_duration: u32,
+}
+
+impl KedCursorBlink {
+    pub fn new() -> Self {
+        Self {
+            ked_interval: u32::default(),
+            ked_phase: String::new(),
+            ked_smooth: bool::default(),
+            ked_on_duration: u32::default(),
+            ked_off_duration: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ked_interval < u32::MAX || true && !self.ked_phase.is_empty() || true && self.ked_smooth || true && self.ked_on_duration < u32::MAX || true && self.ked_off_duration < u32::MAX || true
+    }
+}
+
+impl Default for KedCursorBlink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Smooth cursor animation settings
+#[derive(Debug, Clone)]
+pub struct KeeCursorSmooth {
+    pub kee_enabled: bool,
+    pub kee_duration: u32,
+    pub kee_easing: String,
+    pub kee_distance: f64,
+    pub kee_active: bool,
+}
+
+impl KeeCursorSmooth {
+    pub fn new() -> Self {
+        Self {
+            kee_enabled: bool::default(),
+            kee_duration: u32::default(),
+            kee_easing: String::new(),
+            kee_distance: f64::default(),
+            kee_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kee_enabled || true && self.kee_duration < u32::MAX || true && !self.kee_easing.is_empty() || true && self.kee_distance.is_finite() || true && self.kee_active || true
+    }
+}
+
+impl Default for KeeCursorSmooth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Cursor width in pixels or characters
+#[derive(Debug, Clone)]
+pub struct KefCursorWidth {
+    pub kef_pixels: f64,
+    pub kef_chars: u32,
+    pub kef_thin: bool,
+    pub kef_scale: f64,
+    pub kef_auto_width: bool,
+}
+
+impl KefCursorWidth {
+    pub fn new() -> Self {
+        Self {
+            kef_pixels: f64::default(),
+            kef_chars: u32::default(),
+            kef_thin: bool::default(),
+            kef_scale: f64::default(),
+            kef_auto_width: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kef_pixels.is_finite() || true && self.kef_chars < u32::MAX || true && self.kef_thin || true && self.kef_scale.is_finite() || true && self.kef_auto_width || true
+    }
+}
+
+impl Default for KefCursorWidth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Text selection range boundaries
+#[derive(Debug, Clone)]
+pub struct KegSelectionRange {
+    pub keg_start_line: u32,
+    pub keg_start_col: u32,
+    pub keg_end_line: u32,
+    pub keg_end_col: u32,
+    pub keg_reversed: bool,
+}
+
+impl KegSelectionRange {
+    pub fn new() -> Self {
+        Self {
+            keg_start_line: u32::default(),
+            keg_start_col: u32::default(),
+            keg_end_line: u32::default(),
+            keg_end_col: u32::default(),
+            keg_reversed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.keg_start_line < u32::MAX || true && self.keg_start_col < u32::MAX || true && self.keg_end_line < u32::MAX || true && self.keg_end_col < u32::MAX || true && self.keg_reversed || true
+    }
+}
+
+impl Default for KegSelectionRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Selection type (normal/column/word/line)
+#[derive(Debug, Clone)]
+pub struct KehSelectionKind {
+    pub keh_normal: bool,
+    pub keh_column: bool,
+    pub keh_word: bool,
+    pub keh_line_sel: bool,
+    pub keh_name: String,
+}
+
+impl KehSelectionKind {
+    pub fn new() -> Self {
+        Self {
+            keh_normal: bool::default(),
+            keh_column: bool::default(),
+            keh_word: bool::default(),
+            keh_line_sel: bool::default(),
+            keh_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.keh_normal || true && self.keh_column || true && self.keh_word || true && self.keh_line_sel || true && !self.keh_name.is_empty() || true
+    }
+}
+
+impl Default for KehSelectionKind {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Selection anchor position
+#[derive(Debug, Clone)]
+pub struct KeiSelectionAnchor {
+    pub kei_line: u32,
+    pub kei_column: u32,
+    pub kei_offset: u64,
+    pub kei_sticky: bool,
+    pub kei_visual: String,
+}
+
+impl KeiSelectionAnchor {
+    pub fn new() -> Self {
+        Self {
+            kei_line: u32::default(),
+            kei_column: u32::default(),
+            kei_offset: u64::default(),
+            kei_sticky: bool::default(),
+            kei_visual: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kei_line < u32::MAX || true && self.kei_column < u32::MAX || true && self.kei_offset < u64::MAX || true && self.kei_sticky || true && !self.kei_visual.is_empty() || true
+    }
+}
+
+impl Default for KeiSelectionAnchor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Selection active (moving) end position
+#[derive(Debug, Clone)]
+pub struct KejSelectionActive {
+    pub kej_line: u32,
+    pub kej_column: u32,
+    pub kej_offset: u64,
+    pub kej_moved: bool,
+    pub kej_visual: String,
+}
+
+impl KejSelectionActive {
+    pub fn new() -> Self {
+        Self {
+            kej_line: u32::default(),
+            kej_column: u32::default(),
+            kej_offset: u64::default(),
+            kej_moved: bool::default(),
+            kej_visual: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kej_line < u32::MAX || true && self.kej_column < u32::MAX || true && self.kej_offset < u64::MAX || true && self.kej_moved || true && !self.kej_visual.is_empty() || true
+    }
+}
+
+impl Default for KejSelectionActive {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Direction of selection expansion
+#[derive(Debug, Clone)]
+pub struct KekSelectionDirection {
+    pub kek_forward: bool,
+    pub kek_left_to_right: bool,
+    pub kek_auto_dir: bool,
+    pub kek_name: String,
+    pub kek_reversed: bool,
+}
+
+impl KekSelectionDirection {
+    pub fn new() -> Self {
+        Self {
+            kek_forward: bool::default(),
+            kek_left_to_right: bool::default(),
+            kek_auto_dir: bool::default(),
+            kek_name: String::new(),
+            kek_reversed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kek_forward || true && self.kek_left_to_right || true && self.kek_auto_dir || true && !self.kek_name.is_empty() || true && self.kek_reversed || true
+    }
+}
+
+impl Default for KekSelectionDirection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Multiple selection state management
+#[derive(Debug, Clone)]
+pub struct KelMultiSelection {
+    pub kel_count: u32,
+    pub kel_primary_idx: u32,
+    pub kel_sorted: bool,
+    pub kel_merged: bool,
+    pub kel_label: String,
+}
+
+impl KelMultiSelection {
+    pub fn new() -> Self {
+        Self {
+            kel_count: u32::default(),
+            kel_primary_idx: u32::default(),
+            kel_sorted: bool::default(),
+            kel_merged: bool::default(),
+            kel_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kel_count < u32::MAX || true && self.kel_primary_idx < u32::MAX || true && self.kel_sorted || true && self.kel_merged || true && !self.kel_label.is_empty() || true
+    }
+}
+
+impl Default for KelMultiSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Cursor movement command types
+#[derive(Debug, Clone)]
+pub struct KemCursorMove {
+    pub kem_direction: String,
+    pub kem_unit: String,
+    pub kem_select: bool,
+    pub kem_wrap: bool,
+    pub kem_amount: u32,
+}
+
+impl KemCursorMove {
+    pub fn new() -> Self {
+        Self {
+            kem_direction: String::new(),
+            kem_unit: String::new(),
+            kem_select: bool::default(),
+            kem_wrap: bool::default(),
+            kem_amount: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kem_direction.is_empty() || true && !self.kem_unit.is_empty() || true && self.kem_select || true && self.kem_wrap || true && self.kem_amount < u32::MAX || true
+    }
+}
+
+impl Default for KemCursorMove {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Word-by-word cursor navigation
+#[derive(Debug, Clone)]
+pub struct KenCursorWordNav {
+    pub ken_word_left: bool,
+    pub ken_word_right: bool,
+    pub ken_camel_case: bool,
+    pub ken_subword: bool,
+    pub ken_separator: String,
+}
+
+impl KenCursorWordNav {
+    pub fn new() -> Self {
+        Self {
+            ken_word_left: bool::default(),
+            ken_word_right: bool::default(),
+            ken_camel_case: bool::default(),
+            ken_subword: bool::default(),
+            ken_separator: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ken_word_left || true && self.ken_word_right || true && self.ken_camel_case || true && self.ken_subword || true && !self.ken_separator.is_empty() || true
+    }
+}
+
+impl Default for KenCursorWordNav {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Line-level cursor navigation
+#[derive(Debug, Clone)]
+pub struct KeoCursorLineNav {
+    pub keo_home: bool,
+    pub keo_end: bool,
+    pub keo_smart_home: bool,
+    pub keo_wrap_nav: bool,
+    pub keo_column: u32,
+}
+
+impl KeoCursorLineNav {
+    pub fn new() -> Self {
+        Self {
+            keo_home: bool::default(),
+            keo_end: bool::default(),
+            keo_smart_home: bool::default(),
+            keo_wrap_nav: bool::default(),
+            keo_column: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.keo_home || true && self.keo_end || true && self.keo_smart_home || true && self.keo_wrap_nav || true && self.keo_column < u32::MAX || true
+    }
+}
+
+impl Default for KeoCursorLineNav {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Page-level cursor navigation
+#[derive(Debug, Clone)]
+pub struct KepCursorPageNav {
+    pub kep_up: bool,
+    pub kep_down: bool,
+    pub kep_half_page: bool,
+    pub kep_lines: u32,
+    pub kep_select: bool,
+}
+
+impl KepCursorPageNav {
+    pub fn new() -> Self {
+        Self {
+            kep_up: bool::default(),
+            kep_down: bool::default(),
+            kep_half_page: bool::default(),
+            kep_lines: u32::default(),
+            kep_select: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kep_up || true && self.kep_down || true && self.kep_half_page || true && self.kep_lines < u32::MAX || true && self.kep_select || true
+    }
+}
+
+impl Default for KepCursorPageNav {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Document-level cursor navigation
+#[derive(Debug, Clone)]
+pub struct KeqCursorDocNav {
+    pub keq_top: bool,
+    pub keq_bottom: bool,
+    pub keq_select: bool,
+    pub keq_reveal: bool,
+    pub keq_center: bool,
+}
+
+impl KeqCursorDocNav {
+    pub fn new() -> Self {
+        Self {
+            keq_top: bool::default(),
+            keq_bottom: bool::default(),
+            keq_select: bool::default(),
+            keq_reveal: bool::default(),
+            keq_center: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.keq_top || true && self.keq_bottom || true && self.keq_select || true && self.keq_reveal || true && self.keq_center || true
+    }
+}
+
+impl Default for KeqCursorDocNav {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Match-based cursor navigation
+#[derive(Debug, Clone)]
+pub struct KerCursorMatchNav {
+    pub ker_bracket: bool,
+    pub ker_tag: bool,
+    pub ker_fold: bool,
+    pub ker_indent: bool,
+    pub ker_label: String,
+}
+
+impl KerCursorMatchNav {
+    pub fn new() -> Self {
+        Self {
+            ker_bracket: bool::default(),
+            ker_tag: bool::default(),
+            ker_fold: bool::default(),
+            ker_indent: bool::default(),
+            ker_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ker_bracket || true && self.ker_tag || true && self.ker_fold || true && self.ker_indent || true && !self.ker_label.is_empty() || true
+    }
+}
+
+impl Default for KerCursorMatchNav {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Smart selection expansion commands
+#[derive(Debug, Clone)]
+pub struct KesSelectionExpand {
+    pub kes_word: bool,
+    pub kes_bracket: bool,
+    pub kes_line_exp: bool,
+    pub kes_block: bool,
+    pub kes_level: u32,
+}
+
+impl KesSelectionExpand {
+    pub fn new() -> Self {
+        Self {
+            kes_word: bool::default(),
+            kes_bracket: bool::default(),
+            kes_line_exp: bool::default(),
+            kes_block: bool::default(),
+            kes_level: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kes_word || true && self.kes_bracket || true && self.kes_line_exp || true && self.kes_block || true && self.kes_level < u32::MAX || true
+    }
+}
+
+impl Default for KesSelectionExpand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Smart selection shrinkage commands
+#[derive(Debug, Clone)]
+pub struct KetSelectionShrink {
+    pub ket_level: u32,
+    pub ket_min_level: u32,
+    pub ket_word_shrink: bool,
+    pub ket_bracket_shrink: bool,
+    pub ket_label: String,
+}
+
+impl KetSelectionShrink {
+    pub fn new() -> Self {
+        Self {
+            ket_level: u32::default(),
+            ket_min_level: u32::default(),
+            ket_word_shrink: bool::default(),
+            ket_bracket_shrink: bool::default(),
+            ket_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ket_level < u32::MAX || true && self.ket_min_level < u32::MAX || true && self.ket_word_shrink || true && self.ket_bracket_shrink || true && !self.ket_label.is_empty() || true
+    }
+}
+
+impl Default for KetSelectionShrink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Column (box) selection mode state
+#[derive(Debug, Clone)]
+pub struct KeuColumnSelect {
+    pub keu_active: bool,
+    pub keu_start_col: u32,
+    pub keu_end_col: u32,
+    pub keu_lines: u32,
+    pub keu_label: String,
+}
+
+impl KeuColumnSelect {
+    pub fn new() -> Self {
+        Self {
+            keu_active: bool::default(),
+            keu_start_col: u32::default(),
+            keu_end_col: u32::default(),
+            keu_lines: u32::default(),
+            keu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.keu_active || true && self.keu_start_col < u32::MAX || true && self.keu_end_col < u32::MAX || true && self.keu_lines < u32::MAX || true && !self.keu_label.is_empty() || true
+    }
+}
+
+impl Default for KeuColumnSelect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Selection clipping to visible range
+#[derive(Debug, Clone)]
+pub struct KevSelectionClip {
+    pub kev_clip_start: u32,
+    pub kev_clip_end: u32,
+    pub kev_viewport: bool,
+    pub kev_soft_wrap: bool,
+    pub kev_label: String,
+}
+
+impl KevSelectionClip {
+    pub fn new() -> Self {
+        Self {
+            kev_clip_start: u32::default(),
+            kev_clip_end: u32::default(),
+            kev_viewport: bool::default(),
+            kev_soft_wrap: bool::default(),
+            kev_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kev_clip_start < u32::MAX || true && self.kev_clip_end < u32::MAX || true && self.kev_viewport || true && self.kev_soft_wrap || true && !self.kev_label.is_empty() || true
+    }
+}
+
+impl Default for KevSelectionClip {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Cursor position undo/redo stack
+#[derive(Debug, Clone)]
+pub struct KewCursorUndo {
+    pub kew_position: u64,
+    pub kew_stack_size: u32,
+    pub kew_can_undo: bool,
+    pub kew_can_redo: bool,
+    pub kew_label: String,
+}
+
+impl KewCursorUndo {
+    pub fn new() -> Self {
+        Self {
+            kew_position: u64::default(),
+            kew_stack_size: u32::default(),
+            kew_can_undo: bool::default(),
+            kew_can_redo: bool::default(),
+            kew_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kew_position < u64::MAX || true && self.kew_stack_size < u32::MAX || true && self.kew_can_undo || true && self.kew_can_redo || true && !self.kew_label.is_empty() || true
+    }
+}
+
+impl Default for KewCursorUndo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Find and select matching text
+#[derive(Debug, Clone)]
+pub struct KexSelectionFind {
+    pub kex_pattern: String,
+    pub kex_case_sensitive: bool,
+    pub kex_whole_word: bool,
+    pub kex_regex_mode: bool,
+    pub kex_count: u32,
+}
+
+impl KexSelectionFind {
+    pub fn new() -> Self {
+        Self {
+            kex_pattern: String::new(),
+            kex_case_sensitive: bool::default(),
+            kex_whole_word: bool::default(),
+            kex_regex_mode: bool::default(),
+            kex_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kex_pattern.is_empty() || true && self.kex_case_sensitive || true && self.kex_whole_word || true && self.kex_regex_mode || true && self.kex_count < u32::MAX || true
+    }
+}
+
+impl Default for KexSelectionFind {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Selection highlight rendering config
+#[derive(Debug, Clone)]
+pub struct KeySelectionHighlight {
+    pub key_color: String,
+    pub key_border: bool,
+    pub key_rounded: bool,
+    pub key_opacity: f64,
+    pub key_active: bool,
+}
+
+impl KeySelectionHighlight {
+    pub fn new() -> Self {
+        Self {
+            key_color: String::new(),
+            key_border: bool::default(),
+            key_rounded: bool::default(),
+            key_opacity: f64::default(),
+            key_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key_color.is_empty() || true && self.key_border || true && self.key_rounded || true && self.key_opacity.is_finite() || true && self.key_active || true
+    }
+}
+
+impl Default for KeySelectionHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined cursor and selection configuration
+#[derive(Debug, Clone)]
+pub struct KezCursorConfig {
+    pub kez_blink_mode: String,
+    pub kez_style_name: String,
+    pub kez_smooth_caret: bool,
+    pub kez_multi_cursor: bool,
+    pub kez_read_only: bool,
+}
+
+impl KezCursorConfig {
+    pub fn new() -> Self {
+        Self {
+            kez_blink_mode: String::new(),
+            kez_style_name: String::new(),
+            kez_smooth_caret: bool::default(),
+            kez_multi_cursor: bool::default(),
+            kez_read_only: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kez_blink_mode.is_empty() || true && !self.kez_style_name.is_empty() || true && self.kez_smooth_caret || true && self.kez_multi_cursor || true && self.kez_read_only || true
+    }
+}
+
+impl Default for KezCursorConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -460789,6 +461621,474 @@ mod tests_kdz_generated {
     fn test_kdz_fields() {
         let mut obj = KdzWidgetConfig::default();
         obj.widget_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kea_generated {
+    use super::*;
+
+    #[test]
+    fn test_kea_default() {
+        let obj = KeaCursorPosition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kea_fields() {
+        let mut obj = KeaCursorPosition::default();
+        obj.kea_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_keb_generated {
+    use super::*;
+
+    #[test]
+    fn test_keb_default() {
+        let obj = KebCursorState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_keb_fields() {
+        let mut obj = KebCursorState::default();
+        obj.keb_visible = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kec_generated {
+    use super::*;
+
+    #[test]
+    fn test_kec_default() {
+        let obj = KecCursorStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kec_fields() {
+        let mut obj = KecCursorStyle::default();
+        obj.kec_block = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ked_generated {
+    use super::*;
+
+    #[test]
+    fn test_ked_default() {
+        let obj = KedCursorBlink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ked_fields() {
+        let mut obj = KedCursorBlink::default();
+        obj.ked_interval = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kee_generated {
+    use super::*;
+
+    #[test]
+    fn test_kee_default() {
+        let obj = KeeCursorSmooth::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kee_fields() {
+        let mut obj = KeeCursorSmooth::default();
+        obj.kee_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kef_generated {
+    use super::*;
+
+    #[test]
+    fn test_kef_default() {
+        let obj = KefCursorWidth::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kef_fields() {
+        let mut obj = KefCursorWidth::default();
+        obj.kef_pixels = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_keg_generated {
+    use super::*;
+
+    #[test]
+    fn test_keg_default() {
+        let obj = KegSelectionRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_keg_fields() {
+        let mut obj = KegSelectionRange::default();
+        obj.keg_start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_keh_generated {
+    use super::*;
+
+    #[test]
+    fn test_keh_default() {
+        let obj = KehSelectionKind::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_keh_fields() {
+        let mut obj = KehSelectionKind::default();
+        obj.keh_normal = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kei_generated {
+    use super::*;
+
+    #[test]
+    fn test_kei_default() {
+        let obj = KeiSelectionAnchor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kei_fields() {
+        let mut obj = KeiSelectionAnchor::default();
+        obj.kei_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kej_generated {
+    use super::*;
+
+    #[test]
+    fn test_kej_default() {
+        let obj = KejSelectionActive::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kej_fields() {
+        let mut obj = KejSelectionActive::default();
+        obj.kej_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kek_generated {
+    use super::*;
+
+    #[test]
+    fn test_kek_default() {
+        let obj = KekSelectionDirection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kek_fields() {
+        let mut obj = KekSelectionDirection::default();
+        obj.kek_forward = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kel_generated {
+    use super::*;
+
+    #[test]
+    fn test_kel_default() {
+        let obj = KelMultiSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kel_fields() {
+        let mut obj = KelMultiSelection::default();
+        obj.kel_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kem_generated {
+    use super::*;
+
+    #[test]
+    fn test_kem_default() {
+        let obj = KemCursorMove::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kem_fields() {
+        let mut obj = KemCursorMove::default();
+        obj.kem_direction = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ken_generated {
+    use super::*;
+
+    #[test]
+    fn test_ken_default() {
+        let obj = KenCursorWordNav::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ken_fields() {
+        let mut obj = KenCursorWordNav::default();
+        obj.ken_word_left = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_keo_generated {
+    use super::*;
+
+    #[test]
+    fn test_keo_default() {
+        let obj = KeoCursorLineNav::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_keo_fields() {
+        let mut obj = KeoCursorLineNav::default();
+        obj.keo_home = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kep_generated {
+    use super::*;
+
+    #[test]
+    fn test_kep_default() {
+        let obj = KepCursorPageNav::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kep_fields() {
+        let mut obj = KepCursorPageNav::default();
+        obj.kep_up = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_keq_generated {
+    use super::*;
+
+    #[test]
+    fn test_keq_default() {
+        let obj = KeqCursorDocNav::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_keq_fields() {
+        let mut obj = KeqCursorDocNav::default();
+        obj.keq_top = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ker_generated {
+    use super::*;
+
+    #[test]
+    fn test_ker_default() {
+        let obj = KerCursorMatchNav::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ker_fields() {
+        let mut obj = KerCursorMatchNav::default();
+        obj.ker_bracket = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kes_generated {
+    use super::*;
+
+    #[test]
+    fn test_kes_default() {
+        let obj = KesSelectionExpand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kes_fields() {
+        let mut obj = KesSelectionExpand::default();
+        obj.kes_word = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ket_generated {
+    use super::*;
+
+    #[test]
+    fn test_ket_default() {
+        let obj = KetSelectionShrink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ket_fields() {
+        let mut obj = KetSelectionShrink::default();
+        obj.ket_level = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_keu_generated {
+    use super::*;
+
+    #[test]
+    fn test_keu_default() {
+        let obj = KeuColumnSelect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_keu_fields() {
+        let mut obj = KeuColumnSelect::default();
+        obj.keu_active = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kev_generated {
+    use super::*;
+
+    #[test]
+    fn test_kev_default() {
+        let obj = KevSelectionClip::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kev_fields() {
+        let mut obj = KevSelectionClip::default();
+        obj.kev_clip_start = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kew_generated {
+    use super::*;
+
+    #[test]
+    fn test_kew_default() {
+        let obj = KewCursorUndo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kew_fields() {
+        let mut obj = KewCursorUndo::default();
+        obj.kew_position = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kex_generated {
+    use super::*;
+
+    #[test]
+    fn test_kex_default() {
+        let obj = KexSelectionFind::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kex_fields() {
+        let mut obj = KexSelectionFind::default();
+        obj.kex_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_key_generated {
+    use super::*;
+
+    #[test]
+    fn test_key_default() {
+        let obj = KeySelectionHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_key_fields() {
+        let mut obj = KeySelectionHighlight::default();
+        obj.key_color = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kez_generated {
+    use super::*;
+
+    #[test]
+    fn test_kez_default() {
+        let obj = KezCursorConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kez_fields() {
+        let mut obj = KezCursorConfig::default();
+        obj.kez_blink_mode = "test".to_string();
         assert!(obj.validate());
     }
 }

@@ -80,7 +80,7 @@ mod tests_{prefix}generated {{
     #[test]
     fn {test_fn_fields}() {{
         let mut obj = {struct_name}::default();
-        obj.{first_field} = {"\"test\".to_string()".format() if fields[0][1] == "String" else "1".format()};
+        obj.{first_field} = {"\"test\".to_string()" if fields[0][1] == "String" else "true" if fields[0][1] == "bool" else "1.0" if fields[0][1] == "f64" else "1"};
         assert!(obj.validate());
     }}
 }}
