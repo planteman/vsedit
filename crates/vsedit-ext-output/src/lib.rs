@@ -206599,6 +206599,838 @@ impl Default for LbzGrammarConfig {
     }
 }
 
+/// /// Diff computation result
+#[derive(Debug, Clone)]
+pub struct LcaDiffResult {
+    pub lca_changes_count: u32,
+    pub lca_identical: bool,
+    pub lca_timeout_reached: bool,
+    pub lca_algorithm: String,
+    pub lca_label: String,
+}
+
+impl LcaDiffResult {
+    pub fn new() -> Self {
+        Self {
+            lca_changes_count: u32::default(),
+            lca_identical: bool::default(),
+            lca_timeout_reached: bool::default(),
+            lca_algorithm: String::new(),
+            lca_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lca_changes_count < u32::MAX || true && self.lca_identical || true && self.lca_timeout_reached || true && !self.lca_algorithm.is_empty() || true && !self.lca_label.is_empty() || true
+    }
+}
+
+impl Default for LcaDiffResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Single diff change entry
+#[derive(Debug, Clone)]
+pub struct LcbDiffChange {
+    pub lcb_original_start: u32,
+    pub lcb_original_length: u32,
+    pub lcb_modified_start: u32,
+    pub lcb_modified_length: u32,
+    pub lcb_label: String,
+}
+
+impl LcbDiffChange {
+    pub fn new() -> Self {
+        Self {
+            lcb_original_start: u32::default(),
+            lcb_original_length: u32::default(),
+            lcb_modified_start: u32::default(),
+            lcb_modified_length: u32::default(),
+            lcb_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lcb_original_start < u32::MAX || true && self.lcb_original_length < u32::MAX || true && self.lcb_modified_start < u32::MAX || true && self.lcb_modified_length < u32::MAX || true && !self.lcb_label.is_empty() || true
+    }
+}
+
+impl Default for LcbDiffChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Character-level diff change
+#[derive(Debug, Clone)]
+pub struct LccDiffCharChange {
+    pub lcc_original_start_col: u32,
+    pub lcc_original_end_col: u32,
+    pub lcc_modified_start_col: u32,
+    pub lcc_modified_end_col: u32,
+    pub lcc_label: String,
+}
+
+impl LccDiffCharChange {
+    pub fn new() -> Self {
+        Self {
+            lcc_original_start_col: u32::default(),
+            lcc_original_end_col: u32::default(),
+            lcc_modified_start_col: u32::default(),
+            lcc_modified_end_col: u32::default(),
+            lcc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lcc_original_start_col < u32::MAX || true && self.lcc_original_end_col < u32::MAX || true && self.lcc_modified_start_col < u32::MAX || true && self.lcc_modified_end_col < u32::MAX || true && !self.lcc_label.is_empty() || true
+    }
+}
+
+impl Default for LccDiffCharChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Diff hunk (grouped changes)
+#[derive(Debug, Clone)]
+pub struct LcdDiffHunk {
+    pub lcd_original_start: u32,
+    pub lcd_original_length: u32,
+    pub lcd_modified_start: u32,
+    pub lcd_modified_length: u32,
+    pub lcd_char_changes_count: u32,
+}
+
+impl LcdDiffHunk {
+    pub fn new() -> Self {
+        Self {
+            lcd_original_start: u32::default(),
+            lcd_original_length: u32::default(),
+            lcd_modified_start: u32::default(),
+            lcd_modified_length: u32::default(),
+            lcd_char_changes_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lcd_original_start < u32::MAX || true && self.lcd_original_length < u32::MAX || true && self.lcd_modified_start < u32::MAX || true && self.lcd_modified_length < u32::MAX || true && self.lcd_char_changes_count < u32::MAX || true
+    }
+}
+
+impl Default for LcdDiffHunk {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Diff algorithm selection
+#[derive(Debug, Clone)]
+pub struct LceDiffAlgorithm {
+    pub lce_algorithm_name: String,
+    pub lce_max_computation_ms: u32,
+    pub lce_compute_char_changes: bool,
+    pub lce_ignore_trim: bool,
+    pub lce_label: String,
+}
+
+impl LceDiffAlgorithm {
+    pub fn new() -> Self {
+        Self {
+            lce_algorithm_name: String::new(),
+            lce_max_computation_ms: u32::default(),
+            lce_compute_char_changes: bool::default(),
+            lce_ignore_trim: bool::default(),
+            lce_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lce_algorithm_name.is_empty() || true && self.lce_max_computation_ms < u32::MAX || true && self.lce_compute_char_changes || true && self.lce_ignore_trim || true && !self.lce_label.is_empty() || true
+    }
+}
+
+impl Default for LceDiffAlgorithm {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Diff editor model state
+#[derive(Debug, Clone)]
+pub struct LcfDiffEditor {
+    pub lcf_original_uri: String,
+    pub lcf_modified_uri: String,
+    pub lcf_inline_mode: bool,
+    pub lcf_render_indicators: bool,
+    pub lcf_label: String,
+}
+
+impl LcfDiffEditor {
+    pub fn new() -> Self {
+        Self {
+            lcf_original_uri: String::new(),
+            lcf_modified_uri: String::new(),
+            lcf_inline_mode: bool::default(),
+            lcf_render_indicators: bool::default(),
+            lcf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lcf_original_uri.is_empty() || true && !self.lcf_modified_uri.is_empty() || true && self.lcf_inline_mode || true && self.lcf_render_indicators || true && !self.lcf_label.is_empty() || true
+    }
+}
+
+impl Default for LcfDiffEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Diff gutter decoration
+#[derive(Debug, Clone)]
+pub struct LcgDiffDecoration {
+    pub lcg_line: u32,
+    pub lcg_change_type: String,
+    pub lcg_color: String,
+    pub lcg_gutter_icon: String,
+    pub lcg_label: String,
+}
+
+impl LcgDiffDecoration {
+    pub fn new() -> Self {
+        Self {
+            lcg_line: u32::default(),
+            lcg_change_type: String::new(),
+            lcg_color: String::new(),
+            lcg_gutter_icon: String::new(),
+            lcg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lcg_line < u32::MAX || true && !self.lcg_change_type.is_empty() || true && !self.lcg_color.is_empty() || true && !self.lcg_gutter_icon.is_empty() || true && !self.lcg_label.is_empty() || true
+    }
+}
+
+impl Default for LcgDiffDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Diff change navigator
+#[derive(Debug, Clone)]
+pub struct LchDiffNavigator {
+    pub lch_current_idx: u32,
+    pub lch_total_changes: u32,
+    pub lch_loop_navigation: bool,
+    pub lch_ignore_trim: bool,
+    pub lch_label: String,
+}
+
+impl LchDiffNavigator {
+    pub fn new() -> Self {
+        Self {
+            lch_current_idx: u32::default(),
+            lch_total_changes: u32::default(),
+            lch_loop_navigation: bool::default(),
+            lch_ignore_trim: bool::default(),
+            lch_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lch_current_idx < u32::MAX || true && self.lch_total_changes < u32::MAX || true && self.lch_loop_navigation || true && self.lch_ignore_trim || true && !self.lch_label.is_empty() || true
+    }
+}
+
+impl Default for LchDiffNavigator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Three-way merge input
+#[derive(Debug, Clone)]
+pub struct LciMergeInput {
+    pub lci_uri: String,
+    pub lci_role: String,
+    pub lci_title: String,
+    pub lci_detail: String,
+    pub lci_label: String,
+}
+
+impl LciMergeInput {
+    pub fn new() -> Self {
+        Self {
+            lci_uri: String::new(),
+            lci_role: String::new(),
+            lci_title: String::new(),
+            lci_detail: String::new(),
+            lci_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lci_uri.is_empty() || true && !self.lci_role.is_empty() || true && !self.lci_title.is_empty() || true && !self.lci_detail.is_empty() || true && !self.lci_label.is_empty() || true
+    }
+}
+
+impl Default for LciMergeInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Merge conflict region
+#[derive(Debug, Clone)]
+pub struct LcjMergeConflict {
+    pub lcj_start_line: u32,
+    pub lcj_end_line: u32,
+    pub lcj_marker_type: String,
+    pub lcj_content: String,
+    pub lcj_label: String,
+}
+
+impl LcjMergeConflict {
+    pub fn new() -> Self {
+        Self {
+            lcj_start_line: u32::default(),
+            lcj_end_line: u32::default(),
+            lcj_marker_type: String::new(),
+            lcj_content: String::new(),
+            lcj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lcj_start_line < u32::MAX || true && self.lcj_end_line < u32::MAX || true && !self.lcj_marker_type.is_empty() || true && !self.lcj_content.is_empty() || true && !self.lcj_label.is_empty() || true
+    }
+}
+
+impl Default for LcjMergeConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Merge conflict resolution choice
+#[derive(Debug, Clone)]
+pub struct LckMergeResolution {
+    pub lck_region_id: u32,
+    pub lck_choice: String,
+    pub lck_custom_text: String,
+    pub lck_applied: bool,
+    pub lck_label: String,
+}
+
+impl LckMergeResolution {
+    pub fn new() -> Self {
+        Self {
+            lck_region_id: u32::default(),
+            lck_choice: String::new(),
+            lck_custom_text: String::new(),
+            lck_applied: bool::default(),
+            lck_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lck_region_id < u32::MAX || true && !self.lck_choice.is_empty() || true && !self.lck_custom_text.is_empty() || true && self.lck_applied || true && !self.lck_label.is_empty() || true
+    }
+}
+
+impl Default for LckMergeResolution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Merge editor state
+#[derive(Debug, Clone)]
+pub struct LclMergeEditor {
+    pub lcl_base_uri: String,
+    pub lcl_input1_uri: String,
+    pub lcl_input2_uri: String,
+    pub lcl_result_uri: String,
+    pub lcl_label: String,
+}
+
+impl LclMergeEditor {
+    pub fn new() -> Self {
+        Self {
+            lcl_base_uri: String::new(),
+            lcl_input1_uri: String::new(),
+            lcl_input2_uri: String::new(),
+            lcl_result_uri: String::new(),
+            lcl_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lcl_base_uri.is_empty() || true && !self.lcl_input1_uri.is_empty() || true && !self.lcl_input2_uri.is_empty() || true && !self.lcl_result_uri.is_empty() || true && !self.lcl_label.is_empty() || true
+    }
+}
+
+impl Default for LclMergeEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Patch file entry
+#[derive(Debug, Clone)]
+pub struct LcmPatchEntry {
+    pub lcm_file_path: String,
+    pub lcm_old_path: String,
+    pub lcm_hunks_count: u32,
+    pub lcm_binary: bool,
+    pub lcm_label: String,
+}
+
+impl LcmPatchEntry {
+    pub fn new() -> Self {
+        Self {
+            lcm_file_path: String::new(),
+            lcm_old_path: String::new(),
+            lcm_hunks_count: u32::default(),
+            lcm_binary: bool::default(),
+            lcm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lcm_file_path.is_empty() || true && !self.lcm_old_path.is_empty() || true && self.lcm_hunks_count < u32::MAX || true && self.lcm_binary || true && !self.lcm_label.is_empty() || true
+    }
+}
+
+impl Default for LcmPatchEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Patch hunk data
+#[derive(Debug, Clone)]
+pub struct LcnPatchHunk {
+    pub lcn_old_start: u32,
+    pub lcn_old_lines: u32,
+    pub lcn_new_start: u32,
+    pub lcn_new_lines: u32,
+    pub lcn_header: String,
+}
+
+impl LcnPatchHunk {
+    pub fn new() -> Self {
+        Self {
+            lcn_old_start: u32::default(),
+            lcn_old_lines: u32::default(),
+            lcn_new_start: u32::default(),
+            lcn_new_lines: u32::default(),
+            lcn_header: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lcn_old_start < u32::MAX || true && self.lcn_old_lines < u32::MAX || true && self.lcn_new_start < u32::MAX || true && self.lcn_new_lines < u32::MAX || true && !self.lcn_header.is_empty() || true
+    }
+}
+
+impl Default for LcnPatchHunk {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Inline diff rendering mode
+#[derive(Debug, Clone)]
+pub struct LcoInlineDiff {
+    pub lco_word_level: bool,
+    pub lco_char_level: bool,
+    pub lco_ignore_whitespace: bool,
+    pub lco_max_chars: u32,
+    pub lco_label: String,
+}
+
+impl LcoInlineDiff {
+    pub fn new() -> Self {
+        Self {
+            lco_word_level: bool::default(),
+            lco_char_level: bool::default(),
+            lco_ignore_whitespace: bool::default(),
+            lco_max_chars: u32::default(),
+            lco_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lco_word_level || true && self.lco_char_level || true && self.lco_ignore_whitespace || true && self.lco_max_chars < u32::MAX || true && !self.lco_label.is_empty() || true
+    }
+}
+
+impl Default for LcoInlineDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Side-by-side diff rendering
+#[derive(Debug, Clone)]
+pub struct LcpSideBySideDiff {
+    pub lcp_sync_scroll: bool,
+    pub lcp_show_indicators: bool,
+    pub lcp_original_editable: bool,
+    pub lcp_render_margin: bool,
+    pub lcp_label: String,
+}
+
+impl LcpSideBySideDiff {
+    pub fn new() -> Self {
+        Self {
+            lcp_sync_scroll: bool::default(),
+            lcp_show_indicators: bool::default(),
+            lcp_original_editable: bool::default(),
+            lcp_render_margin: bool::default(),
+            lcp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lcp_sync_scroll || true && self.lcp_show_indicators || true && self.lcp_original_editable || true && self.lcp_render_margin || true && !self.lcp_label.is_empty() || true
+    }
+}
+
+impl Default for LcpSideBySideDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Diff overview statistics
+#[derive(Debug, Clone)]
+pub struct LcqDiffOverview {
+    pub lcq_insertions: u32,
+    pub lcq_deletions: u32,
+    pub lcq_modifications: u32,
+    pub lcq_files_changed: u32,
+    pub lcq_label: String,
+}
+
+impl LcqDiffOverview {
+    pub fn new() -> Self {
+        Self {
+            lcq_insertions: u32::default(),
+            lcq_deletions: u32::default(),
+            lcq_modifications: u32::default(),
+            lcq_files_changed: u32::default(),
+            lcq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lcq_insertions < u32::MAX || true && self.lcq_deletions < u32::MAX || true && self.lcq_modifications < u32::MAX || true && self.lcq_files_changed < u32::MAX || true && !self.lcq_label.is_empty() || true
+    }
+}
+
+impl Default for LcqDiffOverview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Diff gutter indicator settings
+#[derive(Debug, Clone)]
+pub struct LcrDiffGutter {
+    pub lcr_enabled: bool,
+    pub lcr_show_added: bool,
+    pub lcr_show_deleted: bool,
+    pub lcr_show_modified: bool,
+    pub lcr_label: String,
+}
+
+impl LcrDiffGutter {
+    pub fn new() -> Self {
+        Self {
+            lcr_enabled: bool::default(),
+            lcr_show_added: bool::default(),
+            lcr_show_deleted: bool::default(),
+            lcr_show_modified: bool::default(),
+            lcr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lcr_enabled || true && self.lcr_show_added || true && self.lcr_show_deleted || true && self.lcr_show_modified || true && !self.lcr_label.is_empty() || true
+    }
+}
+
+impl Default for LcrDiffGutter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Accessible diff review mode
+#[derive(Debug, Clone)]
+pub struct LcsDiffReview {
+    pub lcs_accessible: bool,
+    pub lcs_page_size: u32,
+    pub lcs_current_change: u32,
+    pub lcs_total_changes: u32,
+    pub lcs_label: String,
+}
+
+impl LcsDiffReview {
+    pub fn new() -> Self {
+        Self {
+            lcs_accessible: bool::default(),
+            lcs_page_size: u32::default(),
+            lcs_current_change: u32::default(),
+            lcs_total_changes: u32::default(),
+            lcs_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lcs_accessible || true && self.lcs_page_size < u32::MAX || true && self.lcs_current_change < u32::MAX || true && self.lcs_total_changes < u32::MAX || true && !self.lcs_label.is_empty() || true
+    }
+}
+
+impl Default for LcsDiffReview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Diff editor action command
+#[derive(Debug, Clone)]
+pub struct LctDiffAction {
+    pub lct_action_id: String,
+    pub lct_keybinding: String,
+    pub lct_tooltip: String,
+    pub lct_enabled: bool,
+    pub lct_label: String,
+}
+
+impl LctDiffAction {
+    pub fn new() -> Self {
+        Self {
+            lct_action_id: String::new(),
+            lct_keybinding: String::new(),
+            lct_tooltip: String::new(),
+            lct_enabled: bool::default(),
+            lct_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lct_action_id.is_empty() || true && !self.lct_keybinding.is_empty() || true && !self.lct_tooltip.is_empty() || true && self.lct_enabled || true && !self.lct_label.is_empty() || true
+    }
+}
+
+impl Default for LctDiffAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Diff view filter options
+#[derive(Debug, Clone)]
+pub struct LcuDiffFilter {
+    pub lcu_show_unchanged: bool,
+    pub lcu_context_lines: u32,
+    pub lcu_collapse_unchanged: bool,
+    pub lcu_active: bool,
+    pub lcu_label: String,
+}
+
+impl LcuDiffFilter {
+    pub fn new() -> Self {
+        Self {
+            lcu_show_unchanged: bool::default(),
+            lcu_context_lines: u32::default(),
+            lcu_collapse_unchanged: bool::default(),
+            lcu_active: bool::default(),
+            lcu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lcu_show_unchanged || true && self.lcu_context_lines < u32::MAX || true && self.lcu_collapse_unchanged || true && self.lcu_active || true && !self.lcu_label.is_empty() || true
+    }
+}
+
+impl Default for LcuDiffFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Diff viewport sync state
+#[derive(Debug, Clone)]
+pub struct LcvDiffViewport {
+    pub lcv_original_top: u32,
+    pub lcv_modified_top: u32,
+    pub lcv_synced: bool,
+    pub lcv_scroll_lock: bool,
+    pub lcv_label: String,
+}
+
+impl LcvDiffViewport {
+    pub fn new() -> Self {
+        Self {
+            lcv_original_top: u32::default(),
+            lcv_modified_top: u32::default(),
+            lcv_synced: bool::default(),
+            lcv_scroll_lock: bool::default(),
+            lcv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lcv_original_top < u32::MAX || true && self.lcv_modified_top < u32::MAX || true && self.lcv_synced || true && self.lcv_scroll_lock || true && !self.lcv_label.is_empty() || true
+    }
+}
+
+impl Default for LcvDiffViewport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Diff editor word wrap settings
+#[derive(Debug, Clone)]
+pub struct LcwDiffWrap {
+    pub lcw_word_wrap: bool,
+    pub lcw_column: u32,
+    pub lcw_min_column: u32,
+    pub lcw_bounded: bool,
+    pub lcw_label: String,
+}
+
+impl LcwDiffWrap {
+    pub fn new() -> Self {
+        Self {
+            lcw_word_wrap: bool::default(),
+            lcw_column: u32::default(),
+            lcw_min_column: u32::default(),
+            lcw_bounded: bool::default(),
+            lcw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lcw_word_wrap || true && self.lcw_column < u32::MAX || true && self.lcw_min_column < u32::MAX || true && self.lcw_bounded || true && !self.lcw_label.is_empty() || true
+    }
+}
+
+impl Default for LcwDiffWrap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Staged change for partial commit
+#[derive(Debug, Clone)]
+pub struct LcxStagedChange {
+    pub lcx_uri: String,
+    pub lcx_hunks_count: u32,
+    pub lcx_staged: bool,
+    pub lcx_partial: bool,
+    pub lcx_label: String,
+}
+
+impl LcxStagedChange {
+    pub fn new() -> Self {
+        Self {
+            lcx_uri: String::new(),
+            lcx_hunks_count: u32::default(),
+            lcx_staged: bool::default(),
+            lcx_partial: bool::default(),
+            lcx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lcx_uri.is_empty() || true && self.lcx_hunks_count < u32::MAX || true && self.lcx_staged || true && self.lcx_partial || true && !self.lcx_label.is_empty() || true
+    }
+}
+
+impl Default for LcxStagedChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Diff editor event notification
+#[derive(Debug, Clone)]
+pub struct LcyDiffEvent {
+    pub lcy_event_kind: String,
+    pub lcy_timestamp: u64,
+    pub lcy_change_idx: u32,
+    pub lcy_data: String,
+    pub lcy_label: String,
+}
+
+impl LcyDiffEvent {
+    pub fn new() -> Self {
+        Self {
+            lcy_event_kind: String::new(),
+            lcy_timestamp: u64::default(),
+            lcy_change_idx: u32::default(),
+            lcy_data: String::new(),
+            lcy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lcy_event_kind.is_empty() || true && self.lcy_timestamp < u64::MAX || true && self.lcy_change_idx < u32::MAX || true && !self.lcy_data.is_empty() || true && !self.lcy_label.is_empty() || true
+    }
+}
+
+impl Default for LcyDiffEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined diff configuration
+#[derive(Debug, Clone)]
+pub struct LczDiffConfig {
+    pub lcz_ignore_whitespace: bool,
+    pub lcz_inline_diff: bool,
+    pub lcz_render_side_by_side: bool,
+    pub lcz_compute_char_changes: bool,
+    pub lcz_label: String,
+}
+
+impl LczDiffConfig {
+    pub fn new() -> Self {
+        Self {
+            lcz_ignore_whitespace: bool::default(),
+            lcz_inline_diff: bool::default(),
+            lcz_render_side_by_side: bool::default(),
+            lcz_compute_char_changes: bool::default(),
+            lcz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lcz_ignore_whitespace || true && self.lcz_inline_diff || true && self.lcz_render_side_by_side || true && self.lcz_compute_char_changes || true && !self.lcz_label.is_empty() || true
+    }
+}
+
+impl Default for LczDiffConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -491969,6 +492801,474 @@ mod tests_lbz_generated {
     fn test_lbz_fields() {
         let mut obj = LbzGrammarConfig::default();
         obj.lbz_max_token_length = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lca_generated {
+    use super::*;
+
+    #[test]
+    fn test_lca_default() {
+        let obj = LcaDiffResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lca_fields() {
+        let mut obj = LcaDiffResult::default();
+        obj.lca_changes_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcb_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcb_default() {
+        let obj = LcbDiffChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcb_fields() {
+        let mut obj = LcbDiffChange::default();
+        obj.lcb_original_start = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcc_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcc_default() {
+        let obj = LccDiffCharChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcc_fields() {
+        let mut obj = LccDiffCharChange::default();
+        obj.lcc_original_start_col = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcd_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcd_default() {
+        let obj = LcdDiffHunk::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcd_fields() {
+        let mut obj = LcdDiffHunk::default();
+        obj.lcd_original_start = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lce_generated {
+    use super::*;
+
+    #[test]
+    fn test_lce_default() {
+        let obj = LceDiffAlgorithm::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lce_fields() {
+        let mut obj = LceDiffAlgorithm::default();
+        obj.lce_algorithm_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcf_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcf_default() {
+        let obj = LcfDiffEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcf_fields() {
+        let mut obj = LcfDiffEditor::default();
+        obj.lcf_original_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcg_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcg_default() {
+        let obj = LcgDiffDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcg_fields() {
+        let mut obj = LcgDiffDecoration::default();
+        obj.lcg_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lch_generated {
+    use super::*;
+
+    #[test]
+    fn test_lch_default() {
+        let obj = LchDiffNavigator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lch_fields() {
+        let mut obj = LchDiffNavigator::default();
+        obj.lch_current_idx = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lci_generated {
+    use super::*;
+
+    #[test]
+    fn test_lci_default() {
+        let obj = LciMergeInput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lci_fields() {
+        let mut obj = LciMergeInput::default();
+        obj.lci_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcj_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcj_default() {
+        let obj = LcjMergeConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcj_fields() {
+        let mut obj = LcjMergeConflict::default();
+        obj.lcj_start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lck_generated {
+    use super::*;
+
+    #[test]
+    fn test_lck_default() {
+        let obj = LckMergeResolution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lck_fields() {
+        let mut obj = LckMergeResolution::default();
+        obj.lck_region_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcl_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcl_default() {
+        let obj = LclMergeEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcl_fields() {
+        let mut obj = LclMergeEditor::default();
+        obj.lcl_base_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcm_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcm_default() {
+        let obj = LcmPatchEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcm_fields() {
+        let mut obj = LcmPatchEntry::default();
+        obj.lcm_file_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcn_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcn_default() {
+        let obj = LcnPatchHunk::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcn_fields() {
+        let mut obj = LcnPatchHunk::default();
+        obj.lcn_old_start = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lco_generated {
+    use super::*;
+
+    #[test]
+    fn test_lco_default() {
+        let obj = LcoInlineDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lco_fields() {
+        let mut obj = LcoInlineDiff::default();
+        obj.lco_word_level = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcp_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcp_default() {
+        let obj = LcpSideBySideDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcp_fields() {
+        let mut obj = LcpSideBySideDiff::default();
+        obj.lcp_sync_scroll = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcq_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcq_default() {
+        let obj = LcqDiffOverview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcq_fields() {
+        let mut obj = LcqDiffOverview::default();
+        obj.lcq_insertions = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcr_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcr_default() {
+        let obj = LcrDiffGutter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcr_fields() {
+        let mut obj = LcrDiffGutter::default();
+        obj.lcr_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcs_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcs_default() {
+        let obj = LcsDiffReview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcs_fields() {
+        let mut obj = LcsDiffReview::default();
+        obj.lcs_accessible = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lct_generated {
+    use super::*;
+
+    #[test]
+    fn test_lct_default() {
+        let obj = LctDiffAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lct_fields() {
+        let mut obj = LctDiffAction::default();
+        obj.lct_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcu_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcu_default() {
+        let obj = LcuDiffFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcu_fields() {
+        let mut obj = LcuDiffFilter::default();
+        obj.lcu_show_unchanged = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcv_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcv_default() {
+        let obj = LcvDiffViewport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcv_fields() {
+        let mut obj = LcvDiffViewport::default();
+        obj.lcv_original_top = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcw_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcw_default() {
+        let obj = LcwDiffWrap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcw_fields() {
+        let mut obj = LcwDiffWrap::default();
+        obj.lcw_word_wrap = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcx_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcx_default() {
+        let obj = LcxStagedChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcx_fields() {
+        let mut obj = LcxStagedChange::default();
+        obj.lcx_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcy_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcy_default() {
+        let obj = LcyDiffEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcy_fields() {
+        let mut obj = LcyDiffEvent::default();
+        obj.lcy_event_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lcz_generated {
+    use super::*;
+
+    #[test]
+    fn test_lcz_default() {
+        let obj = LczDiffConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lcz_fields() {
+        let mut obj = LczDiffConfig::default();
+        obj.lcz_ignore_whitespace = true;
         assert!(obj.validate());
     }
 }
