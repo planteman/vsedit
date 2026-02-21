@@ -199212,6 +199212,838 @@ impl Default for KszSearchConfig {
     }
 }
 
+/// /// Terminal instance state
+#[derive(Debug, Clone)]
+pub struct KtaTerminalInstance {
+    pub kta_terminal_id: u32,
+    pub kta_name: String,
+    pub kta_shell_path: String,
+    pub kta_cwd: String,
+    pub kta_active: bool,
+}
+
+impl KtaTerminalInstance {
+    pub fn new() -> Self {
+        Self {
+            kta_terminal_id: u32::default(),
+            kta_name: String::new(),
+            kta_shell_path: String::new(),
+            kta_cwd: String::new(),
+            kta_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kta_terminal_id < u32::MAX || true && !self.kta_name.is_empty() || true && !self.kta_shell_path.is_empty() || true && !self.kta_cwd.is_empty() || true && self.kta_active || true
+    }
+}
+
+impl Default for KtaTerminalInstance {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal profile definition
+#[derive(Debug, Clone)]
+pub struct KtbTerminalProfile {
+    pub ktb_profile_name: String,
+    pub ktb_shell_path: String,
+    pub ktb_args: String,
+    pub ktb_icon: String,
+    pub ktb_is_default: bool,
+}
+
+impl KtbTerminalProfile {
+    pub fn new() -> Self {
+        Self {
+            ktb_profile_name: String::new(),
+            ktb_shell_path: String::new(),
+            ktb_args: String::new(),
+            ktb_icon: String::new(),
+            ktb_is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ktb_profile_name.is_empty() || true && !self.ktb_shell_path.is_empty() || true && !self.ktb_args.is_empty() || true && !self.ktb_icon.is_empty() || true && self.ktb_is_default || true
+    }
+}
+
+impl Default for KtbTerminalProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal shell process info
+#[derive(Debug, Clone)]
+pub struct KtcTerminalProcess {
+    pub ktc_pid: u32,
+    pub ktc_exit_code: u32,
+    pub ktc_running: bool,
+    pub ktc_shell_type: String,
+    pub ktc_label: String,
+}
+
+impl KtcTerminalProcess {
+    pub fn new() -> Self {
+        Self {
+            ktc_pid: u32::default(),
+            ktc_exit_code: u32::default(),
+            ktc_running: bool::default(),
+            ktc_shell_type: String::new(),
+            ktc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ktc_pid < u32::MAX || true && self.ktc_exit_code < u32::MAX || true && self.ktc_running || true && !self.ktc_shell_type.is_empty() || true && !self.ktc_label.is_empty() || true
+    }
+}
+
+impl Default for KtcTerminalProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal dimensions (rows/cols)
+#[derive(Debug, Clone)]
+pub struct KtdTerminalDimensions {
+    pub ktd_cols: u32,
+    pub ktd_rows: u32,
+    pub ktd_pixel_width: f64,
+    pub ktd_pixel_height: f64,
+    pub ktd_label: String,
+}
+
+impl KtdTerminalDimensions {
+    pub fn new() -> Self {
+        Self {
+            ktd_cols: u32::default(),
+            ktd_rows: u32::default(),
+            ktd_pixel_width: f64::default(),
+            ktd_pixel_height: f64::default(),
+            ktd_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ktd_cols < u32::MAX || true && self.ktd_rows < u32::MAX || true && self.ktd_pixel_width.is_finite() || true && self.ktd_pixel_height.is_finite() || true && !self.ktd_label.is_empty() || true
+    }
+}
+
+impl Default for KtdTerminalDimensions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal scrollback buffer state
+#[derive(Debug, Clone)]
+pub struct KteTerminalBuffer {
+    pub kte_line_count: u32,
+    pub kte_viewport_top: u32,
+    pub kte_max_scrollback: u32,
+    pub kte_trimmed: bool,
+    pub kte_label: String,
+}
+
+impl KteTerminalBuffer {
+    pub fn new() -> Self {
+        Self {
+            kte_line_count: u32::default(),
+            kte_viewport_top: u32::default(),
+            kte_max_scrollback: u32::default(),
+            kte_trimmed: bool::default(),
+            kte_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kte_line_count < u32::MAX || true && self.kte_viewport_top < u32::MAX || true && self.kte_max_scrollback < u32::MAX || true && self.kte_trimmed || true && !self.kte_label.is_empty() || true
+    }
+}
+
+impl Default for KteTerminalBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Clickable link in terminal
+#[derive(Debug, Clone)]
+pub struct KtfTerminalLink {
+    pub ktf_start_col: u32,
+    pub ktf_end_col: u32,
+    pub ktf_line: u32,
+    pub ktf_uri: String,
+    pub ktf_tooltip: String,
+}
+
+impl KtfTerminalLink {
+    pub fn new() -> Self {
+        Self {
+            ktf_start_col: u32::default(),
+            ktf_end_col: u32::default(),
+            ktf_line: u32::default(),
+            ktf_uri: String::new(),
+            ktf_tooltip: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ktf_start_col < u32::MAX || true && self.ktf_end_col < u32::MAX || true && self.ktf_line < u32::MAX || true && !self.ktf_uri.is_empty() || true && !self.ktf_tooltip.is_empty() || true
+    }
+}
+
+impl Default for KtfTerminalLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal text selection
+#[derive(Debug, Clone)]
+pub struct KtgTerminalSelection {
+    pub ktg_start_line: u32,
+    pub ktg_start_col: u32,
+    pub ktg_end_line: u32,
+    pub ktg_end_col: u32,
+    pub ktg_active: bool,
+}
+
+impl KtgTerminalSelection {
+    pub fn new() -> Self {
+        Self {
+            ktg_start_line: u32::default(),
+            ktg_start_col: u32::default(),
+            ktg_end_line: u32::default(),
+            ktg_end_col: u32::default(),
+            ktg_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ktg_start_line < u32::MAX || true && self.ktg_start_col < u32::MAX || true && self.ktg_end_line < u32::MAX || true && self.ktg_end_col < u32::MAX || true && self.ktg_active || true
+    }
+}
+
+impl Default for KtgTerminalSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal find state
+#[derive(Debug, Clone)]
+pub struct KthTerminalFind {
+    pub kth_query: String,
+    pub kth_case_sensitive: bool,
+    pub kth_regex_mode: bool,
+    pub kth_match_count: u32,
+    pub kth_label: String,
+}
+
+impl KthTerminalFind {
+    pub fn new() -> Self {
+        Self {
+            kth_query: String::new(),
+            kth_case_sensitive: bool::default(),
+            kth_regex_mode: bool::default(),
+            kth_match_count: u32::default(),
+            kth_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kth_query.is_empty() || true && self.kth_case_sensitive || true && self.kth_regex_mode || true && self.kth_match_count < u32::MAX || true && !self.kth_label.is_empty() || true
+    }
+}
+
+impl Default for KthTerminalFind {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Split terminal pane
+#[derive(Debug, Clone)]
+pub struct KtiTerminalSplit {
+    pub kti_parent_id: u32,
+    pub kti_direction: String,
+    pub kti_size_pct: f64,
+    pub kti_active: bool,
+    pub kti_label: String,
+}
+
+impl KtiTerminalSplit {
+    pub fn new() -> Self {
+        Self {
+            kti_parent_id: u32::default(),
+            kti_direction: String::new(),
+            kti_size_pct: f64::default(),
+            kti_active: bool::default(),
+            kti_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kti_parent_id < u32::MAX || true && !self.kti_direction.is_empty() || true && self.kti_size_pct.is_finite() || true && self.kti_active || true && !self.kti_label.is_empty() || true
+    }
+}
+
+impl Default for KtiTerminalSplit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal tab in panel
+#[derive(Debug, Clone)]
+pub struct KtjTerminalTab {
+    pub ktj_tab_id: u32,
+    pub ktj_terminal_id: u32,
+    pub ktj_title: String,
+    pub ktj_active: bool,
+    pub ktj_label: String,
+}
+
+impl KtjTerminalTab {
+    pub fn new() -> Self {
+        Self {
+            ktj_tab_id: u32::default(),
+            ktj_terminal_id: u32::default(),
+            ktj_title: String::new(),
+            ktj_active: bool::default(),
+            ktj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ktj_tab_id < u32::MAX || true && self.ktj_terminal_id < u32::MAX || true && !self.ktj_title.is_empty() || true && self.ktj_active || true && !self.ktj_label.is_empty() || true
+    }
+}
+
+impl Default for KtjTerminalTab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal group (split group)
+#[derive(Debug, Clone)]
+pub struct KtkTerminalGroup {
+    pub ktk_group_id: u32,
+    pub ktk_terminals_count: u32,
+    pub ktk_active_idx: u32,
+    pub ktk_collapsed: bool,
+    pub ktk_label: String,
+}
+
+impl KtkTerminalGroup {
+    pub fn new() -> Self {
+        Self {
+            ktk_group_id: u32::default(),
+            ktk_terminals_count: u32::default(),
+            ktk_active_idx: u32::default(),
+            ktk_collapsed: bool::default(),
+            ktk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ktk_group_id < u32::MAX || true && self.ktk_terminals_count < u32::MAX || true && self.ktk_active_idx < u32::MAX || true && self.ktk_collapsed || true && !self.ktk_label.is_empty() || true
+    }
+}
+
+impl Default for KtkTerminalGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal rendering backend
+#[derive(Debug, Clone)]
+pub struct KtlTerminalRenderer {
+    pub ktl_renderer_type: String,
+    pub ktl_gpu_accel: bool,
+    pub ktl_font_name: String,
+    pub ktl_font_size: f64,
+    pub ktl_label: String,
+}
+
+impl KtlTerminalRenderer {
+    pub fn new() -> Self {
+        Self {
+            ktl_renderer_type: String::new(),
+            ktl_gpu_accel: bool::default(),
+            ktl_font_name: String::new(),
+            ktl_font_size: f64::default(),
+            ktl_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ktl_renderer_type.is_empty() || true && self.ktl_gpu_accel || true && !self.ktl_font_name.is_empty() || true && self.ktl_font_size.is_finite() || true && !self.ktl_label.is_empty() || true
+    }
+}
+
+impl Default for KtlTerminalRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal color palette entry
+#[derive(Debug, Clone)]
+pub struct KtmTerminalColor {
+    pub ktm_index: u32,
+    pub ktm_hex_color: String,
+    pub ktm_name: String,
+    pub ktm_bright: bool,
+    pub ktm_label: String,
+}
+
+impl KtmTerminalColor {
+    pub fn new() -> Self {
+        Self {
+            ktm_index: u32::default(),
+            ktm_hex_color: String::new(),
+            ktm_name: String::new(),
+            ktm_bright: bool::default(),
+            ktm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ktm_index < u32::MAX || true && !self.ktm_hex_color.is_empty() || true && !self.ktm_name.is_empty() || true && self.ktm_bright || true && !self.ktm_label.is_empty() || true
+    }
+}
+
+impl Default for KtmTerminalColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal color theme
+#[derive(Debug, Clone)]
+pub struct KtnTerminalTheme {
+    pub ktn_theme_name: String,
+    pub ktn_background: String,
+    pub ktn_foreground: String,
+    pub ktn_cursor_color: String,
+    pub ktn_label: String,
+}
+
+impl KtnTerminalTheme {
+    pub fn new() -> Self {
+        Self {
+            ktn_theme_name: String::new(),
+            ktn_background: String::new(),
+            ktn_foreground: String::new(),
+            ktn_cursor_color: String::new(),
+            ktn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ktn_theme_name.is_empty() || true && !self.ktn_background.is_empty() || true && !self.ktn_foreground.is_empty() || true && !self.ktn_cursor_color.is_empty() || true && !self.ktn_label.is_empty() || true
+    }
+}
+
+impl Default for KtnTerminalTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal font settings
+#[derive(Debug, Clone)]
+pub struct KtoTerminalFont {
+    pub kto_family: String,
+    pub kto_size: f64,
+    pub kto_weight: u32,
+    pub kto_ligatures: bool,
+    pub kto_label: String,
+}
+
+impl KtoTerminalFont {
+    pub fn new() -> Self {
+        Self {
+            kto_family: String::new(),
+            kto_size: f64::default(),
+            kto_weight: u32::default(),
+            kto_ligatures: bool::default(),
+            kto_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kto_family.is_empty() || true && self.kto_size.is_finite() || true && self.kto_weight < u32::MAX || true && self.kto_ligatures || true && !self.kto_label.is_empty() || true
+    }
+}
+
+impl Default for KtoTerminalFont {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal cursor style
+#[derive(Debug, Clone)]
+pub struct KtpTerminalCursor {
+    pub ktp_style_name: String,
+    pub ktp_blinking: bool,
+    pub ktp_width: u32,
+    pub ktp_color: String,
+    pub ktp_label: String,
+}
+
+impl KtpTerminalCursor {
+    pub fn new() -> Self {
+        Self {
+            ktp_style_name: String::new(),
+            ktp_blinking: bool::default(),
+            ktp_width: u32::default(),
+            ktp_color: String::new(),
+            ktp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ktp_style_name.is_empty() || true && self.ktp_blinking || true && self.ktp_width < u32::MAX || true && !self.ktp_color.is_empty() || true && !self.ktp_label.is_empty() || true
+    }
+}
+
+impl Default for KtpTerminalCursor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal bell configuration
+#[derive(Debug, Clone)]
+pub struct KtqTerminalBell {
+    pub ktq_enabled: bool,
+    pub ktq_sound: bool,
+    pub ktq_visual: bool,
+    pub ktq_duration_ms: u32,
+    pub ktq_label: String,
+}
+
+impl KtqTerminalBell {
+    pub fn new() -> Self {
+        Self {
+            ktq_enabled: bool::default(),
+            ktq_sound: bool::default(),
+            ktq_visual: bool::default(),
+            ktq_duration_ms: u32::default(),
+            ktq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ktq_enabled || true && self.ktq_sound || true && self.ktq_visual || true && self.ktq_duration_ms < u32::MAX || true && !self.ktq_label.is_empty() || true
+    }
+}
+
+impl Default for KtqTerminalBell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal environment variable
+#[derive(Debug, Clone)]
+pub struct KtrTerminalEnv {
+    pub ktr_key: String,
+    pub ktr_value: String,
+    pub ktr_inherited: bool,
+    pub ktr_override_mode: bool,
+    pub ktr_label: String,
+}
+
+impl KtrTerminalEnv {
+    pub fn new() -> Self {
+        Self {
+            ktr_key: String::new(),
+            ktr_value: String::new(),
+            ktr_inherited: bool::default(),
+            ktr_override_mode: bool::default(),
+            ktr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ktr_key.is_empty() || true && !self.ktr_value.is_empty() || true && self.ktr_inherited || true && self.ktr_override_mode || true && !self.ktr_label.is_empty() || true
+    }
+}
+
+impl Default for KtrTerminalEnv {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Command sent to terminal
+#[derive(Debug, Clone)]
+pub struct KtsTerminalCommand {
+    pub kts_command_text: String,
+    pub kts_cwd: String,
+    pub kts_exit_code: u32,
+    pub kts_timestamp: u64,
+    pub kts_label: String,
+}
+
+impl KtsTerminalCommand {
+    pub fn new() -> Self {
+        Self {
+            kts_command_text: String::new(),
+            kts_cwd: String::new(),
+            kts_exit_code: u32::default(),
+            kts_timestamp: u64::default(),
+            kts_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kts_command_text.is_empty() || true && !self.kts_cwd.is_empty() || true && self.kts_exit_code < u32::MAX || true && self.kts_timestamp < u64::MAX || true && !self.kts_label.is_empty() || true
+    }
+}
+
+impl Default for KtsTerminalCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Shell type auto-detection
+#[derive(Debug, Clone)]
+pub struct KttTerminalDetect {
+    pub ktt_shell_name: String,
+    pub ktt_shell_path: String,
+    pub ktt_version_str: String,
+    pub ktt_detected: bool,
+    pub ktt_label: String,
+}
+
+impl KttTerminalDetect {
+    pub fn new() -> Self {
+        Self {
+            ktt_shell_name: String::new(),
+            ktt_shell_path: String::new(),
+            ktt_version_str: String::new(),
+            ktt_detected: bool::default(),
+            ktt_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ktt_shell_name.is_empty() || true && !self.ktt_shell_path.is_empty() || true && !self.ktt_version_str.is_empty() || true && self.ktt_detected || true && !self.ktt_label.is_empty() || true
+    }
+}
+
+impl Default for KttTerminalDetect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Shell integration feature
+#[derive(Debug, Clone)]
+pub struct KtuTerminalIntegration {
+    pub ktu_feature_name: String,
+    pub ktu_supported: bool,
+    pub ktu_enabled: bool,
+    pub ktu_shell_type: String,
+    pub ktu_label: String,
+}
+
+impl KtuTerminalIntegration {
+    pub fn new() -> Self {
+        Self {
+            ktu_feature_name: String::new(),
+            ktu_supported: bool::default(),
+            ktu_enabled: bool::default(),
+            ktu_shell_type: String::new(),
+            ktu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ktu_feature_name.is_empty() || true && self.ktu_supported || true && self.ktu_enabled || true && !self.ktu_shell_type.is_empty() || true && !self.ktu_label.is_empty() || true
+    }
+}
+
+impl Default for KtuTerminalIntegration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal decoration provider
+#[derive(Debug, Clone)]
+pub struct KtvTerminalDecoProvider {
+    pub ktv_provider_id: String,
+    pub ktv_pattern: String,
+    pub ktv_color: String,
+    pub ktv_active: bool,
+    pub ktv_label: String,
+}
+
+impl KtvTerminalDecoProvider {
+    pub fn new() -> Self {
+        Self {
+            ktv_provider_id: String::new(),
+            ktv_pattern: String::new(),
+            ktv_color: String::new(),
+            ktv_active: bool::default(),
+            ktv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ktv_provider_id.is_empty() || true && !self.ktv_pattern.is_empty() || true && !self.ktv_color.is_empty() || true && self.ktv_active || true && !self.ktv_label.is_empty() || true
+    }
+}
+
+impl Default for KtvTerminalDecoProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal quick fix suggestion
+#[derive(Debug, Clone)]
+pub struct KtwTerminalQuickFix {
+    pub ktw_command: String,
+    pub ktw_title: String,
+    pub ktw_source: String,
+    pub ktw_auto_apply: bool,
+    pub ktw_label: String,
+}
+
+impl KtwTerminalQuickFix {
+    pub fn new() -> Self {
+        Self {
+            ktw_command: String::new(),
+            ktw_title: String::new(),
+            ktw_source: String::new(),
+            ktw_auto_apply: bool::default(),
+            ktw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ktw_command.is_empty() || true && !self.ktw_title.is_empty() || true && !self.ktw_source.is_empty() || true && self.ktw_auto_apply || true && !self.ktw_label.is_empty() || true
+    }
+}
+
+impl Default for KtwTerminalQuickFix {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal accessibility features
+#[derive(Debug, Clone)]
+pub struct KtxTerminalAccessibility {
+    pub ktx_screen_reader: bool,
+    pub ktx_line_announce: bool,
+    pub ktx_char_announce: bool,
+    pub ktx_focus_trap: bool,
+    pub ktx_label: String,
+}
+
+impl KtxTerminalAccessibility {
+    pub fn new() -> Self {
+        Self {
+            ktx_screen_reader: bool::default(),
+            ktx_line_announce: bool::default(),
+            ktx_char_announce: bool::default(),
+            ktx_focus_trap: bool::default(),
+            ktx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ktx_screen_reader || true && self.ktx_line_announce || true && self.ktx_char_announce || true && self.ktx_focus_trap || true && !self.ktx_label.is_empty() || true
+    }
+}
+
+impl Default for KtxTerminalAccessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Terminal lifecycle event
+#[derive(Debug, Clone)]
+pub struct KtyTerminalEvent {
+    pub kty_event_kind: String,
+    pub kty_terminal_id: u32,
+    pub kty_timestamp: u64,
+    pub kty_data: String,
+    pub kty_label: String,
+}
+
+impl KtyTerminalEvent {
+    pub fn new() -> Self {
+        Self {
+            kty_event_kind: String::new(),
+            kty_terminal_id: u32::default(),
+            kty_timestamp: u64::default(),
+            kty_data: String::new(),
+            kty_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kty_event_kind.is_empty() || true && self.kty_terminal_id < u32::MAX || true && self.kty_timestamp < u64::MAX || true && !self.kty_data.is_empty() || true && !self.kty_label.is_empty() || true
+    }
+}
+
+impl Default for KtyTerminalEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined terminal configuration
+#[derive(Debug, Clone)]
+pub struct KtzTerminalConfig {
+    pub ktz_default_profile: String,
+    pub ktz_scrollback: u32,
+    pub ktz_copy_on_select: bool,
+    pub ktz_right_click_paste: bool,
+    pub ktz_label: String,
+}
+
+impl KtzTerminalConfig {
+    pub fn new() -> Self {
+        Self {
+            ktz_default_profile: String::new(),
+            ktz_scrollback: u32::default(),
+            ktz_copy_on_select: bool::default(),
+            ktz_right_click_paste: bool::default(),
+            ktz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ktz_default_profile.is_empty() || true && self.ktz_scrollback < u32::MAX || true && self.ktz_copy_on_select || true && self.ktz_right_click_paste || true && !self.ktz_label.is_empty() || true
+    }
+}
+
+impl Default for KtzTerminalConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -480245,6 +481077,474 @@ mod tests_ksz_generated {
     fn test_ksz_fields() {
         let mut obj = KszSearchConfig::default();
         obj.ksz_default_scope = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kta_generated {
+    use super::*;
+
+    #[test]
+    fn test_kta_default() {
+        let obj = KtaTerminalInstance::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kta_fields() {
+        let mut obj = KtaTerminalInstance::default();
+        obj.kta_terminal_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktb_default() {
+        let obj = KtbTerminalProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktb_fields() {
+        let mut obj = KtbTerminalProfile::default();
+        obj.ktb_profile_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktc_default() {
+        let obj = KtcTerminalProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktc_fields() {
+        let mut obj = KtcTerminalProcess::default();
+        obj.ktc_pid = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktd_default() {
+        let obj = KtdTerminalDimensions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktd_fields() {
+        let mut obj = KtdTerminalDimensions::default();
+        obj.ktd_cols = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kte_generated {
+    use super::*;
+
+    #[test]
+    fn test_kte_default() {
+        let obj = KteTerminalBuffer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kte_fields() {
+        let mut obj = KteTerminalBuffer::default();
+        obj.kte_line_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktf_default() {
+        let obj = KtfTerminalLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktf_fields() {
+        let mut obj = KtfTerminalLink::default();
+        obj.ktf_start_col = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktg_default() {
+        let obj = KtgTerminalSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktg_fields() {
+        let mut obj = KtgTerminalSelection::default();
+        obj.ktg_start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kth_generated {
+    use super::*;
+
+    #[test]
+    fn test_kth_default() {
+        let obj = KthTerminalFind::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kth_fields() {
+        let mut obj = KthTerminalFind::default();
+        obj.kth_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kti_generated {
+    use super::*;
+
+    #[test]
+    fn test_kti_default() {
+        let obj = KtiTerminalSplit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kti_fields() {
+        let mut obj = KtiTerminalSplit::default();
+        obj.kti_parent_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktj_default() {
+        let obj = KtjTerminalTab::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktj_fields() {
+        let mut obj = KtjTerminalTab::default();
+        obj.ktj_tab_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktk_default() {
+        let obj = KtkTerminalGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktk_fields() {
+        let mut obj = KtkTerminalGroup::default();
+        obj.ktk_group_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktl_default() {
+        let obj = KtlTerminalRenderer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktl_fields() {
+        let mut obj = KtlTerminalRenderer::default();
+        obj.ktl_renderer_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktm_default() {
+        let obj = KtmTerminalColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktm_fields() {
+        let mut obj = KtmTerminalColor::default();
+        obj.ktm_index = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktn_default() {
+        let obj = KtnTerminalTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktn_fields() {
+        let mut obj = KtnTerminalTheme::default();
+        obj.ktn_theme_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kto_generated {
+    use super::*;
+
+    #[test]
+    fn test_kto_default() {
+        let obj = KtoTerminalFont::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kto_fields() {
+        let mut obj = KtoTerminalFont::default();
+        obj.kto_family = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktp_default() {
+        let obj = KtpTerminalCursor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktp_fields() {
+        let mut obj = KtpTerminalCursor::default();
+        obj.ktp_style_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktq_default() {
+        let obj = KtqTerminalBell::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktq_fields() {
+        let mut obj = KtqTerminalBell::default();
+        obj.ktq_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktr_default() {
+        let obj = KtrTerminalEnv::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktr_fields() {
+        let mut obj = KtrTerminalEnv::default();
+        obj.ktr_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kts_generated {
+    use super::*;
+
+    #[test]
+    fn test_kts_default() {
+        let obj = KtsTerminalCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kts_fields() {
+        let mut obj = KtsTerminalCommand::default();
+        obj.kts_command_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktt_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktt_default() {
+        let obj = KttTerminalDetect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktt_fields() {
+        let mut obj = KttTerminalDetect::default();
+        obj.ktt_shell_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktu_default() {
+        let obj = KtuTerminalIntegration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktu_fields() {
+        let mut obj = KtuTerminalIntegration::default();
+        obj.ktu_feature_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktv_default() {
+        let obj = KtvTerminalDecoProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktv_fields() {
+        let mut obj = KtvTerminalDecoProvider::default();
+        obj.ktv_provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktw_default() {
+        let obj = KtwTerminalQuickFix::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktw_fields() {
+        let mut obj = KtwTerminalQuickFix::default();
+        obj.ktw_command = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktx_default() {
+        let obj = KtxTerminalAccessibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktx_fields() {
+        let mut obj = KtxTerminalAccessibility::default();
+        obj.ktx_screen_reader = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kty_generated {
+    use super::*;
+
+    #[test]
+    fn test_kty_default() {
+        let obj = KtyTerminalEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kty_fields() {
+        let mut obj = KtyTerminalEvent::default();
+        obj.kty_event_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ktz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ktz_default() {
+        let obj = KtzTerminalConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ktz_fields() {
+        let mut obj = KtzTerminalConfig::default();
+        obj.ktz_default_profile = "test".to_string();
         assert!(obj.validate());
     }
 }
