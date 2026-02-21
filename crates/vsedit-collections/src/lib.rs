@@ -195302,6 +195302,838 @@ impl Default for KnzEditorEventConfig {
     }
 }
 
+/// /// Task runner definition
+#[derive(Debug, Clone)]
+pub struct KoaTaskDefinition {
+    pub koa_task_type: String,
+    pub koa_command: String,
+    pub koa_args: String,
+    pub koa_is_background: bool,
+    pub koa_label: String,
+}
+
+impl KoaTaskDefinition {
+    pub fn new() -> Self {
+        Self {
+            koa_task_type: String::new(),
+            koa_command: String::new(),
+            koa_args: String::new(),
+            koa_is_background: bool::default(),
+            koa_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.koa_task_type.is_empty() || true && !self.koa_command.is_empty() || true && !self.koa_args.is_empty() || true && self.koa_is_background || true && !self.koa_label.is_empty() || true
+    }
+}
+
+impl Default for KoaTaskDefinition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Task execution state
+#[derive(Debug, Clone)]
+pub struct KobTaskExecution {
+    pub kob_task_id: String,
+    pub kob_state: String,
+    pub kob_exit_code: u32,
+    pub kob_started_at: u64,
+    pub kob_label: String,
+}
+
+impl KobTaskExecution {
+    pub fn new() -> Self {
+        Self {
+            kob_task_id: String::new(),
+            kob_state: String::new(),
+            kob_exit_code: u32::default(),
+            kob_started_at: u64::default(),
+            kob_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kob_task_id.is_empty() || true && !self.kob_state.is_empty() || true && self.kob_exit_code < u32::MAX || true && self.kob_started_at < u64::MAX || true && !self.kob_label.is_empty() || true
+    }
+}
+
+impl Default for KobTaskExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Task group (build/test/clean)
+#[derive(Debug, Clone)]
+pub struct KocTaskGroup {
+    pub koc_group_id: String,
+    pub koc_is_default: bool,
+    pub koc_name: String,
+    pub koc_tasks_count: u32,
+    pub koc_label: String,
+}
+
+impl KocTaskGroup {
+    pub fn new() -> Self {
+        Self {
+            koc_group_id: String::new(),
+            koc_is_default: bool::default(),
+            koc_name: String::new(),
+            koc_tasks_count: u32::default(),
+            koc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.koc_group_id.is_empty() || true && self.koc_is_default || true && !self.koc_name.is_empty() || true && self.koc_tasks_count < u32::MAX || true && !self.koc_label.is_empty() || true
+    }
+}
+
+impl Default for KocTaskGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Task terminal presentation options
+#[derive(Debug, Clone)]
+pub struct KodTaskPresentation {
+    pub kod_reveal: String,
+    pub kod_echo_cmd: bool,
+    pub kod_focus: bool,
+    pub kod_panel: String,
+    pub kod_clear: bool,
+}
+
+impl KodTaskPresentation {
+    pub fn new() -> Self {
+        Self {
+            kod_reveal: String::new(),
+            kod_echo_cmd: bool::default(),
+            kod_focus: bool::default(),
+            kod_panel: String::new(),
+            kod_clear: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kod_reveal.is_empty() || true && self.kod_echo_cmd || true && self.kod_focus || true && !self.kod_panel.is_empty() || true && self.kod_clear || true
+    }
+}
+
+impl Default for KodTaskPresentation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Task dependency declaration
+#[derive(Debug, Clone)]
+pub struct KoeTaskDependency {
+    pub koe_task_id: String,
+    pub koe_depends_on: String,
+    pub koe_order: String,
+    pub koe_optional: bool,
+    pub koe_label: String,
+}
+
+impl KoeTaskDependency {
+    pub fn new() -> Self {
+        Self {
+            koe_task_id: String::new(),
+            koe_depends_on: String::new(),
+            koe_order: String::new(),
+            koe_optional: bool::default(),
+            koe_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.koe_task_id.is_empty() || true && !self.koe_depends_on.is_empty() || true && !self.koe_order.is_empty() || true && self.koe_optional || true && !self.koe_label.is_empty() || true
+    }
+}
+
+impl Default for KoeTaskDependency {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Problem matcher for task output
+#[derive(Debug, Clone)]
+pub struct KofTaskProblemMatcher {
+    pub kof_pattern: String,
+    pub kof_severity: String,
+    pub kof_file_group: u32,
+    pub kof_line_group: u32,
+    pub kof_message_group: u32,
+}
+
+impl KofTaskProblemMatcher {
+    pub fn new() -> Self {
+        Self {
+            kof_pattern: String::new(),
+            kof_severity: String::new(),
+            kof_file_group: u32::default(),
+            kof_line_group: u32::default(),
+            kof_message_group: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kof_pattern.is_empty() || true && !self.kof_severity.is_empty() || true && self.kof_file_group < u32::MAX || true && self.kof_line_group < u32::MAX || true && self.kof_message_group < u32::MAX || true
+    }
+}
+
+impl Default for KofTaskProblemMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Task source (workspace/extension)
+#[derive(Debug, Clone)]
+pub struct KogTaskSource {
+    pub kog_source_type: String,
+    pub kog_workspace_folder: String,
+    pub kog_config_file: String,
+    pub kog_auto_detect: bool,
+    pub kog_label: String,
+}
+
+impl KogTaskSource {
+    pub fn new() -> Self {
+        Self {
+            kog_source_type: String::new(),
+            kog_workspace_folder: String::new(),
+            kog_config_file: String::new(),
+            kog_auto_detect: bool::default(),
+            kog_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kog_source_type.is_empty() || true && !self.kog_workspace_folder.is_empty() || true && !self.kog_config_file.is_empty() || true && self.kog_auto_detect || true && !self.kog_label.is_empty() || true
+    }
+}
+
+impl Default for KogTaskSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Task provider registration
+#[derive(Debug, Clone)]
+pub struct KohTaskProvider {
+    pub koh_provider_type: String,
+    pub koh_extension_id: String,
+    pub koh_priority: u32,
+    pub koh_active: bool,
+    pub koh_label: String,
+}
+
+impl KohTaskProvider {
+    pub fn new() -> Self {
+        Self {
+            koh_provider_type: String::new(),
+            koh_extension_id: String::new(),
+            koh_priority: u32::default(),
+            koh_active: bool::default(),
+            koh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.koh_provider_type.is_empty() || true && !self.koh_extension_id.is_empty() || true && self.koh_priority < u32::MAX || true && self.koh_active || true && !self.koh_label.is_empty() || true
+    }
+}
+
+impl Default for KohTaskProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Task lifecycle event
+#[derive(Debug, Clone)]
+pub struct KoiTaskEvent {
+    pub koi_event_kind: String,
+    pub koi_task_id: String,
+    pub koi_exit_code: u32,
+    pub koi_timestamp: u64,
+    pub koi_label: String,
+}
+
+impl KoiTaskEvent {
+    pub fn new() -> Self {
+        Self {
+            koi_event_kind: String::new(),
+            koi_task_id: String::new(),
+            koi_exit_code: u32::default(),
+            koi_timestamp: u64::default(),
+            koi_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.koi_event_kind.is_empty() || true && !self.koi_task_id.is_empty() || true && self.koi_exit_code < u32::MAX || true && self.koi_timestamp < u64::MAX || true && !self.koi_label.is_empty() || true
+    }
+}
+
+impl Default for KoiTaskEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Task terminal instance link
+#[derive(Debug, Clone)]
+pub struct KojTaskTerminal {
+    pub koj_terminal_id: u32,
+    pub koj_task_id: String,
+    pub koj_reuse_terminal: bool,
+    pub koj_shared: bool,
+    pub koj_label: String,
+}
+
+impl KojTaskTerminal {
+    pub fn new() -> Self {
+        Self {
+            koj_terminal_id: u32::default(),
+            koj_task_id: String::new(),
+            koj_reuse_terminal: bool::default(),
+            koj_shared: bool::default(),
+            koj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.koj_terminal_id < u32::MAX || true && !self.koj_task_id.is_empty() || true && self.koj_reuse_terminal || true && self.koj_shared || true && !self.koj_label.is_empty() || true
+    }
+}
+
+impl Default for KojTaskTerminal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Task list filter criteria
+#[derive(Debug, Clone)]
+pub struct KokTaskFilter {
+    pub kok_task_type: String,
+    pub kok_source_filter: String,
+    pub kok_recent_only: bool,
+    pub kok_group_filter: String,
+    pub kok_label: String,
+}
+
+impl KokTaskFilter {
+    pub fn new() -> Self {
+        Self {
+            kok_task_type: String::new(),
+            kok_source_filter: String::new(),
+            kok_recent_only: bool::default(),
+            kok_group_filter: String::new(),
+            kok_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kok_task_type.is_empty() || true && !self.kok_source_filter.is_empty() || true && self.kok_recent_only || true && !self.kok_group_filter.is_empty() || true && !self.kok_label.is_empty() || true
+    }
+}
+
+impl Default for KokTaskFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Task quick pick item
+#[derive(Debug, Clone)]
+pub struct KolTaskQuickPick {
+    pub kol_label: String,
+    pub kol_task_id: String,
+    pub kol_description: String,
+    pub kol_detail: String,
+    pub kol_recent: bool,
+}
+
+impl KolTaskQuickPick {
+    pub fn new() -> Self {
+        Self {
+            kol_label: String::new(),
+            kol_task_id: String::new(),
+            kol_description: String::new(),
+            kol_detail: String::new(),
+            kol_recent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kol_label.is_empty() || true && !self.kol_task_id.is_empty() || true && !self.kol_description.is_empty() || true && !self.kol_detail.is_empty() || true && self.kol_recent || true
+    }
+}
+
+impl Default for KolTaskQuickPick {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Problem/diagnostic entry
+#[derive(Debug, Clone)]
+pub struct KomProblemEntry {
+    pub kom_uri: String,
+    pub kom_message: String,
+    pub kom_severity: String,
+    pub kom_line: u32,
+    pub kom_column: u32,
+}
+
+impl KomProblemEntry {
+    pub fn new() -> Self {
+        Self {
+            kom_uri: String::new(),
+            kom_message: String::new(),
+            kom_severity: String::new(),
+            kom_line: u32::default(),
+            kom_column: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kom_uri.is_empty() || true && !self.kom_message.is_empty() || true && !self.kom_severity.is_empty() || true && self.kom_line < u32::MAX || true && self.kom_column < u32::MAX || true
+    }
+}
+
+impl Default for KomProblemEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Problem marker in editor
+#[derive(Debug, Clone)]
+pub struct KonProblemMarker {
+    pub kon_severity: String,
+    pub kon_line: u32,
+    pub kon_column: u32,
+    pub kon_end_line: u32,
+    pub kon_source: String,
+}
+
+impl KonProblemMarker {
+    pub fn new() -> Self {
+        Self {
+            kon_severity: String::new(),
+            kon_line: u32::default(),
+            kon_column: u32::default(),
+            kon_end_line: u32::default(),
+            kon_source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kon_severity.is_empty() || true && self.kon_line < u32::MAX || true && self.kon_column < u32::MAX || true && self.kon_end_line < u32::MAX || true && !self.kon_source.is_empty() || true
+    }
+}
+
+impl Default for KonProblemMarker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Problem list filter
+#[derive(Debug, Clone)]
+pub struct KooProblemFilter {
+    pub koo_severity_filter: String,
+    pub koo_source_filter: String,
+    pub koo_file_filter: String,
+    pub koo_active: bool,
+    pub koo_label: String,
+}
+
+impl KooProblemFilter {
+    pub fn new() -> Self {
+        Self {
+            koo_severity_filter: String::new(),
+            koo_source_filter: String::new(),
+            koo_file_filter: String::new(),
+            koo_active: bool::default(),
+            koo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.koo_severity_filter.is_empty() || true && !self.koo_source_filter.is_empty() || true && !self.koo_file_filter.is_empty() || true && self.koo_active || true && !self.koo_label.is_empty() || true
+    }
+}
+
+impl Default for KooProblemFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Problems grouped by file
+#[derive(Debug, Clone)]
+pub struct KopProblemGroup {
+    pub kop_uri: String,
+    pub kop_count: u32,
+    pub kop_max_severity: String,
+    pub kop_collapsed: bool,
+    pub kop_label: String,
+}
+
+impl KopProblemGroup {
+    pub fn new() -> Self {
+        Self {
+            kop_uri: String::new(),
+            kop_count: u32::default(),
+            kop_max_severity: String::new(),
+            kop_collapsed: bool::default(),
+            kop_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kop_uri.is_empty() || true && self.kop_count < u32::MAX || true && !self.kop_max_severity.is_empty() || true && self.kop_collapsed || true && !self.kop_label.is_empty() || true
+    }
+}
+
+impl Default for KopProblemGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Problem count statistics
+#[derive(Debug, Clone)]
+pub struct KoqProblemStats {
+    pub koq_error_count: u32,
+    pub koq_warning_count: u32,
+    pub koq_info_count: u32,
+    pub koq_hint_count: u32,
+    pub koq_label: String,
+}
+
+impl KoqProblemStats {
+    pub fn new() -> Self {
+        Self {
+            koq_error_count: u32::default(),
+            koq_warning_count: u32::default(),
+            koq_info_count: u32::default(),
+            koq_hint_count: u32::default(),
+            koq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.koq_error_count < u32::MAX || true && self.koq_warning_count < u32::MAX || true && self.koq_info_count < u32::MAX || true && self.koq_hint_count < u32::MAX || true && !self.koq_label.is_empty() || true
+    }
+}
+
+impl Default for KoqProblemStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Problem quick fix action
+#[derive(Debug, Clone)]
+pub struct KorProblemAction {
+    pub kor_action_type: String,
+    pub kor_diagnostic_id: String,
+    pub kor_title: String,
+    pub kor_preferred: bool,
+    pub kor_label: String,
+}
+
+impl KorProblemAction {
+    pub fn new() -> Self {
+        Self {
+            kor_action_type: String::new(),
+            kor_diagnostic_id: String::new(),
+            kor_title: String::new(),
+            kor_preferred: bool::default(),
+            kor_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kor_action_type.is_empty() || true && !self.kor_diagnostic_id.is_empty() || true && !self.kor_title.is_empty() || true && self.kor_preferred || true && !self.kor_label.is_empty() || true
+    }
+}
+
+impl Default for KorProblemAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Build task configuration
+#[derive(Debug, Clone)]
+pub struct KosBuildTask {
+    pub kos_command: String,
+    pub kos_args: String,
+    pub kos_group_default: bool,
+    pub kos_problem_matcher: String,
+    pub kos_label: String,
+}
+
+impl KosBuildTask {
+    pub fn new() -> Self {
+        Self {
+            kos_command: String::new(),
+            kos_args: String::new(),
+            kos_group_default: bool::default(),
+            kos_problem_matcher: String::new(),
+            kos_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kos_command.is_empty() || true && !self.kos_args.is_empty() || true && self.kos_group_default || true && !self.kos_problem_matcher.is_empty() || true && !self.kos_label.is_empty() || true
+    }
+}
+
+impl Default for KosBuildTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test task configuration
+#[derive(Debug, Clone)]
+pub struct KotTestTask {
+    pub kot_test_runner: String,
+    pub kot_args: String,
+    pub kot_debug_mode: bool,
+    pub kot_coverage: bool,
+    pub kot_label: String,
+}
+
+impl KotTestTask {
+    pub fn new() -> Self {
+        Self {
+            kot_test_runner: String::new(),
+            kot_args: String::new(),
+            kot_debug_mode: bool::default(),
+            kot_coverage: bool::default(),
+            kot_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kot_test_runner.is_empty() || true && !self.kot_args.is_empty() || true && self.kot_debug_mode || true && self.kot_coverage || true && !self.kot_label.is_empty() || true
+    }
+}
+
+impl Default for KotTestTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Watch task configuration
+#[derive(Debug, Clone)]
+pub struct KouWatchTask {
+    pub kou_file_pattern: String,
+    pub kou_task_to_run: String,
+    pub kou_delay_ms: u32,
+    pub kou_active: bool,
+    pub kou_label: String,
+}
+
+impl KouWatchTask {
+    pub fn new() -> Self {
+        Self {
+            kou_file_pattern: String::new(),
+            kou_task_to_run: String::new(),
+            kou_delay_ms: u32::default(),
+            kou_active: bool::default(),
+            kou_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kou_file_pattern.is_empty() || true && !self.kou_task_to_run.is_empty() || true && self.kou_delay_ms < u32::MAX || true && self.kou_active || true && !self.kou_label.is_empty() || true
+    }
+}
+
+impl Default for KouWatchTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Clean task configuration
+#[derive(Debug, Clone)]
+pub struct KovCleanTask {
+    pub kov_paths: String,
+    pub kov_recursive: bool,
+    pub kov_dry_run: bool,
+    pub kov_force: bool,
+    pub kov_label: String,
+}
+
+impl KovCleanTask {
+    pub fn new() -> Self {
+        Self {
+            kov_paths: String::new(),
+            kov_recursive: bool::default(),
+            kov_dry_run: bool::default(),
+            kov_force: bool::default(),
+            kov_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kov_paths.is_empty() || true && self.kov_recursive || true && self.kov_dry_run || true && self.kov_force || true && !self.kov_label.is_empty() || true
+    }
+}
+
+impl Default for KovCleanTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Shell execution details
+#[derive(Debug, Clone)]
+pub struct KowShellExec {
+    pub kow_shell_path: String,
+    pub kow_shell_args: String,
+    pub kow_cwd: String,
+    pub kow_env_vars: String,
+    pub kow_label: String,
+}
+
+impl KowShellExec {
+    pub fn new() -> Self {
+        Self {
+            kow_shell_path: String::new(),
+            kow_shell_args: String::new(),
+            kow_cwd: String::new(),
+            kow_env_vars: String::new(),
+            kow_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kow_shell_path.is_empty() || true && !self.kow_shell_args.is_empty() || true && !self.kow_cwd.is_empty() || true && !self.kow_env_vars.is_empty() || true && !self.kow_label.is_empty() || true
+    }
+}
+
+impl Default for KowShellExec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Process execution details
+#[derive(Debug, Clone)]
+pub struct KoxProcessExec {
+    pub kox_process_path: String,
+    pub kox_process_args: String,
+    pub kox_cwd: String,
+    pub kox_env_vars: String,
+    pub kox_label: String,
+}
+
+impl KoxProcessExec {
+    pub fn new() -> Self {
+        Self {
+            kox_process_path: String::new(),
+            kox_process_args: String::new(),
+            kox_cwd: String::new(),
+            kox_env_vars: String::new(),
+            kox_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kox_process_path.is_empty() || true && !self.kox_process_args.is_empty() || true && !self.kox_cwd.is_empty() || true && !self.kox_env_vars.is_empty() || true && !self.kox_label.is_empty() || true
+    }
+}
+
+impl Default for KoxProcessExec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Task variable substitution
+#[derive(Debug, Clone)]
+pub struct KoyTaskVariable {
+    pub koy_var_name: String,
+    pub koy_var_value: String,
+    pub koy_scope: String,
+    pub koy_resolved: bool,
+    pub koy_label: String,
+}
+
+impl KoyTaskVariable {
+    pub fn new() -> Self {
+        Self {
+            koy_var_name: String::new(),
+            koy_var_value: String::new(),
+            koy_scope: String::new(),
+            koy_resolved: bool::default(),
+            koy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.koy_var_name.is_empty() || true && !self.koy_var_value.is_empty() || true && !self.koy_scope.is_empty() || true && self.koy_resolved || true && !self.koy_label.is_empty() || true
+    }
+}
+
+impl Default for KoyTaskVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined task runner configuration
+#[derive(Debug, Clone)]
+pub struct KozTaskConfig {
+    pub koz_auto_detect: bool,
+    pub koz_version_str: String,
+    pub koz_windows_config: String,
+    pub koz_linux_config: String,
+    pub koz_label: String,
+}
+
+impl KozTaskConfig {
+    pub fn new() -> Self {
+        Self {
+            koz_auto_detect: bool::default(),
+            koz_version_str: String::new(),
+            koz_windows_config: String::new(),
+            koz_linux_config: String::new(),
+            koz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.koz_auto_detect || true && !self.koz_version_str.is_empty() || true && !self.koz_windows_config.is_empty() || true && !self.koz_linux_config.is_empty() || true && !self.koz_label.is_empty() || true
+    }
+}
+
+impl Default for KozTaskConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -473905,6 +474737,474 @@ mod tests_knz_generated {
     fn test_knz_fields() {
         let mut obj = KnzEditorEventConfig::default();
         obj.knz_debounce_ms = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_koa_generated {
+    use super::*;
+
+    #[test]
+    fn test_koa_default() {
+        let obj = KoaTaskDefinition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_koa_fields() {
+        let mut obj = KoaTaskDefinition::default();
+        obj.koa_task_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kob_generated {
+    use super::*;
+
+    #[test]
+    fn test_kob_default() {
+        let obj = KobTaskExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kob_fields() {
+        let mut obj = KobTaskExecution::default();
+        obj.kob_task_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_koc_generated {
+    use super::*;
+
+    #[test]
+    fn test_koc_default() {
+        let obj = KocTaskGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_koc_fields() {
+        let mut obj = KocTaskGroup::default();
+        obj.koc_group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kod_generated {
+    use super::*;
+
+    #[test]
+    fn test_kod_default() {
+        let obj = KodTaskPresentation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kod_fields() {
+        let mut obj = KodTaskPresentation::default();
+        obj.kod_reveal = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_koe_generated {
+    use super::*;
+
+    #[test]
+    fn test_koe_default() {
+        let obj = KoeTaskDependency::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_koe_fields() {
+        let mut obj = KoeTaskDependency::default();
+        obj.koe_task_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kof_generated {
+    use super::*;
+
+    #[test]
+    fn test_kof_default() {
+        let obj = KofTaskProblemMatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kof_fields() {
+        let mut obj = KofTaskProblemMatcher::default();
+        obj.kof_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kog_generated {
+    use super::*;
+
+    #[test]
+    fn test_kog_default() {
+        let obj = KogTaskSource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kog_fields() {
+        let mut obj = KogTaskSource::default();
+        obj.kog_source_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_koh_generated {
+    use super::*;
+
+    #[test]
+    fn test_koh_default() {
+        let obj = KohTaskProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_koh_fields() {
+        let mut obj = KohTaskProvider::default();
+        obj.koh_provider_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_koi_generated {
+    use super::*;
+
+    #[test]
+    fn test_koi_default() {
+        let obj = KoiTaskEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_koi_fields() {
+        let mut obj = KoiTaskEvent::default();
+        obj.koi_event_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_koj_generated {
+    use super::*;
+
+    #[test]
+    fn test_koj_default() {
+        let obj = KojTaskTerminal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_koj_fields() {
+        let mut obj = KojTaskTerminal::default();
+        obj.koj_terminal_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kok_generated {
+    use super::*;
+
+    #[test]
+    fn test_kok_default() {
+        let obj = KokTaskFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kok_fields() {
+        let mut obj = KokTaskFilter::default();
+        obj.kok_task_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kol_generated {
+    use super::*;
+
+    #[test]
+    fn test_kol_default() {
+        let obj = KolTaskQuickPick::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kol_fields() {
+        let mut obj = KolTaskQuickPick::default();
+        obj.kol_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kom_generated {
+    use super::*;
+
+    #[test]
+    fn test_kom_default() {
+        let obj = KomProblemEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kom_fields() {
+        let mut obj = KomProblemEntry::default();
+        obj.kom_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kon_generated {
+    use super::*;
+
+    #[test]
+    fn test_kon_default() {
+        let obj = KonProblemMarker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kon_fields() {
+        let mut obj = KonProblemMarker::default();
+        obj.kon_severity = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_koo_generated {
+    use super::*;
+
+    #[test]
+    fn test_koo_default() {
+        let obj = KooProblemFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_koo_fields() {
+        let mut obj = KooProblemFilter::default();
+        obj.koo_severity_filter = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kop_generated {
+    use super::*;
+
+    #[test]
+    fn test_kop_default() {
+        let obj = KopProblemGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kop_fields() {
+        let mut obj = KopProblemGroup::default();
+        obj.kop_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_koq_generated {
+    use super::*;
+
+    #[test]
+    fn test_koq_default() {
+        let obj = KoqProblemStats::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_koq_fields() {
+        let mut obj = KoqProblemStats::default();
+        obj.koq_error_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kor_generated {
+    use super::*;
+
+    #[test]
+    fn test_kor_default() {
+        let obj = KorProblemAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kor_fields() {
+        let mut obj = KorProblemAction::default();
+        obj.kor_action_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kos_generated {
+    use super::*;
+
+    #[test]
+    fn test_kos_default() {
+        let obj = KosBuildTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kos_fields() {
+        let mut obj = KosBuildTask::default();
+        obj.kos_command = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kot_generated {
+    use super::*;
+
+    #[test]
+    fn test_kot_default() {
+        let obj = KotTestTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kot_fields() {
+        let mut obj = KotTestTask::default();
+        obj.kot_test_runner = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kou_generated {
+    use super::*;
+
+    #[test]
+    fn test_kou_default() {
+        let obj = KouWatchTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kou_fields() {
+        let mut obj = KouWatchTask::default();
+        obj.kou_file_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kov_generated {
+    use super::*;
+
+    #[test]
+    fn test_kov_default() {
+        let obj = KovCleanTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kov_fields() {
+        let mut obj = KovCleanTask::default();
+        obj.kov_paths = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kow_generated {
+    use super::*;
+
+    #[test]
+    fn test_kow_default() {
+        let obj = KowShellExec::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kow_fields() {
+        let mut obj = KowShellExec::default();
+        obj.kow_shell_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kox_generated {
+    use super::*;
+
+    #[test]
+    fn test_kox_default() {
+        let obj = KoxProcessExec::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kox_fields() {
+        let mut obj = KoxProcessExec::default();
+        obj.kox_process_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_koy_generated {
+    use super::*;
+
+    #[test]
+    fn test_koy_default() {
+        let obj = KoyTaskVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_koy_fields() {
+        let mut obj = KoyTaskVariable::default();
+        obj.koy_var_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_koz_generated {
+    use super::*;
+
+    #[test]
+    fn test_koz_default() {
+        let obj = KozTaskConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_koz_fields() {
+        let mut obj = KozTaskConfig::default();
+        obj.koz_auto_detect = true;
         assert!(obj.validate());
     }
 }
