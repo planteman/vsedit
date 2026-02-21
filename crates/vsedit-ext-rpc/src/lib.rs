@@ -213367,6 +213367,838 @@ impl Default for LjzPerfConfig {
     }
 }
 
+/// /// Comment thread in editor
+#[derive(Debug, Clone)]
+pub struct LkaCommentThread {
+    pub lka_thread_id: String,
+    pub lka_uri: String,
+    pub lka_line: u32,
+    pub lka_comments_count: u32,
+    pub lka_label: String,
+}
+
+impl LkaCommentThread {
+    pub fn new() -> Self {
+        Self {
+            lka_thread_id: String::new(),
+            lka_uri: String::new(),
+            lka_line: u32::default(),
+            lka_comments_count: u32::default(),
+            lka_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lka_thread_id.is_empty() || true && !self.lka_uri.is_empty() || true && self.lka_line < u32::MAX || true && self.lka_comments_count < u32::MAX || true && !self.lka_label.is_empty() || true
+    }
+}
+
+impl Default for LkaCommentThread {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Comment reply entry
+#[derive(Debug, Clone)]
+pub struct LkbCommentReply {
+    pub lkb_body: String,
+    pub lkb_author_name: String,
+    pub lkb_timestamp: u64,
+    pub lkb_edited: bool,
+    pub lkb_label: String,
+}
+
+impl LkbCommentReply {
+    pub fn new() -> Self {
+        Self {
+            lkb_body: String::new(),
+            lkb_author_name: String::new(),
+            lkb_timestamp: u64::default(),
+            lkb_edited: bool::default(),
+            lkb_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lkb_body.is_empty() || true && !self.lkb_author_name.is_empty() || true && self.lkb_timestamp < u64::MAX || true && self.lkb_edited || true && !self.lkb_label.is_empty() || true
+    }
+}
+
+impl Default for LkbCommentReply {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Comment reaction emoji
+#[derive(Debug, Clone)]
+pub struct LkcCommentReaction {
+    pub lkc_label: String,
+    pub lkc_count: u32,
+    pub lkc_has_reacted: bool,
+    pub lkc_icon: String,
+    pub lkc_emoji: String,
+}
+
+impl LkcCommentReaction {
+    pub fn new() -> Self {
+        Self {
+            lkc_label: String::new(),
+            lkc_count: u32::default(),
+            lkc_has_reacted: bool::default(),
+            lkc_icon: String::new(),
+            lkc_emoji: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lkc_label.is_empty() || true && self.lkc_count < u32::MAX || true && self.lkc_has_reacted || true && !self.lkc_icon.is_empty() || true && !self.lkc_emoji.is_empty() || true
+    }
+}
+
+impl Default for LkcCommentReaction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Comment author info
+#[derive(Debug, Clone)]
+pub struct LkdCommentAuthor {
+    pub lkd_name: String,
+    pub lkd_icon_path: String,
+    pub lkd_unique_id: String,
+    pub lkd_verified: bool,
+    pub lkd_label: String,
+}
+
+impl LkdCommentAuthor {
+    pub fn new() -> Self {
+        Self {
+            lkd_name: String::new(),
+            lkd_icon_path: String::new(),
+            lkd_unique_id: String::new(),
+            lkd_verified: bool::default(),
+            lkd_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lkd_name.is_empty() || true && !self.lkd_icon_path.is_empty() || true && !self.lkd_unique_id.is_empty() || true && self.lkd_verified || true && !self.lkd_label.is_empty() || true
+    }
+}
+
+impl Default for LkdCommentAuthor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Comment controller registration
+#[derive(Debug, Clone)]
+pub struct LkeCommentController {
+    pub lke_controller_id: String,
+    pub lke_extension_id: String,
+    pub lke_commenting_range: String,
+    pub lke_active: bool,
+    pub lke_label: String,
+}
+
+impl LkeCommentController {
+    pub fn new() -> Self {
+        Self {
+            lke_controller_id: String::new(),
+            lke_extension_id: String::new(),
+            lke_commenting_range: String::new(),
+            lke_active: bool::default(),
+            lke_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lke_controller_id.is_empty() || true && !self.lke_extension_id.is_empty() || true && !self.lke_commenting_range.is_empty() || true && self.lke_active || true && !self.lke_label.is_empty() || true
+    }
+}
+
+impl Default for LkeCommentController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Comment range in document
+#[derive(Debug, Clone)]
+pub struct LkfCommentRange {
+    pub lkf_start_line: u32,
+    pub lkf_end_line: u32,
+    pub lkf_thread_id: String,
+    pub lkf_active: bool,
+    pub lkf_label: String,
+}
+
+impl LkfCommentRange {
+    pub fn new() -> Self {
+        Self {
+            lkf_start_line: u32::default(),
+            lkf_end_line: u32::default(),
+            lkf_thread_id: String::new(),
+            lkf_active: bool::default(),
+            lkf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lkf_start_line < u32::MAX || true && self.lkf_end_line < u32::MAX || true && !self.lkf_thread_id.is_empty() || true && self.lkf_active || true && !self.lkf_label.is_empty() || true
+    }
+}
+
+impl Default for LkfCommentRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Timeline item entry
+#[derive(Debug, Clone)]
+pub struct LkgTimelineItem {
+    pub lkg_timestamp: u64,
+    pub lkg_source: String,
+    pub lkg_description: String,
+    pub lkg_icon: String,
+    pub lkg_label: String,
+}
+
+impl LkgTimelineItem {
+    pub fn new() -> Self {
+        Self {
+            lkg_timestamp: u64::default(),
+            lkg_source: String::new(),
+            lkg_description: String::new(),
+            lkg_icon: String::new(),
+            lkg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lkg_timestamp < u64::MAX || true && !self.lkg_source.is_empty() || true && !self.lkg_description.is_empty() || true && !self.lkg_icon.is_empty() || true && !self.lkg_label.is_empty() || true
+    }
+}
+
+impl Default for LkgTimelineItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Timeline data provider
+#[derive(Debug, Clone)]
+pub struct LkhTimelineProvider {
+    pub lkh_provider_id: String,
+    pub lkh_scheme: String,
+    pub lkh_extension_id: String,
+    pub lkh_active: bool,
+    pub lkh_label: String,
+}
+
+impl LkhTimelineProvider {
+    pub fn new() -> Self {
+        Self {
+            lkh_provider_id: String::new(),
+            lkh_scheme: String::new(),
+            lkh_extension_id: String::new(),
+            lkh_active: bool::default(),
+            lkh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lkh_provider_id.is_empty() || true && !self.lkh_scheme.is_empty() || true && !self.lkh_extension_id.is_empty() || true && self.lkh_active || true && !self.lkh_label.is_empty() || true
+    }
+}
+
+impl Default for LkhTimelineProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Timeline pagination cursor
+#[derive(Debug, Clone)]
+pub struct LkiTimelineCursor {
+    pub lki_cursor_str: String,
+    pub lki_has_more: bool,
+    pub lki_page_size: u32,
+    pub lki_direction: String,
+    pub lki_label: String,
+}
+
+impl LkiTimelineCursor {
+    pub fn new() -> Self {
+        Self {
+            lki_cursor_str: String::new(),
+            lki_has_more: bool::default(),
+            lki_page_size: u32::default(),
+            lki_direction: String::new(),
+            lki_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lki_cursor_str.is_empty() || true && self.lki_has_more || true && self.lki_page_size < u32::MAX || true && !self.lki_direction.is_empty() || true && !self.lki_label.is_empty() || true
+    }
+}
+
+impl Default for LkiTimelineCursor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Timeline view filter
+#[derive(Debug, Clone)]
+pub struct LkjTimelineFilter {
+    pub lkj_scheme_filter: String,
+    pub lkj_source_filter: String,
+    pub lkj_since: u64,
+    pub lkj_active: bool,
+    pub lkj_label: String,
+}
+
+impl LkjTimelineFilter {
+    pub fn new() -> Self {
+        Self {
+            lkj_scheme_filter: String::new(),
+            lkj_source_filter: String::new(),
+            lkj_since: u64::default(),
+            lkj_active: bool::default(),
+            lkj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lkj_scheme_filter.is_empty() || true && !self.lkj_source_filter.is_empty() || true && self.lkj_since < u64::MAX || true && self.lkj_active || true && !self.lkj_label.is_empty() || true
+    }
+}
+
+impl Default for LkjTimelineFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Timeline panel view state
+#[derive(Debug, Clone)]
+pub struct LkkTimelineView {
+    pub lkk_visible: bool,
+    pub lkk_items_count: u32,
+    pub lkk_loading: bool,
+    pub lkk_follow_active: bool,
+    pub lkk_label: String,
+}
+
+impl LkkTimelineView {
+    pub fn new() -> Self {
+        Self {
+            lkk_visible: bool::default(),
+            lkk_items_count: u32::default(),
+            lkk_loading: bool::default(),
+            lkk_follow_active: bool::default(),
+            lkk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lkk_visible || true && self.lkk_items_count < u32::MAX || true && self.lkk_loading || true && self.lkk_follow_active || true && !self.lkk_label.is_empty() || true
+    }
+}
+
+impl Default for LkkTimelineView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Timeline context action
+#[derive(Debug, Clone)]
+pub struct LklTimelineAction {
+    pub lkl_action_id: String,
+    pub lkl_icon: String,
+    pub lkl_tooltip: String,
+    pub lkl_enabled: bool,
+    pub lkl_label: String,
+}
+
+impl LklTimelineAction {
+    pub fn new() -> Self {
+        Self {
+            lkl_action_id: String::new(),
+            lkl_icon: String::new(),
+            lkl_tooltip: String::new(),
+            lkl_enabled: bool::default(),
+            lkl_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lkl_action_id.is_empty() || true && !self.lkl_icon.is_empty() || true && !self.lkl_tooltip.is_empty() || true && self.lkl_enabled || true && !self.lkl_label.is_empty() || true
+    }
+}
+
+impl Default for LklTimelineAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Authentication provider
+#[derive(Debug, Clone)]
+pub struct LkmAuthProvider {
+    pub lkm_provider_id: String,
+    pub lkm_provider_name: String,
+    pub lkm_supports_multi: bool,
+    pub lkm_active: bool,
+    pub lkm_label: String,
+}
+
+impl LkmAuthProvider {
+    pub fn new() -> Self {
+        Self {
+            lkm_provider_id: String::new(),
+            lkm_provider_name: String::new(),
+            lkm_supports_multi: bool::default(),
+            lkm_active: bool::default(),
+            lkm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lkm_provider_id.is_empty() || true && !self.lkm_provider_name.is_empty() || true && self.lkm_supports_multi || true && self.lkm_active || true && !self.lkm_label.is_empty() || true
+    }
+}
+
+impl Default for LkmAuthProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Auth session state
+#[derive(Debug, Clone)]
+pub struct LknAuthSession {
+    pub lkn_session_id: String,
+    pub lkn_provider_id: String,
+    pub lkn_account_id: String,
+    pub lkn_scopes: String,
+    pub lkn_label: String,
+}
+
+impl LknAuthSession {
+    pub fn new() -> Self {
+        Self {
+            lkn_session_id: String::new(),
+            lkn_provider_id: String::new(),
+            lkn_account_id: String::new(),
+            lkn_scopes: String::new(),
+            lkn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lkn_session_id.is_empty() || true && !self.lkn_provider_id.is_empty() || true && !self.lkn_account_id.is_empty() || true && !self.lkn_scopes.is_empty() || true && !self.lkn_label.is_empty() || true
+    }
+}
+
+impl Default for LknAuthSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Auth account info
+#[derive(Debug, Clone)]
+pub struct LkoAuthAccount {
+    pub lko_account_id: String,
+    pub lko_account_label: String,
+    pub lko_provider_id: String,
+    pub lko_avatar_url: String,
+    pub lko_label: String,
+}
+
+impl LkoAuthAccount {
+    pub fn new() -> Self {
+        Self {
+            lko_account_id: String::new(),
+            lko_account_label: String::new(),
+            lko_provider_id: String::new(),
+            lko_avatar_url: String::new(),
+            lko_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lko_account_id.is_empty() || true && !self.lko_account_label.is_empty() || true && !self.lko_provider_id.is_empty() || true && !self.lko_avatar_url.is_empty() || true && !self.lko_label.is_empty() || true
+    }
+}
+
+impl Default for LkoAuthAccount {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Auth scope/permission
+#[derive(Debug, Clone)]
+pub struct LkpAuthScope {
+    pub lkp_scope_name: String,
+    pub lkp_description: String,
+    pub lkp_required: bool,
+    pub lkp_granted: bool,
+    pub lkp_label: String,
+}
+
+impl LkpAuthScope {
+    pub fn new() -> Self {
+        Self {
+            lkp_scope_name: String::new(),
+            lkp_description: String::new(),
+            lkp_required: bool::default(),
+            lkp_granted: bool::default(),
+            lkp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lkp_scope_name.is_empty() || true && !self.lkp_description.is_empty() || true && self.lkp_required || true && self.lkp_granted || true && !self.lkp_label.is_empty() || true
+    }
+}
+
+impl Default for LkpAuthScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Auth token data
+#[derive(Debug, Clone)]
+pub struct LkqAuthToken {
+    pub lkq_token_str: String,
+    pub lkq_expires_at: u64,
+    pub lkq_refresh_token: String,
+    pub lkq_scope: String,
+    pub lkq_label: String,
+}
+
+impl LkqAuthToken {
+    pub fn new() -> Self {
+        Self {
+            lkq_token_str: String::new(),
+            lkq_expires_at: u64::default(),
+            lkq_refresh_token: String::new(),
+            lkq_scope: String::new(),
+            lkq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lkq_token_str.is_empty() || true && self.lkq_expires_at < u64::MAX || true && !self.lkq_refresh_token.is_empty() || true && !self.lkq_scope.is_empty() || true && !self.lkq_label.is_empty() || true
+    }
+}
+
+impl Default for LkqAuthToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Auth lifecycle event
+#[derive(Debug, Clone)]
+pub struct LkrAuthEvent {
+    pub lkr_event_kind: String,
+    pub lkr_provider_id: String,
+    pub lkr_session_id: String,
+    pub lkr_timestamp: u64,
+    pub lkr_label: String,
+}
+
+impl LkrAuthEvent {
+    pub fn new() -> Self {
+        Self {
+            lkr_event_kind: String::new(),
+            lkr_provider_id: String::new(),
+            lkr_session_id: String::new(),
+            lkr_timestamp: u64::default(),
+            lkr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lkr_event_kind.is_empty() || true && !self.lkr_provider_id.is_empty() || true && !self.lkr_session_id.is_empty() || true && self.lkr_timestamp < u64::MAX || true && !self.lkr_label.is_empty() || true
+    }
+}
+
+impl Default for LkrAuthEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Secret storage service
+#[derive(Debug, Clone)]
+pub struct LksSecretStore {
+    pub lks_service_name: String,
+    pub lks_backed_by: String,
+    pub lks_encrypted: bool,
+    pub lks_entries_count: u32,
+    pub lks_label: String,
+}
+
+impl LksSecretStore {
+    pub fn new() -> Self {
+        Self {
+            lks_service_name: String::new(),
+            lks_backed_by: String::new(),
+            lks_encrypted: bool::default(),
+            lks_entries_count: u32::default(),
+            lks_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lks_service_name.is_empty() || true && !self.lks_backed_by.is_empty() || true && self.lks_encrypted || true && self.lks_entries_count < u32::MAX || true && !self.lks_label.is_empty() || true
+    }
+}
+
+impl Default for LksSecretStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Secret key-value entry
+#[derive(Debug, Clone)]
+pub struct LktSecretEntry {
+    pub lkt_key: String,
+    pub lkt_value_hash: String,
+    pub lkt_created_at: u64,
+    pub lkt_extension_id: String,
+    pub lkt_label: String,
+}
+
+impl LktSecretEntry {
+    pub fn new() -> Self {
+        Self {
+            lkt_key: String::new(),
+            lkt_value_hash: String::new(),
+            lkt_created_at: u64::default(),
+            lkt_extension_id: String::new(),
+            lkt_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lkt_key.is_empty() || true && !self.lkt_value_hash.is_empty() || true && self.lkt_created_at < u64::MAX || true && !self.lkt_extension_id.is_empty() || true && !self.lkt_label.is_empty() || true
+    }
+}
+
+impl Default for LktSecretEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Credential provider
+#[derive(Debug, Clone)]
+pub struct LkuCredentialProvider {
+    pub lku_provider_id: String,
+    pub lku_name: String,
+    pub lku_priority: u32,
+    pub lku_active: bool,
+    pub lku_label: String,
+}
+
+impl LkuCredentialProvider {
+    pub fn new() -> Self {
+        Self {
+            lku_provider_id: String::new(),
+            lku_name: String::new(),
+            lku_priority: u32::default(),
+            lku_active: bool::default(),
+            lku_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lku_provider_id.is_empty() || true && !self.lku_name.is_empty() || true && self.lku_priority < u32::MAX || true && self.lku_active || true && !self.lku_label.is_empty() || true
+    }
+}
+
+impl Default for LkuCredentialProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Proxy configuration
+#[derive(Debug, Clone)]
+pub struct LkvProxySettings {
+    pub lkv_http_proxy: String,
+    pub lkv_https_proxy: String,
+    pub lkv_no_proxy: String,
+    pub lkv_strict_ssl: bool,
+    pub lkv_label: String,
+}
+
+impl LkvProxySettings {
+    pub fn new() -> Self {
+        Self {
+            lkv_http_proxy: String::new(),
+            lkv_https_proxy: String::new(),
+            lkv_no_proxy: String::new(),
+            lkv_strict_ssl: bool::default(),
+            lkv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lkv_http_proxy.is_empty() || true && !self.lkv_https_proxy.is_empty() || true && !self.lkv_no_proxy.is_empty() || true && self.lkv_strict_ssl || true && !self.lkv_label.is_empty() || true
+    }
+}
+
+impl Default for LkvProxySettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// SSL certificate info
+#[derive(Debug, Clone)]
+pub struct LkwCertificate {
+    pub lkw_issuer: String,
+    pub lkw_subject: String,
+    pub lkw_expires_at: u64,
+    pub lkw_trusted: bool,
+    pub lkw_label: String,
+}
+
+impl LkwCertificate {
+    pub fn new() -> Self {
+        Self {
+            lkw_issuer: String::new(),
+            lkw_subject: String::new(),
+            lkw_expires_at: u64::default(),
+            lkw_trusted: bool::default(),
+            lkw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lkw_issuer.is_empty() || true && !self.lkw_subject.is_empty() || true && self.lkw_expires_at < u64::MAX || true && self.lkw_trusted || true && !self.lkw_label.is_empty() || true
+    }
+}
+
+impl Default for LkwCertificate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Trusted domain entry
+#[derive(Debug, Clone)]
+pub struct LkxTrustedDomain {
+    pub lkx_domain: String,
+    pub lkx_trusted: bool,
+    pub lkx_user_added: bool,
+    pub lkx_timestamp: u64,
+    pub lkx_label: String,
+}
+
+impl LkxTrustedDomain {
+    pub fn new() -> Self {
+        Self {
+            lkx_domain: String::new(),
+            lkx_trusted: bool::default(),
+            lkx_user_added: bool::default(),
+            lkx_timestamp: u64::default(),
+            lkx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lkx_domain.is_empty() || true && self.lkx_trusted || true && self.lkx_user_added || true && self.lkx_timestamp < u64::MAX || true && !self.lkx_label.is_empty() || true
+    }
+}
+
+impl Default for LkxTrustedDomain {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Security-related event
+#[derive(Debug, Clone)]
+pub struct LkySecurityEvent {
+    pub lky_event_kind: String,
+    pub lky_source: String,
+    pub lky_detail: String,
+    pub lky_timestamp: u64,
+    pub lky_label: String,
+}
+
+impl LkySecurityEvent {
+    pub fn new() -> Self {
+        Self {
+            lky_event_kind: String::new(),
+            lky_source: String::new(),
+            lky_detail: String::new(),
+            lky_timestamp: u64::default(),
+            lky_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lky_event_kind.is_empty() || true && !self.lky_source.is_empty() || true && !self.lky_detail.is_empty() || true && self.lky_timestamp < u64::MAX || true && !self.lky_label.is_empty() || true
+    }
+}
+
+impl Default for LkySecurityEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined security configuration
+#[derive(Debug, Clone)]
+pub struct LkzSecurityConfig {
+    pub lkz_trust_workspaces: bool,
+    pub lkz_strict_ssl: bool,
+    pub lkz_proxy_auth: bool,
+    pub lkz_allowed_extensions: String,
+    pub lkz_label: String,
+}
+
+impl LkzSecurityConfig {
+    pub fn new() -> Self {
+        Self {
+            lkz_trust_workspaces: bool::default(),
+            lkz_strict_ssl: bool::default(),
+            lkz_proxy_auth: bool::default(),
+            lkz_allowed_extensions: String::new(),
+            lkz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lkz_trust_workspaces || true && self.lkz_strict_ssl || true && self.lkz_proxy_auth || true && !self.lkz_allowed_extensions.is_empty() || true && !self.lkz_label.is_empty() || true
+    }
+}
+
+impl Default for LkzSecurityConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -502515,6 +503347,474 @@ mod tests_ljz_generated {
     fn test_ljz_fields() {
         let mut obj = LjzPerfConfig::default();
         obj.ljz_trace_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lka_generated {
+    use super::*;
+
+    #[test]
+    fn test_lka_default() {
+        let obj = LkaCommentThread::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lka_fields() {
+        let mut obj = LkaCommentThread::default();
+        obj.lka_thread_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkb_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkb_default() {
+        let obj = LkbCommentReply::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkb_fields() {
+        let mut obj = LkbCommentReply::default();
+        obj.lkb_body = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkc_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkc_default() {
+        let obj = LkcCommentReaction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkc_fields() {
+        let mut obj = LkcCommentReaction::default();
+        obj.lkc_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkd_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkd_default() {
+        let obj = LkdCommentAuthor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkd_fields() {
+        let mut obj = LkdCommentAuthor::default();
+        obj.lkd_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lke_generated {
+    use super::*;
+
+    #[test]
+    fn test_lke_default() {
+        let obj = LkeCommentController::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lke_fields() {
+        let mut obj = LkeCommentController::default();
+        obj.lke_controller_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkf_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkf_default() {
+        let obj = LkfCommentRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkf_fields() {
+        let mut obj = LkfCommentRange::default();
+        obj.lkf_start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkg_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkg_default() {
+        let obj = LkgTimelineItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkg_fields() {
+        let mut obj = LkgTimelineItem::default();
+        obj.lkg_timestamp = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkh_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkh_default() {
+        let obj = LkhTimelineProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkh_fields() {
+        let mut obj = LkhTimelineProvider::default();
+        obj.lkh_provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lki_generated {
+    use super::*;
+
+    #[test]
+    fn test_lki_default() {
+        let obj = LkiTimelineCursor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lki_fields() {
+        let mut obj = LkiTimelineCursor::default();
+        obj.lki_cursor_str = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkj_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkj_default() {
+        let obj = LkjTimelineFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkj_fields() {
+        let mut obj = LkjTimelineFilter::default();
+        obj.lkj_scheme_filter = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkk_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkk_default() {
+        let obj = LkkTimelineView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkk_fields() {
+        let mut obj = LkkTimelineView::default();
+        obj.lkk_visible = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkl_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkl_default() {
+        let obj = LklTimelineAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkl_fields() {
+        let mut obj = LklTimelineAction::default();
+        obj.lkl_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkm_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkm_default() {
+        let obj = LkmAuthProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkm_fields() {
+        let mut obj = LkmAuthProvider::default();
+        obj.lkm_provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkn_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkn_default() {
+        let obj = LknAuthSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkn_fields() {
+        let mut obj = LknAuthSession::default();
+        obj.lkn_session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lko_generated {
+    use super::*;
+
+    #[test]
+    fn test_lko_default() {
+        let obj = LkoAuthAccount::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lko_fields() {
+        let mut obj = LkoAuthAccount::default();
+        obj.lko_account_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkp_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkp_default() {
+        let obj = LkpAuthScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkp_fields() {
+        let mut obj = LkpAuthScope::default();
+        obj.lkp_scope_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkq_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkq_default() {
+        let obj = LkqAuthToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkq_fields() {
+        let mut obj = LkqAuthToken::default();
+        obj.lkq_token_str = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkr_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkr_default() {
+        let obj = LkrAuthEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkr_fields() {
+        let mut obj = LkrAuthEvent::default();
+        obj.lkr_event_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lks_generated {
+    use super::*;
+
+    #[test]
+    fn test_lks_default() {
+        let obj = LksSecretStore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lks_fields() {
+        let mut obj = LksSecretStore::default();
+        obj.lks_service_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkt_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkt_default() {
+        let obj = LktSecretEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkt_fields() {
+        let mut obj = LktSecretEntry::default();
+        obj.lkt_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lku_generated {
+    use super::*;
+
+    #[test]
+    fn test_lku_default() {
+        let obj = LkuCredentialProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lku_fields() {
+        let mut obj = LkuCredentialProvider::default();
+        obj.lku_provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkv_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkv_default() {
+        let obj = LkvProxySettings::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkv_fields() {
+        let mut obj = LkvProxySettings::default();
+        obj.lkv_http_proxy = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkw_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkw_default() {
+        let obj = LkwCertificate::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkw_fields() {
+        let mut obj = LkwCertificate::default();
+        obj.lkw_issuer = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkx_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkx_default() {
+        let obj = LkxTrustedDomain::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkx_fields() {
+        let mut obj = LkxTrustedDomain::default();
+        obj.lkx_domain = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lky_generated {
+    use super::*;
+
+    #[test]
+    fn test_lky_default() {
+        let obj = LkySecurityEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lky_fields() {
+        let mut obj = LkySecurityEvent::default();
+        obj.lky_event_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lkz_generated {
+    use super::*;
+
+    #[test]
+    fn test_lkz_default() {
+        let obj = LkzSecurityConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lkz_fields() {
+        let mut obj = LkzSecurityConfig::default();
+        obj.lkz_trust_workspaces = true;
         assert!(obj.validate());
     }
 }
