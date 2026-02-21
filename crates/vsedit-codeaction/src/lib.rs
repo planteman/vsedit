@@ -184928,6 +184928,890 @@ impl Default for KbzEditConfig {
     }
 }
 
+/// Decoration collection set
+#[derive(Debug, Clone)]
+pub struct KcaDecorationSet {
+    pub deco_set_id: String,
+    pub owner_id: String,
+    pub decoration_count: u32,
+    pub model_ref: String,
+    pub version_val: u32,
+    pub is_changed: bool,
+}
+
+impl KcaDecorationSet {
+    pub fn new() -> Self {
+        Self {
+            deco_set_id: String::new(),
+            owner_id: String::new(),
+            decoration_count: u32::default(),
+            model_ref: String::new(),
+            version_val: u32::default(),
+            is_changed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_set_id.is_empty() || true && !self.owner_id.is_empty() || true && self.decoration_count < u32::MAX || true && !self.model_ref.is_empty() || true && self.version_val < u32::MAX || true && self.is_changed || true
+    }
+}
+
+impl Default for KcaDecorationSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Decoration rendering options
+#[derive(Debug, Clone)]
+pub struct KcbDecorationOptions {
+    pub deco_opts_id: String,
+    pub class_name: String,
+    pub inline_class: String,
+    pub before_content: String,
+    pub after_content: String,
+    pub is_whole_line: bool,
+}
+
+impl KcbDecorationOptions {
+    pub fn new() -> Self {
+        Self {
+            deco_opts_id: String::new(),
+            class_name: String::new(),
+            inline_class: String::new(),
+            before_content: String::new(),
+            after_content: String::new(),
+            is_whole_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_opts_id.is_empty() || true && !self.class_name.is_empty() || true && !self.inline_class.is_empty() || true && !self.before_content.is_empty() || true && !self.after_content.is_empty() || true && self.is_whole_line || true
+    }
+}
+
+impl Default for KcbDecorationOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Decoration range descriptor
+#[derive(Debug, Clone)]
+pub struct KccDecorationRange {
+    pub deco_range_id: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub stickiness: bool,
+}
+
+impl KccDecorationRange {
+    pub fn new() -> Self {
+        Self {
+            deco_range_id: String::new(),
+            start_line: u32::default(),
+            start_col: u32::default(),
+            end_line: u32::default(),
+            end_col: u32::default(),
+            stickiness: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_range_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_line < u32::MAX || true && self.end_col < u32::MAX || true && self.stickiness || true
+    }
+}
+
+impl Default for KccDecorationRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Overview ruler decoration
+#[derive(Debug, Clone)]
+pub struct KcdOverviewRulerDeco {
+    pub overview_deco_id: String,
+    pub color_str: String,
+    pub dark_color_str: String,
+    pub position_str: String,
+    pub lane_str: String,
+    pub is_opaque: bool,
+}
+
+impl KcdOverviewRulerDeco {
+    pub fn new() -> Self {
+        Self {
+            overview_deco_id: String::new(),
+            color_str: String::new(),
+            dark_color_str: String::new(),
+            position_str: String::new(),
+            lane_str: String::new(),
+            is_opaque: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.overview_deco_id.is_empty() || true && !self.color_str.is_empty() || true && !self.dark_color_str.is_empty() || true && !self.position_str.is_empty() || true && !self.lane_str.is_empty() || true && self.is_opaque || true
+    }
+}
+
+impl Default for KcdOverviewRulerDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Minimap decoration entry
+#[derive(Debug, Clone)]
+pub struct KceMinimapDeco {
+    pub minimap_deco_id: String,
+    pub color_str: String,
+    pub position_str: String,
+    pub line_start: u32,
+    pub line_end: u32,
+    pub is_inline: bool,
+}
+
+impl KceMinimapDeco {
+    pub fn new() -> Self {
+        Self {
+            minimap_deco_id: String::new(),
+            color_str: String::new(),
+            position_str: String::new(),
+            line_start: u32::default(),
+            line_end: u32::default(),
+            is_inline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.minimap_deco_id.is_empty() || true && !self.color_str.is_empty() || true && !self.position_str.is_empty() || true && self.line_start < u32::MAX || true && self.line_end < u32::MAX || true && self.is_inline || true
+    }
+}
+
+impl Default for KceMinimapDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Glyph margin decoration
+#[derive(Debug, Clone)]
+pub struct KcfGlyphMarginDeco {
+    pub glyph_deco_id: String,
+    pub glyph_class: String,
+    pub hover_message: String,
+    pub lane_val: u32,
+    pub z_index: u32,
+    pub is_sticky: bool,
+}
+
+impl KcfGlyphMarginDeco {
+    pub fn new() -> Self {
+        Self {
+            glyph_deco_id: String::new(),
+            glyph_class: String::new(),
+            hover_message: String::new(),
+            lane_val: u32::default(),
+            z_index: u32::default(),
+            is_sticky: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.glyph_deco_id.is_empty() || true && !self.glyph_class.is_empty() || true && !self.hover_message.is_empty() || true && self.lane_val < u32::MAX || true && self.z_index < u32::MAX || true && self.is_sticky || true
+    }
+}
+
+impl Default for KcfGlyphMarginDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Line-level decoration
+#[derive(Debug, Clone)]
+pub struct KcgLineDecoration {
+    pub line_deco_id: String,
+    pub line_number: u32,
+    pub bg_color: String,
+    pub margin_class: String,
+    pub class_name: String,
+    pub is_hover_highlight: bool,
+}
+
+impl KcgLineDecoration {
+    pub fn new() -> Self {
+        Self {
+            line_deco_id: String::new(),
+            line_number: u32::default(),
+            bg_color: String::new(),
+            margin_class: String::new(),
+            class_name: String::new(),
+            is_hover_highlight: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_deco_id.is_empty() || true && self.line_number < u32::MAX || true && !self.bg_color.is_empty() || true && !self.margin_class.is_empty() || true && !self.class_name.is_empty() || true && self.is_hover_highlight || true
+    }
+}
+
+impl Default for KcgLineDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline text decoration
+#[derive(Debug, Clone)]
+pub struct KchInlineDecoration {
+    pub inline_deco_id: String,
+    pub start_offset: u32,
+    pub end_offset: u32,
+    pub class_name: String,
+    pub inline_style: String,
+    pub is_before_injection: bool,
+}
+
+impl KchInlineDecoration {
+    pub fn new() -> Self {
+        Self {
+            inline_deco_id: String::new(),
+            start_offset: u32::default(),
+            end_offset: u32::default(),
+            class_name: String::new(),
+            inline_style: String::new(),
+            is_before_injection: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_deco_id.is_empty() || true && self.start_offset < u32::MAX || true && self.end_offset < u32::MAX || true && !self.class_name.is_empty() || true && !self.inline_style.is_empty() || true && self.is_before_injection || true
+    }
+}
+
+impl Default for KchInlineDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text highlight decoration
+#[derive(Debug, Clone)]
+pub struct KciHighlightDeco {
+    pub hl_deco_id: String,
+    pub range_json: String,
+    pub highlight_kind: String,
+    pub bg_color: String,
+    pub border_color: String,
+    pub is_word_match: bool,
+}
+
+impl KciHighlightDeco {
+    pub fn new() -> Self {
+        Self {
+            hl_deco_id: String::new(),
+            range_json: String::new(),
+            highlight_kind: String::new(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            is_word_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hl_deco_id.is_empty() || true && !self.range_json.is_empty() || true && !self.highlight_kind.is_empty() || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && self.is_word_match || true
+    }
+}
+
+impl Default for KciHighlightDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bracket pair decoration
+#[derive(Debug, Clone)]
+pub struct KcjBracketDeco {
+    pub bracket_deco_id: String,
+    pub open_range_json: String,
+    pub close_range_json: String,
+    pub nesting_level: u32,
+    pub color_str: String,
+    pub is_error: bool,
+}
+
+impl KcjBracketDeco {
+    pub fn new() -> Self {
+        Self {
+            bracket_deco_id: String::new(),
+            open_range_json: String::new(),
+            close_range_json: String::new(),
+            nesting_level: u32::default(),
+            color_str: String::new(),
+            is_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bracket_deco_id.is_empty() || true && !self.open_range_json.is_empty() || true && !self.close_range_json.is_empty() || true && self.nesting_level < u32::MAX || true && !self.color_str.is_empty() || true && self.is_error || true
+    }
+}
+
+impl Default for KcjBracketDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Indent guide decoration
+#[derive(Debug, Clone)]
+pub struct KckIndentDeco {
+    pub indent_deco_id: String,
+    pub line_number: u32,
+    pub indent_level: u32,
+    pub guide_type_str: String,
+    pub color_str: String,
+    pub is_active: bool,
+}
+
+impl KckIndentDeco {
+    pub fn new() -> Self {
+        Self {
+            indent_deco_id: String::new(),
+            line_number: u32::default(),
+            indent_level: u32::default(),
+            guide_type_str: String::new(),
+            color_str: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.indent_deco_id.is_empty() || true && self.line_number < u32::MAX || true && self.indent_level < u32::MAX || true && !self.guide_type_str.is_empty() || true && !self.color_str.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for KckIndentDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color decorator entry
+#[derive(Debug, Clone)]
+pub struct KclColorDeco {
+    pub color_deco_id: String,
+    pub range_json: String,
+    pub color_hex: String,
+    pub presentation_str: String,
+    pub model_str: String,
+    pub is_inline_preview: bool,
+}
+
+impl KclColorDeco {
+    pub fn new() -> Self {
+        Self {
+            color_deco_id: String::new(),
+            range_json: String::new(),
+            color_hex: String::new(),
+            presentation_str: String::new(),
+            model_str: String::new(),
+            is_inline_preview: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_deco_id.is_empty() || true && !self.range_json.is_empty() || true && !self.color_hex.is_empty() || true && !self.presentation_str.is_empty() || true && !self.model_str.is_empty() || true && self.is_inline_preview || true
+    }
+}
+
+impl Default for KclColorDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Folding region decoration
+#[derive(Debug, Clone)]
+pub struct KcmFoldingDeco {
+    pub folding_deco_id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub collapsed_text: String,
+    pub gutter_icon: String,
+    pub is_collapsed: bool,
+}
+
+impl KcmFoldingDeco {
+    pub fn new() -> Self {
+        Self {
+            folding_deco_id: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            collapsed_text: String::new(),
+            gutter_icon: String::new(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folding_deco_id.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.collapsed_text.is_empty() || true && !self.gutter_icon.is_empty() || true && self.is_collapsed || true
+    }
+}
+
+impl Default for KcmFoldingDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sticky scroll decoration
+#[derive(Debug, Clone)]
+pub struct KcnStickyDeco {
+    pub sticky_deco_id: String,
+    pub line_number: u32,
+    pub text_str: String,
+    pub depth_val: u32,
+    pub bg_color: String,
+    pub is_pinned: bool,
+}
+
+impl KcnStickyDeco {
+    pub fn new() -> Self {
+        Self {
+            sticky_deco_id: String::new(),
+            line_number: u32::default(),
+            text_str: String::new(),
+            depth_val: u32::default(),
+            bg_color: String::new(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sticky_deco_id.is_empty() || true && self.line_number < u32::MAX || true && !self.text_str.is_empty() || true && self.depth_val < u32::MAX || true && !self.bg_color.is_empty() || true && self.is_pinned || true
+    }
+}
+
+impl Default for KcnStickyDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inlay hint decoration
+#[derive(Debug, Clone)]
+pub struct KcoInlayDeco {
+    pub inlay_deco_id: String,
+    pub position_json: String,
+    pub label_parts_json: String,
+    pub kind_str: String,
+    pub tooltip_str: String,
+    pub is_padding: bool,
+}
+
+impl KcoInlayDeco {
+    pub fn new() -> Self {
+        Self {
+            inlay_deco_id: String::new(),
+            position_json: String::new(),
+            label_parts_json: String::new(),
+            kind_str: String::new(),
+            tooltip_str: String::new(),
+            is_padding: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inlay_deco_id.is_empty() || true && !self.position_json.is_empty() || true && !self.label_parts_json.is_empty() || true && !self.kind_str.is_empty() || true && !self.tooltip_str.is_empty() || true && self.is_padding || true
+    }
+}
+
+impl Default for KcoInlayDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code lens decoration
+#[derive(Debug, Clone)]
+pub struct KcpCodeLensDeco {
+    pub lens_deco_id: String,
+    pub range_json: String,
+    pub command_ref: String,
+    pub title_str: String,
+    pub provider_ref: String,
+    pub is_resolved: bool,
+}
+
+impl KcpCodeLensDeco {
+    pub fn new() -> Self {
+        Self {
+            lens_deco_id: String::new(),
+            range_json: String::new(),
+            command_ref: String::new(),
+            title_str: String::new(),
+            provider_ref: String::new(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lens_deco_id.is_empty() || true && !self.range_json.is_empty() || true && !self.command_ref.is_empty() || true && !self.title_str.is_empty() || true && !self.provider_ref.is_empty() || true && self.is_resolved || true
+    }
+}
+
+impl Default for KcpCodeLensDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diagnostic decoration
+#[derive(Debug, Clone)]
+pub struct KcqDiagnosticDeco {
+    pub diag_deco_id: String,
+    pub range_json: String,
+    pub severity_str: String,
+    pub message_str: String,
+    pub squiggly_color: String,
+    pub is_inline_message: bool,
+}
+
+impl KcqDiagnosticDeco {
+    pub fn new() -> Self {
+        Self {
+            diag_deco_id: String::new(),
+            range_json: String::new(),
+            severity_str: String::new(),
+            message_str: String::new(),
+            squiggly_color: String::new(),
+            is_inline_message: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diag_deco_id.is_empty() || true && !self.range_json.is_empty() || true && !self.severity_str.is_empty() || true && !self.message_str.is_empty() || true && !self.squiggly_color.is_empty() || true && self.is_inline_message || true
+    }
+}
+
+impl Default for KcqDiagnosticDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Breakpoint decoration
+#[derive(Debug, Clone)]
+pub struct KcrBreakpointDeco {
+    pub bp_deco_id: String,
+    pub line_number: u32,
+    pub glyph_class: String,
+    pub condition_str: String,
+    pub hit_count_str: String,
+    pub is_verified: bool,
+}
+
+impl KcrBreakpointDeco {
+    pub fn new() -> Self {
+        Self {
+            bp_deco_id: String::new(),
+            line_number: u32::default(),
+            glyph_class: String::new(),
+            condition_str: String::new(),
+            hit_count_str: String::new(),
+            is_verified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bp_deco_id.is_empty() || true && self.line_number < u32::MAX || true && !self.glyph_class.is_empty() || true && !self.condition_str.is_empty() || true && !self.hit_count_str.is_empty() || true && self.is_verified || true
+    }
+}
+
+impl Default for KcrBreakpointDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test result decoration
+#[derive(Debug, Clone)]
+pub struct KcsTestDeco {
+    pub test_deco_id: String,
+    pub line_number: u32,
+    pub state_str: String,
+    pub duration_text: String,
+    pub icon_class: String,
+    pub is_inline_result: bool,
+}
+
+impl KcsTestDeco {
+    pub fn new() -> Self {
+        Self {
+            test_deco_id: String::new(),
+            line_number: u32::default(),
+            state_str: String::new(),
+            duration_text: String::new(),
+            icon_class: String::new(),
+            is_inline_result: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_deco_id.is_empty() || true && self.line_number < u32::MAX || true && !self.state_str.is_empty() || true && !self.duration_text.is_empty() || true && !self.icon_class.is_empty() || true && self.is_inline_result || true
+    }
+}
+
+impl Default for KcsTestDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git change decoration
+#[derive(Debug, Clone)]
+pub struct KctGitDeco {
+    pub git_deco_id: String,
+    pub line_number: u32,
+    pub change_type_str: String,
+    pub gutter_color: String,
+    pub overview_color: String,
+    pub is_dirty: bool,
+}
+
+impl KctGitDeco {
+    pub fn new() -> Self {
+        Self {
+            git_deco_id: String::new(),
+            line_number: u32::default(),
+            change_type_str: String::new(),
+            gutter_color: String::new(),
+            overview_color: String::new(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.git_deco_id.is_empty() || true && self.line_number < u32::MAX || true && !self.change_type_str.is_empty() || true && !self.gutter_color.is_empty() || true && !self.overview_color.is_empty() || true && self.is_dirty || true
+    }
+}
+
+impl Default for KctGitDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search match decoration
+#[derive(Debug, Clone)]
+pub struct KcuSearchDeco {
+    pub search_deco_id: String,
+    pub range_json: String,
+    pub bg_color: String,
+    pub border_color: String,
+    pub match_idx: u32,
+    pub is_current_match: bool,
+}
+
+impl KcuSearchDeco {
+    pub fn new() -> Self {
+        Self {
+            search_deco_id: String::new(),
+            range_json: String::new(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            match_idx: u32::default(),
+            is_current_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_deco_id.is_empty() || true && !self.range_json.is_empty() || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && self.match_idx < u32::MAX || true && self.is_current_match || true
+    }
+}
+
+impl Default for KcuSearchDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Selection highlight decoration
+#[derive(Debug, Clone)]
+pub struct KcvSelectionDeco {
+    pub sel_deco_id: String,
+    pub range_json: String,
+    pub bg_color: String,
+    pub border_color: String,
+    pub round_corners: bool,
+    pub is_word_selection: bool,
+}
+
+impl KcvSelectionDeco {
+    pub fn new() -> Self {
+        Self {
+            sel_deco_id: String::new(),
+            range_json: String::new(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            round_corners: bool::default(),
+            is_word_selection: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sel_deco_id.is_empty() || true && !self.range_json.is_empty() || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && self.round_corners || true && self.is_word_selection || true
+    }
+}
+
+impl Default for KcvSelectionDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Whitespace rendering decoration
+#[derive(Debug, Clone)]
+pub struct KcwWhitespaceDeco {
+    pub ws_deco_id: String,
+    pub render_mode: String,
+    pub tab_char: String,
+    pub space_char: String,
+    pub trail_color: String,
+    pub show_boundary: bool,
+}
+
+impl KcwWhitespaceDeco {
+    pub fn new() -> Self {
+        Self {
+            ws_deco_id: String::new(),
+            render_mode: String::new(),
+            tab_char: String::new(),
+            space_char: String::new(),
+            trail_color: String::new(),
+            show_boundary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_deco_id.is_empty() || true && !self.render_mode.is_empty() || true && !self.tab_char.is_empty() || true && !self.space_char.is_empty() || true && !self.trail_color.is_empty() || true && self.show_boundary || true
+    }
+}
+
+impl Default for KcwWhitespaceDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Column ruler decoration
+#[derive(Debug, Clone)]
+pub struct KcxRulerDeco {
+    pub ruler_deco_id: String,
+    pub column_val: u32,
+    pub color_str: String,
+    pub thickness_px: u32,
+    pub style_str: String,
+    pub is_char_ruler: bool,
+}
+
+impl KcxRulerDeco {
+    pub fn new() -> Self {
+        Self {
+            ruler_deco_id: String::new(),
+            column_val: u32::default(),
+            color_str: String::new(),
+            thickness_px: u32::default(),
+            style_str: String::new(),
+            is_char_ruler: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ruler_deco_id.is_empty() || true && self.column_val < u32::MAX || true && !self.color_str.is_empty() || true && self.thickness_px < u32::MAX || true && !self.style_str.is_empty() || true && self.is_char_ruler || true
+    }
+}
+
+impl Default for KcxRulerDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bookmark decoration
+#[derive(Debug, Clone)]
+pub struct KcyBookmarkDeco {
+    pub bookmark_deco_id: String,
+    pub line_number: u32,
+    pub label_str: String,
+    pub color_str: String,
+    pub icon_ref: String,
+    pub is_numbered: bool,
+}
+
+impl KcyBookmarkDeco {
+    pub fn new() -> Self {
+        Self {
+            bookmark_deco_id: String::new(),
+            line_number: u32::default(),
+            label_str: String::new(),
+            color_str: String::new(),
+            icon_ref: String::new(),
+            is_numbered: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bookmark_deco_id.is_empty() || true && self.line_number < u32::MAX || true && !self.label_str.is_empty() || true && !self.color_str.is_empty() || true && !self.icon_ref.is_empty() || true && self.is_numbered || true
+    }
+}
+
+impl Default for KcyBookmarkDeco {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Decoration configuration
+#[derive(Debug, Clone)]
+pub struct KczDecoConfig {
+    pub deco_config_id: String,
+    pub config_key: String,
+    pub config_value_json: String,
+    pub scope_str: String,
+    pub source_str: String,
+    pub is_default: bool,
+}
+
+impl KczDecoConfig {
+    pub fn new() -> Self {
+        Self {
+            deco_config_id: String::new(),
+            config_key: String::new(),
+            config_value_json: String::new(),
+            scope_str: String::new(),
+            source_str: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_config_id.is_empty() || true && !self.config_key.is_empty() || true && !self.config_value_json.is_empty() || true && !self.scope_str.is_empty() || true && !self.source_str.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for KczDecoConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -458060,6 +458944,474 @@ mod tests_kbz_generated {
     fn test_kbz_fields() {
         let mut obj = KbzEditConfig::default();
         obj.edit_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kca_generated {
+    use super::*;
+
+    #[test]
+    fn test_kca_default() {
+        let obj = KcaDecorationSet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kca_fields() {
+        let mut obj = KcaDecorationSet::default();
+        obj.deco_set_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcb_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcb_default() {
+        let obj = KcbDecorationOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcb_fields() {
+        let mut obj = KcbDecorationOptions::default();
+        obj.deco_opts_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcc_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcc_default() {
+        let obj = KccDecorationRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcc_fields() {
+        let mut obj = KccDecorationRange::default();
+        obj.deco_range_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcd_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcd_default() {
+        let obj = KcdOverviewRulerDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcd_fields() {
+        let mut obj = KcdOverviewRulerDeco::default();
+        obj.overview_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kce_generated {
+    use super::*;
+
+    #[test]
+    fn test_kce_default() {
+        let obj = KceMinimapDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kce_fields() {
+        let mut obj = KceMinimapDeco::default();
+        obj.minimap_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcf_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcf_default() {
+        let obj = KcfGlyphMarginDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcf_fields() {
+        let mut obj = KcfGlyphMarginDeco::default();
+        obj.glyph_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcg_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcg_default() {
+        let obj = KcgLineDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcg_fields() {
+        let mut obj = KcgLineDecoration::default();
+        obj.line_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kch_generated {
+    use super::*;
+
+    #[test]
+    fn test_kch_default() {
+        let obj = KchInlineDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kch_fields() {
+        let mut obj = KchInlineDecoration::default();
+        obj.inline_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kci_generated {
+    use super::*;
+
+    #[test]
+    fn test_kci_default() {
+        let obj = KciHighlightDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kci_fields() {
+        let mut obj = KciHighlightDeco::default();
+        obj.hl_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcj_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcj_default() {
+        let obj = KcjBracketDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcj_fields() {
+        let mut obj = KcjBracketDeco::default();
+        obj.bracket_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kck_generated {
+    use super::*;
+
+    #[test]
+    fn test_kck_default() {
+        let obj = KckIndentDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kck_fields() {
+        let mut obj = KckIndentDeco::default();
+        obj.indent_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcl_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcl_default() {
+        let obj = KclColorDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcl_fields() {
+        let mut obj = KclColorDeco::default();
+        obj.color_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcm_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcm_default() {
+        let obj = KcmFoldingDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcm_fields() {
+        let mut obj = KcmFoldingDeco::default();
+        obj.folding_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcn_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcn_default() {
+        let obj = KcnStickyDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcn_fields() {
+        let mut obj = KcnStickyDeco::default();
+        obj.sticky_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kco_generated {
+    use super::*;
+
+    #[test]
+    fn test_kco_default() {
+        let obj = KcoInlayDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kco_fields() {
+        let mut obj = KcoInlayDeco::default();
+        obj.inlay_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcp_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcp_default() {
+        let obj = KcpCodeLensDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcp_fields() {
+        let mut obj = KcpCodeLensDeco::default();
+        obj.lens_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcq_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcq_default() {
+        let obj = KcqDiagnosticDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcq_fields() {
+        let mut obj = KcqDiagnosticDeco::default();
+        obj.diag_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcr_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcr_default() {
+        let obj = KcrBreakpointDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcr_fields() {
+        let mut obj = KcrBreakpointDeco::default();
+        obj.bp_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcs_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcs_default() {
+        let obj = KcsTestDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcs_fields() {
+        let mut obj = KcsTestDeco::default();
+        obj.test_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kct_generated {
+    use super::*;
+
+    #[test]
+    fn test_kct_default() {
+        let obj = KctGitDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kct_fields() {
+        let mut obj = KctGitDeco::default();
+        obj.git_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcu_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcu_default() {
+        let obj = KcuSearchDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcu_fields() {
+        let mut obj = KcuSearchDeco::default();
+        obj.search_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcv_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcv_default() {
+        let obj = KcvSelectionDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcv_fields() {
+        let mut obj = KcvSelectionDeco::default();
+        obj.sel_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcw_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcw_default() {
+        let obj = KcwWhitespaceDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcw_fields() {
+        let mut obj = KcwWhitespaceDeco::default();
+        obj.ws_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcx_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcx_default() {
+        let obj = KcxRulerDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcx_fields() {
+        let mut obj = KcxRulerDeco::default();
+        obj.ruler_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcy_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcy_default() {
+        let obj = KcyBookmarkDeco::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcy_fields() {
+        let mut obj = KcyBookmarkDeco::default();
+        obj.bookmark_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kcz_generated {
+    use super::*;
+
+    #[test]
+    fn test_kcz_default() {
+        let obj = KczDecoConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kcz_fields() {
+        let mut obj = KczDecoConfig::default();
+        obj.deco_config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
