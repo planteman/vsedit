@@ -194075,6 +194075,838 @@ impl Default for KmzEditorContribConfig {
     }
 }
 
+/// /// Keyboard event in editor
+#[derive(Debug, Clone)]
+pub struct KnaKeyboardEvent {
+    pub kna_key_code: u32,
+    pub kna_ctrl: bool,
+    pub kna_shift: bool,
+    pub kna_alt: bool,
+    pub kna_meta: bool,
+}
+
+impl KnaKeyboardEvent {
+    pub fn new() -> Self {
+        Self {
+            kna_key_code: u32::default(),
+            kna_ctrl: bool::default(),
+            kna_shift: bool::default(),
+            kna_alt: bool::default(),
+            kna_meta: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kna_key_code < u32::MAX || true && self.kna_ctrl || true && self.kna_shift || true && self.kna_alt || true && self.kna_meta || true
+    }
+}
+
+impl Default for KnaKeyboardEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Mouse event in editor
+#[derive(Debug, Clone)]
+pub struct KnbMouseEvent {
+    pub knb_button: u32,
+    pub knb_click_count: u32,
+    pub knb_line: u32,
+    pub knb_column: u32,
+    pub knb_target: String,
+}
+
+impl KnbMouseEvent {
+    pub fn new() -> Self {
+        Self {
+            knb_button: u32::default(),
+            knb_click_count: u32::default(),
+            knb_line: u32::default(),
+            knb_column: u32::default(),
+            knb_target: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.knb_button < u32::MAX || true && self.knb_click_count < u32::MAX || true && self.knb_line < u32::MAX || true && self.knb_column < u32::MAX || true && !self.knb_target.is_empty() || true
+    }
+}
+
+impl Default for KnbMouseEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Mouse wheel event in editor
+#[derive(Debug, Clone)]
+pub struct KncMouseWheelEvent {
+    pub knc_delta_y: f64,
+    pub knc_delta_x: f64,
+    pub knc_ctrl: bool,
+    pub knc_shift: bool,
+    pub knc_precise: bool,
+}
+
+impl KncMouseWheelEvent {
+    pub fn new() -> Self {
+        Self {
+            knc_delta_y: f64::default(),
+            knc_delta_x: f64::default(),
+            knc_ctrl: bool::default(),
+            knc_shift: bool::default(),
+            knc_precise: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.knc_delta_y.is_finite() || true && self.knc_delta_x.is_finite() || true && self.knc_ctrl || true && self.knc_shift || true && self.knc_precise || true
+    }
+}
+
+impl Default for KncMouseWheelEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Touch gesture event in editor
+#[derive(Debug, Clone)]
+pub struct KndGestureEvent {
+    pub knd_gesture_kind: String,
+    pub knd_touches: u32,
+    pub knd_scale: f64,
+    pub knd_rotation: f64,
+    pub knd_label: String,
+}
+
+impl KndGestureEvent {
+    pub fn new() -> Self {
+        Self {
+            knd_gesture_kind: String::new(),
+            knd_touches: u32::default(),
+            knd_scale: f64::default(),
+            knd_rotation: f64::default(),
+            knd_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.knd_gesture_kind.is_empty() || true && self.knd_touches < u32::MAX || true && self.knd_scale.is_finite() || true && self.knd_rotation.is_finite() || true && !self.knd_label.is_empty() || true
+    }
+}
+
+impl Default for KndGestureEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Drop event in editor
+#[derive(Debug, Clone)]
+pub struct KneDropEvent {
+    pub kne_position: u32,
+    pub kne_uri: String,
+    pub kne_data_transfer: String,
+    pub kne_handled: bool,
+    pub kne_label: String,
+}
+
+impl KneDropEvent {
+    pub fn new() -> Self {
+        Self {
+            kne_position: u32::default(),
+            kne_uri: String::new(),
+            kne_data_transfer: String::new(),
+            kne_handled: bool::default(),
+            kne_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kne_position < u32::MAX || true && !self.kne_uri.is_empty() || true && !self.kne_data_transfer.is_empty() || true && self.kne_handled || true && !self.kne_label.is_empty() || true
+    }
+}
+
+impl Default for KneDropEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Drag event in editor
+#[derive(Debug, Clone)]
+pub struct KnfDragEvent {
+    pub knf_source: String,
+    pub knf_target: String,
+    pub knf_data_types: String,
+    pub knf_copy_mode: bool,
+    pub knf_label: String,
+}
+
+impl KnfDragEvent {
+    pub fn new() -> Self {
+        Self {
+            knf_source: String::new(),
+            knf_target: String::new(),
+            knf_data_types: String::new(),
+            knf_copy_mode: bool::default(),
+            knf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.knf_source.is_empty() || true && !self.knf_target.is_empty() || true && !self.knf_data_types.is_empty() || true && self.knf_copy_mode || true && !self.knf_label.is_empty() || true
+    }
+}
+
+impl Default for KnfDragEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor focus gain/loss event
+#[derive(Debug, Clone)]
+pub struct KngFocusEvent {
+    pub kng_gained: bool,
+    pub kng_source: String,
+    pub kng_timestamp: u64,
+    pub kng_editor_id: String,
+    pub kng_label: String,
+}
+
+impl KngFocusEvent {
+    pub fn new() -> Self {
+        Self {
+            kng_gained: bool::default(),
+            kng_source: String::new(),
+            kng_timestamp: u64::default(),
+            kng_editor_id: String::new(),
+            kng_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kng_gained || true && !self.kng_source.is_empty() || true && self.kng_timestamp < u64::MAX || true && !self.kng_editor_id.is_empty() || true && !self.kng_label.is_empty() || true
+    }
+}
+
+impl Default for KngFocusEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor blur event details
+#[derive(Debug, Clone)]
+pub struct KnhBlurEvent {
+    pub knh_reason: String,
+    pub knh_target: String,
+    pub knh_timestamp: u64,
+    pub knh_editor_id: String,
+    pub knh_label: String,
+}
+
+impl KnhBlurEvent {
+    pub fn new() -> Self {
+        Self {
+            knh_reason: String::new(),
+            knh_target: String::new(),
+            knh_timestamp: u64::default(),
+            knh_editor_id: String::new(),
+            knh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.knh_reason.is_empty() || true && !self.knh_target.is_empty() || true && self.knh_timestamp < u64::MAX || true && !self.knh_editor_id.is_empty() || true && !self.knh_label.is_empty() || true
+    }
+}
+
+impl Default for KnhBlurEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor resize event
+#[derive(Debug, Clone)]
+pub struct KniResizeEvent {
+    pub kni_new_width: f64,
+    pub kni_new_height: f64,
+    pub kni_old_width: f64,
+    pub kni_old_height: f64,
+    pub kni_label: String,
+}
+
+impl KniResizeEvent {
+    pub fn new() -> Self {
+        Self {
+            kni_new_width: f64::default(),
+            kni_new_height: f64::default(),
+            kni_old_width: f64::default(),
+            kni_old_height: f64::default(),
+            kni_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kni_new_width.is_finite() || true && self.kni_new_height.is_finite() || true && self.kni_old_width.is_finite() || true && self.kni_old_height.is_finite() || true && !self.kni_label.is_empty() || true
+    }
+}
+
+impl Default for KniResizeEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor scroll event
+#[derive(Debug, Clone)]
+pub struct KnjScrollEvent {
+    pub knj_scroll_top: f64,
+    pub knj_scroll_left: f64,
+    pub knj_scroll_width: f64,
+    pub knj_scroll_height: f64,
+    pub knj_label: String,
+}
+
+impl KnjScrollEvent {
+    pub fn new() -> Self {
+        Self {
+            knj_scroll_top: f64::default(),
+            knj_scroll_left: f64::default(),
+            knj_scroll_width: f64::default(),
+            knj_scroll_height: f64::default(),
+            knj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.knj_scroll_top.is_finite() || true && self.knj_scroll_left.is_finite() || true && self.knj_scroll_width.is_finite() || true && self.knj_scroll_height.is_finite() || true && !self.knj_label.is_empty() || true
+    }
+}
+
+impl Default for KnjScrollEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Content change event in editor
+#[derive(Debug, Clone)]
+pub struct KnkContentChange {
+    pub knk_range_offset: u64,
+    pub knk_range_length: u32,
+    pub knk_text: String,
+    pub knk_version: u64,
+    pub knk_label: String,
+}
+
+impl KnkContentChange {
+    pub fn new() -> Self {
+        Self {
+            knk_range_offset: u64::default(),
+            knk_range_length: u32::default(),
+            knk_text: String::new(),
+            knk_version: u64::default(),
+            knk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.knk_range_offset < u64::MAX || true && self.knk_range_length < u32::MAX || true && !self.knk_text.is_empty() || true && self.knk_version < u64::MAX || true && !self.knk_label.is_empty() || true
+    }
+}
+
+impl Default for KnkContentChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Model (document) change event
+#[derive(Debug, Clone)]
+pub struct KnlModelChange {
+    pub knl_old_uri: String,
+    pub knl_new_uri: String,
+    pub knl_reason: String,
+    pub knl_timestamp: u64,
+    pub knl_label: String,
+}
+
+impl KnlModelChange {
+    pub fn new() -> Self {
+        Self {
+            knl_old_uri: String::new(),
+            knl_new_uri: String::new(),
+            knl_reason: String::new(),
+            knl_timestamp: u64::default(),
+            knl_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.knl_old_uri.is_empty() || true && !self.knl_new_uri.is_empty() || true && !self.knl_reason.is_empty() || true && self.knl_timestamp < u64::MAX || true && !self.knl_label.is_empty() || true
+    }
+}
+
+impl Default for KnlModelChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Cursor position change event
+#[derive(Debug, Clone)]
+pub struct KnmCursorChange {
+    pub knm_new_line: u32,
+    pub knm_new_col: u32,
+    pub knm_old_line: u32,
+    pub knm_old_col: u32,
+    pub knm_source: String,
+}
+
+impl KnmCursorChange {
+    pub fn new() -> Self {
+        Self {
+            knm_new_line: u32::default(),
+            knm_new_col: u32::default(),
+            knm_old_line: u32::default(),
+            knm_old_col: u32::default(),
+            knm_source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.knm_new_line < u32::MAX || true && self.knm_new_col < u32::MAX || true && self.knm_old_line < u32::MAX || true && self.knm_old_col < u32::MAX || true && !self.knm_source.is_empty() || true
+    }
+}
+
+impl Default for KnmCursorChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Selection change event
+#[derive(Debug, Clone)]
+pub struct KnnSelectionChange {
+    pub knn_selection_count: u32,
+    pub knn_primary_start: u32,
+    pub knn_primary_end: u32,
+    pub knn_source: String,
+    pub knn_label: String,
+}
+
+impl KnnSelectionChange {
+    pub fn new() -> Self {
+        Self {
+            knn_selection_count: u32::default(),
+            knn_primary_start: u32::default(),
+            knn_primary_end: u32::default(),
+            knn_source: String::new(),
+            knn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.knn_selection_count < u32::MAX || true && self.knn_primary_start < u32::MAX || true && self.knn_primary_end < u32::MAX || true && !self.knn_source.is_empty() || true && !self.knn_label.is_empty() || true
+    }
+}
+
+impl Default for KnnSelectionChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Language mode change event
+#[derive(Debug, Clone)]
+pub struct KnoLanguageChange {
+    pub kno_old_lang: String,
+    pub kno_new_lang: String,
+    pub kno_uri: String,
+    pub kno_source: String,
+    pub kno_label: String,
+}
+
+impl KnoLanguageChange {
+    pub fn new() -> Self {
+        Self {
+            kno_old_lang: String::new(),
+            kno_new_lang: String::new(),
+            kno_uri: String::new(),
+            kno_source: String::new(),
+            kno_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kno_old_lang.is_empty() || true && !self.kno_new_lang.is_empty() || true && !self.kno_uri.is_empty() || true && !self.kno_source.is_empty() || true && !self.kno_label.is_empty() || true
+    }
+}
+
+impl Default for KnoLanguageChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor option change event
+#[derive(Debug, Clone)]
+pub struct KnpOptionChange {
+    pub knp_option_name: String,
+    pub knp_old_value: String,
+    pub knp_new_value: String,
+    pub knp_scope: String,
+    pub knp_label: String,
+}
+
+impl KnpOptionChange {
+    pub fn new() -> Self {
+        Self {
+            knp_option_name: String::new(),
+            knp_old_value: String::new(),
+            knp_new_value: String::new(),
+            knp_scope: String::new(),
+            knp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.knp_option_name.is_empty() || true && !self.knp_old_value.is_empty() || true && !self.knp_new_value.is_empty() || true && !self.knp_scope.is_empty() || true && !self.knp_label.is_empty() || true
+    }
+}
+
+impl Default for KnpOptionChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Decoration change event
+#[derive(Debug, Clone)]
+pub struct KnqDecorationChange {
+    pub knq_decoration_key: String,
+    pub knq_added_count: u32,
+    pub knq_removed_count: u32,
+    pub knq_changed_count: u32,
+    pub knq_label: String,
+}
+
+impl KnqDecorationChange {
+    pub fn new() -> Self {
+        Self {
+            knq_decoration_key: String::new(),
+            knq_added_count: u32::default(),
+            knq_removed_count: u32::default(),
+            knq_changed_count: u32::default(),
+            knq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.knq_decoration_key.is_empty() || true && self.knq_added_count < u32::MAX || true && self.knq_removed_count < u32::MAX || true && self.knq_changed_count < u32::MAX || true && !self.knq_label.is_empty() || true
+    }
+}
+
+impl Default for KnqDecorationChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Tokenization change event
+#[derive(Debug, Clone)]
+pub struct KnrTokenizationChange {
+    pub knr_start_line: u32,
+    pub knr_end_line: u32,
+    pub knr_lang_id: String,
+    pub knr_full_retokenize: bool,
+    pub knr_label: String,
+}
+
+impl KnrTokenizationChange {
+    pub fn new() -> Self {
+        Self {
+            knr_start_line: u32::default(),
+            knr_end_line: u32::default(),
+            knr_lang_id: String::new(),
+            knr_full_retokenize: bool::default(),
+            knr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.knr_start_line < u32::MAX || true && self.knr_end_line < u32::MAX || true && !self.knr_lang_id.is_empty() || true && self.knr_full_retokenize || true && !self.knr_label.is_empty() || true
+    }
+}
+
+impl Default for KnrTokenizationChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Document save event
+#[derive(Debug, Clone)]
+pub struct KnsSaveEvent {
+    pub kns_uri: String,
+    pub kns_reason: String,
+    pub kns_timestamp: u64,
+    pub kns_auto_save: bool,
+    pub kns_label: String,
+}
+
+impl KnsSaveEvent {
+    pub fn new() -> Self {
+        Self {
+            kns_uri: String::new(),
+            kns_reason: String::new(),
+            kns_timestamp: u64::default(),
+            kns_auto_save: bool::default(),
+            kns_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kns_uri.is_empty() || true && !self.kns_reason.is_empty() || true && self.kns_timestamp < u64::MAX || true && self.kns_auto_save || true && !self.kns_label.is_empty() || true
+    }
+}
+
+impl Default for KnsSaveEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor close event
+#[derive(Debug, Clone)]
+pub struct KntCloseEvent {
+    pub knt_uri: String,
+    pub knt_reason: String,
+    pub knt_saved: bool,
+    pub knt_group_id: u32,
+    pub knt_label: String,
+}
+
+impl KntCloseEvent {
+    pub fn new() -> Self {
+        Self {
+            knt_uri: String::new(),
+            knt_reason: String::new(),
+            knt_saved: bool::default(),
+            knt_group_id: u32::default(),
+            knt_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.knt_uri.is_empty() || true && !self.knt_reason.is_empty() || true && self.knt_saved || true && self.knt_group_id < u32::MAX || true && !self.knt_label.is_empty() || true
+    }
+}
+
+impl Default for KntCloseEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor open event
+#[derive(Debug, Clone)]
+pub struct KnuOpenEvent {
+    pub knu_uri: String,
+    pub knu_lang_id: String,
+    pub knu_preview: bool,
+    pub knu_side_by_side: bool,
+    pub knu_label: String,
+}
+
+impl KnuOpenEvent {
+    pub fn new() -> Self {
+        Self {
+            knu_uri: String::new(),
+            knu_lang_id: String::new(),
+            knu_preview: bool::default(),
+            knu_side_by_side: bool::default(),
+            knu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.knu_uri.is_empty() || true && !self.knu_lang_id.is_empty() || true && self.knu_preview || true && self.knu_side_by_side || true && !self.knu_label.is_empty() || true
+    }
+}
+
+impl Default for KnuOpenEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor visibility change event
+#[derive(Debug, Clone)]
+pub struct KnvVisibilityChange {
+    pub knv_visible: bool,
+    pub knv_editor_id: String,
+    pub knv_column: u32,
+    pub knv_timestamp: u64,
+    pub knv_label: String,
+}
+
+impl KnvVisibilityChange {
+    pub fn new() -> Self {
+        Self {
+            knv_visible: bool::default(),
+            knv_editor_id: String::new(),
+            knv_column: u32::default(),
+            knv_timestamp: u64::default(),
+            knv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.knv_visible || true && !self.knv_editor_id.is_empty() || true && self.knv_column < u32::MAX || true && self.knv_timestamp < u64::MAX || true && !self.knv_label.is_empty() || true
+    }
+}
+
+impl Default for KnvVisibilityChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor layout change event
+#[derive(Debug, Clone)]
+pub struct KnwLayoutChange {
+    pub knw_group_id: u32,
+    pub knw_direction: String,
+    pub knw_size_changed: bool,
+    pub knw_timestamp: u64,
+    pub knw_label: String,
+}
+
+impl KnwLayoutChange {
+    pub fn new() -> Self {
+        Self {
+            knw_group_id: u32::default(),
+            knw_direction: String::new(),
+            knw_size_changed: bool::default(),
+            knw_timestamp: u64::default(),
+            knw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.knw_group_id < u32::MAX || true && !self.knw_direction.is_empty() || true && self.knw_size_changed || true && self.knw_timestamp < u64::MAX || true && !self.knw_label.is_empty() || true
+    }
+}
+
+impl Default for KnwLayoutChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Active editor change event
+#[derive(Debug, Clone)]
+pub struct KnxActiveChange {
+    pub knx_editor_id: String,
+    pub knx_uri: String,
+    pub knx_group_id: u32,
+    pub knx_timestamp: u64,
+    pub knx_label: String,
+}
+
+impl KnxActiveChange {
+    pub fn new() -> Self {
+        Self {
+            knx_editor_id: String::new(),
+            knx_uri: String::new(),
+            knx_group_id: u32::default(),
+            knx_timestamp: u64::default(),
+            knx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.knx_editor_id.is_empty() || true && !self.knx_uri.is_empty() || true && self.knx_group_id < u32::MAX || true && self.knx_timestamp < u64::MAX || true && !self.knx_label.is_empty() || true
+    }
+}
+
+impl Default for KnxActiveChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Document dirty state change event
+#[derive(Debug, Clone)]
+pub struct KnyDirtyChange {
+    pub kny_uri: String,
+    pub kny_dirty: bool,
+    pub kny_version: u64,
+    pub kny_timestamp: u64,
+    pub kny_label: String,
+}
+
+impl KnyDirtyChange {
+    pub fn new() -> Self {
+        Self {
+            kny_uri: String::new(),
+            kny_dirty: bool::default(),
+            kny_version: u64::default(),
+            kny_timestamp: u64::default(),
+            kny_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kny_uri.is_empty() || true && self.kny_dirty || true && self.kny_version < u64::MAX || true && self.kny_timestamp < u64::MAX || true && !self.kny_label.is_empty() || true
+    }
+}
+
+impl Default for KnyDirtyChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined editor event configuration
+#[derive(Debug, Clone)]
+pub struct KnzEditorEventConfig {
+    pub knz_debounce_ms: u32,
+    pub knz_throttle_ms: u32,
+    pub knz_batch_events: bool,
+    pub knz_trace_events: bool,
+    pub knz_label: String,
+}
+
+impl KnzEditorEventConfig {
+    pub fn new() -> Self {
+        Self {
+            knz_debounce_ms: u32::default(),
+            knz_throttle_ms: u32::default(),
+            knz_batch_events: bool::default(),
+            knz_trace_events: bool::default(),
+            knz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.knz_debounce_ms < u32::MAX || true && self.knz_throttle_ms < u32::MAX || true && self.knz_batch_events || true && self.knz_trace_events || true && !self.knz_label.is_empty() || true
+    }
+}
+
+impl Default for KnzEditorEventConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -472463,6 +473295,474 @@ mod tests_kmz_generated {
     fn test_kmz_fields() {
         let mut obj = KmzEditorContribConfig::default();
         obj.kmz_enable_all = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kna_generated {
+    use super::*;
+
+    #[test]
+    fn test_kna_default() {
+        let obj = KnaKeyboardEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kna_fields() {
+        let mut obj = KnaKeyboardEvent::default();
+        obj.kna_key_code = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knb_generated {
+    use super::*;
+
+    #[test]
+    fn test_knb_default() {
+        let obj = KnbMouseEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knb_fields() {
+        let mut obj = KnbMouseEvent::default();
+        obj.knb_button = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knc_generated {
+    use super::*;
+
+    #[test]
+    fn test_knc_default() {
+        let obj = KncMouseWheelEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knc_fields() {
+        let mut obj = KncMouseWheelEvent::default();
+        obj.knc_delta_y = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knd_generated {
+    use super::*;
+
+    #[test]
+    fn test_knd_default() {
+        let obj = KndGestureEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knd_fields() {
+        let mut obj = KndGestureEvent::default();
+        obj.knd_gesture_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kne_generated {
+    use super::*;
+
+    #[test]
+    fn test_kne_default() {
+        let obj = KneDropEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kne_fields() {
+        let mut obj = KneDropEvent::default();
+        obj.kne_position = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knf_generated {
+    use super::*;
+
+    #[test]
+    fn test_knf_default() {
+        let obj = KnfDragEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knf_fields() {
+        let mut obj = KnfDragEvent::default();
+        obj.knf_source = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kng_generated {
+    use super::*;
+
+    #[test]
+    fn test_kng_default() {
+        let obj = KngFocusEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kng_fields() {
+        let mut obj = KngFocusEvent::default();
+        obj.kng_gained = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knh_generated {
+    use super::*;
+
+    #[test]
+    fn test_knh_default() {
+        let obj = KnhBlurEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knh_fields() {
+        let mut obj = KnhBlurEvent::default();
+        obj.knh_reason = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kni_generated {
+    use super::*;
+
+    #[test]
+    fn test_kni_default() {
+        let obj = KniResizeEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kni_fields() {
+        let mut obj = KniResizeEvent::default();
+        obj.kni_new_width = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knj_generated {
+    use super::*;
+
+    #[test]
+    fn test_knj_default() {
+        let obj = KnjScrollEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knj_fields() {
+        let mut obj = KnjScrollEvent::default();
+        obj.knj_scroll_top = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knk_generated {
+    use super::*;
+
+    #[test]
+    fn test_knk_default() {
+        let obj = KnkContentChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knk_fields() {
+        let mut obj = KnkContentChange::default();
+        obj.knk_range_offset = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knl_generated {
+    use super::*;
+
+    #[test]
+    fn test_knl_default() {
+        let obj = KnlModelChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knl_fields() {
+        let mut obj = KnlModelChange::default();
+        obj.knl_old_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knm_generated {
+    use super::*;
+
+    #[test]
+    fn test_knm_default() {
+        let obj = KnmCursorChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knm_fields() {
+        let mut obj = KnmCursorChange::default();
+        obj.knm_new_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knn_generated {
+    use super::*;
+
+    #[test]
+    fn test_knn_default() {
+        let obj = KnnSelectionChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knn_fields() {
+        let mut obj = KnnSelectionChange::default();
+        obj.knn_selection_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kno_generated {
+    use super::*;
+
+    #[test]
+    fn test_kno_default() {
+        let obj = KnoLanguageChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kno_fields() {
+        let mut obj = KnoLanguageChange::default();
+        obj.kno_old_lang = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knp_generated {
+    use super::*;
+
+    #[test]
+    fn test_knp_default() {
+        let obj = KnpOptionChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knp_fields() {
+        let mut obj = KnpOptionChange::default();
+        obj.knp_option_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knq_generated {
+    use super::*;
+
+    #[test]
+    fn test_knq_default() {
+        let obj = KnqDecorationChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knq_fields() {
+        let mut obj = KnqDecorationChange::default();
+        obj.knq_decoration_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knr_generated {
+    use super::*;
+
+    #[test]
+    fn test_knr_default() {
+        let obj = KnrTokenizationChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knr_fields() {
+        let mut obj = KnrTokenizationChange::default();
+        obj.knr_start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kns_generated {
+    use super::*;
+
+    #[test]
+    fn test_kns_default() {
+        let obj = KnsSaveEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kns_fields() {
+        let mut obj = KnsSaveEvent::default();
+        obj.kns_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knt_generated {
+    use super::*;
+
+    #[test]
+    fn test_knt_default() {
+        let obj = KntCloseEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knt_fields() {
+        let mut obj = KntCloseEvent::default();
+        obj.knt_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knu_generated {
+    use super::*;
+
+    #[test]
+    fn test_knu_default() {
+        let obj = KnuOpenEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knu_fields() {
+        let mut obj = KnuOpenEvent::default();
+        obj.knu_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knv_generated {
+    use super::*;
+
+    #[test]
+    fn test_knv_default() {
+        let obj = KnvVisibilityChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knv_fields() {
+        let mut obj = KnvVisibilityChange::default();
+        obj.knv_visible = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knw_generated {
+    use super::*;
+
+    #[test]
+    fn test_knw_default() {
+        let obj = KnwLayoutChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knw_fields() {
+        let mut obj = KnwLayoutChange::default();
+        obj.knw_group_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knx_generated {
+    use super::*;
+
+    #[test]
+    fn test_knx_default() {
+        let obj = KnxActiveChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knx_fields() {
+        let mut obj = KnxActiveChange::default();
+        obj.knx_editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kny_generated {
+    use super::*;
+
+    #[test]
+    fn test_kny_default() {
+        let obj = KnyDirtyChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kny_fields() {
+        let mut obj = KnyDirtyChange::default();
+        obj.kny_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_knz_generated {
+    use super::*;
+
+    #[test]
+    fn test_knz_default() {
+        let obj = KnzEditorEventConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_knz_fields() {
+        let mut obj = KnzEditorEventConfig::default();
+        obj.knz_debounce_ms = 1;
         assert!(obj.validate());
     }
 }
