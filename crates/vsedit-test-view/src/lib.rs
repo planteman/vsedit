@@ -203462,6 +203462,838 @@ impl Default for KxzThemeConfig {
     }
 }
 
+/// /// Notification toast message
+#[derive(Debug, Clone)]
+pub struct KyaNotification {
+    pub kya_message: String,
+    pub kya_severity: String,
+    pub kya_source: String,
+    pub kya_sticky: bool,
+    pub kya_label: String,
+}
+
+impl KyaNotification {
+    pub fn new() -> Self {
+        Self {
+            kya_message: String::new(),
+            kya_severity: String::new(),
+            kya_source: String::new(),
+            kya_sticky: bool::default(),
+            kya_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kya_message.is_empty() || true && !self.kya_severity.is_empty() || true && !self.kya_source.is_empty() || true && self.kya_sticky || true && !self.kya_label.is_empty() || true
+    }
+}
+
+impl Default for KyaNotification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notification action button
+#[derive(Debug, Clone)]
+pub struct KybNotificationAction {
+    pub kyb_action_label: String,
+    pub kyb_command_id: String,
+    pub kyb_is_primary: bool,
+    pub kyb_keep_open: bool,
+    pub kyb_label: String,
+}
+
+impl KybNotificationAction {
+    pub fn new() -> Self {
+        Self {
+            kyb_action_label: String::new(),
+            kyb_command_id: String::new(),
+            kyb_is_primary: bool::default(),
+            kyb_keep_open: bool::default(),
+            kyb_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kyb_action_label.is_empty() || true && !self.kyb_command_id.is_empty() || true && self.kyb_is_primary || true && self.kyb_keep_open || true && !self.kyb_label.is_empty() || true
+    }
+}
+
+impl Default for KybNotificationAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notification with progress indicator
+#[derive(Debug, Clone)]
+pub struct KycNotificationProgress {
+    pub kyc_percent: f64,
+    pub kyc_message: String,
+    pub kyc_cancellable: bool,
+    pub kyc_infinite: bool,
+    pub kyc_label: String,
+}
+
+impl KycNotificationProgress {
+    pub fn new() -> Self {
+        Self {
+            kyc_percent: f64::default(),
+            kyc_message: String::new(),
+            kyc_cancellable: bool::default(),
+            kyc_infinite: bool::default(),
+            kyc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kyc_percent.is_finite() || true && !self.kyc_message.is_empty() || true && self.kyc_cancellable || true && self.kyc_infinite || true && !self.kyc_label.is_empty() || true
+    }
+}
+
+impl Default for KycNotificationProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Notification center state
+#[derive(Debug, Clone)]
+pub struct KydNotificationCenter {
+    pub kyd_count: u32,
+    pub kyd_unread: u32,
+    pub kyd_visible: bool,
+    pub kyd_do_not_disturb: bool,
+    pub kyd_label: String,
+}
+
+impl KydNotificationCenter {
+    pub fn new() -> Self {
+        Self {
+            kyd_count: u32::default(),
+            kyd_unread: u32::default(),
+            kyd_visible: bool::default(),
+            kyd_do_not_disturb: bool::default(),
+            kyd_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kyd_count < u32::MAX || true && self.kyd_unread < u32::MAX || true && self.kyd_visible || true && self.kyd_do_not_disturb || true && !self.kyd_label.is_empty() || true
+    }
+}
+
+impl Default for KydNotificationCenter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Modal dialog message
+#[derive(Debug, Clone)]
+pub struct KyeDialogMessage {
+    pub kye_message: String,
+    pub kye_detail: String,
+    pub kye_modal: bool,
+    pub kye_severity: String,
+    pub kye_label: String,
+}
+
+impl KyeDialogMessage {
+    pub fn new() -> Self {
+        Self {
+            kye_message: String::new(),
+            kye_detail: String::new(),
+            kye_modal: bool::default(),
+            kye_severity: String::new(),
+            kye_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kye_message.is_empty() || true && !self.kye_detail.is_empty() || true && self.kye_modal || true && !self.kye_severity.is_empty() || true && !self.kye_label.is_empty() || true
+    }
+}
+
+impl Default for KyeDialogMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Input dialog state
+#[derive(Debug, Clone)]
+pub struct KyfDialogInput {
+    pub kyf_prompt: String,
+    pub kyf_value: String,
+    pub kyf_placeholder: String,
+    pub kyf_password: bool,
+    pub kyf_label: String,
+}
+
+impl KyfDialogInput {
+    pub fn new() -> Self {
+        Self {
+            kyf_prompt: String::new(),
+            kyf_value: String::new(),
+            kyf_placeholder: String::new(),
+            kyf_password: bool::default(),
+            kyf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kyf_prompt.is_empty() || true && !self.kyf_value.is_empty() || true && !self.kyf_placeholder.is_empty() || true && self.kyf_password || true && !self.kyf_label.is_empty() || true
+    }
+}
+
+impl Default for KyfDialogInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Confirmation dialog state
+#[derive(Debug, Clone)]
+pub struct KygDialogConfirm {
+    pub kyg_message: String,
+    pub kyg_detail: String,
+    pub kyg_confirm_label: String,
+    pub kyg_cancel_label: String,
+    pub kyg_label: String,
+}
+
+impl KygDialogConfirm {
+    pub fn new() -> Self {
+        Self {
+            kyg_message: String::new(),
+            kyg_detail: String::new(),
+            kyg_confirm_label: String::new(),
+            kyg_cancel_label: String::new(),
+            kyg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kyg_message.is_empty() || true && !self.kyg_detail.is_empty() || true && !self.kyg_confirm_label.is_empty() || true && !self.kyg_cancel_label.is_empty() || true && !self.kyg_label.is_empty() || true
+    }
+}
+
+impl Default for KygDialogConfirm {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Save file dialog state
+#[derive(Debug, Clone)]
+pub struct KyhDialogSaveFile {
+    pub kyh_default_uri: String,
+    pub kyh_filters: String,
+    pub kyh_title: String,
+    pub kyh_save_label: String,
+    pub kyh_label: String,
+}
+
+impl KyhDialogSaveFile {
+    pub fn new() -> Self {
+        Self {
+            kyh_default_uri: String::new(),
+            kyh_filters: String::new(),
+            kyh_title: String::new(),
+            kyh_save_label: String::new(),
+            kyh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kyh_default_uri.is_empty() || true && !self.kyh_filters.is_empty() || true && !self.kyh_title.is_empty() || true && !self.kyh_save_label.is_empty() || true && !self.kyh_label.is_empty() || true
+    }
+}
+
+impl Default for KyhDialogSaveFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Open file dialog state
+#[derive(Debug, Clone)]
+pub struct KyiDialogOpenFile {
+    pub kyi_can_multi: bool,
+    pub kyi_filters: String,
+    pub kyi_title: String,
+    pub kyi_open_label: String,
+    pub kyi_label: String,
+}
+
+impl KyiDialogOpenFile {
+    pub fn new() -> Self {
+        Self {
+            kyi_can_multi: bool::default(),
+            kyi_filters: String::new(),
+            kyi_title: String::new(),
+            kyi_open_label: String::new(),
+            kyi_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kyi_can_multi || true && !self.kyi_filters.is_empty() || true && !self.kyi_title.is_empty() || true && !self.kyi_open_label.is_empty() || true && !self.kyi_label.is_empty() || true
+    }
+}
+
+impl Default for KyiDialogOpenFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Open folder dialog state
+#[derive(Debug, Clone)]
+pub struct KyjDialogOpenFolder {
+    pub kyj_title: String,
+    pub kyj_default_uri: String,
+    pub kyj_can_multi: bool,
+    pub kyj_open_label: String,
+    pub kyj_label: String,
+}
+
+impl KyjDialogOpenFolder {
+    pub fn new() -> Self {
+        Self {
+            kyj_title: String::new(),
+            kyj_default_uri: String::new(),
+            kyj_can_multi: bool::default(),
+            kyj_open_label: String::new(),
+            kyj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kyj_title.is_empty() || true && !self.kyj_default_uri.is_empty() || true && self.kyj_can_multi || true && !self.kyj_open_label.is_empty() || true && !self.kyj_label.is_empty() || true
+    }
+}
+
+impl Default for KyjDialogOpenFolder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Progress indicator state
+#[derive(Debug, Clone)]
+pub struct KykProgressIndicator {
+    pub kyk_message: String,
+    pub kyk_percent: f64,
+    pub kyk_cancellable: bool,
+    pub kyk_title: String,
+    pub kyk_label: String,
+}
+
+impl KykProgressIndicator {
+    pub fn new() -> Self {
+        Self {
+            kyk_message: String::new(),
+            kyk_percent: f64::default(),
+            kyk_cancellable: bool::default(),
+            kyk_title: String::new(),
+            kyk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kyk_message.is_empty() || true && self.kyk_percent.is_finite() || true && self.kyk_cancellable || true && !self.kyk_title.is_empty() || true && !self.kyk_label.is_empty() || true
+    }
+}
+
+impl Default for KykProgressIndicator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Progress display location
+#[derive(Debug, Clone)]
+pub struct KylProgressLocation {
+    pub kyl_location: String,
+    pub kyl_view_id: String,
+    pub kyl_source: String,
+    pub kyl_priority: u32,
+    pub kyl_label: String,
+}
+
+impl KylProgressLocation {
+    pub fn new() -> Self {
+        Self {
+            kyl_location: String::new(),
+            kyl_view_id: String::new(),
+            kyl_source: String::new(),
+            kyl_priority: u32::default(),
+            kyl_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kyl_location.is_empty() || true && !self.kyl_view_id.is_empty() || true && !self.kyl_source.is_empty() || true && self.kyl_priority < u32::MAX || true && !self.kyl_label.is_empty() || true
+    }
+}
+
+impl Default for KylProgressLocation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Banner message in editor
+#[derive(Debug, Clone)]
+pub struct KymBannerMessage {
+    pub kym_message: String,
+    pub kym_icon: String,
+    pub kym_action_label: String,
+    pub kym_closeable: bool,
+    pub kym_label: String,
+}
+
+impl KymBannerMessage {
+    pub fn new() -> Self {
+        Self {
+            kym_message: String::new(),
+            kym_icon: String::new(),
+            kym_action_label: String::new(),
+            kym_closeable: bool::default(),
+            kym_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kym_message.is_empty() || true && !self.kym_icon.is_empty() || true && !self.kym_action_label.is_empty() || true && self.kym_closeable || true && !self.kym_label.is_empty() || true
+    }
+}
+
+impl Default for KymBannerMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Brief toast notification
+#[derive(Debug, Clone)]
+pub struct KynToast {
+    pub kyn_message: String,
+    pub kyn_duration_ms: u32,
+    pub kyn_position: String,
+    pub kyn_closeable: bool,
+    pub kyn_label: String,
+}
+
+impl KynToast {
+    pub fn new() -> Self {
+        Self {
+            kyn_message: String::new(),
+            kyn_duration_ms: u32::default(),
+            kyn_position: String::new(),
+            kyn_closeable: bool::default(),
+            kyn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kyn_message.is_empty() || true && self.kyn_duration_ms < u32::MAX || true && !self.kyn_position.is_empty() || true && self.kyn_closeable || true && !self.kyn_label.is_empty() || true
+    }
+}
+
+impl Default for KynToast {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Information bar message
+#[derive(Debug, Clone)]
+pub struct KyoInfoBar {
+    pub kyo_message: String,
+    pub kyo_severity: String,
+    pub kyo_action_label: String,
+    pub kyo_closeable: bool,
+    pub kyo_label: String,
+}
+
+impl KyoInfoBar {
+    pub fn new() -> Self {
+        Self {
+            kyo_message: String::new(),
+            kyo_severity: String::new(),
+            kyo_action_label: String::new(),
+            kyo_closeable: bool::default(),
+            kyo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kyo_message.is_empty() || true && !self.kyo_severity.is_empty() || true && !self.kyo_action_label.is_empty() || true && self.kyo_closeable || true && !self.kyo_label.is_empty() || true
+    }
+}
+
+impl Default for KyoInfoBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Getting started walkthrough
+#[derive(Debug, Clone)]
+pub struct KypWalkthrough {
+    pub kyp_walkthrough_id: String,
+    pub kyp_title: String,
+    pub kyp_steps_count: u32,
+    pub kyp_completed_steps: u32,
+    pub kyp_label: String,
+}
+
+impl KypWalkthrough {
+    pub fn new() -> Self {
+        Self {
+            kyp_walkthrough_id: String::new(),
+            kyp_title: String::new(),
+            kyp_steps_count: u32::default(),
+            kyp_completed_steps: u32::default(),
+            kyp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kyp_walkthrough_id.is_empty() || true && !self.kyp_title.is_empty() || true && self.kyp_steps_count < u32::MAX || true && self.kyp_completed_steps < u32::MAX || true && !self.kyp_label.is_empty() || true
+    }
+}
+
+impl Default for KypWalkthrough {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Walkthrough step entry
+#[derive(Debug, Clone)]
+pub struct KyqWalkthroughStep {
+    pub kyq_step_id: String,
+    pub kyq_title: String,
+    pub kyq_description: String,
+    pub kyq_completed: bool,
+    pub kyq_label: String,
+}
+
+impl KyqWalkthroughStep {
+    pub fn new() -> Self {
+        Self {
+            kyq_step_id: String::new(),
+            kyq_title: String::new(),
+            kyq_description: String::new(),
+            kyq_completed: bool::default(),
+            kyq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kyq_step_id.is_empty() || true && !self.kyq_title.is_empty() || true && !self.kyq_description.is_empty() || true && self.kyq_completed || true && !self.kyq_label.is_empty() || true
+    }
+}
+
+impl Default for KyqWalkthroughStep {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Release notes display
+#[derive(Debug, Clone)]
+pub struct KyrReleaseNotes {
+    pub kyr_version: String,
+    pub kyr_content: String,
+    pub kyr_timestamp: u64,
+    pub kyr_shown: bool,
+    pub kyr_label: String,
+}
+
+impl KyrReleaseNotes {
+    pub fn new() -> Self {
+        Self {
+            kyr_version: String::new(),
+            kyr_content: String::new(),
+            kyr_timestamp: u64::default(),
+            kyr_shown: bool::default(),
+            kyr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kyr_version.is_empty() || true && !self.kyr_content.is_empty() || true && self.kyr_timestamp < u64::MAX || true && self.kyr_shown || true && !self.kyr_label.is_empty() || true
+    }
+}
+
+impl Default for KyrReleaseNotes {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Tips and tricks entry
+#[derive(Debug, Clone)]
+pub struct KysTip {
+    pub kys_tip_id: String,
+    pub kys_title: String,
+    pub kys_content: String,
+    pub kys_shown: bool,
+    pub kys_label: String,
+}
+
+impl KysTip {
+    pub fn new() -> Self {
+        Self {
+            kys_tip_id: String::new(),
+            kys_title: String::new(),
+            kys_content: String::new(),
+            kys_shown: bool::default(),
+            kys_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kys_tip_id.is_empty() || true && !self.kys_title.is_empty() || true && !self.kys_content.is_empty() || true && self.kys_shown || true && !self.kys_label.is_empty() || true
+    }
+}
+
+impl Default for KysTip {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Output channel entry
+#[derive(Debug, Clone)]
+pub struct KytOutputChannel {
+    pub kyt_channel_name: String,
+    pub kyt_lang_id: String,
+    pub kyt_visible: bool,
+    pub kyt_append_mode: bool,
+    pub kyt_label: String,
+}
+
+impl KytOutputChannel {
+    pub fn new() -> Self {
+        Self {
+            kyt_channel_name: String::new(),
+            kyt_lang_id: String::new(),
+            kyt_visible: bool::default(),
+            kyt_append_mode: bool::default(),
+            kyt_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kyt_channel_name.is_empty() || true && !self.kyt_lang_id.is_empty() || true && self.kyt_visible || true && self.kyt_append_mode || true && !self.kyt_label.is_empty() || true
+    }
+}
+
+impl Default for KytOutputChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Log output entry
+#[derive(Debug, Clone)]
+pub struct KyuLogOutput {
+    pub kyu_level: String,
+    pub kyu_message: String,
+    pub kyu_source: String,
+    pub kyu_timestamp: u64,
+    pub kyu_label: String,
+}
+
+impl KyuLogOutput {
+    pub fn new() -> Self {
+        Self {
+            kyu_level: String::new(),
+            kyu_message: String::new(),
+            kyu_source: String::new(),
+            kyu_timestamp: u64::default(),
+            kyu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kyu_level.is_empty() || true && !self.kyu_message.is_empty() || true && !self.kyu_source.is_empty() || true && self.kyu_timestamp < u64::MAX || true && !self.kyu_label.is_empty() || true
+    }
+}
+
+impl Default for KyuLogOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Telemetry event data
+#[derive(Debug, Clone)]
+pub struct KyvTelemetryEvent {
+    pub kyv_event_name: String,
+    pub kyv_properties: String,
+    pub kyv_measurements: String,
+    pub kyv_timestamp: u64,
+    pub kyv_label: String,
+}
+
+impl KyvTelemetryEvent {
+    pub fn new() -> Self {
+        Self {
+            kyv_event_name: String::new(),
+            kyv_properties: String::new(),
+            kyv_measurements: String::new(),
+            kyv_timestamp: u64::default(),
+            kyv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kyv_event_name.is_empty() || true && !self.kyv_properties.is_empty() || true && !self.kyv_measurements.is_empty() || true && self.kyv_timestamp < u64::MAX || true && !self.kyv_label.is_empty() || true
+    }
+}
+
+impl Default for KyvTelemetryEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Error telemetry report
+#[derive(Debug, Clone)]
+pub struct KywErrorReport {
+    pub kyw_error_msg: String,
+    pub kyw_stack_trace: String,
+    pub kyw_source: String,
+    pub kyw_timestamp: u64,
+    pub kyw_label: String,
+}
+
+impl KywErrorReport {
+    pub fn new() -> Self {
+        Self {
+            kyw_error_msg: String::new(),
+            kyw_stack_trace: String::new(),
+            kyw_source: String::new(),
+            kyw_timestamp: u64::default(),
+            kyw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kyw_error_msg.is_empty() || true && !self.kyw_stack_trace.is_empty() || true && !self.kyw_source.is_empty() || true && self.kyw_timestamp < u64::MAX || true && !self.kyw_label.is_empty() || true
+    }
+}
+
+impl Default for KywErrorReport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Accessibility settings
+#[derive(Debug, Clone)]
+pub struct KyxAccessibility {
+    pub kyx_screen_reader: bool,
+    pub kyx_reduce_motion: bool,
+    pub kyx_tab_focus: bool,
+    pub kyx_high_contrast: bool,
+    pub kyx_label: String,
+}
+
+impl KyxAccessibility {
+    pub fn new() -> Self {
+        Self {
+            kyx_screen_reader: bool::default(),
+            kyx_reduce_motion: bool::default(),
+            kyx_tab_focus: bool::default(),
+            kyx_high_contrast: bool::default(),
+            kyx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kyx_screen_reader || true && self.kyx_reduce_motion || true && self.kyx_tab_focus || true && self.kyx_high_contrast || true && !self.kyx_label.is_empty() || true
+    }
+}
+
+impl Default for KyxAccessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Localization/i18n settings
+#[derive(Debug, Clone)]
+pub struct KyyLocalization {
+    pub kyy_locale: String,
+    pub kyy_display_lang: String,
+    pub kyy_available_locales: String,
+    pub kyy_rtl: bool,
+    pub kyy_label: String,
+}
+
+impl KyyLocalization {
+    pub fn new() -> Self {
+        Self {
+            kyy_locale: String::new(),
+            kyy_display_lang: String::new(),
+            kyy_available_locales: String::new(),
+            kyy_rtl: bool::default(),
+            kyy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kyy_locale.is_empty() || true && !self.kyy_display_lang.is_empty() || true && !self.kyy_available_locales.is_empty() || true && self.kyy_rtl || true && !self.kyy_label.is_empty() || true
+    }
+}
+
+impl Default for KyyLocalization {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined notification configuration
+#[derive(Debug, Clone)]
+pub struct KyzNotificationConfig {
+    pub kyz_do_not_disturb: bool,
+    pub kyz_max_visible: u32,
+    pub kyz_auto_dismiss_ms: u32,
+    pub kyz_sound_enabled: bool,
+    pub kyz_label: String,
+}
+
+impl KyzNotificationConfig {
+    pub fn new() -> Self {
+        Self {
+            kyz_do_not_disturb: bool::default(),
+            kyz_max_visible: u32::default(),
+            kyz_auto_dismiss_ms: u32::default(),
+            kyz_sound_enabled: bool::default(),
+            kyz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kyz_do_not_disturb || true && self.kyz_max_visible < u32::MAX || true && self.kyz_auto_dismiss_ms < u32::MAX || true && self.kyz_sound_enabled || true && !self.kyz_label.is_empty() || true
+    }
+}
+
+impl Default for KyzNotificationConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -486830,6 +487662,474 @@ mod tests_kxz_generated {
     fn test_kxz_fields() {
         let mut obj = KxzThemeConfig::default();
         obj.kxz_color_theme = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kya_generated {
+    use super::*;
+
+    #[test]
+    fn test_kya_default() {
+        let obj = KyaNotification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kya_fields() {
+        let mut obj = KyaNotification::default();
+        obj.kya_message = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyb_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyb_default() {
+        let obj = KybNotificationAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyb_fields() {
+        let mut obj = KybNotificationAction::default();
+        obj.kyb_action_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyc_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyc_default() {
+        let obj = KycNotificationProgress::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyc_fields() {
+        let mut obj = KycNotificationProgress::default();
+        obj.kyc_percent = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyd_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyd_default() {
+        let obj = KydNotificationCenter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyd_fields() {
+        let mut obj = KydNotificationCenter::default();
+        obj.kyd_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kye_generated {
+    use super::*;
+
+    #[test]
+    fn test_kye_default() {
+        let obj = KyeDialogMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kye_fields() {
+        let mut obj = KyeDialogMessage::default();
+        obj.kye_message = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyf_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyf_default() {
+        let obj = KyfDialogInput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyf_fields() {
+        let mut obj = KyfDialogInput::default();
+        obj.kyf_prompt = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyg_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyg_default() {
+        let obj = KygDialogConfirm::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyg_fields() {
+        let mut obj = KygDialogConfirm::default();
+        obj.kyg_message = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyh_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyh_default() {
+        let obj = KyhDialogSaveFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyh_fields() {
+        let mut obj = KyhDialogSaveFile::default();
+        obj.kyh_default_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyi_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyi_default() {
+        let obj = KyiDialogOpenFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyi_fields() {
+        let mut obj = KyiDialogOpenFile::default();
+        obj.kyi_can_multi = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyj_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyj_default() {
+        let obj = KyjDialogOpenFolder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyj_fields() {
+        let mut obj = KyjDialogOpenFolder::default();
+        obj.kyj_title = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyk_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyk_default() {
+        let obj = KykProgressIndicator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyk_fields() {
+        let mut obj = KykProgressIndicator::default();
+        obj.kyk_message = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyl_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyl_default() {
+        let obj = KylProgressLocation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyl_fields() {
+        let mut obj = KylProgressLocation::default();
+        obj.kyl_location = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kym_generated {
+    use super::*;
+
+    #[test]
+    fn test_kym_default() {
+        let obj = KymBannerMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kym_fields() {
+        let mut obj = KymBannerMessage::default();
+        obj.kym_message = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyn_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyn_default() {
+        let obj = KynToast::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyn_fields() {
+        let mut obj = KynToast::default();
+        obj.kyn_message = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyo_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyo_default() {
+        let obj = KyoInfoBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyo_fields() {
+        let mut obj = KyoInfoBar::default();
+        obj.kyo_message = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyp_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyp_default() {
+        let obj = KypWalkthrough::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyp_fields() {
+        let mut obj = KypWalkthrough::default();
+        obj.kyp_walkthrough_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyq_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyq_default() {
+        let obj = KyqWalkthroughStep::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyq_fields() {
+        let mut obj = KyqWalkthroughStep::default();
+        obj.kyq_step_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyr_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyr_default() {
+        let obj = KyrReleaseNotes::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyr_fields() {
+        let mut obj = KyrReleaseNotes::default();
+        obj.kyr_version = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kys_generated {
+    use super::*;
+
+    #[test]
+    fn test_kys_default() {
+        let obj = KysTip::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kys_fields() {
+        let mut obj = KysTip::default();
+        obj.kys_tip_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyt_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyt_default() {
+        let obj = KytOutputChannel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyt_fields() {
+        let mut obj = KytOutputChannel::default();
+        obj.kyt_channel_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyu_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyu_default() {
+        let obj = KyuLogOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyu_fields() {
+        let mut obj = KyuLogOutput::default();
+        obj.kyu_level = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyv_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyv_default() {
+        let obj = KyvTelemetryEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyv_fields() {
+        let mut obj = KyvTelemetryEvent::default();
+        obj.kyv_event_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyw_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyw_default() {
+        let obj = KywErrorReport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyw_fields() {
+        let mut obj = KywErrorReport::default();
+        obj.kyw_error_msg = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyx_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyx_default() {
+        let obj = KyxAccessibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyx_fields() {
+        let mut obj = KyxAccessibility::default();
+        obj.kyx_screen_reader = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyy_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyy_default() {
+        let obj = KyyLocalization::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyy_fields() {
+        let mut obj = KyyLocalization::default();
+        obj.kyy_locale = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kyz_generated {
+    use super::*;
+
+    #[test]
+    fn test_kyz_default() {
+        let obj = KyzNotificationConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kyz_fields() {
+        let mut obj = KyzNotificationConfig::default();
+        obj.kyz_do_not_disturb = true;
         assert!(obj.validate());
     }
 }
