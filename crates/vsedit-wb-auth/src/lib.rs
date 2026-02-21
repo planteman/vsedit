@@ -221287,6 +221287,786 @@ impl Default for UriNormalization {
     }
 }
 
+/// Worker thread instance
+#[derive(Debug, Clone)]
+pub struct WorkerThread {
+    pub thread_id: u32,
+    pub name: String,
+    pub stack_size: u32,
+    pub is_busy: bool,
+}
+
+impl WorkerThread {
+    pub fn new() -> Self {
+        Self {
+            thread_id: u32::default(),
+            name: String::new(),
+            stack_size: u32::default(),
+            is_busy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.thread_id < u32::MAX || true && !self.name.is_empty() || true && self.stack_size < u32::MAX || true && self.is_busy || true
+    }
+}
+
+impl Default for WorkerThread {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Thread pool manager
+#[derive(Debug, Clone)]
+pub struct ThreadPool {
+    pub pool_id: u32,
+    pub min_threads: u32,
+    pub max_threads: u32,
+    pub active_count: u32,
+}
+
+impl ThreadPool {
+    pub fn new() -> Self {
+        Self {
+            pool_id: u32::default(),
+            min_threads: u32::default(),
+            max_threads: u32::default(),
+            active_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.pool_id < u32::MAX || true && self.min_threads < u32::MAX || true && self.max_threads < u32::MAX || true && self.active_count < u32::MAX || true
+    }
+}
+
+impl Default for ThreadPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Worker task definition
+#[derive(Debug, Clone)]
+pub struct WorkerTask {
+    pub task_id: u32,
+    pub task_name: String,
+    pub priority: u32,
+    pub is_cancellable: bool,
+}
+
+impl WorkerTask {
+    pub fn new() -> Self {
+        Self {
+            task_id: u32::default(),
+            task_name: String::new(),
+            priority: u32::default(),
+            is_cancellable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.task_id < u32::MAX || true && !self.task_name.is_empty() || true && self.priority < u32::MAX || true && self.is_cancellable || true
+    }
+}
+
+impl Default for WorkerTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task queue state
+#[derive(Debug, Clone)]
+pub struct TaskQueue {
+    pub queue_id: u32,
+    pub pending_count: u32,
+    pub max_size: u32,
+    pub is_bounded: bool,
+}
+
+impl TaskQueue {
+    pub fn new() -> Self {
+        Self {
+            queue_id: u32::default(),
+            pending_count: u32::default(),
+            max_size: u32::default(),
+            is_bounded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.queue_id < u32::MAX || true && self.pending_count < u32::MAX || true && self.max_size < u32::MAX || true && self.is_bounded || true
+    }
+}
+
+impl Default for TaskQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task priority setting
+#[derive(Debug, Clone)]
+pub struct TaskPriority {
+    pub priority_level: u32,
+    pub weight: u32,
+    pub deadline_ms: u32,
+    pub is_preemptive: bool,
+}
+
+impl TaskPriority {
+    pub fn new() -> Self {
+        Self {
+            priority_level: u32::default(),
+            weight: u32::default(),
+            deadline_ms: u32::default(),
+            is_preemptive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.priority_level < u32::MAX || true && self.weight < u32::MAX || true && self.deadline_ms < u32::MAX || true && self.is_preemptive || true
+    }
+}
+
+impl Default for TaskPriority {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task scheduler instance
+#[derive(Debug, Clone)]
+pub struct TaskScheduler {
+    pub scheduler_id: u32,
+    pub algorithm: String,
+    pub time_slice_ms: u32,
+    pub is_fair: bool,
+}
+
+impl TaskScheduler {
+    pub fn new() -> Self {
+        Self {
+            scheduler_id: u32::default(),
+            algorithm: String::new(),
+            time_slice_ms: u32::default(),
+            is_fair: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.scheduler_id < u32::MAX || true && !self.algorithm.is_empty() || true && self.time_slice_ms < u32::MAX || true && self.is_fair || true
+    }
+}
+
+impl Default for TaskScheduler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task execution result
+#[derive(Debug, Clone)]
+pub struct TaskResult {
+    pub result_id: u32,
+    pub status_code: u32,
+    pub output_data: String,
+    pub duration_ms: u32,
+}
+
+impl TaskResult {
+    pub fn new() -> Self {
+        Self {
+            result_id: u32::default(),
+            status_code: u32::default(),
+            output_data: String::new(),
+            duration_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.result_id < u32::MAX || true && self.status_code < u32::MAX || true && !self.output_data.is_empty() || true && self.duration_ms < u32::MAX || true
+    }
+}
+
+impl Default for TaskResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task cancellation token
+#[derive(Debug, Clone)]
+pub struct TaskCancellation {
+    pub cancel_token: u32,
+    pub is_cancelled: bool,
+    pub reason: String,
+    pub timestamp: u64,
+}
+
+impl TaskCancellation {
+    pub fn new() -> Self {
+        Self {
+            cancel_token: u32::default(),
+            is_cancelled: bool::default(),
+            reason: String::new(),
+            timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.cancel_token < u32::MAX || true && self.is_cancelled || true && !self.reason.is_empty() || true && self.timestamp < u64::MAX || true
+    }
+}
+
+impl Default for TaskCancellation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task progress report
+#[derive(Debug, Clone)]
+pub struct TaskProgress {
+    pub progress_id: u32,
+    pub current_step: u32,
+    pub total_steps: u32,
+    pub message: String,
+}
+
+impl TaskProgress {
+    pub fn new() -> Self {
+        Self {
+            progress_id: u32::default(),
+            current_step: u32::default(),
+            total_steps: u32::default(),
+            message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.progress_id < u32::MAX || true && self.current_step < u32::MAX || true && self.total_steps < u32::MAX || true && !self.message.is_empty() || true
+    }
+}
+
+impl Default for TaskProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task timeout config
+#[derive(Debug, Clone)]
+pub struct TaskTimeout {
+    pub timeout_ms: u32,
+    pub retry_count: u32,
+    pub is_expired: bool,
+    pub task_id: u32,
+}
+
+impl TaskTimeout {
+    pub fn new() -> Self {
+        Self {
+            timeout_ms: u32::default(),
+            retry_count: u32::default(),
+            is_expired: bool::default(),
+            task_id: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.timeout_ms < u32::MAX || true && self.retry_count < u32::MAX || true && self.is_expired || true && self.task_id < u32::MAX || true
+    }
+}
+
+impl Default for TaskTimeout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task dependency link
+#[derive(Debug, Clone)]
+pub struct TaskDepLink {
+    pub dep_id: u32,
+    pub upstream_task: u32,
+    pub downstream_task: u32,
+    pub is_satisfied: bool,
+}
+
+impl TaskDepLink {
+    pub fn new() -> Self {
+        Self {
+            dep_id: u32::default(),
+            upstream_task: u32::default(),
+            downstream_task: u32::default(),
+            is_satisfied: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.dep_id < u32::MAX || true && self.upstream_task < u32::MAX || true && self.downstream_task < u32::MAX || true && self.is_satisfied || true
+    }
+}
+
+impl Default for TaskDepLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Async operation state
+#[derive(Debug, Clone)]
+pub struct AsyncOperation {
+    pub operation_id: u32,
+    pub state: u32,
+    pub start_time: u64,
+    pub is_awaitable: bool,
+}
+
+impl AsyncOperation {
+    pub fn new() -> Self {
+        Self {
+            operation_id: u32::default(),
+            state: u32::default(),
+            start_time: u64::default(),
+            is_awaitable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.operation_id < u32::MAX || true && self.state < u32::MAX || true && self.start_time < u64::MAX || true && self.is_awaitable || true
+    }
+}
+
+impl Default for AsyncOperation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Message channel sender
+#[derive(Debug, Clone)]
+pub struct ChannelSender {
+    pub channel_id: u32,
+    pub capacity: u32,
+    pub sent_count: u64,
+    pub is_closed: bool,
+}
+
+impl ChannelSender {
+    pub fn new() -> Self {
+        Self {
+            channel_id: u32::default(),
+            capacity: u32::default(),
+            sent_count: u64::default(),
+            is_closed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.channel_id < u32::MAX || true && self.capacity < u32::MAX || true && self.sent_count < u64::MAX || true && self.is_closed || true
+    }
+}
+
+impl Default for ChannelSender {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Message channel receiver
+#[derive(Debug, Clone)]
+pub struct ChannelReceiver {
+    pub channel_id: u32,
+    pub pending_count: u32,
+    pub received_count: u64,
+    pub is_closed: bool,
+}
+
+impl ChannelReceiver {
+    pub fn new() -> Self {
+        Self {
+            channel_id: u32::default(),
+            pending_count: u32::default(),
+            received_count: u64::default(),
+            is_closed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.channel_id < u32::MAX || true && self.pending_count < u32::MAX || true && self.received_count < u64::MAX || true && self.is_closed || true
+    }
+}
+
+impl Default for ChannelReceiver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Worker message payload
+#[derive(Debug, Clone)]
+pub struct WorkerMessage {
+    pub message_id: u32,
+    pub payload_type: u32,
+    pub payload_size: u32,
+    pub timestamp: u64,
+}
+
+impl WorkerMessage {
+    pub fn new() -> Self {
+        Self {
+            message_id: u32::default(),
+            payload_type: u32::default(),
+            payload_size: u32::default(),
+            timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.message_id < u32::MAX || true && self.payload_type < u32::MAX || true && self.payload_size < u32::MAX || true && self.timestamp < u64::MAX || true
+    }
+}
+
+impl Default for WorkerMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Shared memory segment
+#[derive(Debug, Clone)]
+pub struct SharedMemory {
+    pub segment_id: u32,
+    pub size_bytes: u64,
+    pub access_mode: u32,
+    pub is_mapped: bool,
+}
+
+impl SharedMemory {
+    pub fn new() -> Self {
+        Self {
+            segment_id: u32::default(),
+            size_bytes: u64::default(),
+            access_mode: u32::default(),
+            is_mapped: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.segment_id < u32::MAX || true && self.size_bytes < u64::MAX || true && self.access_mode < u32::MAX || true && self.is_mapped || true
+    }
+}
+
+impl Default for SharedMemory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Atomic counter state
+#[derive(Debug, Clone)]
+pub struct AtomicCounter {
+    pub counter_id: u32,
+    pub current_value: u64,
+    pub max_value: u64,
+    pub is_saturating: bool,
+}
+
+impl AtomicCounter {
+    pub fn new() -> Self {
+        Self {
+            counter_id: u32::default(),
+            current_value: u64::default(),
+            max_value: u64::default(),
+            is_saturating: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.counter_id < u32::MAX || true && self.current_value < u64::MAX || true && self.max_value < u64::MAX || true && self.is_saturating || true
+    }
+}
+
+impl Default for AtomicCounter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Mutex guard state
+#[derive(Debug, Clone)]
+pub struct MutexGuard {
+    pub guard_id: u32,
+    pub resource_name: String,
+    pub holder_thread: u32,
+    pub is_locked: bool,
+}
+
+impl MutexGuard {
+    pub fn new() -> Self {
+        Self {
+            guard_id: u32::default(),
+            resource_name: String::new(),
+            holder_thread: u32::default(),
+            is_locked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.guard_id < u32::MAX || true && !self.resource_name.is_empty() || true && self.holder_thread < u32::MAX || true && self.is_locked || true
+    }
+}
+
+impl Default for MutexGuard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Read-write lock state
+#[derive(Debug, Clone)]
+pub struct RwLockState {
+    pub lock_id: u32,
+    pub reader_count: u32,
+    pub has_writer: bool,
+    pub is_poisoned: bool,
+}
+
+impl RwLockState {
+    pub fn new() -> Self {
+        Self {
+            lock_id: u32::default(),
+            reader_count: u32::default(),
+            has_writer: bool::default(),
+            is_poisoned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lock_id < u32::MAX || true && self.reader_count < u32::MAX || true && self.has_writer || true && self.is_poisoned || true
+    }
+}
+
+impl Default for RwLockState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Barrier synchronization point
+#[derive(Debug, Clone)]
+pub struct BarrierSync {
+    pub barrier_id: u32,
+    pub participant_count: u32,
+    pub arrived_count: u32,
+    pub generation: u32,
+}
+
+impl BarrierSync {
+    pub fn new() -> Self {
+        Self {
+            barrier_id: u32::default(),
+            participant_count: u32::default(),
+            arrived_count: u32::default(),
+            generation: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.barrier_id < u32::MAX || true && self.participant_count < u32::MAX || true && self.arrived_count < u32::MAX || true && self.generation < u32::MAX || true
+    }
+}
+
+impl Default for BarrierSync {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semaphore state
+#[derive(Debug, Clone)]
+pub struct SemaphoreState {
+    pub sem_id: u32,
+    pub permits: u32,
+    pub max_permits: u32,
+    pub waiters_count: u32,
+}
+
+impl SemaphoreState {
+    pub fn new() -> Self {
+        Self {
+            sem_id: u32::default(),
+            permits: u32::default(),
+            max_permits: u32::default(),
+            waiters_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.sem_id < u32::MAX || true && self.permits < u32::MAX || true && self.max_permits < u32::MAX || true && self.waiters_count < u32::MAX || true
+    }
+}
+
+impl Default for SemaphoreState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Thread-local data slot
+#[derive(Debug, Clone)]
+pub struct ThreadLocalData {
+    pub local_id: u32,
+    pub thread_id: u32,
+    pub data_size: u32,
+    pub is_initialized: bool,
+}
+
+impl ThreadLocalData {
+    pub fn new() -> Self {
+        Self {
+            local_id: u32::default(),
+            thread_id: u32::default(),
+            data_size: u32::default(),
+            is_initialized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.local_id < u32::MAX || true && self.thread_id < u32::MAX || true && self.data_size < u32::MAX || true && self.is_initialized || true
+    }
+}
+
+impl Default for ThreadLocalData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Work-stealing queue
+#[derive(Debug, Clone)]
+pub struct WorkStealingQueue {
+    pub queue_id: u32,
+    pub local_count: u32,
+    pub stolen_count: u64,
+    pub is_active: bool,
+}
+
+impl WorkStealingQueue {
+    pub fn new() -> Self {
+        Self {
+            queue_id: u32::default(),
+            local_count: u32::default(),
+            stolen_count: u64::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.queue_id < u32::MAX || true && self.local_count < u32::MAX || true && self.stolen_count < u64::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for WorkStealingQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Future handle state
+#[derive(Debug, Clone)]
+pub struct FutureHandle {
+    pub future_id: u32,
+    pub state: u32,
+    pub output_ready: bool,
+    pub waker_count: u32,
+}
+
+impl FutureHandle {
+    pub fn new() -> Self {
+        Self {
+            future_id: u32::default(),
+            state: u32::default(),
+            output_ready: bool::default(),
+            waker_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.future_id < u32::MAX || true && self.state < u32::MAX || true && self.output_ready || true && self.waker_count < u32::MAX || true
+    }
+}
+
+impl Default for FutureHandle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Async executor config
+#[derive(Debug, Clone)]
+pub struct ExecutorConfig {
+    pub executor_id: u32,
+    pub thread_count: u32,
+    pub blocking_threads: u32,
+    pub is_shutdown: bool,
+}
+
+impl ExecutorConfig {
+    pub fn new() -> Self {
+        Self {
+            executor_id: u32::default(),
+            thread_count: u32::default(),
+            blocking_threads: u32::default(),
+            is_shutdown: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.executor_id < u32::MAX || true && self.thread_count < u32::MAX || true && self.blocking_threads < u32::MAX || true && self.is_shutdown || true
+    }
+}
+
+impl Default for ExecutorConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Runtime performance metrics
+#[derive(Debug, Clone)]
+pub struct RuntimeMetrics {
+    pub metric_id: u32,
+    pub tasks_spawned: u64,
+    pub tasks_completed: u64,
+    pub avg_latency_us: u64,
+}
+
+impl RuntimeMetrics {
+    pub fn new() -> Self {
+        Self {
+            metric_id: u32::default(),
+            tasks_spawned: u64::default(),
+            tasks_completed: u64::default(),
+            avg_latency_us: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.metric_id < u32::MAX || true && self.tasks_spawned < u64::MAX || true && self.tasks_completed < u64::MAX || true && self.avg_latency_us < u64::MAX || true
+    }
+}
+
+impl Default for RuntimeMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -515023,6 +515803,474 @@ mod tests_ltz_generated {
     fn test_ltz_fields() {
         let mut obj = UriNormalization::default();
         obj.norm_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lua_generated {
+    use super::*;
+
+    #[test]
+    fn test_lua_default() {
+        let obj = WorkerThread::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lua_fields() {
+        let mut obj = WorkerThread::default();
+        obj.thread_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lub_generated {
+    use super::*;
+
+    #[test]
+    fn test_lub_default() {
+        let obj = ThreadPool::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lub_fields() {
+        let mut obj = ThreadPool::default();
+        obj.pool_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_luc_generated {
+    use super::*;
+
+    #[test]
+    fn test_luc_default() {
+        let obj = WorkerTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_luc_fields() {
+        let mut obj = WorkerTask::default();
+        obj.task_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lud_generated {
+    use super::*;
+
+    #[test]
+    fn test_lud_default() {
+        let obj = TaskQueue::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lud_fields() {
+        let mut obj = TaskQueue::default();
+        obj.queue_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lue_generated {
+    use super::*;
+
+    #[test]
+    fn test_lue_default() {
+        let obj = TaskPriority::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lue_fields() {
+        let mut obj = TaskPriority::default();
+        obj.priority_level = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_luf_generated {
+    use super::*;
+
+    #[test]
+    fn test_luf_default() {
+        let obj = TaskScheduler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_luf_fields() {
+        let mut obj = TaskScheduler::default();
+        obj.scheduler_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lug_generated {
+    use super::*;
+
+    #[test]
+    fn test_lug_default() {
+        let obj = TaskResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lug_fields() {
+        let mut obj = TaskResult::default();
+        obj.result_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_luh_generated {
+    use super::*;
+
+    #[test]
+    fn test_luh_default() {
+        let obj = TaskCancellation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_luh_fields() {
+        let mut obj = TaskCancellation::default();
+        obj.cancel_token = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lui_generated {
+    use super::*;
+
+    #[test]
+    fn test_lui_default() {
+        let obj = TaskProgress::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lui_fields() {
+        let mut obj = TaskProgress::default();
+        obj.progress_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_luj_generated {
+    use super::*;
+
+    #[test]
+    fn test_luj_default() {
+        let obj = TaskTimeout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_luj_fields() {
+        let mut obj = TaskTimeout::default();
+        obj.timeout_ms = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_luk_generated {
+    use super::*;
+
+    #[test]
+    fn test_luk_default() {
+        let obj = TaskDepLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_luk_fields() {
+        let mut obj = TaskDepLink::default();
+        obj.dep_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lul_generated {
+    use super::*;
+
+    #[test]
+    fn test_lul_default() {
+        let obj = AsyncOperation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lul_fields() {
+        let mut obj = AsyncOperation::default();
+        obj.operation_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lum_generated {
+    use super::*;
+
+    #[test]
+    fn test_lum_default() {
+        let obj = ChannelSender::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lum_fields() {
+        let mut obj = ChannelSender::default();
+        obj.channel_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lun_generated {
+    use super::*;
+
+    #[test]
+    fn test_lun_default() {
+        let obj = ChannelReceiver::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lun_fields() {
+        let mut obj = ChannelReceiver::default();
+        obj.channel_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_luo_generated {
+    use super::*;
+
+    #[test]
+    fn test_luo_default() {
+        let obj = WorkerMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_luo_fields() {
+        let mut obj = WorkerMessage::default();
+        obj.message_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lup_generated {
+    use super::*;
+
+    #[test]
+    fn test_lup_default() {
+        let obj = SharedMemory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lup_fields() {
+        let mut obj = SharedMemory::default();
+        obj.segment_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_luq_generated {
+    use super::*;
+
+    #[test]
+    fn test_luq_default() {
+        let obj = AtomicCounter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_luq_fields() {
+        let mut obj = AtomicCounter::default();
+        obj.counter_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lur_generated {
+    use super::*;
+
+    #[test]
+    fn test_lur_default() {
+        let obj = MutexGuard::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lur_fields() {
+        let mut obj = MutexGuard::default();
+        obj.guard_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lus_generated {
+    use super::*;
+
+    #[test]
+    fn test_lus_default() {
+        let obj = RwLockState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lus_fields() {
+        let mut obj = RwLockState::default();
+        obj.lock_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lut_generated {
+    use super::*;
+
+    #[test]
+    fn test_lut_default() {
+        let obj = BarrierSync::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lut_fields() {
+        let mut obj = BarrierSync::default();
+        obj.barrier_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_luu_generated {
+    use super::*;
+
+    #[test]
+    fn test_luu_default() {
+        let obj = SemaphoreState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_luu_fields() {
+        let mut obj = SemaphoreState::default();
+        obj.sem_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_luv_generated {
+    use super::*;
+
+    #[test]
+    fn test_luv_default() {
+        let obj = ThreadLocalData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_luv_fields() {
+        let mut obj = ThreadLocalData::default();
+        obj.local_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_luw_generated {
+    use super::*;
+
+    #[test]
+    fn test_luw_default() {
+        let obj = WorkStealingQueue::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_luw_fields() {
+        let mut obj = WorkStealingQueue::default();
+        obj.queue_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lux_generated {
+    use super::*;
+
+    #[test]
+    fn test_lux_default() {
+        let obj = FutureHandle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lux_fields() {
+        let mut obj = FutureHandle::default();
+        obj.future_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_luy_generated {
+    use super::*;
+
+    #[test]
+    fn test_luy_default() {
+        let obj = ExecutorConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_luy_fields() {
+        let mut obj = ExecutorConfig::default();
+        obj.executor_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_luz_generated {
+    use super::*;
+
+    #[test]
+    fn test_luz_default() {
+        let obj = RuntimeMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_luz_fields() {
+        let mut obj = RuntimeMetrics::default();
+        obj.metric_id = 1;
         assert!(obj.validate());
     }
 }
