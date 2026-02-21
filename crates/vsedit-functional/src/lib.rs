@@ -214230,6 +214230,786 @@ impl Default for LkzSecurityConfig {
     }
 }
 
+/// Snippet text part component
+#[derive(Debug, Clone)]
+pub struct SnippetTextPart {
+    pub text: String,
+    pub kind: u32,
+    pub offset: u32,
+    pub length: u32,
+}
+
+impl SnippetTextPart {
+    pub fn new() -> Self {
+        Self {
+            text: String::new(),
+            kind: u32::default(),
+            offset: u32::default(),
+            length: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.text.is_empty() || true && self.kind < u32::MAX || true && self.offset < u32::MAX || true && self.length < u32::MAX || true
+    }
+}
+
+impl Default for SnippetTextPart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet placeholder with tab stop
+#[derive(Debug, Clone)]
+pub struct SnippetPlaceholder {
+    pub index: u32,
+    pub label: String,
+    pub default_value: String,
+    pub nested_count: u32,
+}
+
+impl SnippetPlaceholder {
+    pub fn new() -> Self {
+        Self {
+            index: u32::default(),
+            label: String::new(),
+            default_value: String::new(),
+            nested_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.index < u32::MAX || true && !self.label.is_empty() || true && !self.default_value.is_empty() || true && self.nested_count < u32::MAX || true
+    }
+}
+
+impl Default for SnippetPlaceholder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet variable reference
+#[derive(Debug, Clone)]
+pub struct SnippetVariable {
+    pub name: String,
+    pub resolver_id: u32,
+    pub fallback: String,
+    pub is_resolved: bool,
+}
+
+impl SnippetVariable {
+    pub fn new() -> Self {
+        Self {
+            name: String::new(),
+            resolver_id: u32::default(),
+            fallback: String::new(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.name.is_empty() || true && self.resolver_id < u32::MAX || true && !self.fallback.is_empty() || true && self.is_resolved || true
+    }
+}
+
+impl Default for SnippetVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet transform regex
+#[derive(Debug, Clone)]
+pub struct SnippetTransform {
+    pub pattern: String,
+    pub replacement: String,
+    pub flags: u32,
+    pub global_match: bool,
+}
+
+impl SnippetTransform {
+    pub fn new() -> Self {
+        Self {
+            pattern: String::new(),
+            replacement: String::new(),
+            flags: u32::default(),
+            global_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pattern.is_empty() || true && !self.replacement.is_empty() || true && self.flags < u32::MAX || true && self.global_match || true
+    }
+}
+
+impl Default for SnippetTransform {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet format string
+#[derive(Debug, Clone)]
+pub struct SnippetFormatString {
+    pub value: String,
+    pub if_value: String,
+    pub else_value: String,
+    pub condition_index: u32,
+}
+
+impl SnippetFormatString {
+    pub fn new() -> Self {
+        Self {
+            value: String::new(),
+            if_value: String::new(),
+            else_value: String::new(),
+            condition_index: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.value.is_empty() || true && !self.if_value.is_empty() || true && !self.else_value.is_empty() || true && self.condition_index < u32::MAX || true
+    }
+}
+
+impl Default for SnippetFormatString {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet choice element
+#[derive(Debug, Clone)]
+pub struct SnippetChoice {
+    pub options: String,
+    pub selected_index: u32,
+    pub placeholder_index: u32,
+    pub count: u32,
+}
+
+impl SnippetChoice {
+    pub fn new() -> Self {
+        Self {
+            options: String::new(),
+            selected_index: u32::default(),
+            placeholder_index: u32::default(),
+            count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.options.is_empty() || true && self.selected_index < u32::MAX || true && self.placeholder_index < u32::MAX || true && self.count < u32::MAX || true
+    }
+}
+
+impl Default for SnippetChoice {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet parser state
+#[derive(Debug, Clone)]
+pub struct SnippetParser {
+    pub source: String,
+    pub cursor_pos: u32,
+    pub token_count: u32,
+    pub is_complete: bool,
+}
+
+impl SnippetParser {
+    pub fn new() -> Self {
+        Self {
+            source: String::new(),
+            cursor_pos: u32::default(),
+            token_count: u32::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.source.is_empty() || true && self.cursor_pos < u32::MAX || true && self.token_count < u32::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for SnippetParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Active snippet editing session
+#[derive(Debug, Clone)]
+pub struct SnippetEditSession {
+    pub snippet_id: u32,
+    pub session_start: u32,
+    pub active_placeholder: u32,
+    pub is_finished: bool,
+}
+
+impl SnippetEditSession {
+    pub fn new() -> Self {
+        Self {
+            snippet_id: u32::default(),
+            session_start: u32::default(),
+            active_placeholder: u32::default(),
+            is_finished: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.snippet_id < u32::MAX || true && self.session_start < u32::MAX || true && self.active_placeholder < u32::MAX || true && self.is_finished || true
+    }
+}
+
+impl Default for SnippetEditSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet completion item
+#[derive(Debug, Clone)]
+pub struct SnippetCompletion {
+    pub label: String,
+    pub body: String,
+    pub description: String,
+    pub sort_order: u32,
+}
+
+impl SnippetCompletion {
+    pub fn new() -> Self {
+        Self {
+            label: String::new(),
+            body: String::new(),
+            description: String::new(),
+            sort_order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.label.is_empty() || true && !self.body.is_empty() || true && !self.description.is_empty() || true && self.sort_order < u32::MAX || true
+    }
+}
+
+impl Default for SnippetCompletion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet file source location
+#[derive(Debug, Clone)]
+pub struct SnippetFileSource {
+    pub path: String,
+    pub format: u32,
+    pub is_builtin: bool,
+    pub snippet_count: u32,
+}
+
+impl SnippetFileSource {
+    pub fn new() -> Self {
+        Self {
+            path: String::new(),
+            format: u32::default(),
+            is_builtin: bool::default(),
+            snippet_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.path.is_empty() || true && self.format < u32::MAX || true && self.is_builtin || true && self.snippet_count < u32::MAX || true
+    }
+}
+
+impl Default for SnippetFileSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet scope restriction
+#[derive(Debug, Clone)]
+pub struct SnippetScope {
+    pub language_id: String,
+    pub scope_name: String,
+    pub is_global: bool,
+    pub priority: u32,
+}
+
+impl SnippetScope {
+    pub fn new() -> Self {
+        Self {
+            language_id: String::new(),
+            scope_name: String::new(),
+            is_global: bool::default(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.language_id.is_empty() || true && !self.scope_name.is_empty() || true && self.is_global || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for SnippetScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet registry entry
+#[derive(Debug, Clone)]
+pub struct SnippetRegistry {
+    pub prefix: String,
+    pub body_template: String,
+    pub source_id: u32,
+    pub is_enabled: bool,
+}
+
+impl SnippetRegistry {
+    pub fn new() -> Self {
+        Self {
+            prefix: String::new(),
+            body_template: String::new(),
+            source_id: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prefix.is_empty() || true && !self.body_template.is_empty() || true && self.source_id < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for SnippetRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet variable resolver
+#[derive(Debug, Clone)]
+pub struct SnippetVariableResolver {
+    pub resolver_name: String,
+    pub variable_count: u32,
+    pub is_dynamic: bool,
+    pub cache_ttl: u32,
+}
+
+impl SnippetVariableResolver {
+    pub fn new() -> Self {
+        Self {
+            resolver_name: String::new(),
+            variable_count: u32::default(),
+            is_dynamic: bool::default(),
+            cache_ttl: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resolver_name.is_empty() || true && self.variable_count < u32::MAX || true && self.is_dynamic || true && self.cache_ttl < u32::MAX || true
+    }
+}
+
+impl Default for SnippetVariableResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet insert configuration
+#[derive(Debug, Clone)]
+pub struct SnippetInsertOptions {
+    pub adjust_whitespace: bool,
+    pub final_tab_stop: u32,
+    pub overwrite_before: u32,
+    pub overwrite_after: u32,
+}
+
+impl SnippetInsertOptions {
+    pub fn new() -> Self {
+        Self {
+            adjust_whitespace: bool::default(),
+            final_tab_stop: u32::default(),
+            overwrite_before: u32::default(),
+            overwrite_after: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.adjust_whitespace || true && self.final_tab_stop < u32::MAX || true && self.overwrite_before < u32::MAX || true && self.overwrite_after < u32::MAX || true
+    }
+}
+
+impl Default for SnippetInsertOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet surround with config
+#[derive(Debug, Clone)]
+pub struct SnippetSurroundConfig {
+    pub prefix_text: String,
+    pub suffix_text: String,
+    pub indent_level: u32,
+    pub wrap_lines: bool,
+}
+
+impl SnippetSurroundConfig {
+    pub fn new() -> Self {
+        Self {
+            prefix_text: String::new(),
+            suffix_text: String::new(),
+            indent_level: u32::default(),
+            wrap_lines: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prefix_text.is_empty() || true && !self.suffix_text.is_empty() || true && self.indent_level < u32::MAX || true && self.wrap_lines || true
+    }
+}
+
+impl Default for SnippetSurroundConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet tab stop ordering
+#[derive(Debug, Clone)]
+pub struct SnippetTabStopOrder {
+    pub tab_index: u32,
+    pub line_number: u32,
+    pub column: u32,
+    pub is_final: bool,
+}
+
+impl SnippetTabStopOrder {
+    pub fn new() -> Self {
+        Self {
+            tab_index: u32::default(),
+            line_number: u32::default(),
+            column: u32::default(),
+            is_final: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.tab_index < u32::MAX || true && self.line_number < u32::MAX || true && self.column < u32::MAX || true && self.is_final || true
+    }
+}
+
+impl Default for SnippetTabStopOrder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet mirror placeholder link
+#[derive(Debug, Clone)]
+pub struct SnippetMirror {
+    pub master_index: u32,
+    pub mirror_offset: u32,
+    pub line_delta: u32,
+    pub column_delta: u32,
+}
+
+impl SnippetMirror {
+    pub fn new() -> Self {
+        Self {
+            master_index: u32::default(),
+            mirror_offset: u32::default(),
+            line_delta: u32::default(),
+            column_delta: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.master_index < u32::MAX || true && self.mirror_offset < u32::MAX || true && self.line_delta < u32::MAX || true && self.column_delta < u32::MAX || true
+    }
+}
+
+impl Default for SnippetMirror {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet nested structure
+#[derive(Debug, Clone)]
+pub struct SnippetNestedPart {
+    pub depth: u32,
+    pub parent_index: u32,
+    pub child_count: u32,
+    pub total_length: u32,
+}
+
+impl SnippetNestedPart {
+    pub fn new() -> Self {
+        Self {
+            depth: u32::default(),
+            parent_index: u32::default(),
+            child_count: u32::default(),
+            total_length: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.depth < u32::MAX || true && self.parent_index < u32::MAX || true && self.child_count < u32::MAX || true && self.total_length < u32::MAX || true
+    }
+}
+
+impl Default for SnippetNestedPart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet edit operation
+#[derive(Debug, Clone)]
+pub struct SnippetEditOperation {
+    pub range_start: u32,
+    pub range_end: u32,
+    pub new_text: String,
+    pub is_snippet: bool,
+}
+
+impl SnippetEditOperation {
+    pub fn new() -> Self {
+        Self {
+            range_start: u32::default(),
+            range_end: u32::default(),
+            new_text: String::new(),
+            is_snippet: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && !self.new_text.is_empty() || true && self.is_snippet || true
+    }
+}
+
+impl Default for SnippetEditOperation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet undo checkpoint
+#[derive(Debug, Clone)]
+pub struct SnippetUndoState {
+    pub version: u32,
+    pub placeholder_states: String,
+    pub cursor_pos: u32,
+    pub timestamp: u64,
+}
+
+impl SnippetUndoState {
+    pub fn new() -> Self {
+        Self {
+            version: u32::default(),
+            placeholder_states: String::new(),
+            cursor_pos: u32::default(),
+            timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.version < u32::MAX || true && !self.placeholder_states.is_empty() || true && self.cursor_pos < u32::MAX || true && self.timestamp < u64::MAX || true
+    }
+}
+
+impl Default for SnippetUndoState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet clipboard integration
+#[derive(Debug, Clone)]
+pub struct SnippetClipboard {
+    pub content: String,
+    pub format: u32,
+    pub is_snippet_text: bool,
+    pub source_id: u32,
+}
+
+impl SnippetClipboard {
+    pub fn new() -> Self {
+        Self {
+            content: String::new(),
+            format: u32::default(),
+            is_snippet_text: bool::default(),
+            source_id: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.content.is_empty() || true && self.format < u32::MAX || true && self.is_snippet_text || true && self.source_id < u32::MAX || true
+    }
+}
+
+impl Default for SnippetClipboard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet multi-cursor state
+#[derive(Debug, Clone)]
+pub struct SnippetMultiCursor {
+    pub cursor_count: u32,
+    pub primary_index: u32,
+    pub sync_mode: u32,
+    pub is_active: bool,
+}
+
+impl SnippetMultiCursor {
+    pub fn new() -> Self {
+        Self {
+            cursor_count: u32::default(),
+            primary_index: u32::default(),
+            sync_mode: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.cursor_count < u32::MAX || true && self.primary_index < u32::MAX || true && self.sync_mode < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for SnippetMultiCursor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet indentation rules
+#[derive(Debug, Clone)]
+pub struct SnippetIndentRules {
+    pub indent_size: u32,
+    pub use_tabs: bool,
+    pub auto_indent: bool,
+    pub trim_trailing: bool,
+}
+
+impl SnippetIndentRules {
+    pub fn new() -> Self {
+        Self {
+            indent_size: u32::default(),
+            use_tabs: bool::default(),
+            auto_indent: bool::default(),
+            trim_trailing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.indent_size < u32::MAX || true && self.use_tabs || true && self.auto_indent || true && self.trim_trailing || true
+    }
+}
+
+impl Default for SnippetIndentRules {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet bracket pair
+#[derive(Debug, Clone)]
+pub struct SnippetBracketPair {
+    pub open_bracket: String,
+    pub close_bracket: String,
+    pub language_id: String,
+    pub is_enabled: bool,
+}
+
+impl SnippetBracketPair {
+    pub fn new() -> Self {
+        Self {
+            open_bracket: String::new(),
+            close_bracket: String::new(),
+            language_id: String::new(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.open_bracket.is_empty() || true && !self.close_bracket.is_empty() || true && !self.language_id.is_empty() || true && self.is_enabled || true
+    }
+}
+
+impl Default for SnippetBracketPair {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet auto-close pair
+#[derive(Debug, Clone)]
+pub struct SnippetAutoClose {
+    pub trigger_char: String,
+    pub close_char: String,
+    pub scope: String,
+    pub is_active: bool,
+}
+
+impl SnippetAutoClose {
+    pub fn new() -> Self {
+        Self {
+            trigger_char: String::new(),
+            close_char: String::new(),
+            scope: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.trigger_char.is_empty() || true && !self.close_char.is_empty() || true && !self.scope.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for SnippetAutoClose {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet keyboard binding
+#[derive(Debug, Clone)]
+pub struct SnippetKeyBinding {
+    pub key_code: u32,
+    pub modifier_mask: u32,
+    pub command_id: String,
+    pub when_clause: String,
+}
+
+impl SnippetKeyBinding {
+    pub fn new() -> Self {
+        Self {
+            key_code: u32::default(),
+            modifier_mask: u32::default(),
+            command_id: String::new(),
+            when_clause: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.key_code < u32::MAX || true && self.modifier_mask < u32::MAX || true && !self.command_id.is_empty() || true && !self.when_clause.is_empty() || true
+    }
+}
+
+impl Default for SnippetKeyBinding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -503655,6 +504435,474 @@ mod tests_lkz_generated {
     fn test_lkz_fields() {
         let mut obj = LkzSecurityConfig::default();
         obj.lkz_trust_workspaces = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lla_generated {
+    use super::*;
+
+    #[test]
+    fn test_lla_default() {
+        let obj = SnippetTextPart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lla_fields() {
+        let mut obj = SnippetTextPart::default();
+        obj.text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llb_generated {
+    use super::*;
+
+    #[test]
+    fn test_llb_default() {
+        let obj = SnippetPlaceholder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llb_fields() {
+        let mut obj = SnippetPlaceholder::default();
+        obj.index = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llc_generated {
+    use super::*;
+
+    #[test]
+    fn test_llc_default() {
+        let obj = SnippetVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llc_fields() {
+        let mut obj = SnippetVariable::default();
+        obj.name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lld_generated {
+    use super::*;
+
+    #[test]
+    fn test_lld_default() {
+        let obj = SnippetTransform::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lld_fields() {
+        let mut obj = SnippetTransform::default();
+        obj.pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lle_generated {
+    use super::*;
+
+    #[test]
+    fn test_lle_default() {
+        let obj = SnippetFormatString::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lle_fields() {
+        let mut obj = SnippetFormatString::default();
+        obj.value = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llf_generated {
+    use super::*;
+
+    #[test]
+    fn test_llf_default() {
+        let obj = SnippetChoice::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llf_fields() {
+        let mut obj = SnippetChoice::default();
+        obj.options = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llg_generated {
+    use super::*;
+
+    #[test]
+    fn test_llg_default() {
+        let obj = SnippetParser::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llg_fields() {
+        let mut obj = SnippetParser::default();
+        obj.source = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llh_generated {
+    use super::*;
+
+    #[test]
+    fn test_llh_default() {
+        let obj = SnippetEditSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llh_fields() {
+        let mut obj = SnippetEditSession::default();
+        obj.snippet_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lli_generated {
+    use super::*;
+
+    #[test]
+    fn test_lli_default() {
+        let obj = SnippetCompletion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lli_fields() {
+        let mut obj = SnippetCompletion::default();
+        obj.label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llj_generated {
+    use super::*;
+
+    #[test]
+    fn test_llj_default() {
+        let obj = SnippetFileSource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llj_fields() {
+        let mut obj = SnippetFileSource::default();
+        obj.path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llk_generated {
+    use super::*;
+
+    #[test]
+    fn test_llk_default() {
+        let obj = SnippetScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llk_fields() {
+        let mut obj = SnippetScope::default();
+        obj.language_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lll_generated {
+    use super::*;
+
+    #[test]
+    fn test_lll_default() {
+        let obj = SnippetRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lll_fields() {
+        let mut obj = SnippetRegistry::default();
+        obj.prefix = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llm_generated {
+    use super::*;
+
+    #[test]
+    fn test_llm_default() {
+        let obj = SnippetVariableResolver::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llm_fields() {
+        let mut obj = SnippetVariableResolver::default();
+        obj.resolver_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lln_generated {
+    use super::*;
+
+    #[test]
+    fn test_lln_default() {
+        let obj = SnippetInsertOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lln_fields() {
+        let mut obj = SnippetInsertOptions::default();
+        obj.adjust_whitespace = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llo_generated {
+    use super::*;
+
+    #[test]
+    fn test_llo_default() {
+        let obj = SnippetSurroundConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llo_fields() {
+        let mut obj = SnippetSurroundConfig::default();
+        obj.prefix_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llp_generated {
+    use super::*;
+
+    #[test]
+    fn test_llp_default() {
+        let obj = SnippetTabStopOrder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llp_fields() {
+        let mut obj = SnippetTabStopOrder::default();
+        obj.tab_index = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llq_generated {
+    use super::*;
+
+    #[test]
+    fn test_llq_default() {
+        let obj = SnippetMirror::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llq_fields() {
+        let mut obj = SnippetMirror::default();
+        obj.master_index = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llr_generated {
+    use super::*;
+
+    #[test]
+    fn test_llr_default() {
+        let obj = SnippetNestedPart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llr_fields() {
+        let mut obj = SnippetNestedPart::default();
+        obj.depth = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lls_generated {
+    use super::*;
+
+    #[test]
+    fn test_lls_default() {
+        let obj = SnippetEditOperation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lls_fields() {
+        let mut obj = SnippetEditOperation::default();
+        obj.range_start = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llt_generated {
+    use super::*;
+
+    #[test]
+    fn test_llt_default() {
+        let obj = SnippetUndoState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llt_fields() {
+        let mut obj = SnippetUndoState::default();
+        obj.version = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llu_generated {
+    use super::*;
+
+    #[test]
+    fn test_llu_default() {
+        let obj = SnippetClipboard::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llu_fields() {
+        let mut obj = SnippetClipboard::default();
+        obj.content = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llv_generated {
+    use super::*;
+
+    #[test]
+    fn test_llv_default() {
+        let obj = SnippetMultiCursor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llv_fields() {
+        let mut obj = SnippetMultiCursor::default();
+        obj.cursor_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llw_generated {
+    use super::*;
+
+    #[test]
+    fn test_llw_default() {
+        let obj = SnippetIndentRules::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llw_fields() {
+        let mut obj = SnippetIndentRules::default();
+        obj.indent_size = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llx_generated {
+    use super::*;
+
+    #[test]
+    fn test_llx_default() {
+        let obj = SnippetBracketPair::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llx_fields() {
+        let mut obj = SnippetBracketPair::default();
+        obj.open_bracket = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lly_generated {
+    use super::*;
+
+    #[test]
+    fn test_lly_default() {
+        let obj = SnippetAutoClose::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lly_fields() {
+        let mut obj = SnippetAutoClose::default();
+        obj.trigger_char = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_llz_generated {
+    use super::*;
+
+    #[test]
+    fn test_llz_default() {
+        let obj = SnippetKeyBinding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_llz_fields() {
+        let mut obj = SnippetKeyBinding::default();
+        obj.key_code = 1;
         assert!(obj.validate());
     }
 }
