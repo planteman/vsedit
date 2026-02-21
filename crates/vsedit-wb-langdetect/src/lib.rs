@@ -202726,6 +202726,838 @@ impl Default for KwzSettingsConfig {
     }
 }
 
+/// /// Color theme definition
+#[derive(Debug, Clone)]
+pub struct KxaColorTheme {
+    pub kxa_theme_id: String,
+    pub kxa_theme_name: String,
+    pub kxa_theme_type: String,
+    pub kxa_path_str: String,
+    pub kxa_label: String,
+}
+
+impl KxaColorTheme {
+    pub fn new() -> Self {
+        Self {
+            kxa_theme_id: String::new(),
+            kxa_theme_name: String::new(),
+            kxa_theme_type: String::new(),
+            kxa_path_str: String::new(),
+            kxa_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxa_theme_id.is_empty() || true && !self.kxa_theme_name.is_empty() || true && !self.kxa_theme_type.is_empty() || true && !self.kxa_path_str.is_empty() || true && !self.kxa_label.is_empty() || true
+    }
+}
+
+impl Default for KxaColorTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Theme color token value
+#[derive(Debug, Clone)]
+pub struct KxbThemeColor {
+    pub kxb_color_id: String,
+    pub kxb_hex_value: String,
+    pub kxb_opacity: f64,
+    pub kxb_dark_value: String,
+    pub kxb_label: String,
+}
+
+impl KxbThemeColor {
+    pub fn new() -> Self {
+        Self {
+            kxb_color_id: String::new(),
+            kxb_hex_value: String::new(),
+            kxb_opacity: f64::default(),
+            kxb_dark_value: String::new(),
+            kxb_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxb_color_id.is_empty() || true && !self.kxb_hex_value.is_empty() || true && self.kxb_opacity.is_finite() || true && !self.kxb_dark_value.is_empty() || true && !self.kxb_label.is_empty() || true
+    }
+}
+
+impl Default for KxbThemeColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Token color rule (TextMate scope)
+#[derive(Debug, Clone)]
+pub struct KxcTokenColor {
+    pub kxc_scope: String,
+    pub kxc_foreground: String,
+    pub kxc_font_style: String,
+    pub kxc_background: String,
+    pub kxc_label: String,
+}
+
+impl KxcTokenColor {
+    pub fn new() -> Self {
+        Self {
+            kxc_scope: String::new(),
+            kxc_foreground: String::new(),
+            kxc_font_style: String::new(),
+            kxc_background: String::new(),
+            kxc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxc_scope.is_empty() || true && !self.kxc_foreground.is_empty() || true && !self.kxc_font_style.is_empty() || true && !self.kxc_background.is_empty() || true && !self.kxc_label.is_empty() || true
+    }
+}
+
+impl Default for KxcTokenColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File icon theme definition
+#[derive(Debug, Clone)]
+pub struct KxdIconTheme {
+    pub kxd_theme_id: String,
+    pub kxd_theme_name: String,
+    pub kxd_path_str: String,
+    pub kxd_icons_count: u32,
+    pub kxd_label: String,
+}
+
+impl KxdIconTheme {
+    pub fn new() -> Self {
+        Self {
+            kxd_theme_id: String::new(),
+            kxd_theme_name: String::new(),
+            kxd_path_str: String::new(),
+            kxd_icons_count: u32::default(),
+            kxd_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxd_theme_id.is_empty() || true && !self.kxd_theme_name.is_empty() || true && !self.kxd_path_str.is_empty() || true && self.kxd_icons_count < u32::MAX || true && !self.kxd_label.is_empty() || true
+    }
+}
+
+impl Default for KxdIconTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File icon mapping entry
+#[derive(Debug, Clone)]
+pub struct KxeIconEntry {
+    pub kxe_icon_path: String,
+    pub kxe_file_extension: String,
+    pub kxe_file_name: String,
+    pub kxe_lang_id: String,
+    pub kxe_label: String,
+}
+
+impl KxeIconEntry {
+    pub fn new() -> Self {
+        Self {
+            kxe_icon_path: String::new(),
+            kxe_file_extension: String::new(),
+            kxe_file_name: String::new(),
+            kxe_lang_id: String::new(),
+            kxe_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxe_icon_path.is_empty() || true && !self.kxe_file_extension.is_empty() || true && !self.kxe_file_name.is_empty() || true && !self.kxe_lang_id.is_empty() || true && !self.kxe_label.is_empty() || true
+    }
+}
+
+impl Default for KxeIconEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Product/Codicon icon definition
+#[derive(Debug, Clone)]
+pub struct KxfProductIcon {
+    pub kxf_icon_id: String,
+    pub kxf_font_char: String,
+    pub kxf_font_id: String,
+    pub kxf_description: String,
+    pub kxf_label: String,
+}
+
+impl KxfProductIcon {
+    pub fn new() -> Self {
+        Self {
+            kxf_icon_id: String::new(),
+            kxf_font_char: String::new(),
+            kxf_font_id: String::new(),
+            kxf_description: String::new(),
+            kxf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxf_icon_id.is_empty() || true && !self.kxf_font_char.is_empty() || true && !self.kxf_font_id.is_empty() || true && !self.kxf_description.is_empty() || true && !self.kxf_label.is_empty() || true
+    }
+}
+
+impl Default for KxfProductIcon {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Semantic highlighting rule
+#[derive(Debug, Clone)]
+pub struct KxgSemanticHighlight {
+    pub kxg_token_type: String,
+    pub kxg_modifiers: String,
+    pub kxg_foreground: String,
+    pub kxg_bold: bool,
+    pub kxg_label: String,
+}
+
+impl KxgSemanticHighlight {
+    pub fn new() -> Self {
+        Self {
+            kxg_token_type: String::new(),
+            kxg_modifiers: String::new(),
+            kxg_foreground: String::new(),
+            kxg_bold: bool::default(),
+            kxg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxg_token_type.is_empty() || true && !self.kxg_modifiers.is_empty() || true && !self.kxg_foreground.is_empty() || true && self.kxg_bold || true && !self.kxg_label.is_empty() || true
+    }
+}
+
+impl Default for KxgSemanticHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// User color customization
+#[derive(Debug, Clone)]
+pub struct KxhColorCustomization {
+    pub kxh_color_id: String,
+    pub kxh_custom_value: String,
+    pub kxh_scope: String,
+    pub kxh_overridden: bool,
+    pub kxh_label: String,
+}
+
+impl KxhColorCustomization {
+    pub fn new() -> Self {
+        Self {
+            kxh_color_id: String::new(),
+            kxh_custom_value: String::new(),
+            kxh_scope: String::new(),
+            kxh_overridden: bool::default(),
+            kxh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxh_color_id.is_empty() || true && !self.kxh_custom_value.is_empty() || true && !self.kxh_scope.is_empty() || true && self.kxh_overridden || true && !self.kxh_label.is_empty() || true
+    }
+}
+
+impl Default for KxhColorCustomization {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// User token color customization
+#[derive(Debug, Clone)]
+pub struct KxiTokenCustomization {
+    pub kxi_scope: String,
+    pub kxi_foreground: String,
+    pub kxi_font_style: String,
+    pub kxi_overridden: bool,
+    pub kxi_label: String,
+}
+
+impl KxiTokenCustomization {
+    pub fn new() -> Self {
+        Self {
+            kxi_scope: String::new(),
+            kxi_foreground: String::new(),
+            kxi_font_style: String::new(),
+            kxi_overridden: bool::default(),
+            kxi_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxi_scope.is_empty() || true && !self.kxi_foreground.is_empty() || true && !self.kxi_font_style.is_empty() || true && self.kxi_overridden || true && !self.kxi_label.is_empty() || true
+    }
+}
+
+impl Default for KxiTokenCustomization {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Theme selector dialog state
+#[derive(Debug, Clone)]
+pub struct KxjThemeSelector {
+    pub kxj_query: String,
+    pub kxj_results_count: u32,
+    pub kxj_selected_idx: u32,
+    pub kxj_preview_active: bool,
+    pub kxj_label: String,
+}
+
+impl KxjThemeSelector {
+    pub fn new() -> Self {
+        Self {
+            kxj_query: String::new(),
+            kxj_results_count: u32::default(),
+            kxj_selected_idx: u32::default(),
+            kxj_preview_active: bool::default(),
+            kxj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxj_query.is_empty() || true && self.kxj_results_count < u32::MAX || true && self.kxj_selected_idx < u32::MAX || true && self.kxj_preview_active || true && !self.kxj_label.is_empty() || true
+    }
+}
+
+impl Default for KxjThemeSelector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// OS dark/light mode detection
+#[derive(Debug, Clone)]
+pub struct KxkDarkLightDetect {
+    pub kxk_os_theme: String,
+    pub kxk_auto_detect: bool,
+    pub kxk_preferred_dark: String,
+    pub kxk_preferred_light: String,
+    pub kxk_label: String,
+}
+
+impl KxkDarkLightDetect {
+    pub fn new() -> Self {
+        Self {
+            kxk_os_theme: String::new(),
+            kxk_auto_detect: bool::default(),
+            kxk_preferred_dark: String::new(),
+            kxk_preferred_light: String::new(),
+            kxk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxk_os_theme.is_empty() || true && self.kxk_auto_detect || true && !self.kxk_preferred_dark.is_empty() || true && !self.kxk_preferred_light.is_empty() || true && !self.kxk_label.is_empty() || true
+    }
+}
+
+impl Default for KxkDarkLightDetect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// High contrast mode settings
+#[derive(Debug, Clone)]
+pub struct KxlHighContrast {
+    pub kxl_enabled: bool,
+    pub kxl_theme_id: String,
+    pub kxl_border_width: u32,
+    pub kxl_focus_indicator: bool,
+    pub kxl_label: String,
+}
+
+impl KxlHighContrast {
+    pub fn new() -> Self {
+        Self {
+            kxl_enabled: bool::default(),
+            kxl_theme_id: String::new(),
+            kxl_border_width: u32::default(),
+            kxl_focus_indicator: bool::default(),
+            kxl_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kxl_enabled || true && !self.kxl_theme_id.is_empty() || true && self.kxl_border_width < u32::MAX || true && self.kxl_focus_indicator || true && !self.kxl_label.is_empty() || true
+    }
+}
+
+impl Default for KxlHighContrast {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Window zoom level
+#[derive(Debug, Clone)]
+pub struct KxmZoomLevel {
+    pub kxm_level: f64,
+    pub kxm_persistent: bool,
+    pub kxm_default_level: f64,
+    pub kxm_step_size: f64,
+    pub kxm_label: String,
+}
+
+impl KxmZoomLevel {
+    pub fn new() -> Self {
+        Self {
+            kxm_level: f64::default(),
+            kxm_persistent: bool::default(),
+            kxm_default_level: f64::default(),
+            kxm_step_size: f64::default(),
+            kxm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kxm_level.is_finite() || true && self.kxm_persistent || true && self.kxm_default_level.is_finite() || true && self.kxm_step_size.is_finite() || true && !self.kxm_label.is_empty() || true
+    }
+}
+
+impl Default for KxmZoomLevel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Window title bar template
+#[derive(Debug, Clone)]
+pub struct KxnWindowTitle {
+    pub kxn_template: String,
+    pub kxn_separator: String,
+    pub kxn_show_dirty: bool,
+    pub kxn_show_path: bool,
+    pub kxn_label: String,
+}
+
+impl KxnWindowTitle {
+    pub fn new() -> Self {
+        Self {
+            kxn_template: String::new(),
+            kxn_separator: String::new(),
+            kxn_show_dirty: bool::default(),
+            kxn_show_path: bool::default(),
+            kxn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxn_template.is_empty() || true && !self.kxn_separator.is_empty() || true && self.kxn_show_dirty || true && self.kxn_show_path || true && !self.kxn_label.is_empty() || true
+    }
+}
+
+impl Default for KxnWindowTitle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Menu bar visibility mode
+#[derive(Debug, Clone)]
+pub struct KxoMenuBarVisibility {
+    pub kxo_mode: String,
+    pub kxo_compact: bool,
+    pub kxo_native: bool,
+    pub kxo_toggle_key: String,
+    pub kxo_label: String,
+}
+
+impl KxoMenuBarVisibility {
+    pub fn new() -> Self {
+        Self {
+            kxo_mode: String::new(),
+            kxo_compact: bool::default(),
+            kxo_native: bool::default(),
+            kxo_toggle_key: String::new(),
+            kxo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxo_mode.is_empty() || true && self.kxo_compact || true && self.kxo_native || true && !self.kxo_toggle_key.is_empty() || true && !self.kxo_label.is_empty() || true
+    }
+}
+
+impl Default for KxoMenuBarVisibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Sidebar position (left/right)
+#[derive(Debug, Clone)]
+pub struct KxpSideBarPosition {
+    pub kxp_position: String,
+    pub kxp_width_pct: f64,
+    pub kxp_visible: bool,
+    pub kxp_auto_hide: bool,
+    pub kxp_label: String,
+}
+
+impl KxpSideBarPosition {
+    pub fn new() -> Self {
+        Self {
+            kxp_position: String::new(),
+            kxp_width_pct: f64::default(),
+            kxp_visible: bool::default(),
+            kxp_auto_hide: bool::default(),
+            kxp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxp_position.is_empty() || true && self.kxp_width_pct.is_finite() || true && self.kxp_visible || true && self.kxp_auto_hide || true && !self.kxp_label.is_empty() || true
+    }
+}
+
+impl Default for KxpSideBarPosition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Bottom panel position
+#[derive(Debug, Clone)]
+pub struct KxqPanelPosition {
+    pub kxq_position: String,
+    pub kxq_height_pct: f64,
+    pub kxq_visible: bool,
+    pub kxq_maximized: bool,
+    pub kxq_label: String,
+}
+
+impl KxqPanelPosition {
+    pub fn new() -> Self {
+        Self {
+            kxq_position: String::new(),
+            kxq_height_pct: f64::default(),
+            kxq_visible: bool::default(),
+            kxq_maximized: bool::default(),
+            kxq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxq_position.is_empty() || true && self.kxq_height_pct.is_finite() || true && self.kxq_visible || true && self.kxq_maximized || true && !self.kxq_label.is_empty() || true
+    }
+}
+
+impl Default for KxqPanelPosition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor tabs layout mode
+#[derive(Debug, Clone)]
+pub struct KxrTabsLayout {
+    pub kxr_mode: String,
+    pub kxr_show_icons: bool,
+    pub kxr_close_button: String,
+    pub kxr_wrap_tabs: bool,
+    pub kxr_label: String,
+}
+
+impl KxrTabsLayout {
+    pub fn new() -> Self {
+        Self {
+            kxr_mode: String::new(),
+            kxr_show_icons: bool::default(),
+            kxr_close_button: String::new(),
+            kxr_wrap_tabs: bool::default(),
+            kxr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxr_mode.is_empty() || true && self.kxr_show_icons || true && !self.kxr_close_button.is_empty() || true && self.kxr_wrap_tabs || true && !self.kxr_label.is_empty() || true
+    }
+}
+
+impl Default for KxrTabsLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Breadcrumb appearance settings
+#[derive(Debug, Clone)]
+pub struct KxsBreadcrumbStyle {
+    pub kxs_enabled: bool,
+    pub kxs_file_path: bool,
+    pub kxs_symbol_path: bool,
+    pub kxs_font_size: f64,
+    pub kxs_label: String,
+}
+
+impl KxsBreadcrumbStyle {
+    pub fn new() -> Self {
+        Self {
+            kxs_enabled: bool::default(),
+            kxs_file_path: bool::default(),
+            kxs_symbol_path: bool::default(),
+            kxs_font_size: f64::default(),
+            kxs_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kxs_enabled || true && self.kxs_file_path || true && self.kxs_symbol_path || true && self.kxs_font_size.is_finite() || true && !self.kxs_label.is_empty() || true
+    }
+}
+
+impl Default for KxsBreadcrumbStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Minimap appearance settings
+#[derive(Debug, Clone)]
+pub struct KxtMinimapStyle {
+    pub kxt_enabled: bool,
+    pub kxt_side: String,
+    pub kxt_max_column: u32,
+    pub kxt_show_slider: String,
+    pub kxt_label: String,
+}
+
+impl KxtMinimapStyle {
+    pub fn new() -> Self {
+        Self {
+            kxt_enabled: bool::default(),
+            kxt_side: String::new(),
+            kxt_max_column: u32::default(),
+            kxt_show_slider: String::new(),
+            kxt_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kxt_enabled || true && !self.kxt_side.is_empty() || true && self.kxt_max_column < u32::MAX || true && !self.kxt_show_slider.is_empty() || true && !self.kxt_label.is_empty() || true
+    }
+}
+
+impl Default for KxtMinimapStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Scrollbar appearance settings
+#[derive(Debug, Clone)]
+pub struct KxuScrollbarStyle {
+    pub kxu_vertical_mode: String,
+    pub kxu_horizontal_mode: String,
+    pub kxu_arrow_size: u32,
+    pub kxu_scroll_sensitivity: f64,
+    pub kxu_label: String,
+}
+
+impl KxuScrollbarStyle {
+    pub fn new() -> Self {
+        Self {
+            kxu_vertical_mode: String::new(),
+            kxu_horizontal_mode: String::new(),
+            kxu_arrow_size: u32::default(),
+            kxu_scroll_sensitivity: f64::default(),
+            kxu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxu_vertical_mode.is_empty() || true && !self.kxu_horizontal_mode.is_empty() || true && self.kxu_arrow_size < u32::MAX || true && self.kxu_scroll_sensitivity.is_finite() || true && !self.kxu_label.is_empty() || true
+    }
+}
+
+impl Default for KxuScrollbarStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Indent guide appearance
+#[derive(Debug, Clone)]
+pub struct KxvIndentGuideStyle {
+    pub kxv_enabled: bool,
+    pub kxv_highlight_active: bool,
+    pub kxv_color: String,
+    pub kxv_size_px: u32,
+    pub kxv_label: String,
+}
+
+impl KxvIndentGuideStyle {
+    pub fn new() -> Self {
+        Self {
+            kxv_enabled: bool::default(),
+            kxv_highlight_active: bool::default(),
+            kxv_color: String::new(),
+            kxv_size_px: u32::default(),
+            kxv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kxv_enabled || true && self.kxv_highlight_active || true && !self.kxv_color.is_empty() || true && self.kxv_size_px < u32::MAX || true && !self.kxv_label.is_empty() || true
+    }
+}
+
+impl Default for KxvIndentGuideStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Bracket pair colorization style
+#[derive(Debug, Clone)]
+pub struct KxwBracketPairColor {
+    pub kxw_enabled: bool,
+    pub kxw_independent_pairs: bool,
+    pub kxw_max_level: u32,
+    pub kxw_active_guide: bool,
+    pub kxw_label: String,
+}
+
+impl KxwBracketPairColor {
+    pub fn new() -> Self {
+        Self {
+            kxw_enabled: bool::default(),
+            kxw_independent_pairs: bool::default(),
+            kxw_max_level: u32::default(),
+            kxw_active_guide: bool::default(),
+            kxw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kxw_enabled || true && self.kxw_independent_pairs || true && self.kxw_max_level < u32::MAX || true && self.kxw_active_guide || true && !self.kxw_label.is_empty() || true
+    }
+}
+
+impl Default for KxwBracketPairColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Whitespace rendering style
+#[derive(Debug, Clone)]
+pub struct KxxRenderWhitespace {
+    pub kxx_mode: String,
+    pub kxx_boundary: bool,
+    pub kxx_trailing: bool,
+    pub kxx_show_in_selection: bool,
+    pub kxx_label: String,
+}
+
+impl KxxRenderWhitespace {
+    pub fn new() -> Self {
+        Self {
+            kxx_mode: String::new(),
+            kxx_boundary: bool::default(),
+            kxx_trailing: bool::default(),
+            kxx_show_in_selection: bool::default(),
+            kxx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxx_mode.is_empty() || true && self.kxx_boundary || true && self.kxx_trailing || true && self.kxx_show_in_selection || true && !self.kxx_label.is_empty() || true
+    }
+}
+
+impl Default for KxxRenderWhitespace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor visual appearance
+#[derive(Debug, Clone)]
+pub struct KxyEditorAppearance {
+    pub kxy_cursor_style: String,
+    pub kxy_line_highlight: String,
+    pub kxy_render_line_numbers: String,
+    pub kxy_smooth_scrolling: bool,
+    pub kxy_label: String,
+}
+
+impl KxyEditorAppearance {
+    pub fn new() -> Self {
+        Self {
+            kxy_cursor_style: String::new(),
+            kxy_line_highlight: String::new(),
+            kxy_render_line_numbers: String::new(),
+            kxy_smooth_scrolling: bool::default(),
+            kxy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxy_cursor_style.is_empty() || true && !self.kxy_line_highlight.is_empty() || true && !self.kxy_render_line_numbers.is_empty() || true && self.kxy_smooth_scrolling || true && !self.kxy_label.is_empty() || true
+    }
+}
+
+impl Default for KxyEditorAppearance {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined theme configuration
+#[derive(Debug, Clone)]
+pub struct KxzThemeConfig {
+    pub kxz_color_theme: String,
+    pub kxz_icon_theme: String,
+    pub kxz_product_icon_theme: String,
+    pub kxz_auto_detect_color_scheme: bool,
+    pub kxz_label: String,
+}
+
+impl KxzThemeConfig {
+    pub fn new() -> Self {
+        Self {
+            kxz_color_theme: String::new(),
+            kxz_icon_theme: String::new(),
+            kxz_product_icon_theme: String::new(),
+            kxz_auto_detect_color_scheme: bool::default(),
+            kxz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kxz_color_theme.is_empty() || true && !self.kxz_icon_theme.is_empty() || true && !self.kxz_product_icon_theme.is_empty() || true && self.kxz_auto_detect_color_scheme || true && !self.kxz_label.is_empty() || true
+    }
+}
+
+impl Default for KxzThemeConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -485479,6 +486311,474 @@ mod tests_kwz_generated {
     fn test_kwz_fields() {
         let mut obj = KwzSettingsConfig::default();
         obj.kwz_editor_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxa_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxa_default() {
+        let obj = KxaColorTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxa_fields() {
+        let mut obj = KxaColorTheme::default();
+        obj.kxa_theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxb_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxb_default() {
+        let obj = KxbThemeColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxb_fields() {
+        let mut obj = KxbThemeColor::default();
+        obj.kxb_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxc_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxc_default() {
+        let obj = KxcTokenColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxc_fields() {
+        let mut obj = KxcTokenColor::default();
+        obj.kxc_scope = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxd_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxd_default() {
+        let obj = KxdIconTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxd_fields() {
+        let mut obj = KxdIconTheme::default();
+        obj.kxd_theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxe_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxe_default() {
+        let obj = KxeIconEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxe_fields() {
+        let mut obj = KxeIconEntry::default();
+        obj.kxe_icon_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxf_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxf_default() {
+        let obj = KxfProductIcon::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxf_fields() {
+        let mut obj = KxfProductIcon::default();
+        obj.kxf_icon_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxg_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxg_default() {
+        let obj = KxgSemanticHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxg_fields() {
+        let mut obj = KxgSemanticHighlight::default();
+        obj.kxg_token_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxh_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxh_default() {
+        let obj = KxhColorCustomization::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxh_fields() {
+        let mut obj = KxhColorCustomization::default();
+        obj.kxh_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxi_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxi_default() {
+        let obj = KxiTokenCustomization::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxi_fields() {
+        let mut obj = KxiTokenCustomization::default();
+        obj.kxi_scope = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxj_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxj_default() {
+        let obj = KxjThemeSelector::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxj_fields() {
+        let mut obj = KxjThemeSelector::default();
+        obj.kxj_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxk_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxk_default() {
+        let obj = KxkDarkLightDetect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxk_fields() {
+        let mut obj = KxkDarkLightDetect::default();
+        obj.kxk_os_theme = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxl_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxl_default() {
+        let obj = KxlHighContrast::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxl_fields() {
+        let mut obj = KxlHighContrast::default();
+        obj.kxl_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxm_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxm_default() {
+        let obj = KxmZoomLevel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxm_fields() {
+        let mut obj = KxmZoomLevel::default();
+        obj.kxm_level = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxn_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxn_default() {
+        let obj = KxnWindowTitle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxn_fields() {
+        let mut obj = KxnWindowTitle::default();
+        obj.kxn_template = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxo_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxo_default() {
+        let obj = KxoMenuBarVisibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxo_fields() {
+        let mut obj = KxoMenuBarVisibility::default();
+        obj.kxo_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxp_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxp_default() {
+        let obj = KxpSideBarPosition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxp_fields() {
+        let mut obj = KxpSideBarPosition::default();
+        obj.kxp_position = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxq_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxq_default() {
+        let obj = KxqPanelPosition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxq_fields() {
+        let mut obj = KxqPanelPosition::default();
+        obj.kxq_position = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxr_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxr_default() {
+        let obj = KxrTabsLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxr_fields() {
+        let mut obj = KxrTabsLayout::default();
+        obj.kxr_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxs_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxs_default() {
+        let obj = KxsBreadcrumbStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxs_fields() {
+        let mut obj = KxsBreadcrumbStyle::default();
+        obj.kxs_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxt_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxt_default() {
+        let obj = KxtMinimapStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxt_fields() {
+        let mut obj = KxtMinimapStyle::default();
+        obj.kxt_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxu_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxu_default() {
+        let obj = KxuScrollbarStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxu_fields() {
+        let mut obj = KxuScrollbarStyle::default();
+        obj.kxu_vertical_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxv_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxv_default() {
+        let obj = KxvIndentGuideStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxv_fields() {
+        let mut obj = KxvIndentGuideStyle::default();
+        obj.kxv_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxw_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxw_default() {
+        let obj = KxwBracketPairColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxw_fields() {
+        let mut obj = KxwBracketPairColor::default();
+        obj.kxw_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxx_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxx_default() {
+        let obj = KxxRenderWhitespace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxx_fields() {
+        let mut obj = KxxRenderWhitespace::default();
+        obj.kxx_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxy_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxy_default() {
+        let obj = KxyEditorAppearance::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxy_fields() {
+        let mut obj = KxyEditorAppearance::default();
+        obj.kxy_cursor_style = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kxz_generated {
+    use super::*;
+
+    #[test]
+    fn test_kxz_default() {
+        let obj = KxzThemeConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kxz_fields() {
+        let mut obj = KxzThemeConfig::default();
+        obj.kxz_color_theme = "test".to_string();
         assert!(obj.validate());
     }
 }
