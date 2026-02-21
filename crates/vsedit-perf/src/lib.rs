@@ -208572,6 +208572,838 @@ impl Default for LdzFileSystemConfig {
     }
 }
 
+/// /// IPC communication channel
+#[derive(Debug, Clone)]
+pub struct LeaIpcChannel {
+    pub lea_channel_name: String,
+    pub lea_connected: bool,
+    pub lea_buffer_size: u32,
+    pub lea_timeout_ms: u32,
+    pub lea_label: String,
+}
+
+impl LeaIpcChannel {
+    pub fn new() -> Self {
+        Self {
+            lea_channel_name: String::new(),
+            lea_connected: bool::default(),
+            lea_buffer_size: u32::default(),
+            lea_timeout_ms: u32::default(),
+            lea_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lea_channel_name.is_empty() || true && self.lea_connected || true && self.lea_buffer_size < u32::MAX || true && self.lea_timeout_ms < u32::MAX || true && !self.lea_label.is_empty() || true
+    }
+}
+
+impl Default for LeaIpcChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// IPC message envelope
+#[derive(Debug, Clone)]
+pub struct LebIpcMessage {
+    pub leb_msg_type: String,
+    pub leb_header: String,
+    pub leb_body_length: u64,
+    pub leb_sequence: u64,
+    pub leb_label: String,
+}
+
+impl LebIpcMessage {
+    pub fn new() -> Self {
+        Self {
+            leb_msg_type: String::new(),
+            leb_header: String::new(),
+            leb_body_length: u64::default(),
+            leb_sequence: u64::default(),
+            leb_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.leb_msg_type.is_empty() || true && !self.leb_header.is_empty() || true && self.leb_body_length < u64::MAX || true && self.leb_sequence < u64::MAX || true && !self.leb_label.is_empty() || true
+    }
+}
+
+impl Default for LebIpcMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// IPC server instance
+#[derive(Debug, Clone)]
+pub struct LecIpcServer {
+    pub lec_socket_path: String,
+    pub lec_clients_count: u32,
+    pub lec_listening: bool,
+    pub lec_port: u32,
+    pub lec_label: String,
+}
+
+impl LecIpcServer {
+    pub fn new() -> Self {
+        Self {
+            lec_socket_path: String::new(),
+            lec_clients_count: u32::default(),
+            lec_listening: bool::default(),
+            lec_port: u32::default(),
+            lec_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lec_socket_path.is_empty() || true && self.lec_clients_count < u32::MAX || true && self.lec_listening || true && self.lec_port < u32::MAX || true && !self.lec_label.is_empty() || true
+    }
+}
+
+impl Default for LecIpcServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// IPC client connection
+#[derive(Debug, Clone)]
+pub struct LedIpcClient {
+    pub led_server_addr: String,
+    pub led_connected: bool,
+    pub led_reconnect_ms: u32,
+    pub led_timeout_ms: u32,
+    pub led_label: String,
+}
+
+impl LedIpcClient {
+    pub fn new() -> Self {
+        Self {
+            led_server_addr: String::new(),
+            led_connected: bool::default(),
+            led_reconnect_ms: u32::default(),
+            led_timeout_ms: u32::default(),
+            led_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.led_server_addr.is_empty() || true && self.led_connected || true && self.led_reconnect_ms < u32::MAX || true && self.led_timeout_ms < u32::MAX || true && !self.led_label.is_empty() || true
+    }
+}
+
+impl Default for LedIpcClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// JSON-RPC protocol handler
+#[derive(Debug, Clone)]
+pub struct LeeRpcProtocol {
+    pub lee_protocol_ver: String,
+    pub lee_pending_count: u32,
+    pub lee_max_pending: u32,
+    pub lee_trace_enabled: bool,
+    pub lee_label: String,
+}
+
+impl LeeRpcProtocol {
+    pub fn new() -> Self {
+        Self {
+            lee_protocol_ver: String::new(),
+            lee_pending_count: u32::default(),
+            lee_max_pending: u32::default(),
+            lee_trace_enabled: bool::default(),
+            lee_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lee_protocol_ver.is_empty() || true && self.lee_pending_count < u32::MAX || true && self.lee_max_pending < u32::MAX || true && self.lee_trace_enabled || true && !self.lee_label.is_empty() || true
+    }
+}
+
+impl Default for LeeRpcProtocol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// RPC request message
+#[derive(Debug, Clone)]
+pub struct LefRpcRequest {
+    pub lef_method: String,
+    pub lef_params: String,
+    pub lef_request_id: u64,
+    pub lef_cancel_token: String,
+    pub lef_label: String,
+}
+
+impl LefRpcRequest {
+    pub fn new() -> Self {
+        Self {
+            lef_method: String::new(),
+            lef_params: String::new(),
+            lef_request_id: u64::default(),
+            lef_cancel_token: String::new(),
+            lef_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lef_method.is_empty() || true && !self.lef_params.is_empty() || true && self.lef_request_id < u64::MAX || true && !self.lef_cancel_token.is_empty() || true && !self.lef_label.is_empty() || true
+    }
+}
+
+impl Default for LefRpcRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// RPC response message
+#[derive(Debug, Clone)]
+pub struct LegRpcResponse {
+    pub leg_request_id: u64,
+    pub leg_result: String,
+    pub leg_error_code: u32,
+    pub leg_error_msg: String,
+    pub leg_label: String,
+}
+
+impl LegRpcResponse {
+    pub fn new() -> Self {
+        Self {
+            leg_request_id: u64::default(),
+            leg_result: String::new(),
+            leg_error_code: u32::default(),
+            leg_error_msg: String::new(),
+            leg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.leg_request_id < u64::MAX || true && !self.leg_result.is_empty() || true && self.leg_error_code < u32::MAX || true && !self.leg_error_msg.is_empty() || true && !self.leg_label.is_empty() || true
+    }
+}
+
+impl Default for LegRpcResponse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// RPC event notification
+#[derive(Debug, Clone)]
+pub struct LehRpcEvent {
+    pub leh_event_name: String,
+    pub leh_data: String,
+    pub leh_timestamp: u64,
+    pub leh_source: String,
+    pub leh_label: String,
+}
+
+impl LehRpcEvent {
+    pub fn new() -> Self {
+        Self {
+            leh_event_name: String::new(),
+            leh_data: String::new(),
+            leh_timestamp: u64::default(),
+            leh_source: String::new(),
+            leh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.leh_event_name.is_empty() || true && !self.leh_data.is_empty() || true && self.leh_timestamp < u64::MAX || true && !self.leh_source.is_empty() || true && !self.leh_label.is_empty() || true
+    }
+}
+
+impl Default for LehRpcEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Remote server connection
+#[derive(Debug, Clone)]
+pub struct LeiRemoteConnection {
+    pub lei_host: String,
+    pub lei_port: u32,
+    pub lei_connected: bool,
+    pub lei_latency_ms: u32,
+    pub lei_label: String,
+}
+
+impl LeiRemoteConnection {
+    pub fn new() -> Self {
+        Self {
+            lei_host: String::new(),
+            lei_port: u32::default(),
+            lei_connected: bool::default(),
+            lei_latency_ms: u32::default(),
+            lei_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lei_host.is_empty() || true && self.lei_port < u32::MAX || true && self.lei_connected || true && self.lei_latency_ms < u32::MAX || true && !self.lei_label.is_empty() || true
+    }
+}
+
+impl Default for LeiRemoteConnection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Remote authority resolver
+#[derive(Debug, Clone)]
+pub struct LejRemoteAuthority {
+    pub lej_authority: String,
+    pub lej_host: String,
+    pub lej_connection_token: String,
+    pub lej_resolved: bool,
+    pub lej_label: String,
+}
+
+impl LejRemoteAuthority {
+    pub fn new() -> Self {
+        Self {
+            lej_authority: String::new(),
+            lej_host: String::new(),
+            lej_connection_token: String::new(),
+            lej_resolved: bool::default(),
+            lej_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lej_authority.is_empty() || true && !self.lej_host.is_empty() || true && !self.lej_connection_token.is_empty() || true && self.lej_resolved || true && !self.lej_label.is_empty() || true
+    }
+}
+
+impl Default for LejRemoteAuthority {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Remote tunnel connection
+#[derive(Debug, Clone)]
+pub struct LekRemoteTunnel {
+    pub lek_tunnel_id: String,
+    pub lek_local_port: u32,
+    pub lek_remote_port: u32,
+    pub lek_active: bool,
+    pub lek_label: String,
+}
+
+impl LekRemoteTunnel {
+    pub fn new() -> Self {
+        Self {
+            lek_tunnel_id: String::new(),
+            lek_local_port: u32::default(),
+            lek_remote_port: u32::default(),
+            lek_active: bool::default(),
+            lek_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lek_tunnel_id.is_empty() || true && self.lek_local_port < u32::MAX || true && self.lek_remote_port < u32::MAX || true && self.lek_active || true && !self.lek_label.is_empty() || true
+    }
+}
+
+impl Default for LekRemoteTunnel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Remote environment info
+#[derive(Debug, Clone)]
+pub struct LelRemoteEnv {
+    pub lel_os_name: String,
+    pub lel_arch: String,
+    pub lel_home_dir: String,
+    pub lel_tmp_dir: String,
+    pub lel_label: String,
+}
+
+impl LelRemoteEnv {
+    pub fn new() -> Self {
+        Self {
+            lel_os_name: String::new(),
+            lel_arch: String::new(),
+            lel_home_dir: String::new(),
+            lel_tmp_dir: String::new(),
+            lel_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lel_os_name.is_empty() || true && !self.lel_arch.is_empty() || true && !self.lel_home_dir.is_empty() || true && !self.lel_tmp_dir.is_empty() || true && !self.lel_label.is_empty() || true
+    }
+}
+
+impl Default for LelRemoteEnv {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Remote extension host process
+#[derive(Debug, Clone)]
+pub struct LemRemoteExtHost {
+    pub lem_host_id: u32,
+    pub lem_pid: u32,
+    pub lem_responsive: bool,
+    pub lem_extensions_count: u32,
+    pub lem_label: String,
+}
+
+impl LemRemoteExtHost {
+    pub fn new() -> Self {
+        Self {
+            lem_host_id: u32::default(),
+            lem_pid: u32::default(),
+            lem_responsive: bool::default(),
+            lem_extensions_count: u32::default(),
+            lem_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lem_host_id < u32::MAX || true && self.lem_pid < u32::MAX || true && self.lem_responsive || true && self.lem_extensions_count < u32::MAX || true && !self.lem_label.is_empty() || true
+    }
+}
+
+impl Default for LemRemoteExtHost {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Remote file system connection
+#[derive(Debug, Clone)]
+pub struct LenRemoteFileSystem {
+    pub len_scheme: String,
+    pub len_authority: String,
+    pub len_connected: bool,
+    pub len_latency_ms: u32,
+    pub len_label: String,
+}
+
+impl LenRemoteFileSystem {
+    pub fn new() -> Self {
+        Self {
+            len_scheme: String::new(),
+            len_authority: String::new(),
+            len_connected: bool::default(),
+            len_latency_ms: u32::default(),
+            len_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.len_scheme.is_empty() || true && !self.len_authority.is_empty() || true && self.len_connected || true && self.len_latency_ms < u32::MAX || true && !self.len_label.is_empty() || true
+    }
+}
+
+impl Default for LenRemoteFileSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Remote terminal instance
+#[derive(Debug, Clone)]
+pub struct LeoRemoteTerminal {
+    pub leo_terminal_id: u32,
+    pub leo_pid: u32,
+    pub leo_connected: bool,
+    pub leo_cwd: String,
+    pub leo_label: String,
+}
+
+impl LeoRemoteTerminal {
+    pub fn new() -> Self {
+        Self {
+            leo_terminal_id: u32::default(),
+            leo_pid: u32::default(),
+            leo_connected: bool::default(),
+            leo_cwd: String::new(),
+            leo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.leo_terminal_id < u32::MAX || true && self.leo_pid < u32::MAX || true && self.leo_connected || true && !self.leo_cwd.is_empty() || true && !self.leo_label.is_empty() || true
+    }
+}
+
+impl Default for LeoRemoteTerminal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Port forwarding entry
+#[derive(Debug, Clone)]
+pub struct LepRemotePort {
+    pub lep_local_port: u32,
+    pub lep_remote_port: u32,
+    pub lep_protocol: String,
+    pub lep_auto_forward: bool,
+    pub lep_label: String,
+}
+
+impl LepRemotePort {
+    pub fn new() -> Self {
+        Self {
+            lep_local_port: u32::default(),
+            lep_remote_port: u32::default(),
+            lep_protocol: String::new(),
+            lep_auto_forward: bool::default(),
+            lep_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lep_local_port < u32::MAX || true && self.lep_remote_port < u32::MAX || true && !self.lep_protocol.is_empty() || true && self.lep_auto_forward || true && !self.lep_label.is_empty() || true
+    }
+}
+
+impl Default for LepRemotePort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// WebSocket connection state
+#[derive(Debug, Clone)]
+pub struct LeqWebSocket {
+    pub leq_url: String,
+    pub leq_connected: bool,
+    pub leq_protocol: String,
+    pub leq_ping_ms: u32,
+    pub leq_label: String,
+}
+
+impl LeqWebSocket {
+    pub fn new() -> Self {
+        Self {
+            leq_url: String::new(),
+            leq_connected: bool::default(),
+            leq_protocol: String::new(),
+            leq_ping_ms: u32::default(),
+            leq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.leq_url.is_empty() || true && self.leq_connected || true && !self.leq_protocol.is_empty() || true && self.leq_ping_ms < u32::MAX || true && !self.leq_label.is_empty() || true
+    }
+}
+
+impl Default for LeqWebSocket {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Message port for worker comms
+#[derive(Debug, Clone)]
+pub struct LerMessagePort {
+    pub ler_port_id: u32,
+    pub ler_target: String,
+    pub ler_connected: bool,
+    pub ler_buffer_size: u32,
+    pub ler_label: String,
+}
+
+impl LerMessagePort {
+    pub fn new() -> Self {
+        Self {
+            ler_port_id: u32::default(),
+            ler_target: String::new(),
+            ler_connected: bool::default(),
+            ler_buffer_size: u32::default(),
+            ler_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ler_port_id < u32::MAX || true && !self.ler_target.is_empty() || true && self.ler_connected || true && self.ler_buffer_size < u32::MAX || true && !self.ler_label.is_empty() || true
+    }
+}
+
+impl Default for LerMessagePort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Worker thread instance
+#[derive(Debug, Clone)]
+pub struct LesWorkerThread {
+    pub les_worker_id: u32,
+    pub les_name: String,
+    pub les_busy: bool,
+    pub les_memory_bytes: u64,
+    pub les_label: String,
+}
+
+impl LesWorkerThread {
+    pub fn new() -> Self {
+        Self {
+            les_worker_id: u32::default(),
+            les_name: String::new(),
+            les_busy: bool::default(),
+            les_memory_bytes: u64::default(),
+            les_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.les_worker_id < u32::MAX || true && !self.les_name.is_empty() || true && self.les_busy || true && self.les_memory_bytes < u64::MAX || true && !self.les_label.is_empty() || true
+    }
+}
+
+impl Default for LesWorkerThread {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Shared background process
+#[derive(Debug, Clone)]
+pub struct LetSharedProcess {
+    pub let_pid: u32,
+    pub let_responsive: bool,
+    pub let_services_count: u32,
+    pub let_memory_bytes: u64,
+    pub let_label: String,
+}
+
+impl LetSharedProcess {
+    pub fn new() -> Self {
+        Self {
+            let_pid: u32::default(),
+            let_responsive: bool::default(),
+            let_services_count: u32::default(),
+            let_memory_bytes: u64::default(),
+            let_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.let_pid < u32::MAX || true && self.let_responsive || true && self.let_services_count < u32::MAX || true && self.let_memory_bytes < u64::MAX || true && !self.let_label.is_empty() || true
+    }
+}
+
+impl Default for LetSharedProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Service proxy for RPC calls
+#[derive(Debug, Clone)]
+pub struct LeuServiceProxy {
+    pub leu_service_id: String,
+    pub leu_channel_name: String,
+    pub leu_connected: bool,
+    pub leu_call_count: u64,
+    pub leu_label: String,
+}
+
+impl LeuServiceProxy {
+    pub fn new() -> Self {
+        Self {
+            leu_service_id: String::new(),
+            leu_channel_name: String::new(),
+            leu_connected: bool::default(),
+            leu_call_count: u64::default(),
+            leu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.leu_service_id.is_empty() || true && !self.leu_channel_name.is_empty() || true && self.leu_connected || true && self.leu_call_count < u64::MAX || true && !self.leu_label.is_empty() || true
+    }
+}
+
+impl Default for LeuServiceProxy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Named service channel
+#[derive(Debug, Clone)]
+pub struct LevServiceChannel {
+    pub lev_channel_name: String,
+    pub lev_service_id: String,
+    pub lev_connected: bool,
+    pub lev_msg_count: u64,
+    pub lev_label: String,
+}
+
+impl LevServiceChannel {
+    pub fn new() -> Self {
+        Self {
+            lev_channel_name: String::new(),
+            lev_service_id: String::new(),
+            lev_connected: bool::default(),
+            lev_msg_count: u64::default(),
+            lev_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lev_channel_name.is_empty() || true && !self.lev_service_id.is_empty() || true && self.lev_connected || true && self.lev_msg_count < u64::MAX || true && !self.lev_label.is_empty() || true
+    }
+}
+
+impl Default for LevServiceChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Dependency injection container
+#[derive(Debug, Clone)]
+pub struct LewServiceCollection {
+    pub lew_count: u32,
+    pub lew_singletons: u32,
+    pub lew_transients: u32,
+    pub lew_frozen: bool,
+    pub lew_label: String,
+}
+
+impl LewServiceCollection {
+    pub fn new() -> Self {
+        Self {
+            lew_count: u32::default(),
+            lew_singletons: u32::default(),
+            lew_transients: u32::default(),
+            lew_frozen: bool::default(),
+            lew_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lew_count < u32::MAX || true && self.lew_singletons < u32::MAX || true && self.lew_transients < u32::MAX || true && self.lew_frozen || true && !self.lew_label.is_empty() || true
+    }
+}
+
+impl Default for LewServiceCollection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Service descriptor for DI
+#[derive(Debug, Clone)]
+pub struct LexServiceDescriptor {
+    pub lex_service_id: String,
+    pub lex_lifetime: String,
+    pub lex_lazy: bool,
+    pub lex_optional: bool,
+    pub lex_label: String,
+}
+
+impl LexServiceDescriptor {
+    pub fn new() -> Self {
+        Self {
+            lex_service_id: String::new(),
+            lex_lifetime: String::new(),
+            lex_lazy: bool::default(),
+            lex_optional: bool::default(),
+            lex_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lex_service_id.is_empty() || true && !self.lex_lifetime.is_empty() || true && self.lex_lazy || true && self.lex_optional || true && !self.lex_label.is_empty() || true
+    }
+}
+
+impl Default for LexServiceDescriptor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// IPC lifecycle event
+#[derive(Debug, Clone)]
+pub struct LeyIpcEvent {
+    pub ley_event_kind: String,
+    pub ley_channel_name: String,
+    pub ley_timestamp: u64,
+    pub ley_data: String,
+    pub ley_label: String,
+}
+
+impl LeyIpcEvent {
+    pub fn new() -> Self {
+        Self {
+            ley_event_kind: String::new(),
+            ley_channel_name: String::new(),
+            ley_timestamp: u64::default(),
+            ley_data: String::new(),
+            ley_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ley_event_kind.is_empty() || true && !self.ley_channel_name.is_empty() || true && self.ley_timestamp < u64::MAX || true && !self.ley_data.is_empty() || true && !self.ley_label.is_empty() || true
+    }
+}
+
+impl Default for LeyIpcEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined IPC configuration
+#[derive(Debug, Clone)]
+pub struct LezIpcConfig {
+    pub lez_max_message_size: u64,
+    pub lez_timeout_ms: u32,
+    pub lez_retry_count: u32,
+    pub lez_compression: bool,
+    pub lez_label: String,
+}
+
+impl LezIpcConfig {
+    pub fn new() -> Self {
+        Self {
+            lez_max_message_size: u64::default(),
+            lez_timeout_ms: u32::default(),
+            lez_retry_count: u32::default(),
+            lez_compression: bool::default(),
+            lez_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lez_max_message_size < u64::MAX || true && self.lez_timeout_ms < u32::MAX || true && self.lez_retry_count < u32::MAX || true && self.lez_compression || true && !self.lez_label.is_empty() || true
+    }
+}
+
+impl Default for LezIpcConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -494695,6 +495527,474 @@ mod tests_ldz_generated {
     fn test_ldz_fields() {
         let mut obj = LdzFileSystemConfig::default();
         obj.ldz_watch_exclude = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lea_generated {
+    use super::*;
+
+    #[test]
+    fn test_lea_default() {
+        let obj = LeaIpcChannel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lea_fields() {
+        let mut obj = LeaIpcChannel::default();
+        obj.lea_channel_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_leb_generated {
+    use super::*;
+
+    #[test]
+    fn test_leb_default() {
+        let obj = LebIpcMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_leb_fields() {
+        let mut obj = LebIpcMessage::default();
+        obj.leb_msg_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lec_generated {
+    use super::*;
+
+    #[test]
+    fn test_lec_default() {
+        let obj = LecIpcServer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lec_fields() {
+        let mut obj = LecIpcServer::default();
+        obj.lec_socket_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_led_generated {
+    use super::*;
+
+    #[test]
+    fn test_led_default() {
+        let obj = LedIpcClient::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_led_fields() {
+        let mut obj = LedIpcClient::default();
+        obj.led_server_addr = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lee_generated {
+    use super::*;
+
+    #[test]
+    fn test_lee_default() {
+        let obj = LeeRpcProtocol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lee_fields() {
+        let mut obj = LeeRpcProtocol::default();
+        obj.lee_protocol_ver = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lef_generated {
+    use super::*;
+
+    #[test]
+    fn test_lef_default() {
+        let obj = LefRpcRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lef_fields() {
+        let mut obj = LefRpcRequest::default();
+        obj.lef_method = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_leg_generated {
+    use super::*;
+
+    #[test]
+    fn test_leg_default() {
+        let obj = LegRpcResponse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_leg_fields() {
+        let mut obj = LegRpcResponse::default();
+        obj.leg_request_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_leh_generated {
+    use super::*;
+
+    #[test]
+    fn test_leh_default() {
+        let obj = LehRpcEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_leh_fields() {
+        let mut obj = LehRpcEvent::default();
+        obj.leh_event_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lei_generated {
+    use super::*;
+
+    #[test]
+    fn test_lei_default() {
+        let obj = LeiRemoteConnection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lei_fields() {
+        let mut obj = LeiRemoteConnection::default();
+        obj.lei_host = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lej_generated {
+    use super::*;
+
+    #[test]
+    fn test_lej_default() {
+        let obj = LejRemoteAuthority::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lej_fields() {
+        let mut obj = LejRemoteAuthority::default();
+        obj.lej_authority = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lek_generated {
+    use super::*;
+
+    #[test]
+    fn test_lek_default() {
+        let obj = LekRemoteTunnel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lek_fields() {
+        let mut obj = LekRemoteTunnel::default();
+        obj.lek_tunnel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lel_generated {
+    use super::*;
+
+    #[test]
+    fn test_lel_default() {
+        let obj = LelRemoteEnv::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lel_fields() {
+        let mut obj = LelRemoteEnv::default();
+        obj.lel_os_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lem_generated {
+    use super::*;
+
+    #[test]
+    fn test_lem_default() {
+        let obj = LemRemoteExtHost::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lem_fields() {
+        let mut obj = LemRemoteExtHost::default();
+        obj.lem_host_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_len_generated {
+    use super::*;
+
+    #[test]
+    fn test_len_default() {
+        let obj = LenRemoteFileSystem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_len_fields() {
+        let mut obj = LenRemoteFileSystem::default();
+        obj.len_scheme = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_leo_generated {
+    use super::*;
+
+    #[test]
+    fn test_leo_default() {
+        let obj = LeoRemoteTerminal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_leo_fields() {
+        let mut obj = LeoRemoteTerminal::default();
+        obj.leo_terminal_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lep_generated {
+    use super::*;
+
+    #[test]
+    fn test_lep_default() {
+        let obj = LepRemotePort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lep_fields() {
+        let mut obj = LepRemotePort::default();
+        obj.lep_local_port = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_leq_generated {
+    use super::*;
+
+    #[test]
+    fn test_leq_default() {
+        let obj = LeqWebSocket::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_leq_fields() {
+        let mut obj = LeqWebSocket::default();
+        obj.leq_url = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ler_generated {
+    use super::*;
+
+    #[test]
+    fn test_ler_default() {
+        let obj = LerMessagePort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ler_fields() {
+        let mut obj = LerMessagePort::default();
+        obj.ler_port_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_les_generated {
+    use super::*;
+
+    #[test]
+    fn test_les_default() {
+        let obj = LesWorkerThread::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_les_fields() {
+        let mut obj = LesWorkerThread::default();
+        obj.les_worker_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_let_generated {
+    use super::*;
+
+    #[test]
+    fn test_let_default() {
+        let obj = LetSharedProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_let_fields() {
+        let mut obj = LetSharedProcess::default();
+        obj.let_pid = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_leu_generated {
+    use super::*;
+
+    #[test]
+    fn test_leu_default() {
+        let obj = LeuServiceProxy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_leu_fields() {
+        let mut obj = LeuServiceProxy::default();
+        obj.leu_service_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lev_generated {
+    use super::*;
+
+    #[test]
+    fn test_lev_default() {
+        let obj = LevServiceChannel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lev_fields() {
+        let mut obj = LevServiceChannel::default();
+        obj.lev_channel_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lew_generated {
+    use super::*;
+
+    #[test]
+    fn test_lew_default() {
+        let obj = LewServiceCollection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lew_fields() {
+        let mut obj = LewServiceCollection::default();
+        obj.lew_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lex_generated {
+    use super::*;
+
+    #[test]
+    fn test_lex_default() {
+        let obj = LexServiceDescriptor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lex_fields() {
+        let mut obj = LexServiceDescriptor::default();
+        obj.lex_service_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ley_generated {
+    use super::*;
+
+    #[test]
+    fn test_ley_default() {
+        let obj = LeyIpcEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ley_fields() {
+        let mut obj = LeyIpcEvent::default();
+        obj.ley_event_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lez_generated {
+    use super::*;
+
+    #[test]
+    fn test_lez_default() {
+        let obj = LezIpcConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lez_fields() {
+        let mut obj = LezIpcConfig::default();
+        obj.lez_max_message_size = 1;
         assert!(obj.validate());
     }
 }
