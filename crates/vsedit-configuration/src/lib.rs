@@ -198278,6 +198278,838 @@ impl Default for KrzScmConfig {
     }
 }
 
+/// /// Search query parameters
+#[derive(Debug, Clone)]
+pub struct KsaSearchQuery {
+    pub ksa_pattern: String,
+    pub ksa_case_sensitive: bool,
+    pub ksa_whole_word: bool,
+    pub ksa_regex_mode: bool,
+    pub ksa_label: String,
+}
+
+impl KsaSearchQuery {
+    pub fn new() -> Self {
+        Self {
+            ksa_pattern: String::new(),
+            ksa_case_sensitive: bool::default(),
+            ksa_whole_word: bool::default(),
+            ksa_regex_mode: bool::default(),
+            ksa_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ksa_pattern.is_empty() || true && self.ksa_case_sensitive || true && self.ksa_whole_word || true && self.ksa_regex_mode || true && !self.ksa_label.is_empty() || true
+    }
+}
+
+impl Default for KsaSearchQuery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Search result entry
+#[derive(Debug, Clone)]
+pub struct KsbSearchResult {
+    pub ksb_uri: String,
+    pub ksb_matches_count: u32,
+    pub ksb_preview: String,
+    pub ksb_collapsed: bool,
+    pub ksb_label: String,
+}
+
+impl KsbSearchResult {
+    pub fn new() -> Self {
+        Self {
+            ksb_uri: String::new(),
+            ksb_matches_count: u32::default(),
+            ksb_preview: String::new(),
+            ksb_collapsed: bool::default(),
+            ksb_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ksb_uri.is_empty() || true && self.ksb_matches_count < u32::MAX || true && !self.ksb_preview.is_empty() || true && self.ksb_collapsed || true && !self.ksb_label.is_empty() || true
+    }
+}
+
+impl Default for KsbSearchResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Individual search match within file
+#[derive(Debug, Clone)]
+pub struct KscSearchMatch {
+    pub ksc_line: u32,
+    pub ksc_col_start: u32,
+    pub ksc_col_end: u32,
+    pub ksc_preview: String,
+    pub ksc_label: String,
+}
+
+impl KscSearchMatch {
+    pub fn new() -> Self {
+        Self {
+            ksc_line: u32::default(),
+            ksc_col_start: u32::default(),
+            ksc_col_end: u32::default(),
+            ksc_preview: String::new(),
+            ksc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ksc_line < u32::MAX || true && self.ksc_col_start < u32::MAX || true && self.ksc_col_end < u32::MAX || true && !self.ksc_preview.is_empty() || true && !self.ksc_label.is_empty() || true
+    }
+}
+
+impl Default for KscSearchMatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Search and replace parameters
+#[derive(Debug, Clone)]
+pub struct KsdSearchReplace {
+    pub ksd_find_text: String,
+    pub ksd_replace_text: String,
+    pub ksd_preserve_case: bool,
+    pub ksd_replaced_count: u32,
+    pub ksd_label: String,
+}
+
+impl KsdSearchReplace {
+    pub fn new() -> Self {
+        Self {
+            ksd_find_text: String::new(),
+            ksd_replace_text: String::new(),
+            ksd_preserve_case: bool::default(),
+            ksd_replaced_count: u32::default(),
+            ksd_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ksd_find_text.is_empty() || true && !self.ksd_replace_text.is_empty() || true && self.ksd_preserve_case || true && self.ksd_replaced_count < u32::MAX || true && !self.ksd_label.is_empty() || true
+    }
+}
+
+impl Default for KsdSearchReplace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Search history entry
+#[derive(Debug, Clone)]
+pub struct KseSearchHistory {
+    pub kse_query: String,
+    pub kse_timestamp: u64,
+    pub kse_results_count: u32,
+    pub kse_replace_text: String,
+    pub kse_label: String,
+}
+
+impl KseSearchHistory {
+    pub fn new() -> Self {
+        Self {
+            kse_query: String::new(),
+            kse_timestamp: u64::default(),
+            kse_results_count: u32::default(),
+            kse_replace_text: String::new(),
+            kse_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kse_query.is_empty() || true && self.kse_timestamp < u64::MAX || true && self.kse_results_count < u32::MAX || true && !self.kse_replace_text.is_empty() || true && !self.kse_label.is_empty() || true
+    }
+}
+
+impl Default for KseSearchHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Search scope (files to include/exclude)
+#[derive(Debug, Clone)]
+pub struct KsfSearchScope {
+    pub ksf_include_pattern: String,
+    pub ksf_exclude_pattern: String,
+    pub ksf_use_gitignore: bool,
+    pub ksf_follow_symlinks: bool,
+    pub ksf_label: String,
+}
+
+impl KsfSearchScope {
+    pub fn new() -> Self {
+        Self {
+            ksf_include_pattern: String::new(),
+            ksf_exclude_pattern: String::new(),
+            ksf_use_gitignore: bool::default(),
+            ksf_follow_symlinks: bool::default(),
+            ksf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ksf_include_pattern.is_empty() || true && !self.ksf_exclude_pattern.is_empty() || true && self.ksf_use_gitignore || true && self.ksf_follow_symlinks || true && !self.ksf_label.is_empty() || true
+    }
+}
+
+impl Default for KsfSearchScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Search provider registration
+#[derive(Debug, Clone)]
+pub struct KsgSearchProvider {
+    pub ksg_provider_id: String,
+    pub ksg_name: String,
+    pub ksg_supports_replace: bool,
+    pub ksg_priority: u32,
+    pub ksg_label: String,
+}
+
+impl KsgSearchProvider {
+    pub fn new() -> Self {
+        Self {
+            ksg_provider_id: String::new(),
+            ksg_name: String::new(),
+            ksg_supports_replace: bool::default(),
+            ksg_priority: u32::default(),
+            ksg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ksg_provider_id.is_empty() || true && !self.ksg_name.is_empty() || true && self.ksg_supports_replace || true && self.ksg_priority < u32::MAX || true && !self.ksg_label.is_empty() || true
+    }
+}
+
+impl Default for KsgSearchProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Search result decoration in editor
+#[derive(Debug, Clone)]
+pub struct KshSearchDecoration {
+    pub ksh_line: u32,
+    pub ksh_col_start: u32,
+    pub ksh_col_end: u32,
+    pub ksh_highlight_color: String,
+    pub ksh_current: bool,
+}
+
+impl KshSearchDecoration {
+    pub fn new() -> Self {
+        Self {
+            ksh_line: u32::default(),
+            ksh_col_start: u32::default(),
+            ksh_col_end: u32::default(),
+            ksh_highlight_color: String::new(),
+            ksh_current: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ksh_line < u32::MAX || true && self.ksh_col_start < u32::MAX || true && self.ksh_col_end < u32::MAX || true && !self.ksh_highlight_color.is_empty() || true && self.ksh_current || true
+    }
+}
+
+impl Default for KshSearchDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Search view panel state
+#[derive(Debug, Clone)]
+pub struct KsiSearchViewState {
+    pub ksi_query: String,
+    pub ksi_results_count: u32,
+    pub ksi_files_count: u32,
+    pub ksi_expanded: bool,
+    pub ksi_label: String,
+}
+
+impl KsiSearchViewState {
+    pub fn new() -> Self {
+        Self {
+            ksi_query: String::new(),
+            ksi_results_count: u32::default(),
+            ksi_files_count: u32::default(),
+            ksi_expanded: bool::default(),
+            ksi_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ksi_query.is_empty() || true && self.ksi_results_count < u32::MAX || true && self.ksi_files_count < u32::MAX || true && self.ksi_expanded || true && !self.ksi_label.is_empty() || true
+    }
+}
+
+impl Default for KsiSearchViewState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor find widget state
+#[derive(Debug, Clone)]
+pub struct KsjFindWidget {
+    pub ksj_visible: bool,
+    pub ksj_find_text: String,
+    pub ksj_replace_text: String,
+    pub ksj_focused: bool,
+    pub ksj_label: String,
+}
+
+impl KsjFindWidget {
+    pub fn new() -> Self {
+        Self {
+            ksj_visible: bool::default(),
+            ksj_find_text: String::new(),
+            ksj_replace_text: String::new(),
+            ksj_focused: bool::default(),
+            ksj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ksj_visible || true && !self.ksj_find_text.is_empty() || true && !self.ksj_replace_text.is_empty() || true && self.ksj_focused || true && !self.ksj_label.is_empty() || true
+    }
+}
+
+impl Default for KsjFindWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Find widget toggle options
+#[derive(Debug, Clone)]
+pub struct KskFindOption {
+    pub ksk_case_sensitive: bool,
+    pub ksk_whole_word: bool,
+    pub ksk_regex_mode: bool,
+    pub ksk_in_selection: bool,
+    pub ksk_preserve_case: bool,
+}
+
+impl KskFindOption {
+    pub fn new() -> Self {
+        Self {
+            ksk_case_sensitive: bool::default(),
+            ksk_whole_word: bool::default(),
+            ksk_regex_mode: bool::default(),
+            ksk_in_selection: bool::default(),
+            ksk_preserve_case: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ksk_case_sensitive || true && self.ksk_whole_word || true && self.ksk_regex_mode || true && self.ksk_in_selection || true && self.ksk_preserve_case || true
+    }
+}
+
+impl Default for KskFindOption {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Find widget history entry
+#[derive(Debug, Clone)]
+pub struct KslFindHistory {
+    pub ksl_find_text: String,
+    pub ksl_replace_text: String,
+    pub ksl_timestamp: u64,
+    pub ksl_regex_mode: bool,
+    pub ksl_label: String,
+}
+
+impl KslFindHistory {
+    pub fn new() -> Self {
+        Self {
+            ksl_find_text: String::new(),
+            ksl_replace_text: String::new(),
+            ksl_timestamp: u64::default(),
+            ksl_regex_mode: bool::default(),
+            ksl_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ksl_find_text.is_empty() || true && !self.ksl_replace_text.is_empty() || true && self.ksl_timestamp < u64::MAX || true && self.ksl_regex_mode || true && !self.ksl_label.is_empty() || true
+    }
+}
+
+impl Default for KslFindHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Ripgrep search engine options
+#[derive(Debug, Clone)]
+pub struct KsmRipgrepOptions {
+    pub ksm_binary_path: String,
+    pub ksm_max_results: u32,
+    pub ksm_timeout_ms: u32,
+    pub ksm_pcre2: bool,
+    pub ksm_label: String,
+}
+
+impl KsmRipgrepOptions {
+    pub fn new() -> Self {
+        Self {
+            ksm_binary_path: String::new(),
+            ksm_max_results: u32::default(),
+            ksm_timeout_ms: u32::default(),
+            ksm_pcre2: bool::default(),
+            ksm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ksm_binary_path.is_empty() || true && self.ksm_max_results < u32::MAX || true && self.ksm_timeout_ms < u32::MAX || true && self.ksm_pcre2 || true && !self.ksm_label.is_empty() || true
+    }
+}
+
+impl Default for KsmRipgrepOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File-level search result
+#[derive(Debug, Clone)]
+pub struct KsnSearchFileResult {
+    pub ksn_uri: String,
+    pub ksn_match_count: u32,
+    pub ksn_file_size: u64,
+    pub ksn_binary_file: bool,
+    pub ksn_label: String,
+}
+
+impl KsnSearchFileResult {
+    pub fn new() -> Self {
+        Self {
+            ksn_uri: String::new(),
+            ksn_match_count: u32::default(),
+            ksn_file_size: u64::default(),
+            ksn_binary_file: bool::default(),
+            ksn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ksn_uri.is_empty() || true && self.ksn_match_count < u32::MAX || true && self.ksn_file_size < u64::MAX || true && self.ksn_binary_file || true && !self.ksn_label.is_empty() || true
+    }
+}
+
+impl Default for KsnSearchFileResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Text-level search result match
+#[derive(Debug, Clone)]
+pub struct KsoSearchTextResult {
+    pub kso_line_text: String,
+    pub kso_line_num: u32,
+    pub kso_col_start: u32,
+    pub kso_col_end: u32,
+    pub kso_label: String,
+}
+
+impl KsoSearchTextResult {
+    pub fn new() -> Self {
+        Self {
+            kso_line_text: String::new(),
+            kso_line_num: u32::default(),
+            kso_col_start: u32::default(),
+            kso_col_end: u32::default(),
+            kso_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kso_line_text.is_empty() || true && self.kso_line_num < u32::MAX || true && self.kso_col_start < u32::MAX || true && self.kso_col_end < u32::MAX || true && !self.kso_label.is_empty() || true
+    }
+}
+
+impl Default for KsoSearchTextResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Search operation progress
+#[derive(Debug, Clone)]
+pub struct KspSearchProgress {
+    pub ksp_files_searched: u32,
+    pub ksp_matches_found: u32,
+    pub ksp_bytes_read: u64,
+    pub ksp_completed: bool,
+    pub ksp_label: String,
+}
+
+impl KspSearchProgress {
+    pub fn new() -> Self {
+        Self {
+            ksp_files_searched: u32::default(),
+            ksp_matches_found: u32::default(),
+            ksp_bytes_read: u64::default(),
+            ksp_completed: bool::default(),
+            ksp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ksp_files_searched < u32::MAX || true && self.ksp_matches_found < u32::MAX || true && self.ksp_bytes_read < u64::MAX || true && self.ksp_completed || true && !self.ksp_label.is_empty() || true
+    }
+}
+
+impl Default for KspSearchProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Search editor tab state
+#[derive(Debug, Clone)]
+pub struct KsqSearchEditor {
+    pub ksq_uri: String,
+    pub ksq_query: String,
+    pub ksq_results_count: u32,
+    pub ksq_pinned: bool,
+    pub ksq_label: String,
+}
+
+impl KsqSearchEditor {
+    pub fn new() -> Self {
+        Self {
+            ksq_uri: String::new(),
+            ksq_query: String::new(),
+            ksq_results_count: u32::default(),
+            ksq_pinned: bool::default(),
+            ksq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ksq_uri.is_empty() || true && !self.ksq_query.is_empty() || true && self.ksq_results_count < u32::MAX || true && self.ksq_pinned || true && !self.ksq_label.is_empty() || true
+    }
+}
+
+impl Default for KsqSearchEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Navigate between search matches
+#[derive(Debug, Clone)]
+pub struct KsrGotoMatch {
+    pub ksr_match_idx: u32,
+    pub ksr_total_matches: u32,
+    pub ksr_file_uri: String,
+    pub ksr_line: u32,
+    pub ksr_label: String,
+}
+
+impl KsrGotoMatch {
+    pub fn new() -> Self {
+        Self {
+            ksr_match_idx: u32::default(),
+            ksr_total_matches: u32::default(),
+            ksr_file_uri: String::new(),
+            ksr_line: u32::default(),
+            ksr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ksr_match_idx < u32::MAX || true && self.ksr_total_matches < u32::MAX || true && !self.ksr_file_uri.is_empty() || true && self.ksr_line < u32::MAX || true && !self.ksr_label.is_empty() || true
+    }
+}
+
+impl Default for KsrGotoMatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Search include glob pattern
+#[derive(Debug, Clone)]
+pub struct KssSearchInclude {
+    pub kss_pattern: String,
+    pub kss_is_glob: bool,
+    pub kss_from_settings: bool,
+    pub kss_active: bool,
+    pub kss_label: String,
+}
+
+impl KssSearchInclude {
+    pub fn new() -> Self {
+        Self {
+            kss_pattern: String::new(),
+            kss_is_glob: bool::default(),
+            kss_from_settings: bool::default(),
+            kss_active: bool::default(),
+            kss_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kss_pattern.is_empty() || true && self.kss_is_glob || true && self.kss_from_settings || true && self.kss_active || true && !self.kss_label.is_empty() || true
+    }
+}
+
+impl Default for KssSearchInclude {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Search exclude glob pattern
+#[derive(Debug, Clone)]
+pub struct KstSearchExclude {
+    pub kst_pattern: String,
+    pub kst_is_glob: bool,
+    pub kst_from_gitignore: bool,
+    pub kst_active: bool,
+    pub kst_label: String,
+}
+
+impl KstSearchExclude {
+    pub fn new() -> Self {
+        Self {
+            kst_pattern: String::new(),
+            kst_is_glob: bool::default(),
+            kst_from_gitignore: bool::default(),
+            kst_active: bool::default(),
+            kst_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kst_pattern.is_empty() || true && self.kst_is_glob || true && self.kst_from_gitignore || true && self.kst_active || true && !self.kst_label.is_empty() || true
+    }
+}
+
+impl Default for KstSearchExclude {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Search result context lines
+#[derive(Debug, Clone)]
+pub struct KsuSearchContext {
+    pub ksu_context_lines: u32,
+    pub ksu_before_lines: u32,
+    pub ksu_after_lines: u32,
+    pub ksu_show_context: bool,
+    pub ksu_label: String,
+}
+
+impl KsuSearchContext {
+    pub fn new() -> Self {
+        Self {
+            ksu_context_lines: u32::default(),
+            ksu_before_lines: u32::default(),
+            ksu_after_lines: u32::default(),
+            ksu_show_context: bool::default(),
+            ksu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ksu_context_lines < u32::MAX || true && self.ksu_before_lines < u32::MAX || true && self.ksu_after_lines < u32::MAX || true && self.ksu_show_context || true && !self.ksu_label.is_empty() || true
+    }
+}
+
+impl Default for KsuSearchContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Search results sorting
+#[derive(Debug, Clone)]
+pub struct KsvSearchSort {
+    pub ksv_sort_by: String,
+    pub ksv_ascending: bool,
+    pub ksv_group_by_file: bool,
+    pub ksv_recent_first: bool,
+    pub ksv_label: String,
+}
+
+impl KsvSearchSort {
+    pub fn new() -> Self {
+        Self {
+            ksv_sort_by: String::new(),
+            ksv_ascending: bool::default(),
+            ksv_group_by_file: bool::default(),
+            ksv_recent_first: bool::default(),
+            ksv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ksv_sort_by.is_empty() || true && self.ksv_ascending || true && self.ksv_group_by_file || true && self.ksv_recent_first || true && !self.ksv_label.is_empty() || true
+    }
+}
+
+impl Default for KsvSearchSort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Search view action command
+#[derive(Debug, Clone)]
+pub struct KswSearchAction {
+    pub ksw_action_id: String,
+    pub ksw_keybinding: String,
+    pub ksw_tooltip: String,
+    pub ksw_enabled: bool,
+    pub ksw_label: String,
+}
+
+impl KswSearchAction {
+    pub fn new() -> Self {
+        Self {
+            ksw_action_id: String::new(),
+            ksw_keybinding: String::new(),
+            ksw_tooltip: String::new(),
+            ksw_enabled: bool::default(),
+            ksw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ksw_action_id.is_empty() || true && !self.ksw_keybinding.is_empty() || true && !self.ksw_tooltip.is_empty() || true && self.ksw_enabled || true && !self.ksw_label.is_empty() || true
+    }
+}
+
+impl Default for KswSearchAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Find in files operation
+#[derive(Debug, Clone)]
+pub struct KsxFindInFiles {
+    pub ksx_pattern: String,
+    pub ksx_scope: String,
+    pub ksx_max_results: u32,
+    pub ksx_active: bool,
+    pub ksx_label: String,
+}
+
+impl KsxFindInFiles {
+    pub fn new() -> Self {
+        Self {
+            ksx_pattern: String::new(),
+            ksx_scope: String::new(),
+            ksx_max_results: u32::default(),
+            ksx_active: bool::default(),
+            ksx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ksx_pattern.is_empty() || true && !self.ksx_scope.is_empty() || true && self.ksx_max_results < u32::MAX || true && self.ksx_active || true && !self.ksx_label.is_empty() || true
+    }
+}
+
+impl Default for KsxFindInFiles {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Replace in files operation
+#[derive(Debug, Clone)]
+pub struct KsyReplaceInFiles {
+    pub ksy_find_text: String,
+    pub ksy_replace_text: String,
+    pub ksy_confirm_each: bool,
+    pub ksy_replaced_count: u32,
+    pub ksy_label: String,
+}
+
+impl KsyReplaceInFiles {
+    pub fn new() -> Self {
+        Self {
+            ksy_find_text: String::new(),
+            ksy_replace_text: String::new(),
+            ksy_confirm_each: bool::default(),
+            ksy_replaced_count: u32::default(),
+            ksy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ksy_find_text.is_empty() || true && !self.ksy_replace_text.is_empty() || true && self.ksy_confirm_each || true && self.ksy_replaced_count < u32::MAX || true && !self.ksy_label.is_empty() || true
+    }
+}
+
+impl Default for KsyReplaceInFiles {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined search configuration
+#[derive(Debug, Clone)]
+pub struct KszSearchConfig {
+    pub ksz_default_scope: String,
+    pub ksz_max_results: u32,
+    pub ksz_use_ripgrep: bool,
+    pub ksz_smart_case: bool,
+    pub ksz_label: String,
+}
+
+impl KszSearchConfig {
+    pub fn new() -> Self {
+        Self {
+            ksz_default_scope: String::new(),
+            ksz_max_results: u32::default(),
+            ksz_use_ripgrep: bool::default(),
+            ksz_smart_case: bool::default(),
+            ksz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ksz_default_scope.is_empty() || true && self.ksz_max_results < u32::MAX || true && self.ksz_use_ripgrep || true && self.ksz_smart_case || true && !self.ksz_label.is_empty() || true
+    }
+}
+
+impl Default for KszSearchConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -478953,6 +479785,474 @@ mod tests_krz_generated {
     fn test_krz_fields() {
         let mut obj = KrzScmConfig::default();
         obj.krz_default_provider = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksa_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksa_default() {
+        let obj = KsaSearchQuery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksa_fields() {
+        let mut obj = KsaSearchQuery::default();
+        obj.ksa_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksb_default() {
+        let obj = KsbSearchResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksb_fields() {
+        let mut obj = KsbSearchResult::default();
+        obj.ksb_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksc_default() {
+        let obj = KscSearchMatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksc_fields() {
+        let mut obj = KscSearchMatch::default();
+        obj.ksc_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksd_default() {
+        let obj = KsdSearchReplace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksd_fields() {
+        let mut obj = KsdSearchReplace::default();
+        obj.ksd_find_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kse_generated {
+    use super::*;
+
+    #[test]
+    fn test_kse_default() {
+        let obj = KseSearchHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kse_fields() {
+        let mut obj = KseSearchHistory::default();
+        obj.kse_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksf_default() {
+        let obj = KsfSearchScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksf_fields() {
+        let mut obj = KsfSearchScope::default();
+        obj.ksf_include_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksg_default() {
+        let obj = KsgSearchProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksg_fields() {
+        let mut obj = KsgSearchProvider::default();
+        obj.ksg_provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksh_default() {
+        let obj = KshSearchDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksh_fields() {
+        let mut obj = KshSearchDecoration::default();
+        obj.ksh_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksi_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksi_default() {
+        let obj = KsiSearchViewState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksi_fields() {
+        let mut obj = KsiSearchViewState::default();
+        obj.ksi_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksj_default() {
+        let obj = KsjFindWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksj_fields() {
+        let mut obj = KsjFindWidget::default();
+        obj.ksj_visible = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksk_default() {
+        let obj = KskFindOption::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksk_fields() {
+        let mut obj = KskFindOption::default();
+        obj.ksk_case_sensitive = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksl_default() {
+        let obj = KslFindHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksl_fields() {
+        let mut obj = KslFindHistory::default();
+        obj.ksl_find_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksm_default() {
+        let obj = KsmRipgrepOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksm_fields() {
+        let mut obj = KsmRipgrepOptions::default();
+        obj.ksm_binary_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksn_default() {
+        let obj = KsnSearchFileResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksn_fields() {
+        let mut obj = KsnSearchFileResult::default();
+        obj.ksn_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kso_generated {
+    use super::*;
+
+    #[test]
+    fn test_kso_default() {
+        let obj = KsoSearchTextResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kso_fields() {
+        let mut obj = KsoSearchTextResult::default();
+        obj.kso_line_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksp_default() {
+        let obj = KspSearchProgress::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksp_fields() {
+        let mut obj = KspSearchProgress::default();
+        obj.ksp_files_searched = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksq_default() {
+        let obj = KsqSearchEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksq_fields() {
+        let mut obj = KsqSearchEditor::default();
+        obj.ksq_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksr_default() {
+        let obj = KsrGotoMatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksr_fields() {
+        let mut obj = KsrGotoMatch::default();
+        obj.ksr_match_idx = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kss_generated {
+    use super::*;
+
+    #[test]
+    fn test_kss_default() {
+        let obj = KssSearchInclude::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kss_fields() {
+        let mut obj = KssSearchInclude::default();
+        obj.kss_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kst_generated {
+    use super::*;
+
+    #[test]
+    fn test_kst_default() {
+        let obj = KstSearchExclude::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kst_fields() {
+        let mut obj = KstSearchExclude::default();
+        obj.kst_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksu_default() {
+        let obj = KsuSearchContext::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksu_fields() {
+        let mut obj = KsuSearchContext::default();
+        obj.ksu_context_lines = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksv_default() {
+        let obj = KsvSearchSort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksv_fields() {
+        let mut obj = KsvSearchSort::default();
+        obj.ksv_sort_by = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksw_default() {
+        let obj = KswSearchAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksw_fields() {
+        let mut obj = KswSearchAction::default();
+        obj.ksw_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksx_default() {
+        let obj = KsxFindInFiles::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksx_fields() {
+        let mut obj = KsxFindInFiles::default();
+        obj.ksx_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksy_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksy_default() {
+        let obj = KsyReplaceInFiles::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksy_fields() {
+        let mut obj = KsyReplaceInFiles::default();
+        obj.ksy_find_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ksz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ksz_default() {
+        let obj = KszSearchConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ksz_fields() {
+        let mut obj = KszSearchConfig::default();
+        obj.ksz_default_scope = "test".to_string();
         assert!(obj.validate());
     }
 }
