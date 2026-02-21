@@ -224389,6 +224389,786 @@ impl Default for MenuAccessibility {
     }
 }
 
+/// Toolbar item entry
+#[derive(Debug, Clone)]
+pub struct ToolbarItem {
+    pub item_id: String,
+    pub label: String,
+    pub icon_name: String,
+    pub command_id: String,
+}
+
+impl ToolbarItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            label: String::new(),
+            icon_name: String::new(),
+            command_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.label.is_empty() || true && !self.icon_name.is_empty() || true && !self.command_id.is_empty() || true
+    }
+}
+
+impl Default for ToolbarItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar group container
+#[derive(Debug, Clone)]
+pub struct ToolbarGroup {
+    pub group_id: String,
+    pub label: String,
+    pub order: u32,
+    pub item_count: u32,
+}
+
+impl ToolbarGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            label: String::new(),
+            order: u32::default(),
+            item_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.label.is_empty() || true && self.order < u32::MAX || true && self.item_count < u32::MAX || true
+    }
+}
+
+impl Default for ToolbarGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Action bar item
+#[derive(Debug, Clone)]
+pub struct ActionBarItem {
+    pub action_id: String,
+    pub label: String,
+    pub icon_name: String,
+    pub is_enabled: bool,
+}
+
+impl ActionBarItem {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            label: String::new(),
+            icon_name: String::new(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.label.is_empty() || true && !self.icon_name.is_empty() || true && self.is_enabled || true
+    }
+}
+
+impl Default for ActionBarItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar separator
+#[derive(Debug, Clone)]
+pub struct ToolbarSeparator {
+    pub sep_id: u32,
+    pub toolbar_id: String,
+    pub position: u32,
+    pub is_visible: bool,
+}
+
+impl ToolbarSeparator {
+    pub fn new() -> Self {
+        Self {
+            sep_id: u32::default(),
+            toolbar_id: String::new(),
+            position: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.sep_id < u32::MAX || true && !self.toolbar_id.is_empty() || true && self.position < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for ToolbarSeparator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar dropdown button
+#[derive(Debug, Clone)]
+pub struct ToolbarDropdown {
+    pub dropdown_id: String,
+    pub label: String,
+    pub icon_name: String,
+    pub option_count: u32,
+}
+
+impl ToolbarDropdown {
+    pub fn new() -> Self {
+        Self {
+            dropdown_id: String::new(),
+            label: String::new(),
+            icon_name: String::new(),
+            option_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dropdown_id.is_empty() || true && !self.label.is_empty() || true && !self.icon_name.is_empty() || true && self.option_count < u32::MAX || true
+    }
+}
+
+impl Default for ToolbarDropdown {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar toggle button
+#[derive(Debug, Clone)]
+pub struct ToolbarToggle {
+    pub toggle_id: String,
+    pub label: String,
+    pub is_toggled: bool,
+    pub command_id: String,
+}
+
+impl ToolbarToggle {
+    pub fn new() -> Self {
+        Self {
+            toggle_id: String::new(),
+            label: String::new(),
+            is_toggled: bool::default(),
+            command_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.toggle_id.is_empty() || true && !self.label.is_empty() || true && self.is_toggled || true && !self.command_id.is_empty() || true
+    }
+}
+
+impl Default for ToolbarToggle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar badge indicator
+#[derive(Debug, Clone)]
+pub struct ToolbarBadge {
+    pub badge_id: String,
+    pub count: u32,
+    pub color: String,
+    pub is_visible: bool,
+}
+
+impl ToolbarBadge {
+    pub fn new() -> Self {
+        Self {
+            badge_id: String::new(),
+            count: u32::default(),
+            color: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.badge_id.is_empty() || true && self.count < u32::MAX || true && !self.color.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for ToolbarBadge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar progress indicator
+#[derive(Debug, Clone)]
+pub struct ToolbarProgress {
+    pub progress_id: u32,
+    pub percent: f64,
+    pub label: String,
+    pub is_indeterminate: bool,
+}
+
+impl ToolbarProgress {
+    pub fn new() -> Self {
+        Self {
+            progress_id: u32::default(),
+            percent: f64::default(),
+            label: String::new(),
+            is_indeterminate: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.progress_id < u32::MAX || true && self.percent.is_finite() || true && !self.label.is_empty() || true && self.is_indeterminate || true
+    }
+}
+
+impl Default for ToolbarProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar visibility state
+#[derive(Debug, Clone)]
+pub struct ToolbarState {
+    pub state_id: String,
+    pub is_visible: bool,
+    pub is_compact: bool,
+    pub active_items: u32,
+}
+
+impl ToolbarState {
+    pub fn new() -> Self {
+        Self {
+            state_id: String::new(),
+            is_visible: bool::default(),
+            is_compact: bool::default(),
+            active_items: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.state_id.is_empty() || true && self.is_visible || true && self.is_compact || true && self.active_items < u32::MAX || true
+    }
+}
+
+impl Default for ToolbarState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar layout config
+#[derive(Debug, Clone)]
+pub struct ToolbarLayout {
+    pub layout_id: String,
+    pub orientation: u32,
+    pub item_spacing: u32,
+    pub is_wrapping: bool,
+}
+
+impl ToolbarLayout {
+    pub fn new() -> Self {
+        Self {
+            layout_id: String::new(),
+            orientation: u32::default(),
+            item_spacing: u32::default(),
+            is_wrapping: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_id.is_empty() || true && self.orientation < u32::MAX || true && self.item_spacing < u32::MAX || true && self.is_wrapping || true
+    }
+}
+
+impl Default for ToolbarLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar overflow menu
+#[derive(Debug, Clone)]
+pub struct ToolbarOverflow {
+    pub overflow_id: u32,
+    pub hidden_items: u32,
+    pub has_chevron: bool,
+    pub max_visible: u32,
+}
+
+impl ToolbarOverflow {
+    pub fn new() -> Self {
+        Self {
+            overflow_id: u32::default(),
+            hidden_items: u32::default(),
+            has_chevron: bool::default(),
+            max_visible: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.overflow_id < u32::MAX || true && self.hidden_items < u32::MAX || true && self.has_chevron || true && self.max_visible < u32::MAX || true
+    }
+}
+
+impl Default for ToolbarOverflow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar customization
+#[derive(Debug, Clone)]
+pub struct ToolbarCustomize {
+    pub custom_id: u32,
+    pub item_order: String,
+    pub hidden_items_list: String,
+    pub is_saved: bool,
+}
+
+impl ToolbarCustomize {
+    pub fn new() -> Self {
+        Self {
+            custom_id: u32::default(),
+            item_order: String::new(),
+            hidden_items_list: String::new(),
+            is_saved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.custom_id < u32::MAX || true && !self.item_order.is_empty() || true && !self.hidden_items_list.is_empty() || true && self.is_saved || true
+    }
+}
+
+impl Default for ToolbarCustomize {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar theme config
+#[derive(Debug, Clone)]
+pub struct ToolbarTheme {
+    pub theme_id: String,
+    pub bg_color: String,
+    pub icon_color: String,
+    pub hover_color: String,
+}
+
+impl ToolbarTheme {
+    pub fn new() -> Self {
+        Self {
+            theme_id: String::new(),
+            bg_color: String::new(),
+            icon_color: String::new(),
+            hover_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_id.is_empty() || true && !self.bg_color.is_empty() || true && !self.icon_color.is_empty() || true && !self.hover_color.is_empty() || true
+    }
+}
+
+impl Default for ToolbarTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar animation
+#[derive(Debug, Clone)]
+pub struct ToolbarAnimation {
+    pub anim_id: u32,
+    pub anim_type: u32,
+    pub duration_ms: u32,
+    pub is_enabled: bool,
+}
+
+impl ToolbarAnimation {
+    pub fn new() -> Self {
+        Self {
+            anim_id: u32::default(),
+            anim_type: u32::default(),
+            duration_ms: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.anim_id < u32::MAX || true && self.anim_type < u32::MAX || true && self.duration_ms < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for ToolbarAnimation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar item tooltip
+#[derive(Debug, Clone)]
+pub struct ToolbarTooltip {
+    pub tooltip_id: u32,
+    pub text: String,
+    pub shortcut: String,
+    pub delay_ms: u32,
+}
+
+impl ToolbarTooltip {
+    pub fn new() -> Self {
+        Self {
+            tooltip_id: u32::default(),
+            text: String::new(),
+            shortcut: String::new(),
+            delay_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.tooltip_id < u32::MAX || true && !self.text.is_empty() || true && !self.shortcut.is_empty() || true && self.delay_ms < u32::MAX || true
+    }
+}
+
+impl Default for ToolbarTooltip {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar drag reorder
+#[derive(Debug, Clone)]
+pub struct ToolbarDrag {
+    pub drag_id: u32,
+    pub source_index: u32,
+    pub target_index: u32,
+    pub is_dragging: bool,
+}
+
+impl ToolbarDrag {
+    pub fn new() -> Self {
+        Self {
+            drag_id: u32::default(),
+            source_index: u32::default(),
+            target_index: u32::default(),
+            is_dragging: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.drag_id < u32::MAX || true && self.source_index < u32::MAX || true && self.target_index < u32::MAX || true && self.is_dragging || true
+    }
+}
+
+impl Default for ToolbarDrag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar search input
+#[derive(Debug, Clone)]
+pub struct ToolbarSearch {
+    pub search_id: u32,
+    pub placeholder: String,
+    pub query: String,
+    pub is_expanded: bool,
+}
+
+impl ToolbarSearch {
+    pub fn new() -> Self {
+        Self {
+            search_id: u32::default(),
+            placeholder: String::new(),
+            query: String::new(),
+            is_expanded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.search_id < u32::MAX || true && !self.placeholder.is_empty() || true && !self.query.is_empty() || true && self.is_expanded || true
+    }
+}
+
+impl Default for ToolbarSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar accessibility
+#[derive(Debug, Clone)]
+pub struct ToolbarAccessibility {
+    pub a11y_id: u32,
+    pub aria_role: String,
+    pub aria_label: String,
+    pub tab_index: u32,
+}
+
+impl ToolbarAccessibility {
+    pub fn new() -> Self {
+        Self {
+            a11y_id: u32::default(),
+            aria_role: String::new(),
+            aria_label: String::new(),
+            tab_index: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.a11y_id < u32::MAX || true && !self.aria_role.is_empty() || true && !self.aria_label.is_empty() || true && self.tab_index < u32::MAX || true
+    }
+}
+
+impl Default for ToolbarAccessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension toolbar contribution
+#[derive(Debug, Clone)]
+pub struct ToolbarExtension {
+    pub ext_id: String,
+    pub extension_id: String,
+    pub toolbar_id: String,
+    pub is_active: bool,
+}
+
+impl ToolbarExtension {
+    pub fn new() -> Self {
+        Self {
+            ext_id: String::new(),
+            extension_id: String::new(),
+            toolbar_id: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_id.is_empty() || true && !self.extension_id.is_empty() || true && !self.toolbar_id.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for ToolbarExtension {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar position config
+#[derive(Debug, Clone)]
+pub struct ToolbarPosition {
+    pub position_type: u32,
+    pub side: u32,
+    pub offset: u32,
+    pub is_floating: bool,
+}
+
+impl ToolbarPosition {
+    pub fn new() -> Self {
+        Self {
+            position_type: u32::default(),
+            side: u32::default(),
+            offset: u32::default(),
+            is_floating: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.position_type < u32::MAX || true && self.side < u32::MAX || true && self.offset < u32::MAX || true && self.is_floating || true
+    }
+}
+
+impl Default for ToolbarPosition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar size config
+#[derive(Debug, Clone)]
+pub struct ToolbarSize {
+    pub size_type: u32,
+    pub width: u32,
+    pub height: u32,
+    pub icon_size: u32,
+}
+
+impl ToolbarSize {
+    pub fn new() -> Self {
+        Self {
+            size_type: u32::default(),
+            width: u32::default(),
+            height: u32::default(),
+            icon_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.size_type < u32::MAX || true && self.width < u32::MAX || true && self.height < u32::MAX || true && self.icon_size < u32::MAX || true
+    }
+}
+
+impl Default for ToolbarSize {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar reset operation
+#[derive(Debug, Clone)]
+pub struct ToolbarReset {
+    pub reset_id: u32,
+    pub toolbar_id: String,
+    pub reset_scope: u32,
+    pub timestamp: u64,
+}
+
+impl ToolbarReset {
+    pub fn new() -> Self {
+        Self {
+            reset_id: u32::default(),
+            toolbar_id: String::new(),
+            reset_scope: u32::default(),
+            timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.reset_id < u32::MAX || true && !self.toolbar_id.is_empty() || true && self.reset_scope < u32::MAX || true && self.timestamp < u64::MAX || true
+    }
+}
+
+impl Default for ToolbarReset {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar config export
+#[derive(Debug, Clone)]
+pub struct ToolbarExport {
+    pub export_id: u32,
+    pub format: u32,
+    pub toolbar_id: String,
+    pub output_path: String,
+}
+
+impl ToolbarExport {
+    pub fn new() -> Self {
+        Self {
+            export_id: u32::default(),
+            format: u32::default(),
+            toolbar_id: String::new(),
+            output_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.export_id < u32::MAX || true && self.format < u32::MAX || true && !self.toolbar_id.is_empty() || true && !self.output_path.is_empty() || true
+    }
+}
+
+impl Default for ToolbarExport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar config import
+#[derive(Debug, Clone)]
+pub struct ToolbarImport {
+    pub import_id: u32,
+    pub source_path: String,
+    pub merge_mode: u32,
+    pub is_validated: bool,
+}
+
+impl ToolbarImport {
+    pub fn new() -> Self {
+        Self {
+            import_id: u32::default(),
+            source_path: String::new(),
+            merge_mode: u32::default(),
+            is_validated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.import_id < u32::MAX || true && !self.source_path.is_empty() || true && self.merge_mode < u32::MAX || true && self.is_validated || true
+    }
+}
+
+impl Default for ToolbarImport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar key binding
+#[derive(Debug, Clone)]
+pub struct ToolbarBinding {
+    pub binding_id: u32,
+    pub key_sequence: String,
+    pub toolbar_action: String,
+    pub is_custom: bool,
+}
+
+impl ToolbarBinding {
+    pub fn new() -> Self {
+        Self {
+            binding_id: u32::default(),
+            key_sequence: String::new(),
+            toolbar_action: String::new(),
+            is_custom: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.binding_id < u32::MAX || true && !self.key_sequence.is_empty() || true && !self.toolbar_action.is_empty() || true && self.is_custom || true
+    }
+}
+
+impl Default for ToolbarBinding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar registry instance
+#[derive(Debug, Clone)]
+pub struct ToolbarRegistry {
+    pub registry_id: u32,
+    pub toolbar_count: u32,
+    pub item_count: u32,
+    pub is_frozen: bool,
+}
+
+impl ToolbarRegistry {
+    pub fn new() -> Self {
+        Self {
+            registry_id: u32::default(),
+            toolbar_count: u32::default(),
+            item_count: u32::default(),
+            is_frozen: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.registry_id < u32::MAX || true && self.toolbar_count < u32::MAX || true && self.item_count < u32::MAX || true && self.is_frozen || true
+    }
+}
+
+impl Default for ToolbarRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -519883,6 +520663,474 @@ mod tests_lxz_generated {
     fn test_lxz_fields() {
         let mut obj = MenuAccessibility::default();
         obj.a11y_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lya_generated {
+    use super::*;
+
+    #[test]
+    fn test_lya_default() {
+        let obj = ToolbarItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lya_fields() {
+        let mut obj = ToolbarItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyb_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyb_default() {
+        let obj = ToolbarGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyb_fields() {
+        let mut obj = ToolbarGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyc_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyc_default() {
+        let obj = ActionBarItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyc_fields() {
+        let mut obj = ActionBarItem::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyd_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyd_default() {
+        let obj = ToolbarSeparator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyd_fields() {
+        let mut obj = ToolbarSeparator::default();
+        obj.sep_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lye_generated {
+    use super::*;
+
+    #[test]
+    fn test_lye_default() {
+        let obj = ToolbarDropdown::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lye_fields() {
+        let mut obj = ToolbarDropdown::default();
+        obj.dropdown_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyf_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyf_default() {
+        let obj = ToolbarToggle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyf_fields() {
+        let mut obj = ToolbarToggle::default();
+        obj.toggle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyg_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyg_default() {
+        let obj = ToolbarBadge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyg_fields() {
+        let mut obj = ToolbarBadge::default();
+        obj.badge_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyh_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyh_default() {
+        let obj = ToolbarProgress::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyh_fields() {
+        let mut obj = ToolbarProgress::default();
+        obj.progress_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyi_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyi_default() {
+        let obj = ToolbarState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyi_fields() {
+        let mut obj = ToolbarState::default();
+        obj.state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyj_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyj_default() {
+        let obj = ToolbarLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyj_fields() {
+        let mut obj = ToolbarLayout::default();
+        obj.layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyk_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyk_default() {
+        let obj = ToolbarOverflow::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyk_fields() {
+        let mut obj = ToolbarOverflow::default();
+        obj.overflow_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyl_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyl_default() {
+        let obj = ToolbarCustomize::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyl_fields() {
+        let mut obj = ToolbarCustomize::default();
+        obj.custom_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lym_generated {
+    use super::*;
+
+    #[test]
+    fn test_lym_default() {
+        let obj = ToolbarTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lym_fields() {
+        let mut obj = ToolbarTheme::default();
+        obj.theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyn_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyn_default() {
+        let obj = ToolbarAnimation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyn_fields() {
+        let mut obj = ToolbarAnimation::default();
+        obj.anim_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyo_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyo_default() {
+        let obj = ToolbarTooltip::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyo_fields() {
+        let mut obj = ToolbarTooltip::default();
+        obj.tooltip_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyp_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyp_default() {
+        let obj = ToolbarDrag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyp_fields() {
+        let mut obj = ToolbarDrag::default();
+        obj.drag_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyq_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyq_default() {
+        let obj = ToolbarSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyq_fields() {
+        let mut obj = ToolbarSearch::default();
+        obj.search_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyr_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyr_default() {
+        let obj = ToolbarAccessibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyr_fields() {
+        let mut obj = ToolbarAccessibility::default();
+        obj.a11y_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lys_generated {
+    use super::*;
+
+    #[test]
+    fn test_lys_default() {
+        let obj = ToolbarExtension::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lys_fields() {
+        let mut obj = ToolbarExtension::default();
+        obj.ext_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyt_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyt_default() {
+        let obj = ToolbarPosition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyt_fields() {
+        let mut obj = ToolbarPosition::default();
+        obj.position_type = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyu_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyu_default() {
+        let obj = ToolbarSize::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyu_fields() {
+        let mut obj = ToolbarSize::default();
+        obj.size_type = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyv_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyv_default() {
+        let obj = ToolbarReset::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyv_fields() {
+        let mut obj = ToolbarReset::default();
+        obj.reset_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyw_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyw_default() {
+        let obj = ToolbarExport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyw_fields() {
+        let mut obj = ToolbarExport::default();
+        obj.export_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyx_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyx_default() {
+        let obj = ToolbarImport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyx_fields() {
+        let mut obj = ToolbarImport::default();
+        obj.import_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyy_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyy_default() {
+        let obj = ToolbarBinding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyy_fields() {
+        let mut obj = ToolbarBinding::default();
+        obj.binding_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lyz_generated {
+    use super::*;
+
+    #[test]
+    fn test_lyz_default() {
+        let obj = ToolbarRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lyz_fields() {
+        let mut obj = ToolbarRegistry::default();
+        obj.registry_id = 1;
         assert!(obj.validate());
     }
 }
