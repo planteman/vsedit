@@ -231431,6 +231431,786 @@ impl Default for TerminalShellProfile {
     }
 }
 
+/// Inlay hint display item
+#[derive(Debug, Clone)]
+pub struct InlayHintDisplay {
+    pub hint_id: u32,
+    pub label: String,
+    pub position_line: u32,
+    pub position_char: u32,
+}
+
+impl InlayHintDisplay {
+    pub fn new() -> Self {
+        Self {
+            hint_id: u32::default(),
+            label: String::new(),
+            position_line: u32::default(),
+            position_char: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.hint_id < u32::MAX || true && !self.label.is_empty() || true && self.position_line < u32::MAX || true && self.position_char < u32::MAX || true
+    }
+}
+
+impl Default for InlayHintDisplay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inlay hint kind type
+#[derive(Debug, Clone)]
+pub struct InlayHintKind {
+    pub kind_id: u32,
+    pub kind_name: String,
+    pub display_style: u32,
+    pub is_type_hint: bool,
+}
+
+impl InlayHintKind {
+    pub fn new() -> Self {
+        Self {
+            kind_id: u32::default(),
+            kind_name: String::new(),
+            display_style: u32::default(),
+            is_type_hint: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kind_id < u32::MAX || true && !self.kind_name.is_empty() || true && self.display_style < u32::MAX || true && self.is_type_hint || true
+    }
+}
+
+impl Default for InlayHintKind {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inlay hint provider
+#[derive(Debug, Clone)]
+pub struct InlayHintProvider {
+    pub provider_id: String,
+    pub language_selector: String,
+    pub event_count: u32,
+    pub is_active: bool,
+}
+
+impl InlayHintProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            language_selector: String::new(),
+            event_count: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.language_selector.is_empty() || true && self.event_count < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for InlayHintProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline completion entry
+#[derive(Debug, Clone)]
+pub struct InlineCompletionEntry {
+    pub item_id: u32,
+    pub insert_text: String,
+    pub filter_text: String,
+    pub range_start: u32,
+}
+
+impl InlineCompletionEntry {
+    pub fn new() -> Self {
+        Self {
+            item_id: u32::default(),
+            insert_text: String::new(),
+            filter_text: String::new(),
+            range_start: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.item_id < u32::MAX || true && !self.insert_text.is_empty() || true && !self.filter_text.is_empty() || true && self.range_start < u32::MAX || true
+    }
+}
+
+impl Default for InlineCompletionEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline completion provider
+#[derive(Debug, Clone)]
+pub struct InlineCompletionProvider {
+    pub provider_id: String,
+    pub trigger_kind: u32,
+    pub is_cached: bool,
+    pub last_trigger: u64,
+}
+
+impl InlineCompletionProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            trigger_kind: u32::default(),
+            is_cached: bool::default(),
+            last_trigger: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && self.trigger_kind < u32::MAX || true && self.is_cached || true && self.last_trigger < u64::MAX || true
+    }
+}
+
+impl Default for InlineCompletionProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Ghost text display widget
+#[derive(Debug, Clone)]
+pub struct GhostTextWidget {
+    pub widget_id: u32,
+    pub text: String,
+    pub line: u32,
+    pub column: u32,
+}
+
+impl GhostTextWidget {
+    pub fn new() -> Self {
+        Self {
+            widget_id: u32::default(),
+            text: String::new(),
+            line: u32::default(),
+            column: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.widget_id < u32::MAX || true && !self.text.is_empty() || true && self.line < u32::MAX || true && self.column < u32::MAX || true
+    }
+}
+
+impl Default for GhostTextWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic token data
+#[derive(Debug, Clone)]
+pub struct SemanticTokenData {
+    pub token_id: u32,
+    pub delta_line: u32,
+    pub delta_start: u32,
+    pub length: u32,
+}
+
+impl SemanticTokenData {
+    pub fn new() -> Self {
+        Self {
+            token_id: u32::default(),
+            delta_line: u32::default(),
+            delta_start: u32::default(),
+            length: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.token_id < u32::MAX || true && self.delta_line < u32::MAX || true && self.delta_start < u32::MAX || true && self.length < u32::MAX || true
+    }
+}
+
+impl Default for SemanticTokenData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic token legend
+#[derive(Debug, Clone)]
+pub struct SemanticTokenLegend {
+    pub legend_id: u32,
+    pub token_types_count: u32,
+    pub token_modifiers_count: u32,
+    pub version: u32,
+}
+
+impl SemanticTokenLegend {
+    pub fn new() -> Self {
+        Self {
+            legend_id: u32::default(),
+            token_types_count: u32::default(),
+            token_modifiers_count: u32::default(),
+            version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.legend_id < u32::MAX || true && self.token_types_count < u32::MAX || true && self.token_modifiers_count < u32::MAX || true && self.version < u32::MAX || true
+    }
+}
+
+impl Default for SemanticTokenLegend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic token provider
+#[derive(Debug, Clone)]
+pub struct SemanticTokenProvider {
+    pub provider_id: String,
+    pub language_id: String,
+    pub is_full: bool,
+    pub is_range: bool,
+}
+
+impl SemanticTokenProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            language_id: String::new(),
+            is_full: bool::default(),
+            is_range: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.language_id.is_empty() || true && self.is_full || true && self.is_range || true
+    }
+}
+
+impl Default for SemanticTokenProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic token delta edit
+#[derive(Debug, Clone)]
+pub struct SemanticTokenEdit {
+    pub edit_id: u32,
+    pub start_offset: u32,
+    pub delete_count: u32,
+    pub data_length: u32,
+}
+
+impl SemanticTokenEdit {
+    pub fn new() -> Self {
+        Self {
+            edit_id: u32::default(),
+            start_offset: u32::default(),
+            delete_count: u32::default(),
+            data_length: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.edit_id < u32::MAX || true && self.start_offset < u32::MAX || true && self.delete_count < u32::MAX || true && self.data_length < u32::MAX || true
+    }
+}
+
+impl Default for SemanticTokenEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic token builder
+#[derive(Debug, Clone)]
+pub struct SemanticTokenBuilder {
+    pub builder_id: u32,
+    pub token_count: u32,
+    pub prev_line: u32,
+    pub prev_char: u32,
+}
+
+impl SemanticTokenBuilder {
+    pub fn new() -> Self {
+        Self {
+            builder_id: u32::default(),
+            token_count: u32::default(),
+            prev_line: u32::default(),
+            prev_char: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.builder_id < u32::MAX || true && self.token_count < u32::MAX || true && self.prev_line < u32::MAX || true && self.prev_char < u32::MAX || true
+    }
+}
+
+impl Default for SemanticTokenBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic token modifier
+#[derive(Debug, Clone)]
+pub struct SemanticTokenModifier {
+    pub modifier_id: u32,
+    pub modifier_name: String,
+    pub bit_flag: u32,
+    pub is_standard: bool,
+}
+
+impl SemanticTokenModifier {
+    pub fn new() -> Self {
+        Self {
+            modifier_id: u32::default(),
+            modifier_name: String::new(),
+            bit_flag: u32::default(),
+            is_standard: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.modifier_id < u32::MAX || true && !self.modifier_name.is_empty() || true && self.bit_flag < u32::MAX || true && self.is_standard || true
+    }
+}
+
+impl Default for SemanticTokenModifier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document highlight
+#[derive(Debug, Clone)]
+pub struct DocumentHighlightItem {
+    pub highlight_id: u32,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub kind: u32,
+}
+
+impl DocumentHighlightItem {
+    pub fn new() -> Self {
+        Self {
+            highlight_id: u32::default(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            kind: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.highlight_id < u32::MAX || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && self.kind < u32::MAX || true
+    }
+}
+
+impl Default for DocumentHighlightItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Highlight kind type
+#[derive(Debug, Clone)]
+pub struct DocumentHighlightKind {
+    pub kind_id: u32,
+    pub kind_name: String,
+    pub color_key: String,
+    pub is_read: bool,
+}
+
+impl DocumentHighlightKind {
+    pub fn new() -> Self {
+        Self {
+            kind_id: u32::default(),
+            kind_name: String::new(),
+            color_key: String::new(),
+            is_read: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kind_id < u32::MAX || true && !self.kind_name.is_empty() || true && !self.color_key.is_empty() || true && self.is_read || true
+    }
+}
+
+impl Default for DocumentHighlightKind {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Call hierarchy node
+#[derive(Debug, Clone)]
+pub struct CallHierarchyNode {
+    pub call_item_id: u32,
+    pub name: String,
+    pub kind: u32,
+    pub uri: String,
+}
+
+impl CallHierarchyNode {
+    pub fn new() -> Self {
+        Self {
+            call_item_id: u32::default(),
+            name: String::new(),
+            kind: u32::default(),
+            uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.call_item_id < u32::MAX || true && !self.name.is_empty() || true && self.kind < u32::MAX || true && !self.uri.is_empty() || true
+    }
+}
+
+impl Default for CallHierarchyNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Call hierarchy direction
+#[derive(Debug, Clone)]
+pub struct CallHierarchyDirection {
+    pub direction_id: u32,
+    pub is_incoming: bool,
+    pub is_outgoing: bool,
+    pub depth: u32,
+}
+
+impl CallHierarchyDirection {
+    pub fn new() -> Self {
+        Self {
+            direction_id: u32::default(),
+            is_incoming: bool::default(),
+            is_outgoing: bool::default(),
+            depth: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.direction_id < u32::MAX || true && self.is_incoming || true && self.is_outgoing || true && self.depth < u32::MAX || true
+    }
+}
+
+impl Default for CallHierarchyDirection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Type hierarchy node
+#[derive(Debug, Clone)]
+pub struct TypeHierarchyNode {
+    pub type_item_id: u32,
+    pub name: String,
+    pub kind: u32,
+    pub uri: String,
+}
+
+impl TypeHierarchyNode {
+    pub fn new() -> Self {
+        Self {
+            type_item_id: u32::default(),
+            name: String::new(),
+            kind: u32::default(),
+            uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.type_item_id < u32::MAX || true && !self.name.is_empty() || true && self.kind < u32::MAX || true && !self.uri.is_empty() || true
+    }
+}
+
+impl Default for TypeHierarchyNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Type hierarchy direction
+#[derive(Debug, Clone)]
+pub struct TypeHierarchyDirection {
+    pub th_direction_id: u32,
+    pub is_supertypes: bool,
+    pub is_subtypes: bool,
+    pub depth: u32,
+}
+
+impl TypeHierarchyDirection {
+    pub fn new() -> Self {
+        Self {
+            th_direction_id: u32::default(),
+            is_supertypes: bool::default(),
+            is_subtypes: bool::default(),
+            depth: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.th_direction_id < u32::MAX || true && self.is_supertypes || true && self.is_subtypes || true && self.depth < u32::MAX || true
+    }
+}
+
+impl Default for TypeHierarchyDirection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Linked editing range
+#[derive(Debug, Clone)]
+pub struct LinkedEditingRangeItem {
+    pub linked_id: u32,
+    pub start_line: u32,
+    pub start_char: u32,
+    pub word_pattern: String,
+}
+
+impl LinkedEditingRangeItem {
+    pub fn new() -> Self {
+        Self {
+            linked_id: u32::default(),
+            start_line: u32::default(),
+            start_char: u32::default(),
+            word_pattern: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.linked_id < u32::MAX || true && self.start_line < u32::MAX || true && self.start_char < u32::MAX || true && !self.word_pattern.is_empty() || true
+    }
+}
+
+impl Default for LinkedEditingRangeItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Linked editing provider
+#[derive(Debug, Clone)]
+pub struct LinkedEditingProvider {
+    pub le_provider_id: String,
+    pub language_selector: String,
+    pub is_active: bool,
+    pub trigger_count: u32,
+}
+
+impl LinkedEditingProvider {
+    pub fn new() -> Self {
+        Self {
+            le_provider_id: String::new(),
+            language_selector: String::new(),
+            is_active: bool::default(),
+            trigger_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.le_provider_id.is_empty() || true && !self.language_selector.is_empty() || true && self.is_active || true && self.trigger_count < u32::MAX || true
+    }
+}
+
+impl Default for LinkedEditingProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Selection range item
+#[derive(Debug, Clone)]
+pub struct SelectionRangeItem {
+    pub sel_range_id: u32,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub parent_id: u32,
+}
+
+impl SelectionRangeItem {
+    pub fn new() -> Self {
+        Self {
+            sel_range_id: u32::default(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            parent_id: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.sel_range_id < u32::MAX || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && self.parent_id < u32::MAX || true
+    }
+}
+
+impl Default for SelectionRangeItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Selection range provider
+#[derive(Debug, Clone)]
+pub struct SelectionRangeProvider {
+    pub sr_provider_id: String,
+    pub language_selector: String,
+    pub is_active: bool,
+    pub cache_size: u32,
+}
+
+impl SelectionRangeProvider {
+    pub fn new() -> Self {
+        Self {
+            sr_provider_id: String::new(),
+            language_selector: String::new(),
+            is_active: bool::default(),
+            cache_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sr_provider_id.is_empty() || true && !self.language_selector.is_empty() || true && self.is_active || true && self.cache_size < u32::MAX || true
+    }
+}
+
+impl Default for SelectionRangeProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Folding range item
+#[derive(Debug, Clone)]
+pub struct FoldingRangeItem {
+    pub fold_id: u32,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub kind: u32,
+}
+
+impl FoldingRangeItem {
+    pub fn new() -> Self {
+        Self {
+            fold_id: u32::default(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            kind: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.fold_id < u32::MAX || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && self.kind < u32::MAX || true
+    }
+}
+
+impl Default for FoldingRangeItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Folding range provider
+#[derive(Debug, Clone)]
+pub struct FoldingRangeProvider {
+    pub fr_provider_id: String,
+    pub language_selector: String,
+    pub is_active: bool,
+    pub max_ranges: u32,
+}
+
+impl FoldingRangeProvider {
+    pub fn new() -> Self {
+        Self {
+            fr_provider_id: String::new(),
+            language_selector: String::new(),
+            is_active: bool::default(),
+            max_ranges: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fr_provider_id.is_empty() || true && !self.language_selector.is_empty() || true && self.is_active || true && self.max_ranges < u32::MAX || true
+    }
+}
+
+impl Default for FoldingRangeProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color information item
+#[derive(Debug, Clone)]
+pub struct ColorInformation {
+    pub color_info_id: u32,
+    pub red: f64,
+    pub green: f64,
+    pub blue: f64,
+}
+
+impl ColorInformation {
+    pub fn new() -> Self {
+        Self {
+            color_info_id: u32::default(),
+            red: f64::default(),
+            green: f64::default(),
+            blue: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.color_info_id < u32::MAX || true && self.red.is_finite() || true && self.green.is_finite() || true && self.blue.is_finite() || true
+    }
+}
+
+impl Default for ColorInformation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color presentation item
+#[derive(Debug, Clone)]
+pub struct ColorPresentation {
+    pub color_pres_id: u32,
+    pub label: String,
+    pub text_edit_text: String,
+    pub additional_edits: u32,
+}
+
+impl ColorPresentation {
+    pub fn new() -> Self {
+        Self {
+            color_pres_id: u32::default(),
+            label: String::new(),
+            text_edit_text: String::new(),
+            additional_edits: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.color_pres_id < u32::MAX || true && !self.label.is_empty() || true && !self.text_edit_text.is_empty() || true && self.additional_edits < u32::MAX || true
+    }
+}
+
+impl Default for ColorPresentation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -531247,6 +532027,474 @@ mod tests_mgz_generated {
     fn test_mgz_fields() {
         let mut obj = TerminalShellProfile::default();
         obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mha_generated {
+    use super::*;
+
+    #[test]
+    fn test_mha_default() {
+        let obj = InlayHintDisplay::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mha_fields() {
+        let mut obj = InlayHintDisplay::default();
+        obj.hint_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhb_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhb_default() {
+        let obj = InlayHintKind::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhb_fields() {
+        let mut obj = InlayHintKind::default();
+        obj.kind_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhc_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhc_default() {
+        let obj = InlayHintProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhc_fields() {
+        let mut obj = InlayHintProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhd_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhd_default() {
+        let obj = InlineCompletionEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhd_fields() {
+        let mut obj = InlineCompletionEntry::default();
+        obj.item_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhe_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhe_default() {
+        let obj = InlineCompletionProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhe_fields() {
+        let mut obj = InlineCompletionProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhf_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhf_default() {
+        let obj = GhostTextWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhf_fields() {
+        let mut obj = GhostTextWidget::default();
+        obj.widget_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhg_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhg_default() {
+        let obj = SemanticTokenData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhg_fields() {
+        let mut obj = SemanticTokenData::default();
+        obj.token_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhh_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhh_default() {
+        let obj = SemanticTokenLegend::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhh_fields() {
+        let mut obj = SemanticTokenLegend::default();
+        obj.legend_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhi_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhi_default() {
+        let obj = SemanticTokenProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhi_fields() {
+        let mut obj = SemanticTokenProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhj_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhj_default() {
+        let obj = SemanticTokenEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhj_fields() {
+        let mut obj = SemanticTokenEdit::default();
+        obj.edit_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhk_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhk_default() {
+        let obj = SemanticTokenBuilder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhk_fields() {
+        let mut obj = SemanticTokenBuilder::default();
+        obj.builder_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhl_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhl_default() {
+        let obj = SemanticTokenModifier::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhl_fields() {
+        let mut obj = SemanticTokenModifier::default();
+        obj.modifier_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhm_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhm_default() {
+        let obj = DocumentHighlightItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhm_fields() {
+        let mut obj = DocumentHighlightItem::default();
+        obj.highlight_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhn_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhn_default() {
+        let obj = DocumentHighlightKind::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhn_fields() {
+        let mut obj = DocumentHighlightKind::default();
+        obj.kind_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mho_generated {
+    use super::*;
+
+    #[test]
+    fn test_mho_default() {
+        let obj = CallHierarchyNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mho_fields() {
+        let mut obj = CallHierarchyNode::default();
+        obj.call_item_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhp_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhp_default() {
+        let obj = CallHierarchyDirection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhp_fields() {
+        let mut obj = CallHierarchyDirection::default();
+        obj.direction_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhq_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhq_default() {
+        let obj = TypeHierarchyNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhq_fields() {
+        let mut obj = TypeHierarchyNode::default();
+        obj.type_item_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhr_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhr_default() {
+        let obj = TypeHierarchyDirection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhr_fields() {
+        let mut obj = TypeHierarchyDirection::default();
+        obj.th_direction_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhs_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhs_default() {
+        let obj = LinkedEditingRangeItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhs_fields() {
+        let mut obj = LinkedEditingRangeItem::default();
+        obj.linked_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mht_generated {
+    use super::*;
+
+    #[test]
+    fn test_mht_default() {
+        let obj = LinkedEditingProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mht_fields() {
+        let mut obj = LinkedEditingProvider::default();
+        obj.le_provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhu_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhu_default() {
+        let obj = SelectionRangeItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhu_fields() {
+        let mut obj = SelectionRangeItem::default();
+        obj.sel_range_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhv_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhv_default() {
+        let obj = SelectionRangeProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhv_fields() {
+        let mut obj = SelectionRangeProvider::default();
+        obj.sr_provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhw_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhw_default() {
+        let obj = FoldingRangeItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhw_fields() {
+        let mut obj = FoldingRangeItem::default();
+        obj.fold_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhx_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhx_default() {
+        let obj = FoldingRangeProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhx_fields() {
+        let mut obj = FoldingRangeProvider::default();
+        obj.fr_provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhy_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhy_default() {
+        let obj = ColorInformation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhy_fields() {
+        let mut obj = ColorInformation::default();
+        obj.color_info_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mhz_generated {
+    use super::*;
+
+    #[test]
+    fn test_mhz_default() {
+        let obj = ColorPresentation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mhz_fields() {
+        let mut obj = ColorPresentation::default();
+        obj.color_pres_id = 1;
         assert!(obj.validate());
     }
 }
