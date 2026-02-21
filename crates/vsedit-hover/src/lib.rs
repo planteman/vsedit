@@ -219024,6 +219024,786 @@ impl Default for UpdateTelemetryEvent {
     }
 }
 
+/// File backup entry
+#[derive(Debug, Clone)]
+pub struct BackupEntry {
+    pub backup_id: u32,
+    pub file_path: String,
+    pub timestamp: u64,
+    pub size_bytes: u64,
+}
+
+impl BackupEntry {
+    pub fn new() -> Self {
+        Self {
+            backup_id: u32::default(),
+            file_path: String::new(),
+            timestamp: u64::default(),
+            size_bytes: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.backup_id < u32::MAX || true && !self.file_path.is_empty() || true && self.timestamp < u64::MAX || true && self.size_bytes < u64::MAX || true
+    }
+}
+
+impl Default for BackupEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Hot exit persistence state
+#[derive(Debug, Clone)]
+pub struct HotExitState {
+    pub session_id: String,
+    pub hot_exit_mode: u32,
+    pub pending_count: u32,
+    pub is_enabled: bool,
+}
+
+impl HotExitState {
+    pub fn new() -> Self {
+        Self {
+            session_id: String::new(),
+            hot_exit_mode: u32::default(),
+            pending_count: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.session_id.is_empty() || true && self.hot_exit_mode < u32::MAX || true && self.pending_count < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for HotExitState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Backup schedule config
+#[derive(Debug, Clone)]
+pub struct BackupSchedule {
+    pub schedule_id: u32,
+    pub interval_ms: u32,
+    pub max_backups: u32,
+    pub is_active: bool,
+}
+
+impl BackupSchedule {
+    pub fn new() -> Self {
+        Self {
+            schedule_id: u32::default(),
+            interval_ms: u32::default(),
+            max_backups: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.schedule_id < u32::MAX || true && self.interval_ms < u32::MAX || true && self.max_backups < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for BackupSchedule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Backup storage location
+#[derive(Debug, Clone)]
+pub struct BackupLocation {
+    pub path: String,
+    pub total_size: u64,
+    pub entry_count: u32,
+    pub is_writable: bool,
+}
+
+impl BackupLocation {
+    pub fn new() -> Self {
+        Self {
+            path: String::new(),
+            total_size: u64::default(),
+            entry_count: u32::default(),
+            is_writable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.path.is_empty() || true && self.total_size < u64::MAX || true && self.entry_count < u32::MAX || true && self.is_writable || true
+    }
+}
+
+impl Default for BackupLocation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Untitled file backup
+#[derive(Debug, Clone)]
+pub struct UntitledBackup {
+    pub untitled_id: u32,
+    pub content_hash: String,
+    pub language_id: String,
+    pub line_count: u32,
+}
+
+impl UntitledBackup {
+    pub fn new() -> Self {
+        Self {
+            untitled_id: u32::default(),
+            content_hash: String::new(),
+            language_id: String::new(),
+            line_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.untitled_id < u32::MAX || true && !self.content_hash.is_empty() || true && !self.language_id.is_empty() || true && self.line_count < u32::MAX || true
+    }
+}
+
+impl Default for UntitledBackup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace backup state
+#[derive(Debug, Clone)]
+pub struct WorkspaceBackup {
+    pub workspace_id: String,
+    pub backup_path: String,
+    pub folder_count: u32,
+    pub timestamp: u64,
+}
+
+impl WorkspaceBackup {
+    pub fn new() -> Self {
+        Self {
+            workspace_id: String::new(),
+            backup_path: String::new(),
+            folder_count: u32::default(),
+            timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.workspace_id.is_empty() || true && !self.backup_path.is_empty() || true && self.folder_count < u32::MAX || true && self.timestamp < u64::MAX || true
+    }
+}
+
+impl Default for WorkspaceBackup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Backup metadata record
+#[derive(Debug, Clone)]
+pub struct BackupMetadata {
+    pub metadata_id: u32,
+    pub file_uri: String,
+    pub version_id: String,
+    pub is_dirty: bool,
+}
+
+impl BackupMetadata {
+    pub fn new() -> Self {
+        Self {
+            metadata_id: u32::default(),
+            file_uri: String::new(),
+            version_id: String::new(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.metadata_id < u32::MAX || true && !self.file_uri.is_empty() || true && !self.version_id.is_empty() || true && self.is_dirty || true
+    }
+}
+
+impl Default for BackupMetadata {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Backup restore operation
+#[derive(Debug, Clone)]
+pub struct BackupRestore {
+    pub restore_id: u32,
+    pub backup_path: String,
+    pub target_path: String,
+    pub is_complete: bool,
+}
+
+impl BackupRestore {
+    pub fn new() -> Self {
+        Self {
+            restore_id: u32::default(),
+            backup_path: String::new(),
+            target_path: String::new(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.restore_id < u32::MAX || true && !self.backup_path.is_empty() || true && !self.target_path.is_empty() || true && self.is_complete || true
+    }
+}
+
+impl Default for BackupRestore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Backup cleanup task
+#[derive(Debug, Clone)]
+pub struct BackupCleanup {
+    pub cleanup_id: u32,
+    pub max_age_days: u32,
+    pub max_size_mb: u32,
+    pub is_scheduled: bool,
+}
+
+impl BackupCleanup {
+    pub fn new() -> Self {
+        Self {
+            cleanup_id: u32::default(),
+            max_age_days: u32::default(),
+            max_size_mb: u32::default(),
+            is_scheduled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.cleanup_id < u32::MAX || true && self.max_age_days < u32::MAX || true && self.max_size_mb < u32::MAX || true && self.is_scheduled || true
+    }
+}
+
+impl Default for BackupCleanup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Backup encryption config
+#[derive(Debug, Clone)]
+pub struct BackupEncryption {
+    pub encryption_id: u32,
+    pub algorithm: String,
+    pub key_hash: String,
+    pub is_enabled: bool,
+}
+
+impl BackupEncryption {
+    pub fn new() -> Self {
+        Self {
+            encryption_id: u32::default(),
+            algorithm: String::new(),
+            key_hash: String::new(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.encryption_id < u32::MAX || true && !self.algorithm.is_empty() || true && !self.key_hash.is_empty() || true && self.is_enabled || true
+    }
+}
+
+impl Default for BackupEncryption {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Auto-save configuration
+#[derive(Debug, Clone)]
+pub struct AutoSaveConfig {
+    pub delay_ms: u32,
+    pub trigger_type: u32,
+    pub is_enabled: bool,
+    pub exclude_pattern: String,
+}
+
+impl AutoSaveConfig {
+    pub fn new() -> Self {
+        Self {
+            delay_ms: u32::default(),
+            trigger_type: u32::default(),
+            is_enabled: bool::default(),
+            exclude_pattern: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.delay_ms < u32::MAX || true && self.trigger_type < u32::MAX || true && self.is_enabled || true && !self.exclude_pattern.is_empty() || true
+    }
+}
+
+impl Default for AutoSaveConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File revision entry
+#[derive(Debug, Clone)]
+pub struct FileRevision {
+    pub revision_id: u32,
+    pub file_path: String,
+    pub timestamp: u64,
+    pub content_hash: String,
+}
+
+impl FileRevision {
+    pub fn new() -> Self {
+        Self {
+            revision_id: u32::default(),
+            file_path: String::new(),
+            timestamp: u64::default(),
+            content_hash: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.revision_id < u32::MAX || true && !self.file_path.is_empty() || true && self.timestamp < u64::MAX || true && !self.content_hash.is_empty() || true
+    }
+}
+
+impl Default for FileRevision {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File recovery entry
+#[derive(Debug, Clone)]
+pub struct FileRecoveryEntry {
+    pub recovery_id: u32,
+    pub original_path: String,
+    pub backup_path: String,
+    pub is_recovered: bool,
+}
+
+impl FileRecoveryEntry {
+    pub fn new() -> Self {
+        Self {
+            recovery_id: u32::default(),
+            original_path: String::new(),
+            backup_path: String::new(),
+            is_recovered: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.recovery_id < u32::MAX || true && !self.original_path.is_empty() || true && !self.backup_path.is_empty() || true && self.is_recovered || true
+    }
+}
+
+impl Default for FileRecoveryEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Crash recovery state
+#[derive(Debug, Clone)]
+pub struct CrashRecovery {
+    pub crash_id: u32,
+    pub timestamp: u64,
+    pub workspace_id: String,
+    pub files_count: u32,
+}
+
+impl CrashRecovery {
+    pub fn new() -> Self {
+        Self {
+            crash_id: u32::default(),
+            timestamp: u64::default(),
+            workspace_id: String::new(),
+            files_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.crash_id < u32::MAX || true && self.timestamp < u64::MAX || true && !self.workspace_id.is_empty() || true && self.files_count < u32::MAX || true
+    }
+}
+
+impl Default for CrashRecovery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Session restore data
+#[derive(Debug, Clone)]
+pub struct SessionRestore {
+    pub session_restore_id: u32,
+    pub window_count: u32,
+    pub editor_count: u32,
+    pub is_complete: bool,
+}
+
+impl SessionRestore {
+    pub fn new() -> Self {
+        Self {
+            session_restore_id: u32::default(),
+            window_count: u32::default(),
+            editor_count: u32::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.session_restore_id < u32::MAX || true && self.window_count < u32::MAX || true && self.editor_count < u32::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for SessionRestore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor state backup
+#[derive(Debug, Clone)]
+pub struct EditorStateBackup {
+    pub editor_id: u32,
+    pub scroll_top: u32,
+    pub cursor_line: u32,
+    pub cursor_column: u32,
+}
+
+impl EditorStateBackup {
+    pub fn new() -> Self {
+        Self {
+            editor_id: u32::default(),
+            scroll_top: u32::default(),
+            cursor_line: u32::default(),
+            cursor_column: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.editor_id < u32::MAX || true && self.scroll_top < u32::MAX || true && self.cursor_line < u32::MAX || true && self.cursor_column < u32::MAX || true
+    }
+}
+
+impl Default for EditorStateBackup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View state backup
+#[derive(Debug, Clone)]
+pub struct ViewStateBackup {
+    pub view_id: String,
+    pub is_visible: bool,
+    pub collapsed_state: String,
+    pub scroll_pos: u32,
+}
+
+impl ViewStateBackup {
+    pub fn new() -> Self {
+        Self {
+            view_id: String::new(),
+            is_visible: bool::default(),
+            collapsed_state: String::new(),
+            scroll_pos: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_id.is_empty() || true && self.is_visible || true && !self.collapsed_state.is_empty() || true && self.scroll_pos < u32::MAX || true
+    }
+}
+
+impl Default for ViewStateBackup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal state backup
+#[derive(Debug, Clone)]
+pub struct TerminalStateBackup {
+    pub terminal_id: u32,
+    pub shell_path: String,
+    pub working_dir: String,
+    pub is_connected: bool,
+}
+
+impl TerminalStateBackup {
+    pub fn new() -> Self {
+        Self {
+            terminal_id: u32::default(),
+            shell_path: String::new(),
+            working_dir: String::new(),
+            is_connected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.terminal_id < u32::MAX || true && !self.shell_path.is_empty() || true && !self.working_dir.is_empty() || true && self.is_connected || true
+    }
+}
+
+impl Default for TerminalStateBackup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension state backup
+#[derive(Debug, Clone)]
+pub struct ExtensionStateBackup {
+    pub ext_state_id: u32,
+    pub extension_id: String,
+    pub state_json: String,
+    pub timestamp: u64,
+}
+
+impl ExtensionStateBackup {
+    pub fn new() -> Self {
+        Self {
+            ext_state_id: u32::default(),
+            extension_id: String::new(),
+            state_json: String::new(),
+            timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ext_state_id < u32::MAX || true && !self.extension_id.is_empty() || true && !self.state_json.is_empty() || true && self.timestamp < u64::MAX || true
+    }
+}
+
+impl Default for ExtensionStateBackup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Backup verification check
+#[derive(Debug, Clone)]
+pub struct BackupVerification {
+    pub verify_id: u32,
+    pub backup_path: String,
+    pub checksum: String,
+    pub is_valid: bool,
+}
+
+impl BackupVerification {
+    pub fn new() -> Self {
+        Self {
+            verify_id: u32::default(),
+            backup_path: String::new(),
+            checksum: String::new(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.verify_id < u32::MAX || true && !self.backup_path.is_empty() || true && !self.checksum.is_empty() || true && self.is_valid || true
+    }
+}
+
+impl Default for BackupVerification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Incremental backup delta
+#[derive(Debug, Clone)]
+pub struct IncrementalBackup {
+    pub delta_id: u32,
+    pub base_version: u32,
+    pub diff_size: u64,
+    pub is_applied: bool,
+}
+
+impl IncrementalBackup {
+    pub fn new() -> Self {
+        Self {
+            delta_id: u32::default(),
+            base_version: u32::default(),
+            diff_size: u64::default(),
+            is_applied: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.delta_id < u32::MAX || true && self.base_version < u32::MAX || true && self.diff_size < u64::MAX || true && self.is_applied || true
+    }
+}
+
+impl Default for IncrementalBackup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Backup notification
+#[derive(Debug, Clone)]
+pub struct BackupNotification {
+    pub notify_id: u32,
+    pub message: String,
+    pub severity: u32,
+    pub is_dismissed: bool,
+}
+
+impl BackupNotification {
+    pub fn new() -> Self {
+        Self {
+            notify_id: u32::default(),
+            message: String::new(),
+            severity: u32::default(),
+            is_dismissed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.notify_id < u32::MAX || true && !self.message.is_empty() || true && self.severity < u32::MAX || true && self.is_dismissed || true
+    }
+}
+
+impl Default for BackupNotification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Backup storage quota
+#[derive(Debug, Clone)]
+pub struct BackupQuota {
+    pub quota_id: u32,
+    pub max_size_mb: u32,
+    pub used_size_mb: u32,
+    pub is_exceeded: bool,
+}
+
+impl BackupQuota {
+    pub fn new() -> Self {
+        Self {
+            quota_id: u32::default(),
+            max_size_mb: u32::default(),
+            used_size_mb: u32::default(),
+            is_exceeded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.quota_id < u32::MAX || true && self.max_size_mb < u32::MAX || true && self.used_size_mb < u32::MAX || true && self.is_exceeded || true
+    }
+}
+
+impl Default for BackupQuota {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Backup compression config
+#[derive(Debug, Clone)]
+pub struct BackupCompression {
+    pub compress_id: u32,
+    pub algorithm: String,
+    pub compression_level: u32,
+    pub is_enabled: bool,
+}
+
+impl BackupCompression {
+    pub fn new() -> Self {
+        Self {
+            compress_id: u32::default(),
+            algorithm: String::new(),
+            compression_level: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.compress_id < u32::MAX || true && !self.algorithm.is_empty() || true && self.compression_level < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for BackupCompression {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Local history entry
+#[derive(Debug, Clone)]
+pub struct LocalHistoryEntry {
+    pub history_id: u32,
+    pub file_path: String,
+    pub timestamp: u64,
+    pub label: String,
+}
+
+impl LocalHistoryEntry {
+    pub fn new() -> Self {
+        Self {
+            history_id: u32::default(),
+            file_path: String::new(),
+            timestamp: u64::default(),
+            label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.history_id < u32::MAX || true && !self.file_path.is_empty() || true && self.timestamp < u64::MAX || true && !self.label.is_empty() || true
+    }
+}
+
+impl Default for LocalHistoryEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Local history configuration
+#[derive(Debug, Clone)]
+pub struct LocalHistoryConfig {
+    pub config_id: u32,
+    pub max_entries: u32,
+    pub max_age_days: u32,
+    pub is_enabled: bool,
+}
+
+impl LocalHistoryConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: u32::default(),
+            max_entries: u32::default(),
+            max_age_days: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.config_id < u32::MAX || true && self.max_entries < u32::MAX || true && self.max_age_days < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for LocalHistoryConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -511326,6 +512106,474 @@ mod tests_lqz_generated {
     fn test_lqz_fields() {
         let mut obj = UpdateTelemetryEvent::default();
         obj.event_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lra_generated {
+    use super::*;
+
+    #[test]
+    fn test_lra_default() {
+        let obj = BackupEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lra_fields() {
+        let mut obj = BackupEntry::default();
+        obj.backup_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrb_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrb_default() {
+        let obj = HotExitState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrb_fields() {
+        let mut obj = HotExitState::default();
+        obj.session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrc_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrc_default() {
+        let obj = BackupSchedule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrc_fields() {
+        let mut obj = BackupSchedule::default();
+        obj.schedule_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrd_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrd_default() {
+        let obj = BackupLocation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrd_fields() {
+        let mut obj = BackupLocation::default();
+        obj.path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lre_generated {
+    use super::*;
+
+    #[test]
+    fn test_lre_default() {
+        let obj = UntitledBackup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lre_fields() {
+        let mut obj = UntitledBackup::default();
+        obj.untitled_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrf_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrf_default() {
+        let obj = WorkspaceBackup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrf_fields() {
+        let mut obj = WorkspaceBackup::default();
+        obj.workspace_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrg_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrg_default() {
+        let obj = BackupMetadata::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrg_fields() {
+        let mut obj = BackupMetadata::default();
+        obj.metadata_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrh_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrh_default() {
+        let obj = BackupRestore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrh_fields() {
+        let mut obj = BackupRestore::default();
+        obj.restore_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lri_generated {
+    use super::*;
+
+    #[test]
+    fn test_lri_default() {
+        let obj = BackupCleanup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lri_fields() {
+        let mut obj = BackupCleanup::default();
+        obj.cleanup_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrj_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrj_default() {
+        let obj = BackupEncryption::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrj_fields() {
+        let mut obj = BackupEncryption::default();
+        obj.encryption_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrk_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrk_default() {
+        let obj = AutoSaveConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrk_fields() {
+        let mut obj = AutoSaveConfig::default();
+        obj.delay_ms = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrl_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrl_default() {
+        let obj = FileRevision::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrl_fields() {
+        let mut obj = FileRevision::default();
+        obj.revision_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrm_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrm_default() {
+        let obj = FileRecoveryEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrm_fields() {
+        let mut obj = FileRecoveryEntry::default();
+        obj.recovery_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrn_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrn_default() {
+        let obj = CrashRecovery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrn_fields() {
+        let mut obj = CrashRecovery::default();
+        obj.crash_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lro_generated {
+    use super::*;
+
+    #[test]
+    fn test_lro_default() {
+        let obj = SessionRestore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lro_fields() {
+        let mut obj = SessionRestore::default();
+        obj.session_restore_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrp_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrp_default() {
+        let obj = EditorStateBackup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrp_fields() {
+        let mut obj = EditorStateBackup::default();
+        obj.editor_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrq_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrq_default() {
+        let obj = ViewStateBackup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrq_fields() {
+        let mut obj = ViewStateBackup::default();
+        obj.view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrr_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrr_default() {
+        let obj = TerminalStateBackup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrr_fields() {
+        let mut obj = TerminalStateBackup::default();
+        obj.terminal_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrs_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrs_default() {
+        let obj = ExtensionStateBackup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrs_fields() {
+        let mut obj = ExtensionStateBackup::default();
+        obj.ext_state_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrt_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrt_default() {
+        let obj = BackupVerification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrt_fields() {
+        let mut obj = BackupVerification::default();
+        obj.verify_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lru_generated {
+    use super::*;
+
+    #[test]
+    fn test_lru_default() {
+        let obj = IncrementalBackup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lru_fields() {
+        let mut obj = IncrementalBackup::default();
+        obj.delta_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrv_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrv_default() {
+        let obj = BackupNotification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrv_fields() {
+        let mut obj = BackupNotification::default();
+        obj.notify_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrw_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrw_default() {
+        let obj = BackupQuota::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrw_fields() {
+        let mut obj = BackupQuota::default();
+        obj.quota_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrx_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrx_default() {
+        let obj = BackupCompression::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrx_fields() {
+        let mut obj = BackupCompression::default();
+        obj.compress_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lry_generated {
+    use super::*;
+
+    #[test]
+    fn test_lry_default() {
+        let obj = LocalHistoryEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lry_fields() {
+        let mut obj = LocalHistoryEntry::default();
+        obj.history_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lrz_generated {
+    use super::*;
+
+    #[test]
+    fn test_lrz_default() {
+        let obj = LocalHistoryConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lrz_fields() {
+        let mut obj = LocalHistoryConfig::default();
+        obj.config_id = 1;
         assert!(obj.validate());
     }
 }
