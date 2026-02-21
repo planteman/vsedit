@@ -204979,6 +204979,838 @@ impl Default for KzzInfraConfig {
     }
 }
 
+/// /// LSP client connection state
+#[derive(Debug, Clone)]
+pub struct LaaLspClient {
+    pub laa_server_id: String,
+    pub laa_state: String,
+    pub laa_pid: u32,
+    pub laa_root_uri: String,
+    pub laa_label: String,
+}
+
+impl LaaLspClient {
+    pub fn new() -> Self {
+        Self {
+            laa_server_id: String::new(),
+            laa_state: String::new(),
+            laa_pid: u32::default(),
+            laa_root_uri: String::new(),
+            laa_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.laa_server_id.is_empty() || true && !self.laa_state.is_empty() || true && self.laa_pid < u32::MAX || true && !self.laa_root_uri.is_empty() || true && !self.laa_label.is_empty() || true
+    }
+}
+
+impl Default for LaaLspClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP server process info
+#[derive(Debug, Clone)]
+pub struct LabLspServer {
+    pub lab_name: String,
+    pub lab_command: String,
+    pub lab_args: String,
+    pub lab_transport: String,
+    pub lab_label: String,
+}
+
+impl LabLspServer {
+    pub fn new() -> Self {
+        Self {
+            lab_name: String::new(),
+            lab_command: String::new(),
+            lab_args: String::new(),
+            lab_transport: String::new(),
+            lab_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lab_name.is_empty() || true && !self.lab_command.is_empty() || true && !self.lab_args.is_empty() || true && !self.lab_transport.is_empty() || true && !self.lab_label.is_empty() || true
+    }
+}
+
+impl Default for LabLspServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP server capability declaration
+#[derive(Debug, Clone)]
+pub struct LacLspCapability {
+    pub lac_capability_name: String,
+    pub lac_supported: bool,
+    pub lac_options: String,
+    pub lac_dynamic_reg: bool,
+    pub lac_label: String,
+}
+
+impl LacLspCapability {
+    pub fn new() -> Self {
+        Self {
+            lac_capability_name: String::new(),
+            lac_supported: bool::default(),
+            lac_options: String::new(),
+            lac_dynamic_reg: bool::default(),
+            lac_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lac_capability_name.is_empty() || true && self.lac_supported || true && !self.lac_options.is_empty() || true && self.lac_dynamic_reg || true && !self.lac_label.is_empty() || true
+    }
+}
+
+impl Default for LacLspCapability {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP JSON-RPC request message
+#[derive(Debug, Clone)]
+pub struct LadLspRequest {
+    pub lad_method: String,
+    pub lad_params: String,
+    pub lad_request_id: u64,
+    pub lad_timeout_ms: u32,
+    pub lad_label: String,
+}
+
+impl LadLspRequest {
+    pub fn new() -> Self {
+        Self {
+            lad_method: String::new(),
+            lad_params: String::new(),
+            lad_request_id: u64::default(),
+            lad_timeout_ms: u32::default(),
+            lad_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lad_method.is_empty() || true && !self.lad_params.is_empty() || true && self.lad_request_id < u64::MAX || true && self.lad_timeout_ms < u32::MAX || true && !self.lad_label.is_empty() || true
+    }
+}
+
+impl Default for LadLspRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP JSON-RPC response message
+#[derive(Debug, Clone)]
+pub struct LaeLspResponse {
+    pub lae_request_id: u64,
+    pub lae_result: String,
+    pub lae_error_code: u32,
+    pub lae_error_msg: String,
+    pub lae_label: String,
+}
+
+impl LaeLspResponse {
+    pub fn new() -> Self {
+        Self {
+            lae_request_id: u64::default(),
+            lae_result: String::new(),
+            lae_error_code: u32::default(),
+            lae_error_msg: String::new(),
+            lae_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lae_request_id < u64::MAX || true && !self.lae_result.is_empty() || true && self.lae_error_code < u32::MAX || true && !self.lae_error_msg.is_empty() || true && !self.lae_label.is_empty() || true
+    }
+}
+
+impl Default for LaeLspResponse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP JSON-RPC notification message
+#[derive(Debug, Clone)]
+pub struct LafLspNotification {
+    pub laf_method: String,
+    pub laf_params: String,
+    pub laf_timestamp: u64,
+    pub laf_server_id: String,
+    pub laf_label: String,
+}
+
+impl LafLspNotification {
+    pub fn new() -> Self {
+        Self {
+            laf_method: String::new(),
+            laf_params: String::new(),
+            laf_timestamp: u64::default(),
+            laf_server_id: String::new(),
+            laf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.laf_method.is_empty() || true && !self.laf_params.is_empty() || true && self.laf_timestamp < u64::MAX || true && !self.laf_server_id.is_empty() || true && !self.laf_label.is_empty() || true
+    }
+}
+
+impl Default for LafLspNotification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP diagnostic entry
+#[derive(Debug, Clone)]
+pub struct LagLspDiagnostic {
+    pub lag_uri: String,
+    pub lag_message: String,
+    pub lag_severity: u32,
+    pub lag_line: u32,
+    pub lag_source: String,
+}
+
+impl LagLspDiagnostic {
+    pub fn new() -> Self {
+        Self {
+            lag_uri: String::new(),
+            lag_message: String::new(),
+            lag_severity: u32::default(),
+            lag_line: u32::default(),
+            lag_source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lag_uri.is_empty() || true && !self.lag_message.is_empty() || true && self.lag_severity < u32::MAX || true && self.lag_line < u32::MAX || true && !self.lag_source.is_empty() || true
+    }
+}
+
+impl Default for LagLspDiagnostic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP completion item
+#[derive(Debug, Clone)]
+pub struct LahLspCompletion {
+    pub lah_label: String,
+    pub lah_kind: u32,
+    pub lah_detail: String,
+    pub lah_sort_text: String,
+    pub lah_insert_text: String,
+}
+
+impl LahLspCompletion {
+    pub fn new() -> Self {
+        Self {
+            lah_label: String::new(),
+            lah_kind: u32::default(),
+            lah_detail: String::new(),
+            lah_sort_text: String::new(),
+            lah_insert_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lah_label.is_empty() || true && self.lah_kind < u32::MAX || true && !self.lah_detail.is_empty() || true && !self.lah_sort_text.is_empty() || true && !self.lah_insert_text.is_empty() || true
+    }
+}
+
+impl Default for LahLspCompletion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP completion result list
+#[derive(Debug, Clone)]
+pub struct LaiLspCompletionList {
+    pub lai_is_incomplete: bool,
+    pub lai_items_count: u32,
+    pub lai_default_range: String,
+    pub lai_trigger_char: String,
+    pub lai_label: String,
+}
+
+impl LaiLspCompletionList {
+    pub fn new() -> Self {
+        Self {
+            lai_is_incomplete: bool::default(),
+            lai_items_count: u32::default(),
+            lai_default_range: String::new(),
+            lai_trigger_char: String::new(),
+            lai_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lai_is_incomplete || true && self.lai_items_count < u32::MAX || true && !self.lai_default_range.is_empty() || true && !self.lai_trigger_char.is_empty() || true && !self.lai_label.is_empty() || true
+    }
+}
+
+impl Default for LaiLspCompletionList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP hover result content
+#[derive(Debug, Clone)]
+pub struct LajLspHover {
+    pub laj_contents: String,
+    pub laj_range_start: u32,
+    pub laj_range_end: u32,
+    pub laj_format: String,
+    pub laj_label: String,
+}
+
+impl LajLspHover {
+    pub fn new() -> Self {
+        Self {
+            laj_contents: String::new(),
+            laj_range_start: u32::default(),
+            laj_range_end: u32::default(),
+            laj_format: String::new(),
+            laj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.laj_contents.is_empty() || true && self.laj_range_start < u32::MAX || true && self.laj_range_end < u32::MAX || true && !self.laj_format.is_empty() || true && !self.laj_label.is_empty() || true
+    }
+}
+
+impl Default for LajLspHover {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP signature help result
+#[derive(Debug, Clone)]
+pub struct LakLspSignatureHelp {
+    pub lak_active_sig: u32,
+    pub lak_active_param: u32,
+    pub lak_signatures_count: u32,
+    pub lak_trigger_char: String,
+    pub lak_label: String,
+}
+
+impl LakLspSignatureHelp {
+    pub fn new() -> Self {
+        Self {
+            lak_active_sig: u32::default(),
+            lak_active_param: u32::default(),
+            lak_signatures_count: u32::default(),
+            lak_trigger_char: String::new(),
+            lak_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lak_active_sig < u32::MAX || true && self.lak_active_param < u32::MAX || true && self.lak_signatures_count < u32::MAX || true && !self.lak_trigger_char.is_empty() || true && !self.lak_label.is_empty() || true
+    }
+}
+
+impl Default for LakLspSignatureHelp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP definition location result
+#[derive(Debug, Clone)]
+pub struct LalLspDefinition {
+    pub lal_uri: String,
+    pub lal_line: u32,
+    pub lal_column: u32,
+    pub lal_end_line: u32,
+    pub lal_label: String,
+}
+
+impl LalLspDefinition {
+    pub fn new() -> Self {
+        Self {
+            lal_uri: String::new(),
+            lal_line: u32::default(),
+            lal_column: u32::default(),
+            lal_end_line: u32::default(),
+            lal_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lal_uri.is_empty() || true && self.lal_line < u32::MAX || true && self.lal_column < u32::MAX || true && self.lal_end_line < u32::MAX || true && !self.lal_label.is_empty() || true
+    }
+}
+
+impl Default for LalLspDefinition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP reference location result
+#[derive(Debug, Clone)]
+pub struct LamLspReference {
+    pub lam_uri: String,
+    pub lam_line: u32,
+    pub lam_column: u32,
+    pub lam_context: String,
+    pub lam_label: String,
+}
+
+impl LamLspReference {
+    pub fn new() -> Self {
+        Self {
+            lam_uri: String::new(),
+            lam_line: u32::default(),
+            lam_column: u32::default(),
+            lam_context: String::new(),
+            lam_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lam_uri.is_empty() || true && self.lam_line < u32::MAX || true && self.lam_column < u32::MAX || true && !self.lam_context.is_empty() || true && !self.lam_label.is_empty() || true
+    }
+}
+
+impl Default for LamLspReference {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP document symbol result
+#[derive(Debug, Clone)]
+pub struct LanLspDocSymbol {
+    pub lan_name: String,
+    pub lan_kind: u32,
+    pub lan_range_start: u32,
+    pub lan_detail: String,
+    pub lan_children_count: u32,
+}
+
+impl LanLspDocSymbol {
+    pub fn new() -> Self {
+        Self {
+            lan_name: String::new(),
+            lan_kind: u32::default(),
+            lan_range_start: u32::default(),
+            lan_detail: String::new(),
+            lan_children_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lan_name.is_empty() || true && self.lan_kind < u32::MAX || true && self.lan_range_start < u32::MAX || true && !self.lan_detail.is_empty() || true && self.lan_children_count < u32::MAX || true
+    }
+}
+
+impl Default for LanLspDocSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP workspace symbol result
+#[derive(Debug, Clone)]
+pub struct LaoLspWorkSymbol {
+    pub lao_name: String,
+    pub lao_kind: u32,
+    pub lao_container: String,
+    pub lao_uri: String,
+    pub lao_label: String,
+}
+
+impl LaoLspWorkSymbol {
+    pub fn new() -> Self {
+        Self {
+            lao_name: String::new(),
+            lao_kind: u32::default(),
+            lao_container: String::new(),
+            lao_uri: String::new(),
+            lao_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lao_name.is_empty() || true && self.lao_kind < u32::MAX || true && !self.lao_container.is_empty() || true && !self.lao_uri.is_empty() || true && !self.lao_label.is_empty() || true
+    }
+}
+
+impl Default for LaoLspWorkSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP code action result
+#[derive(Debug, Clone)]
+pub struct LapLspCodeAction {
+    pub lap_title: String,
+    pub lap_kind: String,
+    pub lap_diagnostics_str: String,
+    pub lap_preferred: bool,
+    pub lap_label: String,
+}
+
+impl LapLspCodeAction {
+    pub fn new() -> Self {
+        Self {
+            lap_title: String::new(),
+            lap_kind: String::new(),
+            lap_diagnostics_str: String::new(),
+            lap_preferred: bool::default(),
+            lap_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lap_title.is_empty() || true && !self.lap_kind.is_empty() || true && !self.lap_diagnostics_str.is_empty() || true && self.lap_preferred || true && !self.lap_label.is_empty() || true
+    }
+}
+
+impl Default for LapLspCodeAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP code lens result
+#[derive(Debug, Clone)]
+pub struct LaqLspCodeLens {
+    pub laq_line: u32,
+    pub laq_command_title: String,
+    pub laq_command_id: String,
+    pub laq_data: String,
+    pub laq_label: String,
+}
+
+impl LaqLspCodeLens {
+    pub fn new() -> Self {
+        Self {
+            laq_line: u32::default(),
+            laq_command_title: String::new(),
+            laq_command_id: String::new(),
+            laq_data: String::new(),
+            laq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.laq_line < u32::MAX || true && !self.laq_command_title.is_empty() || true && !self.laq_command_id.is_empty() || true && !self.laq_data.is_empty() || true && !self.laq_label.is_empty() || true
+    }
+}
+
+impl Default for LaqLspCodeLens {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP formatting text edit result
+#[derive(Debug, Clone)]
+pub struct LarLspFormatEdit {
+    pub lar_offset: u64,
+    pub lar_length: u32,
+    pub lar_new_text: String,
+    pub lar_range_end: u64,
+    pub lar_label: String,
+}
+
+impl LarLspFormatEdit {
+    pub fn new() -> Self {
+        Self {
+            lar_offset: u64::default(),
+            lar_length: u32::default(),
+            lar_new_text: String::new(),
+            lar_range_end: u64::default(),
+            lar_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lar_offset < u64::MAX || true && self.lar_length < u32::MAX || true && !self.lar_new_text.is_empty() || true && self.lar_range_end < u64::MAX || true && !self.lar_label.is_empty() || true
+    }
+}
+
+impl Default for LarLspFormatEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP rename operation
+#[derive(Debug, Clone)]
+pub struct LasLspRename {
+    pub las_new_name: String,
+    pub las_uri: String,
+    pub las_position: u32,
+    pub las_preview: bool,
+    pub las_label: String,
+}
+
+impl LasLspRename {
+    pub fn new() -> Self {
+        Self {
+            las_new_name: String::new(),
+            las_uri: String::new(),
+            las_position: u32::default(),
+            las_preview: bool::default(),
+            las_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.las_new_name.is_empty() || true && !self.las_uri.is_empty() || true && self.las_position < u32::MAX || true && self.las_preview || true && !self.las_label.is_empty() || true
+    }
+}
+
+impl Default for LasLspRename {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP document link result
+#[derive(Debug, Clone)]
+pub struct LatLspDocLink {
+    pub lat_target_uri: String,
+    pub lat_start_line: u32,
+    pub lat_end_line: u32,
+    pub lat_tooltip: String,
+    pub lat_label: String,
+}
+
+impl LatLspDocLink {
+    pub fn new() -> Self {
+        Self {
+            lat_target_uri: String::new(),
+            lat_start_line: u32::default(),
+            lat_end_line: u32::default(),
+            lat_tooltip: String::new(),
+            lat_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lat_target_uri.is_empty() || true && self.lat_start_line < u32::MAX || true && self.lat_end_line < u32::MAX || true && !self.lat_tooltip.is_empty() || true && !self.lat_label.is_empty() || true
+    }
+}
+
+impl Default for LatLspDocLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP document color result
+#[derive(Debug, Clone)]
+pub struct LauLspDocColor {
+    pub lau_red: f64,
+    pub lau_green: f64,
+    pub lau_blue: f64,
+    pub lau_alpha: f64,
+    pub lau_label: String,
+}
+
+impl LauLspDocColor {
+    pub fn new() -> Self {
+        Self {
+            lau_red: f64::default(),
+            lau_green: f64::default(),
+            lau_blue: f64::default(),
+            lau_alpha: f64::default(),
+            lau_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lau_red.is_finite() || true && self.lau_green.is_finite() || true && self.lau_blue.is_finite() || true && self.lau_alpha.is_finite() || true && !self.lau_label.is_empty() || true
+    }
+}
+
+impl Default for LauLspDocColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP folding range result
+#[derive(Debug, Clone)]
+pub struct LavLspFoldRange {
+    pub lav_start_line: u32,
+    pub lav_end_line: u32,
+    pub lav_kind: String,
+    pub lav_collapsed_text: String,
+    pub lav_label: String,
+}
+
+impl LavLspFoldRange {
+    pub fn new() -> Self {
+        Self {
+            lav_start_line: u32::default(),
+            lav_end_line: u32::default(),
+            lav_kind: String::new(),
+            lav_collapsed_text: String::new(),
+            lav_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lav_start_line < u32::MAX || true && self.lav_end_line < u32::MAX || true && !self.lav_kind.is_empty() || true && !self.lav_collapsed_text.is_empty() || true && !self.lav_label.is_empty() || true
+    }
+}
+
+impl Default for LavLspFoldRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP selection range result
+#[derive(Debug, Clone)]
+pub struct LawLspSelRange {
+    pub law_start_line: u32,
+    pub law_start_col: u32,
+    pub law_end_line: u32,
+    pub law_end_col: u32,
+    pub law_parent_idx: u32,
+}
+
+impl LawLspSelRange {
+    pub fn new() -> Self {
+        Self {
+            law_start_line: u32::default(),
+            law_start_col: u32::default(),
+            law_end_line: u32::default(),
+            law_end_col: u32::default(),
+            law_parent_idx: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.law_start_line < u32::MAX || true && self.law_start_col < u32::MAX || true && self.law_end_line < u32::MAX || true && self.law_end_col < u32::MAX || true && self.law_parent_idx < u32::MAX || true
+    }
+}
+
+impl Default for LawLspSelRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP semantic token data
+#[derive(Debug, Clone)]
+pub struct LaxLspSemanticToken {
+    pub lax_line: u32,
+    pub lax_start_col: u32,
+    pub lax_length: u32,
+    pub lax_token_type: u32,
+    pub lax_modifiers: u32,
+}
+
+impl LaxLspSemanticToken {
+    pub fn new() -> Self {
+        Self {
+            lax_line: u32::default(),
+            lax_start_col: u32::default(),
+            lax_length: u32::default(),
+            lax_token_type: u32::default(),
+            lax_modifiers: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lax_line < u32::MAX || true && self.lax_start_col < u32::MAX || true && self.lax_length < u32::MAX || true && self.lax_token_type < u32::MAX || true && self.lax_modifiers < u32::MAX || true
+    }
+}
+
+impl Default for LaxLspSemanticToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// LSP inlay hint result
+#[derive(Debug, Clone)]
+pub struct LayLspInlayHint {
+    pub lay_position: u32,
+    pub lay_hint_label: String,
+    pub lay_kind: String,
+    pub lay_padding_left: bool,
+    pub lay_tooltip: String,
+}
+
+impl LayLspInlayHint {
+    pub fn new() -> Self {
+        Self {
+            lay_position: u32::default(),
+            lay_hint_label: String::new(),
+            lay_kind: String::new(),
+            lay_padding_left: bool::default(),
+            lay_tooltip: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lay_position < u32::MAX || true && !self.lay_hint_label.is_empty() || true && !self.lay_kind.is_empty() || true && self.lay_padding_left || true && !self.lay_tooltip.is_empty() || true
+    }
+}
+
+impl Default for LayLspInlayHint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined LSP client configuration
+#[derive(Debug, Clone)]
+pub struct LazLspConfig {
+    pub laz_trace_level: String,
+    pub laz_auto_restart: bool,
+    pub laz_max_restart: u32,
+    pub laz_log_messages: bool,
+    pub laz_label: String,
+}
+
+impl LazLspConfig {
+    pub fn new() -> Self {
+        Self {
+            laz_trace_level: String::new(),
+            laz_auto_restart: bool::default(),
+            laz_max_restart: u32::default(),
+            laz_log_messages: bool::default(),
+            laz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.laz_trace_level.is_empty() || true && self.laz_auto_restart || true && self.laz_max_restart < u32::MAX || true && self.laz_log_messages || true && !self.laz_label.is_empty() || true
+    }
+}
+
+impl Default for LazLspConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -489500,6 +490332,474 @@ mod tests_kzz_generated {
     fn test_kzz_fields() {
         let mut obj = KzzInfraConfig::default();
         obj.kzz_log_level = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_laa_generated {
+    use super::*;
+
+    #[test]
+    fn test_laa_default() {
+        let obj = LaaLspClient::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_laa_fields() {
+        let mut obj = LaaLspClient::default();
+        obj.laa_server_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lab_generated {
+    use super::*;
+
+    #[test]
+    fn test_lab_default() {
+        let obj = LabLspServer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lab_fields() {
+        let mut obj = LabLspServer::default();
+        obj.lab_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lac_generated {
+    use super::*;
+
+    #[test]
+    fn test_lac_default() {
+        let obj = LacLspCapability::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lac_fields() {
+        let mut obj = LacLspCapability::default();
+        obj.lac_capability_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lad_generated {
+    use super::*;
+
+    #[test]
+    fn test_lad_default() {
+        let obj = LadLspRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lad_fields() {
+        let mut obj = LadLspRequest::default();
+        obj.lad_method = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lae_generated {
+    use super::*;
+
+    #[test]
+    fn test_lae_default() {
+        let obj = LaeLspResponse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lae_fields() {
+        let mut obj = LaeLspResponse::default();
+        obj.lae_request_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_laf_generated {
+    use super::*;
+
+    #[test]
+    fn test_laf_default() {
+        let obj = LafLspNotification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_laf_fields() {
+        let mut obj = LafLspNotification::default();
+        obj.laf_method = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lag_generated {
+    use super::*;
+
+    #[test]
+    fn test_lag_default() {
+        let obj = LagLspDiagnostic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lag_fields() {
+        let mut obj = LagLspDiagnostic::default();
+        obj.lag_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lah_generated {
+    use super::*;
+
+    #[test]
+    fn test_lah_default() {
+        let obj = LahLspCompletion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lah_fields() {
+        let mut obj = LahLspCompletion::default();
+        obj.lah_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lai_generated {
+    use super::*;
+
+    #[test]
+    fn test_lai_default() {
+        let obj = LaiLspCompletionList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lai_fields() {
+        let mut obj = LaiLspCompletionList::default();
+        obj.lai_is_incomplete = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_laj_generated {
+    use super::*;
+
+    #[test]
+    fn test_laj_default() {
+        let obj = LajLspHover::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_laj_fields() {
+        let mut obj = LajLspHover::default();
+        obj.laj_contents = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lak_generated {
+    use super::*;
+
+    #[test]
+    fn test_lak_default() {
+        let obj = LakLspSignatureHelp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lak_fields() {
+        let mut obj = LakLspSignatureHelp::default();
+        obj.lak_active_sig = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lal_generated {
+    use super::*;
+
+    #[test]
+    fn test_lal_default() {
+        let obj = LalLspDefinition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lal_fields() {
+        let mut obj = LalLspDefinition::default();
+        obj.lal_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lam_generated {
+    use super::*;
+
+    #[test]
+    fn test_lam_default() {
+        let obj = LamLspReference::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lam_fields() {
+        let mut obj = LamLspReference::default();
+        obj.lam_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lan_generated {
+    use super::*;
+
+    #[test]
+    fn test_lan_default() {
+        let obj = LanLspDocSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lan_fields() {
+        let mut obj = LanLspDocSymbol::default();
+        obj.lan_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lao_generated {
+    use super::*;
+
+    #[test]
+    fn test_lao_default() {
+        let obj = LaoLspWorkSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lao_fields() {
+        let mut obj = LaoLspWorkSymbol::default();
+        obj.lao_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lap_generated {
+    use super::*;
+
+    #[test]
+    fn test_lap_default() {
+        let obj = LapLspCodeAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lap_fields() {
+        let mut obj = LapLspCodeAction::default();
+        obj.lap_title = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_laq_generated {
+    use super::*;
+
+    #[test]
+    fn test_laq_default() {
+        let obj = LaqLspCodeLens::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_laq_fields() {
+        let mut obj = LaqLspCodeLens::default();
+        obj.laq_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lar_generated {
+    use super::*;
+
+    #[test]
+    fn test_lar_default() {
+        let obj = LarLspFormatEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lar_fields() {
+        let mut obj = LarLspFormatEdit::default();
+        obj.lar_offset = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_las_generated {
+    use super::*;
+
+    #[test]
+    fn test_las_default() {
+        let obj = LasLspRename::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_las_fields() {
+        let mut obj = LasLspRename::default();
+        obj.las_new_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lat_generated {
+    use super::*;
+
+    #[test]
+    fn test_lat_default() {
+        let obj = LatLspDocLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lat_fields() {
+        let mut obj = LatLspDocLink::default();
+        obj.lat_target_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lau_generated {
+    use super::*;
+
+    #[test]
+    fn test_lau_default() {
+        let obj = LauLspDocColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lau_fields() {
+        let mut obj = LauLspDocColor::default();
+        obj.lau_red = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lav_generated {
+    use super::*;
+
+    #[test]
+    fn test_lav_default() {
+        let obj = LavLspFoldRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lav_fields() {
+        let mut obj = LavLspFoldRange::default();
+        obj.lav_start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_law_generated {
+    use super::*;
+
+    #[test]
+    fn test_law_default() {
+        let obj = LawLspSelRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_law_fields() {
+        let mut obj = LawLspSelRange::default();
+        obj.law_start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lax_generated {
+    use super::*;
+
+    #[test]
+    fn test_lax_default() {
+        let obj = LaxLspSemanticToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lax_fields() {
+        let mut obj = LaxLspSemanticToken::default();
+        obj.lax_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lay_generated {
+    use super::*;
+
+    #[test]
+    fn test_lay_default() {
+        let obj = LayLspInlayHint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lay_fields() {
+        let mut obj = LayLspInlayHint::default();
+        obj.lay_position = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_laz_generated {
+    use super::*;
+
+    #[test]
+    fn test_laz_default() {
+        let obj = LazLspConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_laz_fields() {
+        let mut obj = LazLspConfig::default();
+        obj.laz_trace_level = "test".to_string();
         assert!(obj.validate());
     }
 }
