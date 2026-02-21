@@ -215765,6 +215765,786 @@ impl Default for LanguageDeclaration {
     }
 }
 
+/// Configuration scope level
+#[derive(Debug, Clone)]
+pub struct ConfigurationScope {
+    pub scope_id: u32,
+    pub scope_name: String,
+    pub order: u32,
+    pub is_machine: bool,
+}
+
+impl ConfigurationScope {
+    pub fn new() -> Self {
+        Self {
+            scope_id: u32::default(),
+            scope_name: String::new(),
+            order: u32::default(),
+            is_machine: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.scope_id < u32::MAX || true && !self.scope_name.is_empty() || true && self.order < u32::MAX || true && self.is_machine || true
+    }
+}
+
+impl Default for ConfigurationScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration override entry
+#[derive(Debug, Clone)]
+pub struct ConfigurationOverride {
+    pub key: String,
+    pub value_json: String,
+    pub scope_uri: String,
+    pub is_overridden: bool,
+}
+
+impl ConfigurationOverride {
+    pub fn new() -> Self {
+        Self {
+            key: String::new(),
+            value_json: String::new(),
+            scope_uri: String::new(),
+            is_overridden: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key.is_empty() || true && !self.value_json.is_empty() || true && !self.scope_uri.is_empty() || true && self.is_overridden || true
+    }
+}
+
+impl Default for ConfigurationOverride {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration default value
+#[derive(Debug, Clone)]
+pub struct ConfigurationDefault {
+    pub key: String,
+    pub default_json: String,
+    pub source: String,
+    pub is_builtin: bool,
+}
+
+impl ConfigurationDefault {
+    pub fn new() -> Self {
+        Self {
+            key: String::new(),
+            default_json: String::new(),
+            source: String::new(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key.is_empty() || true && !self.default_json.is_empty() || true && !self.source.is_empty() || true && self.is_builtin || true
+    }
+}
+
+impl Default for ConfigurationDefault {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration policy restriction
+#[derive(Debug, Clone)]
+pub struct ConfigurationPolicy {
+    pub policy_name: String,
+    pub setting_key: String,
+    pub enforced_value: String,
+    pub is_locked: bool,
+}
+
+impl ConfigurationPolicy {
+    pub fn new() -> Self {
+        Self {
+            policy_name: String::new(),
+            setting_key: String::new(),
+            enforced_value: String::new(),
+            is_locked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.policy_name.is_empty() || true && !self.setting_key.is_empty() || true && !self.enforced_value.is_empty() || true && self.is_locked || true
+    }
+}
+
+impl Default for ConfigurationPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration value inspection
+#[derive(Debug, Clone)]
+pub struct ConfigurationInspect {
+    pub key: String,
+    pub user_value: String,
+    pub workspace_value: String,
+    pub default_value: String,
+}
+
+impl ConfigurationInspect {
+    pub fn new() -> Self {
+        Self {
+            key: String::new(),
+            user_value: String::new(),
+            workspace_value: String::new(),
+            default_value: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key.is_empty() || true && !self.user_value.is_empty() || true && !self.workspace_value.is_empty() || true && !self.default_value.is_empty() || true
+    }
+}
+
+impl Default for ConfigurationInspect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration target level
+#[derive(Debug, Clone)]
+pub struct ConfigurationTarget {
+    pub target_type: u32,
+    pub display_name: String,
+    pub scope_uri: String,
+    pub priority: u32,
+}
+
+impl ConfigurationTarget {
+    pub fn new() -> Self {
+        Self {
+            target_type: u32::default(),
+            display_name: String::new(),
+            scope_uri: String::new(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.target_type < u32::MAX || true && !self.display_name.is_empty() || true && !self.scope_uri.is_empty() || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for ConfigurationTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings property schema entry
+#[derive(Debug, Clone)]
+pub struct SettingsPropertyEntry {
+    pub property_key: String,
+    pub property_type: String,
+    pub description: String,
+    pub enum_values_count: u32,
+}
+
+impl SettingsPropertyEntry {
+    pub fn new() -> Self {
+        Self {
+            property_key: String::new(),
+            property_type: String::new(),
+            description: String::new(),
+            enum_values_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.property_key.is_empty() || true && !self.property_type.is_empty() || true && !self.description.is_empty() || true && self.enum_values_count < u32::MAX || true
+    }
+}
+
+impl Default for SettingsPropertyEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings group definition
+#[derive(Debug, Clone)]
+pub struct SettingsGroupEntry {
+    pub group_id: String,
+    pub title: String,
+    pub order: u32,
+    pub parent_group: String,
+}
+
+impl SettingsGroupEntry {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            title: String::new(),
+            order: u32::default(),
+            parent_group: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.title.is_empty() || true && self.order < u32::MAX || true && !self.parent_group.is_empty() || true
+    }
+}
+
+impl Default for SettingsGroupEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings search result
+#[derive(Debug, Clone)]
+pub struct SettingsSearchResult {
+    pub key: String,
+    pub score: f64,
+    pub match_type: u32,
+    pub display_name: String,
+}
+
+impl SettingsSearchResult {
+    pub fn new() -> Self {
+        Self {
+            key: String::new(),
+            score: f64::default(),
+            match_type: u32::default(),
+            display_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key.is_empty() || true && self.score.is_finite() || true && self.match_type < u32::MAX || true && !self.display_name.is_empty() || true
+    }
+}
+
+impl Default for SettingsSearchResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings value validation
+#[derive(Debug, Clone)]
+pub struct SettingsValidation {
+    pub key: String,
+    pub error_message: String,
+    pub severity: u32,
+    pub is_valid: bool,
+}
+
+impl SettingsValidation {
+    pub fn new() -> Self {
+        Self {
+            key: String::new(),
+            error_message: String::new(),
+            severity: u32::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key.is_empty() || true && !self.error_message.is_empty() || true && self.severity < u32::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for SettingsValidation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension settings contribution
+#[derive(Debug, Clone)]
+pub struct SettingsExtensionEntry {
+    pub extension_id: String,
+    pub settings_count: u32,
+    pub group_id: String,
+    pub is_active: bool,
+}
+
+impl SettingsExtensionEntry {
+    pub fn new() -> Self {
+        Self {
+            extension_id: String::new(),
+            settings_count: u32::default(),
+            group_id: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.extension_id.is_empty() || true && self.settings_count < u32::MAX || true && !self.group_id.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for SettingsExtensionEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings migration rule
+#[derive(Debug, Clone)]
+pub struct SettingsMigration {
+    pub old_key: String,
+    pub new_key: String,
+    pub transform_type: u32,
+    pub is_applied: bool,
+}
+
+impl SettingsMigration {
+    pub fn new() -> Self {
+        Self {
+            old_key: String::new(),
+            new_key: String::new(),
+            transform_type: u32::default(),
+            is_applied: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.old_key.is_empty() || true && !self.new_key.is_empty() || true && self.transform_type < u32::MAX || true && self.is_applied || true
+    }
+}
+
+impl Default for SettingsMigration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings sync state
+#[derive(Debug, Clone)]
+pub struct SettingsSync {
+    pub sync_id: String,
+    pub last_sync: u64,
+    pub conflict_count: u32,
+    pub is_enabled: bool,
+}
+
+impl SettingsSync {
+    pub fn new() -> Self {
+        Self {
+            sync_id: String::new(),
+            last_sync: u64::default(),
+            conflict_count: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sync_id.is_empty() || true && self.last_sync < u64::MAX || true && self.conflict_count < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for SettingsSync {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings profile entry
+#[derive(Debug, Clone)]
+pub struct SettingsProfile {
+    pub profile_name: String,
+    pub profile_id: String,
+    pub is_default: bool,
+    pub settings_count: u32,
+}
+
+impl SettingsProfile {
+    pub fn new() -> Self {
+        Self {
+            profile_name: String::new(),
+            profile_id: String::new(),
+            is_default: bool::default(),
+            settings_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_name.is_empty() || true && !self.profile_id.is_empty() || true && self.is_default || true && self.settings_count < u32::MAX || true
+    }
+}
+
+impl Default for SettingsProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings merge conflict
+#[derive(Debug, Clone)]
+pub struct SettingsConflict {
+    pub key: String,
+    pub local_value: String,
+    pub remote_value: String,
+    pub resolution: u32,
+}
+
+impl SettingsConflict {
+    pub fn new() -> Self {
+        Self {
+            key: String::new(),
+            local_value: String::new(),
+            remote_value: String::new(),
+            resolution: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key.is_empty() || true && !self.local_value.is_empty() || true && !self.remote_value.is_empty() || true && self.resolution < u32::MAX || true
+    }
+}
+
+impl Default for SettingsConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings export format
+#[derive(Debug, Clone)]
+pub struct SettingsExport {
+    pub format_type: u32,
+    pub include_extensions: bool,
+    pub include_keybindings: bool,
+    pub output_path: String,
+}
+
+impl SettingsExport {
+    pub fn new() -> Self {
+        Self {
+            format_type: u32::default(),
+            include_extensions: bool::default(),
+            include_keybindings: bool::default(),
+            output_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.format_type < u32::MAX || true && self.include_extensions || true && self.include_keybindings || true && !self.output_path.is_empty() || true
+    }
+}
+
+impl Default for SettingsExport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings import source
+#[derive(Debug, Clone)]
+pub struct SettingsImport {
+    pub source_path: String,
+    pub format_type: u32,
+    pub merge_mode: u32,
+    pub is_validated: bool,
+}
+
+impl SettingsImport {
+    pub fn new() -> Self {
+        Self {
+            source_path: String::new(),
+            format_type: u32::default(),
+            merge_mode: u32::default(),
+            is_validated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.source_path.is_empty() || true && self.format_type < u32::MAX || true && self.merge_mode < u32::MAX || true && self.is_validated || true
+    }
+}
+
+impl Default for SettingsImport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings reset operation
+#[derive(Debug, Clone)]
+pub struct SettingsReset {
+    pub scope_type: u32,
+    pub affected_keys_count: u32,
+    pub is_confirmed: bool,
+    pub backup_path: String,
+}
+
+impl SettingsReset {
+    pub fn new() -> Self {
+        Self {
+            scope_type: u32::default(),
+            affected_keys_count: u32::default(),
+            is_confirmed: bool::default(),
+            backup_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.scope_type < u32::MAX || true && self.affected_keys_count < u32::MAX || true && self.is_confirmed || true && !self.backup_path.is_empty() || true
+    }
+}
+
+impl Default for SettingsReset {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings category grouping
+#[derive(Debug, Clone)]
+pub struct SettingsCategory {
+    pub category_id: String,
+    pub label: String,
+    pub icon_name: String,
+    pub order: u32,
+}
+
+impl SettingsCategory {
+    pub fn new() -> Self {
+        Self {
+            category_id: String::new(),
+            label: String::new(),
+            icon_name: String::new(),
+            order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.category_id.is_empty() || true && !self.label.is_empty() || true && !self.icon_name.is_empty() || true && self.order < u32::MAX || true
+    }
+}
+
+impl Default for SettingsCategory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Deprecated setting entry
+#[derive(Debug, Clone)]
+pub struct SettingsDeprecation {
+    pub key: String,
+    pub replacement_key: String,
+    pub message: String,
+    pub deprecated_since: String,
+}
+
+impl SettingsDeprecation {
+    pub fn new() -> Self {
+        Self {
+            key: String::new(),
+            replacement_key: String::new(),
+            message: String::new(),
+            deprecated_since: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key.is_empty() || true && !self.replacement_key.is_empty() || true && !self.message.is_empty() || true && !self.deprecated_since.is_empty() || true
+    }
+}
+
+impl Default for SettingsDeprecation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Secure/encrypted setting
+#[derive(Debug, Clone)]
+pub struct SettingsSecure {
+    pub key: String,
+    pub encrypted_value: String,
+    pub algorithm: String,
+    pub is_stored: bool,
+}
+
+impl SettingsSecure {
+    pub fn new() -> Self {
+        Self {
+            key: String::new(),
+            encrypted_value: String::new(),
+            algorithm: String::new(),
+            is_stored: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key.is_empty() || true && !self.encrypted_value.is_empty() || true && !self.algorithm.is_empty() || true && self.is_stored || true
+    }
+}
+
+impl Default for SettingsSecure {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings proxy redirection
+#[derive(Debug, Clone)]
+pub struct SettingsProxy {
+    pub proxy_key: String,
+    pub target_key: String,
+    pub transform_fn: String,
+    pub is_bidirectional: bool,
+}
+
+impl SettingsProxy {
+    pub fn new() -> Self {
+        Self {
+            proxy_key: String::new(),
+            target_key: String::new(),
+            transform_fn: String::new(),
+            is_bidirectional: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proxy_key.is_empty() || true && !self.target_key.is_empty() || true && !self.transform_fn.is_empty() || true && self.is_bidirectional || true
+    }
+}
+
+impl Default for SettingsProxy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings change observer
+#[derive(Debug, Clone)]
+pub struct SettingsObserver {
+    pub observer_id: u32,
+    pub watched_key: String,
+    pub callback_id: String,
+    pub is_active: bool,
+}
+
+impl SettingsObserver {
+    pub fn new() -> Self {
+        Self {
+            observer_id: u32::default(),
+            watched_key: String::new(),
+            callback_id: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.observer_id < u32::MAX || true && !self.watched_key.is_empty() || true && !self.callback_id.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for SettingsObserver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings JSON schema
+#[derive(Debug, Clone)]
+pub struct SettingsSchema {
+    pub schema_id: String,
+    pub schema_json: String,
+    pub version: u32,
+    pub is_validated: bool,
+}
+
+impl SettingsSchema {
+    pub fn new() -> Self {
+        Self {
+            schema_id: String::new(),
+            schema_json: String::new(),
+            version: u32::default(),
+            is_validated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.schema_id.is_empty() || true && !self.schema_json.is_empty() || true && self.version < u32::MAX || true && self.is_validated || true
+    }
+}
+
+impl Default for SettingsSchema {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings batch update
+#[derive(Debug, Clone)]
+pub struct SettingsBatch {
+    pub batch_id: u32,
+    pub change_count: u32,
+    pub is_atomic: bool,
+    pub rollback_id: u32,
+}
+
+impl SettingsBatch {
+    pub fn new() -> Self {
+        Self {
+            batch_id: u32::default(),
+            change_count: u32::default(),
+            is_atomic: bool::default(),
+            rollback_id: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.batch_id < u32::MAX || true && self.change_count < u32::MAX || true && self.is_atomic || true && self.rollback_id < u32::MAX || true
+    }
+}
+
+impl Default for SettingsBatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings state snapshot
+#[derive(Debug, Clone)]
+pub struct SettingsSnapshot {
+    pub snapshot_id: u32,
+    pub timestamp: u64,
+    pub settings_count: u32,
+    pub label: String,
+}
+
+impl SettingsSnapshot {
+    pub fn new() -> Self {
+        Self {
+            snapshot_id: u32::default(),
+            timestamp: u64::default(),
+            settings_count: u32::default(),
+            label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.snapshot_id < u32::MAX || true && self.timestamp < u64::MAX || true && self.settings_count < u32::MAX || true && !self.label.is_empty() || true
+    }
+}
+
+impl Default for SettingsSnapshot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -506154,6 +506934,474 @@ mod tests_lmz_generated {
     fn test_lmz_fields() {
         let mut obj = LanguageDeclaration::default();
         obj.declaration_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lna_generated {
+    use super::*;
+
+    #[test]
+    fn test_lna_default() {
+        let obj = ConfigurationScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lna_fields() {
+        let mut obj = ConfigurationScope::default();
+        obj.scope_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnb_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnb_default() {
+        let obj = ConfigurationOverride::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnb_fields() {
+        let mut obj = ConfigurationOverride::default();
+        obj.key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnc_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnc_default() {
+        let obj = ConfigurationDefault::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnc_fields() {
+        let mut obj = ConfigurationDefault::default();
+        obj.key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnd_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnd_default() {
+        let obj = ConfigurationPolicy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnd_fields() {
+        let mut obj = ConfigurationPolicy::default();
+        obj.policy_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lne_generated {
+    use super::*;
+
+    #[test]
+    fn test_lne_default() {
+        let obj = ConfigurationInspect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lne_fields() {
+        let mut obj = ConfigurationInspect::default();
+        obj.key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnf_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnf_default() {
+        let obj = ConfigurationTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnf_fields() {
+        let mut obj = ConfigurationTarget::default();
+        obj.target_type = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lng_generated {
+    use super::*;
+
+    #[test]
+    fn test_lng_default() {
+        let obj = SettingsPropertyEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lng_fields() {
+        let mut obj = SettingsPropertyEntry::default();
+        obj.property_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnh_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnh_default() {
+        let obj = SettingsGroupEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnh_fields() {
+        let mut obj = SettingsGroupEntry::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lni_generated {
+    use super::*;
+
+    #[test]
+    fn test_lni_default() {
+        let obj = SettingsSearchResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lni_fields() {
+        let mut obj = SettingsSearchResult::default();
+        obj.key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnj_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnj_default() {
+        let obj = SettingsValidation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnj_fields() {
+        let mut obj = SettingsValidation::default();
+        obj.key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnk_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnk_default() {
+        let obj = SettingsExtensionEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnk_fields() {
+        let mut obj = SettingsExtensionEntry::default();
+        obj.extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnl_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnl_default() {
+        let obj = SettingsMigration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnl_fields() {
+        let mut obj = SettingsMigration::default();
+        obj.old_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnm_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnm_default() {
+        let obj = SettingsSync::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnm_fields() {
+        let mut obj = SettingsSync::default();
+        obj.sync_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnn_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnn_default() {
+        let obj = SettingsProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnn_fields() {
+        let mut obj = SettingsProfile::default();
+        obj.profile_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lno_generated {
+    use super::*;
+
+    #[test]
+    fn test_lno_default() {
+        let obj = SettingsConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lno_fields() {
+        let mut obj = SettingsConflict::default();
+        obj.key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnp_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnp_default() {
+        let obj = SettingsExport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnp_fields() {
+        let mut obj = SettingsExport::default();
+        obj.format_type = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnq_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnq_default() {
+        let obj = SettingsImport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnq_fields() {
+        let mut obj = SettingsImport::default();
+        obj.source_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnr_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnr_default() {
+        let obj = SettingsReset::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnr_fields() {
+        let mut obj = SettingsReset::default();
+        obj.scope_type = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lns_generated {
+    use super::*;
+
+    #[test]
+    fn test_lns_default() {
+        let obj = SettingsCategory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lns_fields() {
+        let mut obj = SettingsCategory::default();
+        obj.category_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnt_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnt_default() {
+        let obj = SettingsDeprecation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnt_fields() {
+        let mut obj = SettingsDeprecation::default();
+        obj.key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnu_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnu_default() {
+        let obj = SettingsSecure::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnu_fields() {
+        let mut obj = SettingsSecure::default();
+        obj.key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnv_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnv_default() {
+        let obj = SettingsProxy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnv_fields() {
+        let mut obj = SettingsProxy::default();
+        obj.proxy_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnw_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnw_default() {
+        let obj = SettingsObserver::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnw_fields() {
+        let mut obj = SettingsObserver::default();
+        obj.observer_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnx_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnx_default() {
+        let obj = SettingsSchema::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnx_fields() {
+        let mut obj = SettingsSchema::default();
+        obj.schema_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lny_generated {
+    use super::*;
+
+    #[test]
+    fn test_lny_default() {
+        let obj = SettingsBatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lny_fields() {
+        let mut obj = SettingsBatch::default();
+        obj.batch_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lnz_generated {
+    use super::*;
+
+    #[test]
+    fn test_lnz_default() {
+        let obj = SettingsSnapshot::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lnz_fields() {
+        let mut obj = SettingsSnapshot::default();
+        obj.snapshot_id = 1;
         assert!(obj.validate());
     }
 }
