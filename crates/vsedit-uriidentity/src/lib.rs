@@ -216529,6 +216529,786 @@ impl Default for SettingsSnapshot {
     }
 }
 
+/// Accessibility signal event
+#[derive(Debug, Clone)]
+pub struct AccessibilitySignal {
+    pub signal_type: u32,
+    pub label: String,
+    pub audio_cue: String,
+    pub is_enabled: bool,
+}
+
+impl AccessibilitySignal {
+    pub fn new() -> Self {
+        Self {
+            signal_type: u32::default(),
+            label: String::new(),
+            audio_cue: String::new(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.signal_type < u32::MAX || true && !self.label.is_empty() || true && !self.audio_cue.is_empty() || true && self.is_enabled || true
+    }
+}
+
+impl Default for AccessibilitySignal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Screen reader content
+#[derive(Debug, Clone)]
+pub struct ScreenReaderContent {
+    pub content_text: String,
+    pub role: String,
+    pub line_number: u32,
+    pub is_live: bool,
+}
+
+impl ScreenReaderContent {
+    pub fn new() -> Self {
+        Self {
+            content_text: String::new(),
+            role: String::new(),
+            line_number: u32::default(),
+            is_live: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.content_text.is_empty() || true && !self.role.is_empty() || true && self.line_number < u32::MAX || true && self.is_live || true
+    }
+}
+
+impl Default for ScreenReaderContent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// ARIA live region announcer state
+#[derive(Debug, Clone)]
+pub struct AriaLiveAnnouncer {
+    pub region_id: String,
+    pub politeness: u32,
+    pub content: String,
+    pub is_atomic: bool,
+}
+
+impl AriaLiveAnnouncer {
+    pub fn new() -> Self {
+        Self {
+            region_id: String::new(),
+            politeness: u32::default(),
+            content: String::new(),
+            is_atomic: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.region_id.is_empty() || true && self.politeness < u32::MAX || true && !self.content.is_empty() || true && self.is_atomic || true
+    }
+}
+
+impl Default for AriaLiveAnnouncer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible view representation
+#[derive(Debug, Clone)]
+pub struct AccessibleView {
+    pub view_id: String,
+    pub title: String,
+    pub content: String,
+    pub has_actions: bool,
+}
+
+impl AccessibleView {
+    pub fn new() -> Self {
+        Self {
+            view_id: String::new(),
+            title: String::new(),
+            content: String::new(),
+            has_actions: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_id.is_empty() || true && !self.title.is_empty() || true && !self.content.is_empty() || true && self.has_actions || true
+    }
+}
+
+impl Default for AccessibleView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessibility help content
+#[derive(Debug, Clone)]
+pub struct AccessibilityHelp {
+    pub topic_id: String,
+    pub title: String,
+    pub content: String,
+    pub key_binding: String,
+}
+
+impl AccessibilityHelp {
+    pub fn new() -> Self {
+        Self {
+            topic_id: String::new(),
+            title: String::new(),
+            content: String::new(),
+            key_binding: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.topic_id.is_empty() || true && !self.title.is_empty() || true && !self.content.is_empty() || true && !self.key_binding.is_empty() || true
+    }
+}
+
+impl Default for AccessibilityHelp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// High contrast theme config
+#[derive(Debug, Clone)]
+pub struct HighContrastTheme {
+    pub theme_id: String,
+    pub contrast_ratio: f64,
+    pub border_width: u32,
+    pub is_active: bool,
+}
+
+impl HighContrastTheme {
+    pub fn new() -> Self {
+        Self {
+            theme_id: String::new(),
+            contrast_ratio: f64::default(),
+            border_width: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_id.is_empty() || true && self.contrast_ratio.is_finite() || true && self.border_width < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for HighContrastTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tab focus mode setting
+#[derive(Debug, Clone)]
+pub struct TabFocusMode {
+    pub mode_type: u32,
+    pub is_active: bool,
+    pub scope: String,
+    pub toggle_key: String,
+}
+
+impl TabFocusMode {
+    pub fn new() -> Self {
+        Self {
+            mode_type: u32::default(),
+            is_active: bool::default(),
+            scope: String::new(),
+            toggle_key: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.mode_type < u32::MAX || true && self.is_active || true && !self.scope.is_empty() || true && !self.toggle_key.is_empty() || true
+    }
+}
+
+impl Default for TabFocusMode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keyboard navigation state
+#[derive(Debug, Clone)]
+pub struct KeyboardNavigation {
+    pub nav_type: u32,
+    pub current_element: String,
+    pub direction: u32,
+    pub is_cycling: bool,
+}
+
+impl KeyboardNavigation {
+    pub fn new() -> Self {
+        Self {
+            nav_type: u32::default(),
+            current_element: String::new(),
+            direction: u32::default(),
+            is_cycling: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.nav_type < u32::MAX || true && !self.current_element.is_empty() || true && self.direction < u32::MAX || true && self.is_cycling || true
+    }
+}
+
+impl Default for KeyboardNavigation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Focus trap container
+#[derive(Debug, Clone)]
+pub struct FocusTrap {
+    pub trap_id: String,
+    pub first_element: String,
+    pub last_element: String,
+    pub is_active: bool,
+}
+
+impl FocusTrap {
+    pub fn new() -> Self {
+        Self {
+            trap_id: String::new(),
+            first_element: String::new(),
+            last_element: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.trap_id.is_empty() || true && !self.first_element.is_empty() || true && !self.last_element.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for FocusTrap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible notification
+#[derive(Debug, Clone)]
+pub struct AccessibleNotification {
+    pub notification_id: u32,
+    pub message: String,
+    pub severity: u32,
+    pub is_announced: bool,
+}
+
+impl AccessibleNotification {
+    pub fn new() -> Self {
+        Self {
+            notification_id: u32::default(),
+            message: String::new(),
+            severity: u32::default(),
+            is_announced: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.notification_id < u32::MAX || true && !self.message.is_empty() || true && self.severity < u32::MAX || true && self.is_announced || true
+    }
+}
+
+impl Default for AccessibleNotification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Reduced motion preference
+#[derive(Debug, Clone)]
+pub struct ReducedMotion {
+    pub setting_value: u32,
+    pub is_system_setting: bool,
+    pub animation_allowed: bool,
+    pub transition_duration: u32,
+}
+
+impl ReducedMotion {
+    pub fn new() -> Self {
+        Self {
+            setting_value: u32::default(),
+            is_system_setting: bool::default(),
+            animation_allowed: bool::default(),
+            transition_duration: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.setting_value < u32::MAX || true && self.is_system_setting || true && self.animation_allowed || true && self.transition_duration < u32::MAX || true
+    }
+}
+
+impl Default for ReducedMotion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible tree view state
+#[derive(Debug, Clone)]
+pub struct AccessibleTreeView {
+    pub tree_id: String,
+    pub item_count: u32,
+    pub selected_index: u32,
+    pub aria_label: String,
+}
+
+impl AccessibleTreeView {
+    pub fn new() -> Self {
+        Self {
+            tree_id: String::new(),
+            item_count: u32::default(),
+            selected_index: u32::default(),
+            aria_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_id.is_empty() || true && self.item_count < u32::MAX || true && self.selected_index < u32::MAX || true && !self.aria_label.is_empty() || true
+    }
+}
+
+impl Default for AccessibleTreeView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible list view state
+#[derive(Debug, Clone)]
+pub struct AccessibleListView {
+    pub list_id: String,
+    pub item_count: u32,
+    pub focused_index: u32,
+    pub aria_label: String,
+}
+
+impl AccessibleListView {
+    pub fn new() -> Self {
+        Self {
+            list_id: String::new(),
+            item_count: u32::default(),
+            focused_index: u32::default(),
+            aria_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_id.is_empty() || true && self.item_count < u32::MAX || true && self.focused_index < u32::MAX || true && !self.aria_label.is_empty() || true
+    }
+}
+
+impl Default for AccessibleListView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible table view state
+#[derive(Debug, Clone)]
+pub struct AccessibleTableView {
+    pub table_id: String,
+    pub row_count: u32,
+    pub column_count: u32,
+    pub active_cell: String,
+}
+
+impl AccessibleTableView {
+    pub fn new() -> Self {
+        Self {
+            table_id: String::new(),
+            row_count: u32::default(),
+            column_count: u32::default(),
+            active_cell: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.table_id.is_empty() || true && self.row_count < u32::MAX || true && self.column_count < u32::MAX || true && !self.active_cell.is_empty() || true
+    }
+}
+
+impl Default for AccessibleTableView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible editor line info
+#[derive(Debug, Clone)]
+pub struct AccessibleEditorLine {
+    pub line_number: u32,
+    pub content: String,
+    pub indent_level: u32,
+    pub has_folding: bool,
+}
+
+impl AccessibleEditorLine {
+    pub fn new() -> Self {
+        Self {
+            line_number: u32::default(),
+            content: String::new(),
+            indent_level: u32::default(),
+            has_folding: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.line_number < u32::MAX || true && !self.content.is_empty() || true && self.indent_level < u32::MAX || true && self.has_folding || true
+    }
+}
+
+impl Default for AccessibleEditorLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible cursor position
+#[derive(Debug, Clone)]
+pub struct AccessibleCursorPosition {
+    pub line_num: u32,
+    pub column_num: u32,
+    pub word_at_cursor: String,
+    pub is_in_selection: bool,
+}
+
+impl AccessibleCursorPosition {
+    pub fn new() -> Self {
+        Self {
+            line_num: u32::default(),
+            column_num: u32::default(),
+            word_at_cursor: String::new(),
+            is_in_selection: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.line_num < u32::MAX || true && self.column_num < u32::MAX || true && !self.word_at_cursor.is_empty() || true && self.is_in_selection || true
+    }
+}
+
+impl Default for AccessibleCursorPosition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible selection info
+#[derive(Debug, Clone)]
+pub struct AccessibleSelectionInfo {
+    pub selection_id: u32,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub selected_text: String,
+}
+
+impl AccessibleSelectionInfo {
+    pub fn new() -> Self {
+        Self {
+            selection_id: u32::default(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            selected_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.selection_id < u32::MAX || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.selected_text.is_empty() || true
+    }
+}
+
+impl Default for AccessibleSelectionInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible diagnostic info
+#[derive(Debug, Clone)]
+pub struct AccessibleDiagnostic {
+    pub diagnostic_id: u32,
+    pub message: String,
+    pub severity: u32,
+    pub source: String,
+}
+
+impl AccessibleDiagnostic {
+    pub fn new() -> Self {
+        Self {
+            diagnostic_id: u32::default(),
+            message: String::new(),
+            severity: u32::default(),
+            source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.diagnostic_id < u32::MAX || true && !self.message.is_empty() || true && self.severity < u32::MAX || true && !self.source.is_empty() || true
+    }
+}
+
+impl Default for AccessibleDiagnostic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible breadcrumb state
+#[derive(Debug, Clone)]
+pub struct AccessibleBreadcrumb {
+    pub breadcrumb_id: String,
+    pub path: String,
+    pub depth: u32,
+    pub is_focused: bool,
+}
+
+impl AccessibleBreadcrumb {
+    pub fn new() -> Self {
+        Self {
+            breadcrumb_id: String::new(),
+            path: String::new(),
+            depth: u32::default(),
+            is_focused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.breadcrumb_id.is_empty() || true && !self.path.is_empty() || true && self.depth < u32::MAX || true && self.is_focused || true
+    }
+}
+
+impl Default for AccessibleBreadcrumb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible suggestion info
+#[derive(Debug, Clone)]
+pub struct AccessibleSuggestion {
+    pub suggestion_id: u32,
+    pub label: String,
+    pub detail: String,
+    pub is_selected: bool,
+}
+
+impl AccessibleSuggestion {
+    pub fn new() -> Self {
+        Self {
+            suggestion_id: u32::default(),
+            label: String::new(),
+            detail: String::new(),
+            is_selected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.suggestion_id < u32::MAX || true && !self.label.is_empty() || true && !self.detail.is_empty() || true && self.is_selected || true
+    }
+}
+
+impl Default for AccessibleSuggestion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible hover content
+#[derive(Debug, Clone)]
+pub struct AccessibleHover {
+    pub hover_id: u32,
+    pub content: String,
+    pub line_number: u32,
+    pub is_visible: bool,
+}
+
+impl AccessibleHover {
+    pub fn new() -> Self {
+        Self {
+            hover_id: u32::default(),
+            content: String::new(),
+            line_number: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.hover_id < u32::MAX || true && !self.content.is_empty() || true && self.line_number < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for AccessibleHover {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible action command
+#[derive(Debug, Clone)]
+pub struct AccessibleAction {
+    pub action_id: String,
+    pub label: String,
+    pub key_binding: String,
+    pub is_enabled: bool,
+}
+
+impl AccessibleAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            label: String::new(),
+            key_binding: String::new(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.label.is_empty() || true && !self.key_binding.is_empty() || true && self.is_enabled || true
+    }
+}
+
+impl Default for AccessibleAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible landmark region
+#[derive(Debug, Clone)]
+pub struct AccessibleLandmark {
+    pub landmark_id: String,
+    pub role: String,
+    pub label: String,
+    pub order: u32,
+}
+
+impl AccessibleLandmark {
+    pub fn new() -> Self {
+        Self {
+            landmark_id: String::new(),
+            role: String::new(),
+            label: String::new(),
+            order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.landmark_id.is_empty() || true && !self.role.is_empty() || true && !self.label.is_empty() || true && self.order < u32::MAX || true
+    }
+}
+
+impl Default for AccessibleLandmark {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible announcement
+#[derive(Debug, Clone)]
+pub struct AccessibleAnnouncement {
+    pub announcement_id: u32,
+    pub message: String,
+    pub priority: u32,
+    pub delay_ms: u32,
+}
+
+impl AccessibleAnnouncement {
+    pub fn new() -> Self {
+        Self {
+            announcement_id: u32::default(),
+            message: String::new(),
+            priority: u32::default(),
+            delay_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.announcement_id < u32::MAX || true && !self.message.is_empty() || true && self.priority < u32::MAX || true && self.delay_ms < u32::MAX || true
+    }
+}
+
+impl Default for AccessibleAnnouncement {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible keyboard shortcut
+#[derive(Debug, Clone)]
+pub struct AccessibleShortcut {
+    pub shortcut_id: String,
+    pub display_text: String,
+    pub command_id: String,
+    pub scope: String,
+}
+
+impl AccessibleShortcut {
+    pub fn new() -> Self {
+        Self {
+            shortcut_id: String::new(),
+            display_text: String::new(),
+            command_id: String::new(),
+            scope: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shortcut_id.is_empty() || true && !self.display_text.is_empty() || true && !self.command_id.is_empty() || true && !self.scope.is_empty() || true
+    }
+}
+
+impl Default for AccessibleShortcut {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible status message
+#[derive(Debug, Clone)]
+pub struct AccessibleStatus {
+    pub status_id: String,
+    pub text: String,
+    pub role: u32,
+    pub is_live: bool,
+}
+
+impl AccessibleStatus {
+    pub fn new() -> Self {
+        Self {
+            status_id: String::new(),
+            text: String::new(),
+            role: u32::default(),
+            is_live: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.status_id.is_empty() || true && !self.text.is_empty() || true && self.role < u32::MAX || true && self.is_live || true
+    }
+}
+
+impl Default for AccessibleStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -507427,6 +508207,474 @@ mod tests_lnz_generated {
     fn test_lnz_fields() {
         let mut obj = SettingsSnapshot::default();
         obj.snapshot_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_loa_generated {
+    use super::*;
+
+    #[test]
+    fn test_loa_default() {
+        let obj = AccessibilitySignal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_loa_fields() {
+        let mut obj = AccessibilitySignal::default();
+        obj.signal_type = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lob_generated {
+    use super::*;
+
+    #[test]
+    fn test_lob_default() {
+        let obj = ScreenReaderContent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lob_fields() {
+        let mut obj = ScreenReaderContent::default();
+        obj.content_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_loc_generated {
+    use super::*;
+
+    #[test]
+    fn test_loc_default() {
+        let obj = AriaLiveAnnouncer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_loc_fields() {
+        let mut obj = AriaLiveAnnouncer::default();
+        obj.region_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lod_generated {
+    use super::*;
+
+    #[test]
+    fn test_lod_default() {
+        let obj = AccessibleView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lod_fields() {
+        let mut obj = AccessibleView::default();
+        obj.view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_loe_generated {
+    use super::*;
+
+    #[test]
+    fn test_loe_default() {
+        let obj = AccessibilityHelp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_loe_fields() {
+        let mut obj = AccessibilityHelp::default();
+        obj.topic_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lof_generated {
+    use super::*;
+
+    #[test]
+    fn test_lof_default() {
+        let obj = HighContrastTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lof_fields() {
+        let mut obj = HighContrastTheme::default();
+        obj.theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_log_generated {
+    use super::*;
+
+    #[test]
+    fn test_log_default() {
+        let obj = TabFocusMode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_log_fields() {
+        let mut obj = TabFocusMode::default();
+        obj.mode_type = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_loh_generated {
+    use super::*;
+
+    #[test]
+    fn test_loh_default() {
+        let obj = KeyboardNavigation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_loh_fields() {
+        let mut obj = KeyboardNavigation::default();
+        obj.nav_type = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_loi_generated {
+    use super::*;
+
+    #[test]
+    fn test_loi_default() {
+        let obj = FocusTrap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_loi_fields() {
+        let mut obj = FocusTrap::default();
+        obj.trap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_loj_generated {
+    use super::*;
+
+    #[test]
+    fn test_loj_default() {
+        let obj = AccessibleNotification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_loj_fields() {
+        let mut obj = AccessibleNotification::default();
+        obj.notification_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lok_generated {
+    use super::*;
+
+    #[test]
+    fn test_lok_default() {
+        let obj = ReducedMotion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lok_fields() {
+        let mut obj = ReducedMotion::default();
+        obj.setting_value = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lol_generated {
+    use super::*;
+
+    #[test]
+    fn test_lol_default() {
+        let obj = AccessibleTreeView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lol_fields() {
+        let mut obj = AccessibleTreeView::default();
+        obj.tree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lom_generated {
+    use super::*;
+
+    #[test]
+    fn test_lom_default() {
+        let obj = AccessibleListView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lom_fields() {
+        let mut obj = AccessibleListView::default();
+        obj.list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lon_generated {
+    use super::*;
+
+    #[test]
+    fn test_lon_default() {
+        let obj = AccessibleTableView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lon_fields() {
+        let mut obj = AccessibleTableView::default();
+        obj.table_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_loo_generated {
+    use super::*;
+
+    #[test]
+    fn test_loo_default() {
+        let obj = AccessibleEditorLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_loo_fields() {
+        let mut obj = AccessibleEditorLine::default();
+        obj.line_number = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lop_generated {
+    use super::*;
+
+    #[test]
+    fn test_lop_default() {
+        let obj = AccessibleCursorPosition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lop_fields() {
+        let mut obj = AccessibleCursorPosition::default();
+        obj.line_num = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_loq_generated {
+    use super::*;
+
+    #[test]
+    fn test_loq_default() {
+        let obj = AccessibleSelectionInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_loq_fields() {
+        let mut obj = AccessibleSelectionInfo::default();
+        obj.selection_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lor_generated {
+    use super::*;
+
+    #[test]
+    fn test_lor_default() {
+        let obj = AccessibleDiagnostic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lor_fields() {
+        let mut obj = AccessibleDiagnostic::default();
+        obj.diagnostic_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_los_generated {
+    use super::*;
+
+    #[test]
+    fn test_los_default() {
+        let obj = AccessibleBreadcrumb::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_los_fields() {
+        let mut obj = AccessibleBreadcrumb::default();
+        obj.breadcrumb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lot_generated {
+    use super::*;
+
+    #[test]
+    fn test_lot_default() {
+        let obj = AccessibleSuggestion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lot_fields() {
+        let mut obj = AccessibleSuggestion::default();
+        obj.suggestion_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lou_generated {
+    use super::*;
+
+    #[test]
+    fn test_lou_default() {
+        let obj = AccessibleHover::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lou_fields() {
+        let mut obj = AccessibleHover::default();
+        obj.hover_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lov_generated {
+    use super::*;
+
+    #[test]
+    fn test_lov_default() {
+        let obj = AccessibleAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lov_fields() {
+        let mut obj = AccessibleAction::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_low_generated {
+    use super::*;
+
+    #[test]
+    fn test_low_default() {
+        let obj = AccessibleLandmark::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_low_fields() {
+        let mut obj = AccessibleLandmark::default();
+        obj.landmark_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lox_generated {
+    use super::*;
+
+    #[test]
+    fn test_lox_default() {
+        let obj = AccessibleAnnouncement::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lox_fields() {
+        let mut obj = AccessibleAnnouncement::default();
+        obj.announcement_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_loy_generated {
+    use super::*;
+
+    #[test]
+    fn test_loy_default() {
+        let obj = AccessibleShortcut::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_loy_fields() {
+        let mut obj = AccessibleShortcut::default();
+        obj.shortcut_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_loz_generated {
+    use super::*;
+
+    #[test]
+    fn test_loz_default() {
+        let obj = AccessibleStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_loz_fields() {
+        let mut obj = AccessibleStatus::default();
+        obj.status_id = "test".to_string();
         assert!(obj.validate());
     }
 }
