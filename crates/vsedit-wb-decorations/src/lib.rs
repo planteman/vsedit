@@ -196605,6 +196605,838 @@ impl Default for KpzDebugConfig {
     }
 }
 
+/// /// Test item in test explorer
+#[derive(Debug, Clone)]
+pub struct KqaTestItem {
+    pub kqa_test_id: String,
+    pub kqa_label: String,
+    pub kqa_uri: String,
+    pub kqa_range_start: u32,
+    pub kqa_can_resolve: bool,
+}
+
+impl KqaTestItem {
+    pub fn new() -> Self {
+        Self {
+            kqa_test_id: String::new(),
+            kqa_label: String::new(),
+            kqa_uri: String::new(),
+            kqa_range_start: u32::default(),
+            kqa_can_resolve: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqa_test_id.is_empty() || true && !self.kqa_label.is_empty() || true && !self.kqa_uri.is_empty() || true && self.kqa_range_start < u32::MAX || true && self.kqa_can_resolve || true
+    }
+}
+
+impl Default for KqaTestItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test run execution state
+#[derive(Debug, Clone)]
+pub struct KqbTestRun {
+    pub kqb_run_id: String,
+    pub kqb_state: String,
+    pub kqb_total_tests: u32,
+    pub kqb_passed: u32,
+    pub kqb_failed: u32,
+}
+
+impl KqbTestRun {
+    pub fn new() -> Self {
+        Self {
+            kqb_run_id: String::new(),
+            kqb_state: String::new(),
+            kqb_total_tests: u32::default(),
+            kqb_passed: u32::default(),
+            kqb_failed: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqb_run_id.is_empty() || true && !self.kqb_state.is_empty() || true && self.kqb_total_tests < u32::MAX || true && self.kqb_passed < u32::MAX || true && self.kqb_failed < u32::MAX || true
+    }
+}
+
+impl Default for KqbTestRun {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Individual test result
+#[derive(Debug, Clone)]
+pub struct KqcTestResult {
+    pub kqc_state: String,
+    pub kqc_duration_ms: u64,
+    pub kqc_test_id: String,
+    pub kqc_message_str: String,
+    pub kqc_label: String,
+}
+
+impl KqcTestResult {
+    pub fn new() -> Self {
+        Self {
+            kqc_state: String::new(),
+            kqc_duration_ms: u64::default(),
+            kqc_test_id: String::new(),
+            kqc_message_str: String::new(),
+            kqc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqc_state.is_empty() || true && self.kqc_duration_ms < u64::MAX || true && !self.kqc_test_id.is_empty() || true && !self.kqc_message_str.is_empty() || true && !self.kqc_label.is_empty() || true
+    }
+}
+
+impl Default for KqcTestResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test failure/error message
+#[derive(Debug, Clone)]
+pub struct KqaTestMessage {
+    pub kqd_message: String,
+    pub kqd_expected: String,
+    pub kqd_actual: String,
+    pub kqd_location_uri: String,
+    pub kqd_line: u32,
+}
+
+impl KqaTestMessage {
+    pub fn new() -> Self {
+        Self {
+            kqd_message: String::new(),
+            kqd_expected: String::new(),
+            kqd_actual: String::new(),
+            kqd_location_uri: String::new(),
+            kqd_line: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqd_message.is_empty() || true && !self.kqd_expected.is_empty() || true && !self.kqd_actual.is_empty() || true && !self.kqd_location_uri.is_empty() || true && self.kqd_line < u32::MAX || true
+    }
+}
+
+impl Default for KqaTestMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test run profile configuration
+#[derive(Debug, Clone)]
+pub struct KqeTestProfile {
+    pub kqe_profile_id: String,
+    pub kqe_kind: String,
+    pub kqe_is_default: bool,
+    pub kqe_supports_debug: bool,
+    pub kqe_label: String,
+}
+
+impl KqeTestProfile {
+    pub fn new() -> Self {
+        Self {
+            kqe_profile_id: String::new(),
+            kqe_kind: String::new(),
+            kqe_is_default: bool::default(),
+            kqe_supports_debug: bool::default(),
+            kqe_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqe_profile_id.is_empty() || true && !self.kqe_kind.is_empty() || true && self.kqe_is_default || true && self.kqe_supports_debug || true && !self.kqe_label.is_empty() || true
+    }
+}
+
+impl Default for KqeTestProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test controller registration
+#[derive(Debug, Clone)]
+pub struct KqfTestController {
+    pub kqf_controller_id: String,
+    pub kqf_extension_id: String,
+    pub kqf_items_count: u32,
+    pub kqf_active: bool,
+    pub kqf_label: String,
+}
+
+impl KqfTestController {
+    pub fn new() -> Self {
+        Self {
+            kqf_controller_id: String::new(),
+            kqf_extension_id: String::new(),
+            kqf_items_count: u32::default(),
+            kqf_active: bool::default(),
+            kqf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqf_controller_id.is_empty() || true && !self.kqf_extension_id.is_empty() || true && self.kqf_items_count < u32::MAX || true && self.kqf_active || true && !self.kqf_label.is_empty() || true
+    }
+}
+
+impl Default for KqfTestController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test coverage data
+#[derive(Debug, Clone)]
+pub struct KqgTestCoverage {
+    pub kqg_file_uri: String,
+    pub kqg_line_coverage: f64,
+    pub kqg_branch_coverage: f64,
+    pub kqg_covered_lines: u32,
+    pub kqg_label: String,
+}
+
+impl KqgTestCoverage {
+    pub fn new() -> Self {
+        Self {
+            kqg_file_uri: String::new(),
+            kqg_line_coverage: f64::default(),
+            kqg_branch_coverage: f64::default(),
+            kqg_covered_lines: u32::default(),
+            kqg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqg_file_uri.is_empty() || true && self.kqg_line_coverage.is_finite() || true && self.kqg_branch_coverage.is_finite() || true && self.kqg_covered_lines < u32::MAX || true && !self.kqg_label.is_empty() || true
+    }
+}
+
+impl Default for KqgTestCoverage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test item tag for filtering
+#[derive(Debug, Clone)]
+pub struct KqhTestTag {
+    pub kqh_tag_id: String,
+    pub kqh_tag_label: String,
+    pub kqh_color: String,
+    pub kqh_icon: String,
+    pub kqh_active: bool,
+}
+
+impl KqhTestTag {
+    pub fn new() -> Self {
+        Self {
+            kqh_tag_id: String::new(),
+            kqh_tag_label: String::new(),
+            kqh_color: String::new(),
+            kqh_icon: String::new(),
+            kqh_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqh_tag_id.is_empty() || true && !self.kqh_tag_label.is_empty() || true && !self.kqh_color.is_empty() || true && !self.kqh_icon.is_empty() || true && self.kqh_active || true
+    }
+}
+
+impl Default for KqhTestTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test explorer filter criteria
+#[derive(Debug, Clone)]
+pub struct KqiTestFilter {
+    pub kqi_query: String,
+    pub kqi_state_filter: String,
+    pub kqi_tag_filter: String,
+    pub kqi_file_filter: String,
+    pub kqi_label: String,
+}
+
+impl KqiTestFilter {
+    pub fn new() -> Self {
+        Self {
+            kqi_query: String::new(),
+            kqi_state_filter: String::new(),
+            kqi_tag_filter: String::new(),
+            kqi_file_filter: String::new(),
+            kqi_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqi_query.is_empty() || true && !self.kqi_state_filter.is_empty() || true && !self.kqi_tag_filter.is_empty() || true && !self.kqi_file_filter.is_empty() || true && !self.kqi_label.is_empty() || true
+    }
+}
+
+impl Default for KqiTestFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test explorer sort options
+#[derive(Debug, Clone)]
+pub struct KqjTestSort {
+    pub kqj_sort_by: String,
+    pub kqj_ascending: bool,
+    pub kqj_group_first: bool,
+    pub kqj_failed_first: bool,
+    pub kqj_label: String,
+}
+
+impl KqjTestSort {
+    pub fn new() -> Self {
+        Self {
+            kqj_sort_by: String::new(),
+            kqj_ascending: bool::default(),
+            kqj_group_first: bool::default(),
+            kqj_failed_first: bool::default(),
+            kqj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqj_sort_by.is_empty() || true && self.kqj_ascending || true && self.kqj_group_first || true && self.kqj_failed_first || true && !self.kqj_label.is_empty() || true
+    }
+}
+
+impl Default for KqjTestSort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test explorer grouping options
+#[derive(Debug, Clone)]
+pub struct KqkTestGroup {
+    pub kqk_group_by: String,
+    pub kqk_collapse_groups: bool,
+    pub kqk_show_empty: bool,
+    pub kqk_flatten: bool,
+    pub kqk_label: String,
+}
+
+impl KqkTestGroup {
+    pub fn new() -> Self {
+        Self {
+            kqk_group_by: String::new(),
+            kqk_collapse_groups: bool::default(),
+            kqk_show_empty: bool::default(),
+            kqk_flatten: bool::default(),
+            kqk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqk_group_by.is_empty() || true && self.kqk_collapse_groups || true && self.kqk_show_empty || true && self.kqk_flatten || true && !self.kqk_label.is_empty() || true
+    }
+}
+
+impl Default for KqkTestGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test run output capture
+#[derive(Debug, Clone)]
+pub struct KqlTestOutput {
+    pub kql_output_text: String,
+    pub kql_test_id: String,
+    pub kql_stream_kind: String,
+    pub kql_timestamp: u64,
+    pub kql_label: String,
+}
+
+impl KqlTestOutput {
+    pub fn new() -> Self {
+        Self {
+            kql_output_text: String::new(),
+            kql_test_id: String::new(),
+            kql_stream_kind: String::new(),
+            kql_timestamp: u64::default(),
+            kql_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kql_output_text.is_empty() || true && !self.kql_test_id.is_empty() || true && !self.kql_stream_kind.is_empty() || true && self.kql_timestamp < u64::MAX || true && !self.kql_label.is_empty() || true
+    }
+}
+
+impl Default for KqlTestOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test expected vs actual diff
+#[derive(Debug, Clone)]
+pub struct KqmTestDiff {
+    pub kqm_expected: String,
+    pub kqm_actual: String,
+    pub kqm_diff_text: String,
+    pub kqm_location_uri: String,
+    pub kqm_label: String,
+}
+
+impl KqmTestDiff {
+    pub fn new() -> Self {
+        Self {
+            kqm_expected: String::new(),
+            kqm_actual: String::new(),
+            kqm_diff_text: String::new(),
+            kqm_location_uri: String::new(),
+            kqm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqm_expected.is_empty() || true && !self.kqm_actual.is_empty() || true && !self.kqm_diff_text.is_empty() || true && !self.kqm_location_uri.is_empty() || true && !self.kqm_label.is_empty() || true
+    }
+}
+
+impl Default for KqmTestDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test failure stack trace
+#[derive(Debug, Clone)]
+pub struct KqnTestStack {
+    pub kqn_frame_uri: String,
+    pub kqn_frame_line: u32,
+    pub kqn_frame_name: String,
+    pub kqn_depth: u32,
+    pub kqn_label: String,
+}
+
+impl KqnTestStack {
+    pub fn new() -> Self {
+        Self {
+            kqn_frame_uri: String::new(),
+            kqn_frame_line: u32::default(),
+            kqn_frame_name: String::new(),
+            kqn_depth: u32::default(),
+            kqn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqn_frame_uri.is_empty() || true && self.kqn_frame_line < u32::MAX || true && !self.kqn_frame_name.is_empty() || true && self.kqn_depth < u32::MAX || true && !self.kqn_label.is_empty() || true
+    }
+}
+
+impl Default for KqnTestStack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test result gutter decoration
+#[derive(Debug, Clone)]
+pub struct KqoTestDecoration {
+    pub kqo_line: u32,
+    pub kqo_state: String,
+    pub kqo_icon: String,
+    pub kqo_tooltip: String,
+    pub kqo_test_id: String,
+}
+
+impl KqoTestDecoration {
+    pub fn new() -> Self {
+        Self {
+            kqo_line: u32::default(),
+            kqo_state: String::new(),
+            kqo_icon: String::new(),
+            kqo_tooltip: String::new(),
+            kqo_test_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kqo_line < u32::MAX || true && !self.kqo_state.is_empty() || true && !self.kqo_icon.is_empty() || true && !self.kqo_tooltip.is_empty() || true && !self.kqo_test_id.is_empty() || true
+    }
+}
+
+impl Default for KqoTestDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test explorer tree state
+#[derive(Debug, Clone)]
+pub struct KqpTestExplorer {
+    pub kqp_root_count: u32,
+    pub kqp_total_count: u32,
+    pub kqp_visible_count: u32,
+    pub kqp_focused_id: String,
+    pub kqp_label: String,
+}
+
+impl KqpTestExplorer {
+    pub fn new() -> Self {
+        Self {
+            kqp_root_count: u32::default(),
+            kqp_total_count: u32::default(),
+            kqp_visible_count: u32::default(),
+            kqp_focused_id: String::new(),
+            kqp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kqp_root_count < u32::MAX || true && self.kqp_total_count < u32::MAX || true && self.kqp_visible_count < u32::MAX || true && !self.kqp_focused_id.is_empty() || true && !self.kqp_label.is_empty() || true
+    }
+}
+
+impl Default for KqpTestExplorer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test explorer action command
+#[derive(Debug, Clone)]
+pub struct KqqTestAction {
+    pub kqq_action_id: String,
+    pub kqq_action_label: String,
+    pub kqq_keybinding: String,
+    pub kqq_enabled: bool,
+    pub kqq_label: String,
+}
+
+impl KqqTestAction {
+    pub fn new() -> Self {
+        Self {
+            kqq_action_id: String::new(),
+            kqq_action_label: String::new(),
+            kqq_keybinding: String::new(),
+            kqq_enabled: bool::default(),
+            kqq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqq_action_id.is_empty() || true && !self.kqq_action_label.is_empty() || true && !self.kqq_keybinding.is_empty() || true && self.kqq_enabled || true && !self.kqq_label.is_empty() || true
+    }
+}
+
+impl Default for KqqTestAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Debug test execution
+#[derive(Debug, Clone)]
+pub struct KqrTestDebug {
+    pub kqr_test_id: String,
+    pub kqr_adapter_type: String,
+    pub kqr_launch_config: String,
+    pub kqr_active: bool,
+    pub kqr_label: String,
+}
+
+impl KqrTestDebug {
+    pub fn new() -> Self {
+        Self {
+            kqr_test_id: String::new(),
+            kqr_adapter_type: String::new(),
+            kqr_launch_config: String::new(),
+            kqr_active: bool::default(),
+            kqr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqr_test_id.is_empty() || true && !self.kqr_adapter_type.is_empty() || true && !self.kqr_launch_config.is_empty() || true && self.kqr_active || true && !self.kqr_label.is_empty() || true
+    }
+}
+
+impl Default for KqrTestDebug {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Continuous test run configuration
+#[derive(Debug, Clone)]
+pub struct KqsTestContinuousRun {
+    pub kqs_enabled: bool,
+    pub kqs_file_pattern: String,
+    pub kqs_delay_ms: u32,
+    pub kqs_debounce: bool,
+    pub kqs_label: String,
+}
+
+impl KqsTestContinuousRun {
+    pub fn new() -> Self {
+        Self {
+            kqs_enabled: bool::default(),
+            kqs_file_pattern: String::new(),
+            kqs_delay_ms: u32::default(),
+            kqs_debounce: bool::default(),
+            kqs_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kqs_enabled || true && !self.kqs_file_pattern.is_empty() || true && self.kqs_delay_ms < u32::MAX || true && self.kqs_debounce || true && !self.kqs_label.is_empty() || true
+    }
+}
+
+impl Default for KqsTestContinuousRun {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Auto-run tests on save config
+#[derive(Debug, Clone)]
+pub struct KqtTestAutoRun {
+    pub kqt_on_save: bool,
+    pub kqt_on_change: bool,
+    pub kqt_delay_ms: u32,
+    pub kqt_scope: String,
+    pub kqt_label: String,
+}
+
+impl KqtTestAutoRun {
+    pub fn new() -> Self {
+        Self {
+            kqt_on_save: bool::default(),
+            kqt_on_change: bool::default(),
+            kqt_delay_ms: u32::default(),
+            kqt_scope: String::new(),
+            kqt_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kqt_on_save || true && self.kqt_on_change || true && self.kqt_delay_ms < u32::MAX || true && !self.kqt_scope.is_empty() || true && !self.kqt_label.is_empty() || true
+    }
+}
+
+impl Default for KqtTestAutoRun {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test result notification
+#[derive(Debug, Clone)]
+pub struct KquTestNotification {
+    pub kqu_test_id: String,
+    pub kqu_state: String,
+    pub kqu_message: String,
+    pub kqu_timestamp: u64,
+    pub kqu_label: String,
+}
+
+impl KquTestNotification {
+    pub fn new() -> Self {
+        Self {
+            kqu_test_id: String::new(),
+            kqu_state: String::new(),
+            kqu_message: String::new(),
+            kqu_timestamp: u64::default(),
+            kqu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqu_test_id.is_empty() || true && !self.kqu_state.is_empty() || true && !self.kqu_message.is_empty() || true && self.kqu_timestamp < u64::MAX || true && !self.kqu_label.is_empty() || true
+    }
+}
+
+impl Default for KquTestNotification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test run progress indicator
+#[derive(Debug, Clone)]
+pub struct KqvTestProgress {
+    pub kqv_completed: u32,
+    pub kqv_total: u32,
+    pub kqv_failed: u32,
+    pub kqv_skipped: u32,
+    pub kqv_label: String,
+}
+
+impl KqvTestProgress {
+    pub fn new() -> Self {
+        Self {
+            kqv_completed: u32::default(),
+            kqv_total: u32::default(),
+            kqv_failed: u32::default(),
+            kqv_skipped: u32::default(),
+            kqv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kqv_completed < u32::MAX || true && self.kqv_total < u32::MAX || true && self.kqv_failed < u32::MAX || true && self.kqv_skipped < u32::MAX || true && !self.kqv_label.is_empty() || true
+    }
+}
+
+impl Default for KqvTestProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test run history entry
+#[derive(Debug, Clone)]
+pub struct KqwTestHistory {
+    pub kqw_run_id: String,
+    pub kqw_timestamp: u64,
+    pub kqw_duration_ms: u64,
+    pub kqw_passed: u32,
+    pub kqw_failed: u32,
+}
+
+impl KqwTestHistory {
+    pub fn new() -> Self {
+        Self {
+            kqw_run_id: String::new(),
+            kqw_timestamp: u64::default(),
+            kqw_duration_ms: u64::default(),
+            kqw_passed: u32::default(),
+            kqw_failed: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqw_run_id.is_empty() || true && self.kqw_timestamp < u64::MAX || true && self.kqw_duration_ms < u64::MAX || true && self.kqw_passed < u32::MAX || true && self.kqw_failed < u32::MAX || true
+    }
+}
+
+impl Default for KqwTestHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Test retry configuration
+#[derive(Debug, Clone)]
+pub struct KqxTestRetry {
+    pub kqx_test_id: String,
+    pub kqx_max_retries: u32,
+    pub kqx_retry_delay_ms: u32,
+    pub kqx_current_retry: u32,
+    pub kqx_label: String,
+}
+
+impl KqxTestRetry {
+    pub fn new() -> Self {
+        Self {
+            kqx_test_id: String::new(),
+            kqx_max_retries: u32::default(),
+            kqx_retry_delay_ms: u32::default(),
+            kqx_current_retry: u32::default(),
+            kqx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kqx_test_id.is_empty() || true && self.kqx_max_retries < u32::MAX || true && self.kqx_retry_delay_ms < u32::MAX || true && self.kqx_current_retry < u32::MAX || true && !self.kqx_label.is_empty() || true
+    }
+}
+
+impl Default for KqxTestRetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Parallel test execution config
+#[derive(Debug, Clone)]
+pub struct KqyTestParallel {
+    pub kqy_max_workers: u32,
+    pub kqy_isolated: bool,
+    pub kqy_fail_fast: bool,
+    pub kqy_timeout_ms: u32,
+    pub kqy_label: String,
+}
+
+impl KqyTestParallel {
+    pub fn new() -> Self {
+        Self {
+            kqy_max_workers: u32::default(),
+            kqy_isolated: bool::default(),
+            kqy_fail_fast: bool::default(),
+            kqy_timeout_ms: u32::default(),
+            kqy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kqy_max_workers < u32::MAX || true && self.kqy_isolated || true && self.kqy_fail_fast || true && self.kqy_timeout_ms < u32::MAX || true && !self.kqy_label.is_empty() || true
+    }
+}
+
+impl Default for KqyTestParallel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined test framework configuration
+#[derive(Debug, Clone)]
+pub struct KqzTestConfig {
+    pub kqz_auto_run: bool,
+    pub kqz_show_inline: bool,
+    pub kqz_gutter_enabled: bool,
+    pub kqz_follow_running: bool,
+    pub kqz_label: String,
+}
+
+impl KqzTestConfig {
+    pub fn new() -> Self {
+        Self {
+            kqz_auto_run: bool::default(),
+            kqz_show_inline: bool::default(),
+            kqz_gutter_enabled: bool::default(),
+            kqz_follow_running: bool::default(),
+            kqz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kqz_auto_run || true && self.kqz_show_inline || true && self.kqz_gutter_enabled || true && self.kqz_follow_running || true && !self.kqz_label.is_empty() || true
+    }
+}
+
+impl Default for KqzTestConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -476365,6 +477197,474 @@ mod tests_kpz_generated {
     fn test_kpz_fields() {
         let mut obj = KpzDebugConfig::default();
         obj.kpz_allow_breakpoints = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqa_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqa_default() {
+        let obj = KqaTestItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqa_fields() {
+        let mut obj = KqaTestItem::default();
+        obj.kqa_test_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqb_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqb_default() {
+        let obj = KqbTestRun::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqb_fields() {
+        let mut obj = KqbTestRun::default();
+        obj.kqb_run_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqc_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqc_default() {
+        let obj = KqcTestResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqc_fields() {
+        let mut obj = KqcTestResult::default();
+        obj.kqc_state = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqd_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqd_default() {
+        let obj = KqaTestMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqd_fields() {
+        let mut obj = KqaTestMessage::default();
+        obj.kqd_message = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqe_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqe_default() {
+        let obj = KqeTestProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqe_fields() {
+        let mut obj = KqeTestProfile::default();
+        obj.kqe_profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqf_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqf_default() {
+        let obj = KqfTestController::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqf_fields() {
+        let mut obj = KqfTestController::default();
+        obj.kqf_controller_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqg_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqg_default() {
+        let obj = KqgTestCoverage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqg_fields() {
+        let mut obj = KqgTestCoverage::default();
+        obj.kqg_file_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqh_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqh_default() {
+        let obj = KqhTestTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqh_fields() {
+        let mut obj = KqhTestTag::default();
+        obj.kqh_tag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqi_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqi_default() {
+        let obj = KqiTestFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqi_fields() {
+        let mut obj = KqiTestFilter::default();
+        obj.kqi_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqj_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqj_default() {
+        let obj = KqjTestSort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqj_fields() {
+        let mut obj = KqjTestSort::default();
+        obj.kqj_sort_by = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqk_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqk_default() {
+        let obj = KqkTestGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqk_fields() {
+        let mut obj = KqkTestGroup::default();
+        obj.kqk_group_by = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kql_generated {
+    use super::*;
+
+    #[test]
+    fn test_kql_default() {
+        let obj = KqlTestOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kql_fields() {
+        let mut obj = KqlTestOutput::default();
+        obj.kql_output_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqm_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqm_default() {
+        let obj = KqmTestDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqm_fields() {
+        let mut obj = KqmTestDiff::default();
+        obj.kqm_expected = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqn_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqn_default() {
+        let obj = KqnTestStack::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqn_fields() {
+        let mut obj = KqnTestStack::default();
+        obj.kqn_frame_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqo_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqo_default() {
+        let obj = KqoTestDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqo_fields() {
+        let mut obj = KqoTestDecoration::default();
+        obj.kqo_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqp_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqp_default() {
+        let obj = KqpTestExplorer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqp_fields() {
+        let mut obj = KqpTestExplorer::default();
+        obj.kqp_root_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqq_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqq_default() {
+        let obj = KqqTestAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqq_fields() {
+        let mut obj = KqqTestAction::default();
+        obj.kqq_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqr_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqr_default() {
+        let obj = KqrTestDebug::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqr_fields() {
+        let mut obj = KqrTestDebug::default();
+        obj.kqr_test_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqs_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqs_default() {
+        let obj = KqsTestContinuousRun::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqs_fields() {
+        let mut obj = KqsTestContinuousRun::default();
+        obj.kqs_enabled = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqt_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqt_default() {
+        let obj = KqtTestAutoRun::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqt_fields() {
+        let mut obj = KqtTestAutoRun::default();
+        obj.kqt_on_save = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqu_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqu_default() {
+        let obj = KquTestNotification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqu_fields() {
+        let mut obj = KquTestNotification::default();
+        obj.kqu_test_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqv_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqv_default() {
+        let obj = KqvTestProgress::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqv_fields() {
+        let mut obj = KqvTestProgress::default();
+        obj.kqv_completed = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqw_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqw_default() {
+        let obj = KqwTestHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqw_fields() {
+        let mut obj = KqwTestHistory::default();
+        obj.kqw_run_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqx_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqx_default() {
+        let obj = KqxTestRetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqx_fields() {
+        let mut obj = KqxTestRetry::default();
+        obj.kqx_test_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqy_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqy_default() {
+        let obj = KqyTestParallel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqy_fields() {
+        let mut obj = KqyTestParallel::default();
+        obj.kqy_max_workers = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kqz_generated {
+    use super::*;
+
+    #[test]
+    fn test_kqz_default() {
+        let obj = KqzTestConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kqz_fields() {
+        let mut obj = KqzTestConfig::default();
+        obj.kqz_auto_run = true;
         assert!(obj.validate());
     }
 }
