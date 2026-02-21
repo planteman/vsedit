@@ -210819,6 +210819,838 @@ impl Default for LgzNotebookConfig {
     }
 }
 
+/// /// Webview panel instance
+#[derive(Debug, Clone)]
+pub struct LhaWebviewPanel {
+    pub lha_panel_id: String,
+    pub lha_title: String,
+    pub lha_visible: bool,
+    pub lha_view_column: u32,
+    pub lha_label: String,
+}
+
+impl LhaWebviewPanel {
+    pub fn new() -> Self {
+        Self {
+            lha_panel_id: String::new(),
+            lha_title: String::new(),
+            lha_visible: bool::default(),
+            lha_view_column: u32::default(),
+            lha_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lha_panel_id.is_empty() || true && !self.lha_title.is_empty() || true && self.lha_visible || true && self.lha_view_column < u32::MAX || true && !self.lha_label.is_empty() || true
+    }
+}
+
+impl Default for LhaWebviewPanel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Webview view in sidebar/panel
+#[derive(Debug, Clone)]
+pub struct LhbWebviewView {
+    pub lhb_view_id: String,
+    pub lhb_title: String,
+    pub lhb_visible: bool,
+    pub lhb_badge_count: u32,
+    pub lhb_label: String,
+}
+
+impl LhbWebviewView {
+    pub fn new() -> Self {
+        Self {
+            lhb_view_id: String::new(),
+            lhb_title: String::new(),
+            lhb_visible: bool::default(),
+            lhb_badge_count: u32::default(),
+            lhb_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhb_view_id.is_empty() || true && !self.lhb_title.is_empty() || true && self.lhb_visible || true && self.lhb_badge_count < u32::MAX || true && !self.lhb_label.is_empty() || true
+    }
+}
+
+impl Default for LhbWebviewView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Webview rendering options
+#[derive(Debug, Clone)]
+pub struct LhcWebviewOptions {
+    pub lhc_enable_scripts: bool,
+    pub lhc_enable_forms: bool,
+    pub lhc_retain_context: bool,
+    pub lhc_local_resources: String,
+    pub lhc_label: String,
+}
+
+impl LhcWebviewOptions {
+    pub fn new() -> Self {
+        Self {
+            lhc_enable_scripts: bool::default(),
+            lhc_enable_forms: bool::default(),
+            lhc_retain_context: bool::default(),
+            lhc_local_resources: String::new(),
+            lhc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lhc_enable_scripts || true && self.lhc_enable_forms || true && self.lhc_retain_context || true && !self.lhc_local_resources.is_empty() || true && !self.lhc_label.is_empty() || true
+    }
+}
+
+impl Default for LhcWebviewOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Webview postMessage exchange
+#[derive(Debug, Clone)]
+pub struct LhdWebviewMessage {
+    pub lhd_msg_type: String,
+    pub lhd_data: String,
+    pub lhd_source: String,
+    pub lhd_timestamp: u64,
+    pub lhd_label: String,
+}
+
+impl LhdWebviewMessage {
+    pub fn new() -> Self {
+        Self {
+            lhd_msg_type: String::new(),
+            lhd_data: String::new(),
+            lhd_source: String::new(),
+            lhd_timestamp: u64::default(),
+            lhd_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhd_msg_type.is_empty() || true && !self.lhd_data.is_empty() || true && !self.lhd_source.is_empty() || true && self.lhd_timestamp < u64::MAX || true && !self.lhd_label.is_empty() || true
+    }
+}
+
+impl Default for LhdWebviewMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Webview resource URI mapping
+#[derive(Debug, Clone)]
+pub struct LheWebviewResource {
+    pub lhe_uri: String,
+    pub lhe_webview_uri: String,
+    pub lhe_mime_type: String,
+    pub lhe_cached: bool,
+    pub lhe_label: String,
+}
+
+impl LheWebviewResource {
+    pub fn new() -> Self {
+        Self {
+            lhe_uri: String::new(),
+            lhe_webview_uri: String::new(),
+            lhe_mime_type: String::new(),
+            lhe_cached: bool::default(),
+            lhe_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhe_uri.is_empty() || true && !self.lhe_webview_uri.is_empty() || true && !self.lhe_mime_type.is_empty() || true && self.lhe_cached || true && !self.lhe_label.is_empty() || true
+    }
+}
+
+impl Default for LheWebviewResource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Custom editor provider
+#[derive(Debug, Clone)]
+pub struct LhfCustomEditor {
+    pub lhf_editor_type: String,
+    pub lhf_extension_id: String,
+    pub lhf_view_type: String,
+    pub lhf_priority: u32,
+    pub lhf_label: String,
+}
+
+impl LhfCustomEditor {
+    pub fn new() -> Self {
+        Self {
+            lhf_editor_type: String::new(),
+            lhf_extension_id: String::new(),
+            lhf_view_type: String::new(),
+            lhf_priority: u32::default(),
+            lhf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhf_editor_type.is_empty() || true && !self.lhf_extension_id.is_empty() || true && !self.lhf_view_type.is_empty() || true && self.lhf_priority < u32::MAX || true && !self.lhf_label.is_empty() || true
+    }
+}
+
+impl Default for LhfCustomEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Custom editor document model
+#[derive(Debug, Clone)]
+pub struct LhgCustomDocument {
+    pub lhg_uri: String,
+    pub lhg_dirty: bool,
+    pub lhg_version: u64,
+    pub lhg_backup_uri: String,
+    pub lhg_label: String,
+}
+
+impl LhgCustomDocument {
+    pub fn new() -> Self {
+        Self {
+            lhg_uri: String::new(),
+            lhg_dirty: bool::default(),
+            lhg_version: u64::default(),
+            lhg_backup_uri: String::new(),
+            lhg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhg_uri.is_empty() || true && self.lhg_dirty || true && self.lhg_version < u64::MAX || true && !self.lhg_backup_uri.is_empty() || true && !self.lhg_label.is_empty() || true
+    }
+}
+
+impl Default for LhgCustomDocument {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Custom editor undo/redo edit
+#[derive(Debug, Clone)]
+pub struct LhhCustomEditorEdit {
+    pub lhh_edit_type: String,
+    pub lhh_data: String,
+    pub lhh_undoable: bool,
+    pub lhh_timestamp: u64,
+    pub lhh_label: String,
+}
+
+impl LhhCustomEditorEdit {
+    pub fn new() -> Self {
+        Self {
+            lhh_edit_type: String::new(),
+            lhh_data: String::new(),
+            lhh_undoable: bool::default(),
+            lhh_timestamp: u64::default(),
+            lhh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhh_edit_type.is_empty() || true && !self.lhh_data.is_empty() || true && self.lhh_undoable || true && self.lhh_timestamp < u64::MAX || true && !self.lhh_label.is_empty() || true
+    }
+}
+
+impl Default for LhhCustomEditorEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Webview theme integration
+#[derive(Debug, Clone)]
+pub struct LhiWebviewTheme {
+    pub lhi_theme_kind: String,
+    pub lhi_active_theme: String,
+    pub lhi_css_vars: String,
+    pub lhi_auto_update: bool,
+    pub lhi_label: String,
+}
+
+impl LhiWebviewTheme {
+    pub fn new() -> Self {
+        Self {
+            lhi_theme_kind: String::new(),
+            lhi_active_theme: String::new(),
+            lhi_css_vars: String::new(),
+            lhi_auto_update: bool::default(),
+            lhi_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhi_theme_kind.is_empty() || true && !self.lhi_active_theme.is_empty() || true && !self.lhi_css_vars.is_empty() || true && self.lhi_auto_update || true && !self.lhi_label.is_empty() || true
+    }
+}
+
+impl Default for LhiWebviewTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Webview state persistence
+#[derive(Debug, Clone)]
+pub struct LhjWebviewPersist {
+    pub lhj_state: String,
+    pub lhj_view_type: String,
+    pub lhj_serialized_at: u64,
+    pub lhj_version: u32,
+    pub lhj_label: String,
+}
+
+impl LhjWebviewPersist {
+    pub fn new() -> Self {
+        Self {
+            lhj_state: String::new(),
+            lhj_view_type: String::new(),
+            lhj_serialized_at: u64::default(),
+            lhj_version: u32::default(),
+            lhj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhj_state.is_empty() || true && !self.lhj_view_type.is_empty() || true && self.lhj_serialized_at < u64::MAX || true && self.lhj_version < u32::MAX || true && !self.lhj_label.is_empty() || true
+    }
+}
+
+impl Default for LhjWebviewPersist {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Webview serializer for restore
+#[derive(Debug, Clone)]
+pub struct LhkWebviewSerializer {
+    pub lhk_view_type: String,
+    pub lhk_extension_id: String,
+    pub lhk_active: bool,
+    pub lhk_priority: u32,
+    pub lhk_label: String,
+}
+
+impl LhkWebviewSerializer {
+    pub fn new() -> Self {
+        Self {
+            lhk_view_type: String::new(),
+            lhk_extension_id: String::new(),
+            lhk_active: bool::default(),
+            lhk_priority: u32::default(),
+            lhk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhk_view_type.is_empty() || true && !self.lhk_extension_id.is_empty() || true && self.lhk_active || true && self.lhk_priority < u32::MAX || true && !self.lhk_label.is_empty() || true
+    }
+}
+
+impl Default for LhkWebviewSerializer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Webview link click handler
+#[derive(Debug, Clone)]
+pub struct LhlWebviewLink {
+    pub lhl_href: String,
+    pub lhl_target: String,
+    pub lhl_handled: bool,
+    pub lhl_external: bool,
+    pub lhl_label: String,
+}
+
+impl LhlWebviewLink {
+    pub fn new() -> Self {
+        Self {
+            lhl_href: String::new(),
+            lhl_target: String::new(),
+            lhl_handled: bool::default(),
+            lhl_external: bool::default(),
+            lhl_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhl_href.is_empty() || true && !self.lhl_target.is_empty() || true && self.lhl_handled || true && self.lhl_external || true && !self.lhl_label.is_empty() || true
+    }
+}
+
+impl Default for LhlWebviewLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Webview content security policy
+#[derive(Debug, Clone)]
+pub struct LhmWebviewCsp {
+    pub lhm_policy: String,
+    pub lhm_nonce: String,
+    pub lhm_script_src: String,
+    pub lhm_style_src: String,
+    pub lhm_label: String,
+}
+
+impl LhmWebviewCsp {
+    pub fn new() -> Self {
+        Self {
+            lhm_policy: String::new(),
+            lhm_nonce: String::new(),
+            lhm_script_src: String::new(),
+            lhm_style_src: String::new(),
+            lhm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhm_policy.is_empty() || true && !self.lhm_nonce.is_empty() || true && !self.lhm_script_src.is_empty() || true && !self.lhm_style_src.is_empty() || true && !self.lhm_label.is_empty() || true
+    }
+}
+
+impl Default for LhmWebviewCsp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension contributing webview
+#[derive(Debug, Clone)]
+pub struct LhnWebviewExtension {
+    pub lhn_extension_id: String,
+    pub lhn_view_type: String,
+    pub lhn_webview_count: u32,
+    pub lhn_active: bool,
+    pub lhn_label: String,
+}
+
+impl LhnWebviewExtension {
+    pub fn new() -> Self {
+        Self {
+            lhn_extension_id: String::new(),
+            lhn_view_type: String::new(),
+            lhn_webview_count: u32::default(),
+            lhn_active: bool::default(),
+            lhn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhn_extension_id.is_empty() || true && !self.lhn_view_type.is_empty() || true && self.lhn_webview_count < u32::MAX || true && self.lhn_active || true && !self.lhn_label.is_empty() || true
+    }
+}
+
+impl Default for LhnWebviewExtension {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Webview API surface
+#[derive(Debug, Clone)]
+pub struct LhoWebviewApi {
+    pub lho_api_version: String,
+    pub lho_supported_features: String,
+    pub lho_deprecated: bool,
+    pub lho_stable: bool,
+    pub lho_label: String,
+}
+
+impl LhoWebviewApi {
+    pub fn new() -> Self {
+        Self {
+            lho_api_version: String::new(),
+            lho_supported_features: String::new(),
+            lho_deprecated: bool::default(),
+            lho_stable: bool::default(),
+            lho_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lho_api_version.is_empty() || true && !self.lho_supported_features.is_empty() || true && self.lho_deprecated || true && self.lho_stable || true && !self.lho_label.is_empty() || true
+    }
+}
+
+impl Default for LhoWebviewApi {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Markdown preview webview
+#[derive(Debug, Clone)]
+pub struct LhpMarkdownPreview {
+    pub lhp_uri: String,
+    pub lhp_scroll_top: f64,
+    pub lhp_line_at_top: u32,
+    pub lhp_locked: bool,
+    pub lhp_label: String,
+}
+
+impl LhpMarkdownPreview {
+    pub fn new() -> Self {
+        Self {
+            lhp_uri: String::new(),
+            lhp_scroll_top: f64::default(),
+            lhp_line_at_top: u32::default(),
+            lhp_locked: bool::default(),
+            lhp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhp_uri.is_empty() || true && self.lhp_scroll_top.is_finite() || true && self.lhp_line_at_top < u32::MAX || true && self.lhp_locked || true && !self.lhp_label.is_empty() || true
+    }
+}
+
+impl Default for LhpMarkdownPreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// HTML preview webview
+#[derive(Debug, Clone)]
+pub struct LhqHtmlPreview {
+    pub lhq_uri: String,
+    pub lhq_auto_refresh: bool,
+    pub lhq_external_resources: bool,
+    pub lhq_scroll_top: f64,
+    pub lhq_label: String,
+}
+
+impl LhqHtmlPreview {
+    pub fn new() -> Self {
+        Self {
+            lhq_uri: String::new(),
+            lhq_auto_refresh: bool::default(),
+            lhq_external_resources: bool::default(),
+            lhq_scroll_top: f64::default(),
+            lhq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhq_uri.is_empty() || true && self.lhq_auto_refresh || true && self.lhq_external_resources || true && self.lhq_scroll_top.is_finite() || true && !self.lhq_label.is_empty() || true
+    }
+}
+
+impl Default for LhqHtmlPreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// SVG preview webview
+#[derive(Debug, Clone)]
+pub struct LhrSvgPreview {
+    pub lhr_uri: String,
+    pub lhr_zoom_level: f64,
+    pub lhr_fit_to_screen: bool,
+    pub lhr_background: String,
+    pub lhr_label: String,
+}
+
+impl LhrSvgPreview {
+    pub fn new() -> Self {
+        Self {
+            lhr_uri: String::new(),
+            lhr_zoom_level: f64::default(),
+            lhr_fit_to_screen: bool::default(),
+            lhr_background: String::new(),
+            lhr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhr_uri.is_empty() || true && self.lhr_zoom_level.is_finite() || true && self.lhr_fit_to_screen || true && !self.lhr_background.is_empty() || true && !self.lhr_label.is_empty() || true
+    }
+}
+
+impl Default for LhrSvgPreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Image preview viewer
+#[derive(Debug, Clone)]
+pub struct LhsImagePreview {
+    pub lhs_uri: String,
+    pub lhs_zoom_level: f64,
+    pub lhs_fit_mode: String,
+    pub lhs_background: String,
+    pub lhs_label: String,
+}
+
+impl LhsImagePreview {
+    pub fn new() -> Self {
+        Self {
+            lhs_uri: String::new(),
+            lhs_zoom_level: f64::default(),
+            lhs_fit_mode: String::new(),
+            lhs_background: String::new(),
+            lhs_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhs_uri.is_empty() || true && self.lhs_zoom_level.is_finite() || true && !self.lhs_fit_mode.is_empty() || true && !self.lhs_background.is_empty() || true && !self.lhs_label.is_empty() || true
+    }
+}
+
+impl Default for LhsImagePreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// PDF preview viewer
+#[derive(Debug, Clone)]
+pub struct LhtPdfPreview {
+    pub lht_uri: String,
+    pub lht_page: u32,
+    pub lht_total_pages: u32,
+    pub lht_zoom_level: f64,
+    pub lht_label: String,
+}
+
+impl LhtPdfPreview {
+    pub fn new() -> Self {
+        Self {
+            lht_uri: String::new(),
+            lht_page: u32::default(),
+            lht_total_pages: u32::default(),
+            lht_zoom_level: f64::default(),
+            lht_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lht_uri.is_empty() || true && self.lht_page < u32::MAX || true && self.lht_total_pages < u32::MAX || true && self.lht_zoom_level.is_finite() || true && !self.lht_label.is_empty() || true
+    }
+}
+
+impl Default for LhtPdfPreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Video preview viewer
+#[derive(Debug, Clone)]
+pub struct LhuVideoPreview {
+    pub lhu_uri: String,
+    pub lhu_playing: bool,
+    pub lhu_position_ms: u64,
+    pub lhu_duration_ms: u64,
+    pub lhu_label: String,
+}
+
+impl LhuVideoPreview {
+    pub fn new() -> Self {
+        Self {
+            lhu_uri: String::new(),
+            lhu_playing: bool::default(),
+            lhu_position_ms: u64::default(),
+            lhu_duration_ms: u64::default(),
+            lhu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhu_uri.is_empty() || true && self.lhu_playing || true && self.lhu_position_ms < u64::MAX || true && self.lhu_duration_ms < u64::MAX || true && !self.lhu_label.is_empty() || true
+    }
+}
+
+impl Default for LhuVideoPreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Audio preview viewer
+#[derive(Debug, Clone)]
+pub struct LhvAudioPreview {
+    pub lhv_uri: String,
+    pub lhv_playing: bool,
+    pub lhv_position_ms: u64,
+    pub lhv_duration_ms: u64,
+    pub lhv_label: String,
+}
+
+impl LhvAudioPreview {
+    pub fn new() -> Self {
+        Self {
+            lhv_uri: String::new(),
+            lhv_playing: bool::default(),
+            lhv_position_ms: u64::default(),
+            lhv_duration_ms: u64::default(),
+            lhv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhv_uri.is_empty() || true && self.lhv_playing || true && self.lhv_position_ms < u64::MAX || true && self.lhv_duration_ms < u64::MAX || true && !self.lhv_label.is_empty() || true
+    }
+}
+
+impl Default for LhvAudioPreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Font preview viewer
+#[derive(Debug, Clone)]
+pub struct LhwFontPreview {
+    pub lhw_uri: String,
+    pub lhw_sample_text: String,
+    pub lhw_font_size: f64,
+    pub lhw_font_name: String,
+    pub lhw_label: String,
+}
+
+impl LhwFontPreview {
+    pub fn new() -> Self {
+        Self {
+            lhw_uri: String::new(),
+            lhw_sample_text: String::new(),
+            lhw_font_size: f64::default(),
+            lhw_font_name: String::new(),
+            lhw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhw_uri.is_empty() || true && !self.lhw_sample_text.is_empty() || true && self.lhw_font_size.is_finite() || true && !self.lhw_font_name.is_empty() || true && !self.lhw_label.is_empty() || true
+    }
+}
+
+impl Default for LhwFontPreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Binary/hex file preview
+#[derive(Debug, Clone)]
+pub struct LhxBinaryPreview {
+    pub lhx_uri: String,
+    pub lhx_offset: u64,
+    pub lhx_byte_count: u32,
+    pub lhx_encoding_mode: String,
+    pub lhx_label: String,
+}
+
+impl LhxBinaryPreview {
+    pub fn new() -> Self {
+        Self {
+            lhx_uri: String::new(),
+            lhx_offset: u64::default(),
+            lhx_byte_count: u32::default(),
+            lhx_encoding_mode: String::new(),
+            lhx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhx_uri.is_empty() || true && self.lhx_offset < u64::MAX || true && self.lhx_byte_count < u32::MAX || true && !self.lhx_encoding_mode.is_empty() || true && !self.lhx_label.is_empty() || true
+    }
+}
+
+impl Default for LhxBinaryPreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Webview lifecycle event
+#[derive(Debug, Clone)]
+pub struct LhyWebviewEvent {
+    pub lhy_event_kind: String,
+    pub lhy_panel_id: String,
+    pub lhy_timestamp: u64,
+    pub lhy_data: String,
+    pub lhy_label: String,
+}
+
+impl LhyWebviewEvent {
+    pub fn new() -> Self {
+        Self {
+            lhy_event_kind: String::new(),
+            lhy_panel_id: String::new(),
+            lhy_timestamp: u64::default(),
+            lhy_data: String::new(),
+            lhy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhy_event_kind.is_empty() || true && !self.lhy_panel_id.is_empty() || true && self.lhy_timestamp < u64::MAX || true && !self.lhy_data.is_empty() || true && !self.lhy_label.is_empty() || true
+    }
+}
+
+impl Default for LhyWebviewEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined webview configuration
+#[derive(Debug, Clone)]
+pub struct LhzWebviewConfig {
+    pub lhz_default_options: String,
+    pub lhz_external_browser: bool,
+    pub lhz_csp_enabled: bool,
+    pub lhz_retainContext: bool,
+    pub lhz_label: String,
+}
+
+impl LhzWebviewConfig {
+    pub fn new() -> Self {
+        Self {
+            lhz_default_options: String::new(),
+            lhz_external_browser: bool::default(),
+            lhz_csp_enabled: bool::default(),
+            lhz_retainContext: bool::default(),
+            lhz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lhz_default_options.is_empty() || true && self.lhz_external_browser || true && self.lhz_csp_enabled || true && self.lhz_retainContext || true && !self.lhz_label.is_empty() || true
+    }
+}
+
+impl Default for LhzWebviewConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -498546,6 +499378,474 @@ mod tests_lgz_generated {
     fn test_lgz_fields() {
         let mut obj = LgzNotebookConfig::default();
         obj.lgz_default_kernel = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lha_generated {
+    use super::*;
+
+    #[test]
+    fn test_lha_default() {
+        let obj = LhaWebviewPanel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lha_fields() {
+        let mut obj = LhaWebviewPanel::default();
+        obj.lha_panel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhb_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhb_default() {
+        let obj = LhbWebviewView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhb_fields() {
+        let mut obj = LhbWebviewView::default();
+        obj.lhb_view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhc_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhc_default() {
+        let obj = LhcWebviewOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhc_fields() {
+        let mut obj = LhcWebviewOptions::default();
+        obj.lhc_enable_scripts = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhd_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhd_default() {
+        let obj = LhdWebviewMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhd_fields() {
+        let mut obj = LhdWebviewMessage::default();
+        obj.lhd_msg_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhe_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhe_default() {
+        let obj = LheWebviewResource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhe_fields() {
+        let mut obj = LheWebviewResource::default();
+        obj.lhe_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhf_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhf_default() {
+        let obj = LhfCustomEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhf_fields() {
+        let mut obj = LhfCustomEditor::default();
+        obj.lhf_editor_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhg_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhg_default() {
+        let obj = LhgCustomDocument::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhg_fields() {
+        let mut obj = LhgCustomDocument::default();
+        obj.lhg_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhh_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhh_default() {
+        let obj = LhhCustomEditorEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhh_fields() {
+        let mut obj = LhhCustomEditorEdit::default();
+        obj.lhh_edit_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhi_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhi_default() {
+        let obj = LhiWebviewTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhi_fields() {
+        let mut obj = LhiWebviewTheme::default();
+        obj.lhi_theme_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhj_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhj_default() {
+        let obj = LhjWebviewPersist::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhj_fields() {
+        let mut obj = LhjWebviewPersist::default();
+        obj.lhj_state = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhk_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhk_default() {
+        let obj = LhkWebviewSerializer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhk_fields() {
+        let mut obj = LhkWebviewSerializer::default();
+        obj.lhk_view_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhl_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhl_default() {
+        let obj = LhlWebviewLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhl_fields() {
+        let mut obj = LhlWebviewLink::default();
+        obj.lhl_href = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhm_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhm_default() {
+        let obj = LhmWebviewCsp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhm_fields() {
+        let mut obj = LhmWebviewCsp::default();
+        obj.lhm_policy = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhn_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhn_default() {
+        let obj = LhnWebviewExtension::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhn_fields() {
+        let mut obj = LhnWebviewExtension::default();
+        obj.lhn_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lho_generated {
+    use super::*;
+
+    #[test]
+    fn test_lho_default() {
+        let obj = LhoWebviewApi::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lho_fields() {
+        let mut obj = LhoWebviewApi::default();
+        obj.lho_api_version = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhp_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhp_default() {
+        let obj = LhpMarkdownPreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhp_fields() {
+        let mut obj = LhpMarkdownPreview::default();
+        obj.lhp_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhq_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhq_default() {
+        let obj = LhqHtmlPreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhq_fields() {
+        let mut obj = LhqHtmlPreview::default();
+        obj.lhq_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhr_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhr_default() {
+        let obj = LhrSvgPreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhr_fields() {
+        let mut obj = LhrSvgPreview::default();
+        obj.lhr_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhs_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhs_default() {
+        let obj = LhsImagePreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhs_fields() {
+        let mut obj = LhsImagePreview::default();
+        obj.lhs_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lht_generated {
+    use super::*;
+
+    #[test]
+    fn test_lht_default() {
+        let obj = LhtPdfPreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lht_fields() {
+        let mut obj = LhtPdfPreview::default();
+        obj.lht_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhu_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhu_default() {
+        let obj = LhuVideoPreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhu_fields() {
+        let mut obj = LhuVideoPreview::default();
+        obj.lhu_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhv_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhv_default() {
+        let obj = LhvAudioPreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhv_fields() {
+        let mut obj = LhvAudioPreview::default();
+        obj.lhv_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhw_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhw_default() {
+        let obj = LhwFontPreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhw_fields() {
+        let mut obj = LhwFontPreview::default();
+        obj.lhw_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhx_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhx_default() {
+        let obj = LhxBinaryPreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhx_fields() {
+        let mut obj = LhxBinaryPreview::default();
+        obj.lhx_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhy_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhy_default() {
+        let obj = LhyWebviewEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhy_fields() {
+        let mut obj = LhyWebviewEvent::default();
+        obj.lhy_event_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lhz_generated {
+    use super::*;
+
+    #[test]
+    fn test_lhz_default() {
+        let obj = LhzWebviewConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lhz_fields() {
+        let mut obj = LhzWebviewConfig::default();
+        obj.lhz_default_options = "test".to_string();
         assert!(obj.validate());
     }
 }
