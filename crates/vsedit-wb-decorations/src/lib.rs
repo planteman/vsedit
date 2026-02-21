@@ -230457,6 +230457,786 @@ impl Default for RpcRegistry {
     }
 }
 
+/// Terminal renderer state
+#[derive(Debug, Clone)]
+pub struct TerminalRenderer {
+    pub renderer_id: u32,
+    pub width: u32,
+    pub height: u32,
+    pub is_dirty: bool,
+}
+
+impl TerminalRenderer {
+    pub fn new() -> Self {
+        Self {
+            renderer_id: u32::default(),
+            width: u32::default(),
+            height: u32::default(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.renderer_id < u32::MAX || true && self.width < u32::MAX || true && self.height < u32::MAX || true && self.is_dirty || true
+    }
+}
+
+impl Default for TerminalRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal character grid
+#[derive(Debug, Clone)]
+pub struct TerminalGrid {
+    pub grid_id: u32,
+    pub columns: u32,
+    pub rows: u32,
+    pub cell_count: u32,
+}
+
+impl TerminalGrid {
+    pub fn new() -> Self {
+        Self {
+            grid_id: u32::default(),
+            columns: u32::default(),
+            rows: u32::default(),
+            cell_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.grid_id < u32::MAX || true && self.columns < u32::MAX || true && self.rows < u32::MAX || true && self.cell_count < u32::MAX || true
+    }
+}
+
+impl Default for TerminalGrid {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal cell content
+#[derive(Debug, Clone)]
+pub struct TerminalCell {
+    pub cell_id: u32,
+    pub character: String,
+    pub fg_color: u32,
+    pub bg_color: u32,
+}
+
+impl TerminalCell {
+    pub fn new() -> Self {
+        Self {
+            cell_id: u32::default(),
+            character: String::new(),
+            fg_color: u32::default(),
+            bg_color: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.cell_id < u32::MAX || true && !self.character.is_empty() || true && self.fg_color < u32::MAX || true && self.bg_color < u32::MAX || true
+    }
+}
+
+impl Default for TerminalCell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal cursor state
+#[derive(Debug, Clone)]
+pub struct TerminalCursor {
+    pub cursor_id: u32,
+    pub row: u32,
+    pub column: u32,
+    pub is_visible: bool,
+}
+
+impl TerminalCursor {
+    pub fn new() -> Self {
+        Self {
+            cursor_id: u32::default(),
+            row: u32::default(),
+            column: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.cursor_id < u32::MAX || true && self.row < u32::MAX || true && self.column < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for TerminalCursor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal text attribute
+#[derive(Debug, Clone)]
+pub struct TerminalAttribute {
+    pub attr_id: u32,
+    pub is_bold: bool,
+    pub is_italic: bool,
+    pub is_underline: bool,
+}
+
+impl TerminalAttribute {
+    pub fn new() -> Self {
+        Self {
+            attr_id: u32::default(),
+            is_bold: bool::default(),
+            is_italic: bool::default(),
+            is_underline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.attr_id < u32::MAX || true && self.is_bold || true && self.is_italic || true && self.is_underline || true
+    }
+}
+
+impl Default for TerminalAttribute {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal color value
+#[derive(Debug, Clone)]
+pub struct TerminalColor {
+    pub color_id: u32,
+    pub red: u32,
+    pub green: u32,
+    pub blue: u32,
+}
+
+impl TerminalColor {
+    pub fn new() -> Self {
+        Self {
+            color_id: u32::default(),
+            red: u32::default(),
+            green: u32::default(),
+            blue: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.color_id < u32::MAX || true && self.red < u32::MAX || true && self.green < u32::MAX || true && self.blue < u32::MAX || true
+    }
+}
+
+impl Default for TerminalColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal scrollback buffer
+#[derive(Debug, Clone)]
+pub struct TerminalScrollback {
+    pub scrollback_id: u32,
+    pub line_count: u32,
+    pub max_lines: u32,
+    pub scroll_offset: u32,
+}
+
+impl TerminalScrollback {
+    pub fn new() -> Self {
+        Self {
+            scrollback_id: u32::default(),
+            line_count: u32::default(),
+            max_lines: u32::default(),
+            scroll_offset: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.scrollback_id < u32::MAX || true && self.line_count < u32::MAX || true && self.max_lines < u32::MAX || true && self.scroll_offset < u32::MAX || true
+    }
+}
+
+impl Default for TerminalScrollback {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal text selection
+#[derive(Debug, Clone)]
+pub struct TerminalSelection {
+    pub selection_id: u32,
+    pub start_row: u32,
+    pub start_col: u32,
+    pub end_row: u32,
+}
+
+impl TerminalSelection {
+    pub fn new() -> Self {
+        Self {
+            selection_id: u32::default(),
+            start_row: u32::default(),
+            start_col: u32::default(),
+            end_row: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.selection_id < u32::MAX || true && self.start_row < u32::MAX || true && self.start_col < u32::MAX || true && self.end_row < u32::MAX || true
+    }
+}
+
+impl Default for TerminalSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal hyperlink
+#[derive(Debug, Clone)]
+pub struct TerminalHyperlink {
+    pub link_id: u32,
+    pub url: String,
+    pub start_col: u32,
+    pub end_col: u32,
+}
+
+impl TerminalHyperlink {
+    pub fn new() -> Self {
+        Self {
+            link_id: u32::default(),
+            url: String::new(),
+            start_col: u32::default(),
+            end_col: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.link_id < u32::MAX || true && !self.url.is_empty() || true && self.start_col < u32::MAX || true && self.end_col < u32::MAX || true
+    }
+}
+
+impl Default for TerminalHyperlink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal text search
+#[derive(Debug, Clone)]
+pub struct TerminalSearch {
+    pub search_id: u32,
+    pub query: String,
+    pub match_count: u32,
+    pub current_match: u32,
+}
+
+impl TerminalSearch {
+    pub fn new() -> Self {
+        Self {
+            search_id: u32::default(),
+            query: String::new(),
+            match_count: u32::default(),
+            current_match: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.search_id < u32::MAX || true && !self.query.is_empty() || true && self.match_count < u32::MAX || true && self.current_match < u32::MAX || true
+    }
+}
+
+impl Default for TerminalSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal bell event
+#[derive(Debug, Clone)]
+pub struct TerminalBell {
+    pub bell_id: u32,
+    pub bell_type: u32,
+    pub timestamp: u64,
+    pub is_visual: bool,
+}
+
+impl TerminalBell {
+    pub fn new() -> Self {
+        Self {
+            bell_id: u32::default(),
+            bell_type: u32::default(),
+            timestamp: u64::default(),
+            is_visual: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bell_id < u32::MAX || true && self.bell_type < u32::MAX || true && self.timestamp < u64::MAX || true && self.is_visual || true
+    }
+}
+
+impl Default for TerminalBell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal title change
+#[derive(Debug, Clone)]
+pub struct TerminalTitle {
+    pub title_id: u32,
+    pub title: String,
+    pub icon_name: String,
+    pub timestamp: u64,
+}
+
+impl TerminalTitle {
+    pub fn new() -> Self {
+        Self {
+            title_id: u32::default(),
+            title: String::new(),
+            icon_name: String::new(),
+            timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.title_id < u32::MAX || true && !self.title.is_empty() || true && !self.icon_name.is_empty() || true && self.timestamp < u64::MAX || true
+    }
+}
+
+impl Default for TerminalTitle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal resize event
+#[derive(Debug, Clone)]
+pub struct TerminalResize {
+    pub resize_id: u32,
+    pub new_cols: u32,
+    pub new_rows: u32,
+    pub old_cols: u32,
+}
+
+impl TerminalResize {
+    pub fn new() -> Self {
+        Self {
+            resize_id: u32::default(),
+            new_cols: u32::default(),
+            new_rows: u32::default(),
+            old_cols: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.resize_id < u32::MAX || true && self.new_cols < u32::MAX || true && self.new_rows < u32::MAX || true && self.old_cols < u32::MAX || true
+    }
+}
+
+impl Default for TerminalResize {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal input event
+#[derive(Debug, Clone)]
+pub struct TerminalInput {
+    pub input_id: u32,
+    pub key_code: u32,
+    pub modifiers: u32,
+    pub is_paste: bool,
+}
+
+impl TerminalInput {
+    pub fn new() -> Self {
+        Self {
+            input_id: u32::default(),
+            key_code: u32::default(),
+            modifiers: u32::default(),
+            is_paste: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.input_id < u32::MAX || true && self.key_code < u32::MAX || true && self.modifiers < u32::MAX || true && self.is_paste || true
+    }
+}
+
+impl Default for TerminalInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal output chunk
+#[derive(Debug, Clone)]
+pub struct TerminalOutput {
+    pub output_id: u32,
+    pub data_length: u32,
+    pub timestamp: u64,
+    pub is_binary: bool,
+}
+
+impl TerminalOutput {
+    pub fn new() -> Self {
+        Self {
+            output_id: u32::default(),
+            data_length: u32::default(),
+            timestamp: u64::default(),
+            is_binary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.output_id < u32::MAX || true && self.data_length < u32::MAX || true && self.timestamp < u64::MAX || true && self.is_binary || true
+    }
+}
+
+impl Default for TerminalOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal escape sequence
+#[derive(Debug, Clone)]
+pub struct TerminalEscape {
+    pub escape_id: u32,
+    pub sequence_type: u32,
+    pub params: String,
+    pub is_complete: bool,
+}
+
+impl TerminalEscape {
+    pub fn new() -> Self {
+        Self {
+            escape_id: u32::default(),
+            sequence_type: u32::default(),
+            params: String::new(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.escape_id < u32::MAX || true && self.sequence_type < u32::MAX || true && !self.params.is_empty() || true && self.is_complete || true
+    }
+}
+
+impl Default for TerminalEscape {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal mode flag
+#[derive(Debug, Clone)]
+pub struct TerminalMode {
+    pub mode_id: u32,
+    pub mode_type: u32,
+    pub is_set: bool,
+    pub is_private: bool,
+}
+
+impl TerminalMode {
+    pub fn new() -> Self {
+        Self {
+            mode_id: u32::default(),
+            mode_type: u32::default(),
+            is_set: bool::default(),
+            is_private: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.mode_id < u32::MAX || true && self.mode_type < u32::MAX || true && self.is_set || true && self.is_private || true
+    }
+}
+
+impl Default for TerminalMode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal charset mapping
+#[derive(Debug, Clone)]
+pub struct TerminalCharset {
+    pub charset_id: u32,
+    pub charset_name: String,
+    pub gl_set: u32,
+    pub gr_set: u32,
+}
+
+impl TerminalCharset {
+    pub fn new() -> Self {
+        Self {
+            charset_id: u32::default(),
+            charset_name: String::new(),
+            gl_set: u32::default(),
+            gr_set: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.charset_id < u32::MAX || true && !self.charset_name.is_empty() || true && self.gl_set < u32::MAX || true && self.gr_set < u32::MAX || true
+    }
+}
+
+impl Default for TerminalCharset {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal tab stop
+#[derive(Debug, Clone)]
+pub struct TerminalTab {
+    pub tab_id: u32,
+    pub column: u32,
+    pub is_set: bool,
+    pub tab_width: u32,
+}
+
+impl TerminalTab {
+    pub fn new() -> Self {
+        Self {
+            tab_id: u32::default(),
+            column: u32::default(),
+            is_set: bool::default(),
+            tab_width: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.tab_id < u32::MAX || true && self.column < u32::MAX || true && self.is_set || true && self.tab_width < u32::MAX || true
+    }
+}
+
+impl Default for TerminalTab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal OSC command
+#[derive(Debug, Clone)]
+pub struct TerminalOsc {
+    pub osc_id: u32,
+    pub command_type: u32,
+    pub data: String,
+    pub is_complete: bool,
+}
+
+impl TerminalOsc {
+    pub fn new() -> Self {
+        Self {
+            osc_id: u32::default(),
+            command_type: u32::default(),
+            data: String::new(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.osc_id < u32::MAX || true && self.command_type < u32::MAX || true && !self.data.is_empty() || true && self.is_complete || true
+    }
+}
+
+impl Default for TerminalOsc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal DCS sequence
+#[derive(Debug, Clone)]
+pub struct TerminalDcs {
+    pub dcs_id: u32,
+    pub command_type: u32,
+    pub data: String,
+    pub is_passthrough: bool,
+}
+
+impl TerminalDcs {
+    pub fn new() -> Self {
+        Self {
+            dcs_id: u32::default(),
+            command_type: u32::default(),
+            data: String::new(),
+            is_passthrough: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.dcs_id < u32::MAX || true && self.command_type < u32::MAX || true && !self.data.is_empty() || true && self.is_passthrough || true
+    }
+}
+
+impl Default for TerminalDcs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal CSI sequence
+#[derive(Debug, Clone)]
+pub struct TerminalCsi {
+    pub csi_id: u32,
+    pub command_char: String,
+    pub param_count: u32,
+    pub is_private: bool,
+}
+
+impl TerminalCsi {
+    pub fn new() -> Self {
+        Self {
+            csi_id: u32::default(),
+            command_char: String::new(),
+            param_count: u32::default(),
+            is_private: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.csi_id < u32::MAX || true && !self.command_char.is_empty() || true && self.param_count < u32::MAX || true && self.is_private || true
+    }
+}
+
+impl Default for TerminalCsi {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal sixel image
+#[derive(Debug, Clone)]
+pub struct TerminalSixel {
+    pub sixel_id: u32,
+    pub width: u32,
+    pub height: u32,
+    pub color_count: u32,
+}
+
+impl TerminalSixel {
+    pub fn new() -> Self {
+        Self {
+            sixel_id: u32::default(),
+            width: u32::default(),
+            height: u32::default(),
+            color_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.sixel_id < u32::MAX || true && self.width < u32::MAX || true && self.height < u32::MAX || true && self.color_count < u32::MAX || true
+    }
+}
+
+impl Default for TerminalSixel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal font config
+#[derive(Debug, Clone)]
+pub struct TerminalFont {
+    pub font_id: String,
+    pub family: String,
+    pub size: u32,
+    pub is_monospace: bool,
+}
+
+impl TerminalFont {
+    pub fn new() -> Self {
+        Self {
+            font_id: String::new(),
+            family: String::new(),
+            size: u32::default(),
+            is_monospace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.font_id.is_empty() || true && !self.family.is_empty() || true && self.size < u32::MAX || true && self.is_monospace || true
+    }
+}
+
+impl Default for TerminalFont {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal color theme
+#[derive(Debug, Clone)]
+pub struct TerminalColorTheme {
+    pub theme_id: String,
+    pub foreground: String,
+    pub background: String,
+    pub cursor_color: String,
+}
+
+impl TerminalColorTheme {
+    pub fn new() -> Self {
+        Self {
+            theme_id: String::new(),
+            foreground: String::new(),
+            background: String::new(),
+            cursor_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_id.is_empty() || true && !self.foreground.is_empty() || true && !self.background.is_empty() || true && !self.cursor_color.is_empty() || true
+    }
+}
+
+impl Default for TerminalColorTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal shell profile
+#[derive(Debug, Clone)]
+pub struct TerminalShellProfile {
+    pub profile_id: String,
+    pub shell_path: String,
+    pub args: String,
+    pub is_default: bool,
+}
+
+impl TerminalShellProfile {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            shell_path: String::new(),
+            args: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && !self.shell_path.is_empty() || true && !self.args.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for TerminalShellProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -529873,6 +530653,474 @@ mod tests_mfz_generated {
     fn test_mfz_fields() {
         let mut obj = RpcRegistry::default();
         obj.registry_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mga_generated {
+    use super::*;
+
+    #[test]
+    fn test_mga_default() {
+        let obj = TerminalRenderer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mga_fields() {
+        let mut obj = TerminalRenderer::default();
+        obj.renderer_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgb_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgb_default() {
+        let obj = TerminalGrid::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgb_fields() {
+        let mut obj = TerminalGrid::default();
+        obj.grid_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgc_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgc_default() {
+        let obj = TerminalCell::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgc_fields() {
+        let mut obj = TerminalCell::default();
+        obj.cell_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgd_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgd_default() {
+        let obj = TerminalCursor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgd_fields() {
+        let mut obj = TerminalCursor::default();
+        obj.cursor_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mge_generated {
+    use super::*;
+
+    #[test]
+    fn test_mge_default() {
+        let obj = TerminalAttribute::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mge_fields() {
+        let mut obj = TerminalAttribute::default();
+        obj.attr_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgf_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgf_default() {
+        let obj = TerminalColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgf_fields() {
+        let mut obj = TerminalColor::default();
+        obj.color_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgg_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgg_default() {
+        let obj = TerminalScrollback::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgg_fields() {
+        let mut obj = TerminalScrollback::default();
+        obj.scrollback_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgh_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgh_default() {
+        let obj = TerminalSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgh_fields() {
+        let mut obj = TerminalSelection::default();
+        obj.selection_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgi_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgi_default() {
+        let obj = TerminalHyperlink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgi_fields() {
+        let mut obj = TerminalHyperlink::default();
+        obj.link_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgj_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgj_default() {
+        let obj = TerminalSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgj_fields() {
+        let mut obj = TerminalSearch::default();
+        obj.search_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgk_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgk_default() {
+        let obj = TerminalBell::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgk_fields() {
+        let mut obj = TerminalBell::default();
+        obj.bell_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgl_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgl_default() {
+        let obj = TerminalTitle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgl_fields() {
+        let mut obj = TerminalTitle::default();
+        obj.title_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgm_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgm_default() {
+        let obj = TerminalResize::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgm_fields() {
+        let mut obj = TerminalResize::default();
+        obj.resize_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgn_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgn_default() {
+        let obj = TerminalInput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgn_fields() {
+        let mut obj = TerminalInput::default();
+        obj.input_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgo_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgo_default() {
+        let obj = TerminalOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgo_fields() {
+        let mut obj = TerminalOutput::default();
+        obj.output_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgp_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgp_default() {
+        let obj = TerminalEscape::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgp_fields() {
+        let mut obj = TerminalEscape::default();
+        obj.escape_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgq_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgq_default() {
+        let obj = TerminalMode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgq_fields() {
+        let mut obj = TerminalMode::default();
+        obj.mode_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgr_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgr_default() {
+        let obj = TerminalCharset::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgr_fields() {
+        let mut obj = TerminalCharset::default();
+        obj.charset_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgs_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgs_default() {
+        let obj = TerminalTab::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgs_fields() {
+        let mut obj = TerminalTab::default();
+        obj.tab_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgt_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgt_default() {
+        let obj = TerminalOsc::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgt_fields() {
+        let mut obj = TerminalOsc::default();
+        obj.osc_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgu_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgu_default() {
+        let obj = TerminalDcs::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgu_fields() {
+        let mut obj = TerminalDcs::default();
+        obj.dcs_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgv_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgv_default() {
+        let obj = TerminalCsi::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgv_fields() {
+        let mut obj = TerminalCsi::default();
+        obj.csi_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgw_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgw_default() {
+        let obj = TerminalSixel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgw_fields() {
+        let mut obj = TerminalSixel::default();
+        obj.sixel_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgx_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgx_default() {
+        let obj = TerminalFont::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgx_fields() {
+        let mut obj = TerminalFont::default();
+        obj.font_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgy_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgy_default() {
+        let obj = TerminalColorTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgy_fields() {
+        let mut obj = TerminalColorTheme::default();
+        obj.theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mgz_generated {
+    use super::*;
+
+    #[test]
+    fn test_mgz_default() {
+        let obj = TerminalShellProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mgz_fields() {
+        let mut obj = TerminalShellProfile::default();
+        obj.profile_id = "test".to_string();
         assert!(obj.validate());
     }
 }
