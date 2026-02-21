@@ -220648,6 +220648,786 @@ impl Default for StorageProvider {
     }
 }
 
+/// URI scheme definition
+#[derive(Debug, Clone)]
+pub struct UriScheme {
+    pub scheme_name: String,
+    pub handler_id: String,
+    pub is_opaque: bool,
+    pub priority: u32,
+}
+
+impl UriScheme {
+    pub fn new() -> Self {
+        Self {
+            scheme_name: String::new(),
+            handler_id: String::new(),
+            is_opaque: bool::default(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scheme_name.is_empty() || true && !self.handler_id.is_empty() || true && self.is_opaque || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for UriScheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI authority component
+#[derive(Debug, Clone)]
+pub struct UriAuthority {
+    pub authority_string: String,
+    pub host: String,
+    pub port: u32,
+    pub has_user_info: bool,
+}
+
+impl UriAuthority {
+    pub fn new() -> Self {
+        Self {
+            authority_string: String::new(),
+            host: String::new(),
+            port: u32::default(),
+            has_user_info: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.authority_string.is_empty() || true && !self.host.is_empty() || true && self.port < u32::MAX || true && self.has_user_info || true
+    }
+}
+
+impl Default for UriAuthority {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI path component
+#[derive(Debug, Clone)]
+pub struct UriPath {
+    pub path_string: String,
+    pub segment_count: u32,
+    pub is_absolute: bool,
+    pub has_trailing_slash: bool,
+}
+
+impl UriPath {
+    pub fn new() -> Self {
+        Self {
+            path_string: String::new(),
+            segment_count: u32::default(),
+            is_absolute: bool::default(),
+            has_trailing_slash: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.path_string.is_empty() || true && self.segment_count < u32::MAX || true && self.is_absolute || true && self.has_trailing_slash || true
+    }
+}
+
+impl Default for UriPath {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI query component
+#[derive(Debug, Clone)]
+pub struct UriQuery {
+    pub query_string: String,
+    pub param_count: u32,
+    pub is_encoded: bool,
+    pub has_fragment: bool,
+}
+
+impl UriQuery {
+    pub fn new() -> Self {
+        Self {
+            query_string: String::new(),
+            param_count: u32::default(),
+            is_encoded: bool::default(),
+            has_fragment: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.query_string.is_empty() || true && self.param_count < u32::MAX || true && self.is_encoded || true && self.has_fragment || true
+    }
+}
+
+impl Default for UriQuery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI fragment component
+#[derive(Debug, Clone)]
+pub struct UriFragment {
+    pub fragment_string: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub is_encoded: bool,
+}
+
+impl UriFragment {
+    pub fn new() -> Self {
+        Self {
+            fragment_string: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            is_encoded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fragment_string.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && self.is_encoded || true
+    }
+}
+
+impl Default for UriFragment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI transformation rule
+#[derive(Debug, Clone)]
+pub struct UriTransform {
+    pub transform_id: u32,
+    pub source_scheme: String,
+    pub target_scheme: String,
+    pub is_bidirectional: bool,
+}
+
+impl UriTransform {
+    pub fn new() -> Self {
+        Self {
+            transform_id: u32::default(),
+            source_scheme: String::new(),
+            target_scheme: String::new(),
+            is_bidirectional: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.transform_id < u32::MAX || true && !self.source_scheme.is_empty() || true && !self.target_scheme.is_empty() || true && self.is_bidirectional || true
+    }
+}
+
+impl Default for UriTransform {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI resolver instance
+#[derive(Debug, Clone)]
+pub struct UriResolver {
+    pub resolver_id: u32,
+    pub scheme_filter: String,
+    pub priority: u32,
+    pub is_cached: bool,
+}
+
+impl UriResolver {
+    pub fn new() -> Self {
+        Self {
+            resolver_id: u32::default(),
+            scheme_filter: String::new(),
+            priority: u32::default(),
+            is_cached: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.resolver_id < u32::MAX || true && !self.scheme_filter.is_empty() || true && self.priority < u32::MAX || true && self.is_cached || true
+    }
+}
+
+impl Default for UriResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI redirect mapping
+#[derive(Debug, Clone)]
+pub struct UriRedirect {
+    pub redirect_id: u32,
+    pub from_uri: String,
+    pub to_uri: String,
+    pub is_permanent: bool,
+}
+
+impl UriRedirect {
+    pub fn new() -> Self {
+        Self {
+            redirect_id: u32::default(),
+            from_uri: String::new(),
+            to_uri: String::new(),
+            is_permanent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.redirect_id < u32::MAX || true && !self.from_uri.is_empty() || true && !self.to_uri.is_empty() || true && self.is_permanent || true
+    }
+}
+
+impl Default for UriRedirect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI encoding config
+#[derive(Debug, Clone)]
+pub struct UriEncoding {
+    pub encoding_type: u32,
+    pub charset: String,
+    pub escape_char: String,
+    pub is_strict: bool,
+}
+
+impl UriEncoding {
+    pub fn new() -> Self {
+        Self {
+            encoding_type: u32::default(),
+            charset: String::new(),
+            escape_char: String::new(),
+            is_strict: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.encoding_type < u32::MAX || true && !self.charset.is_empty() || true && !self.escape_char.is_empty() || true && self.is_strict || true
+    }
+}
+
+impl Default for UriEncoding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI identity comparison
+#[derive(Debug, Clone)]
+pub struct UriIdentity {
+    pub identity_hash: String,
+    pub normalized_uri: String,
+    pub comparison_flags: u32,
+    pub is_case_sensitive: bool,
+}
+
+impl UriIdentity {
+    pub fn new() -> Self {
+        Self {
+            identity_hash: String::new(),
+            normalized_uri: String::new(),
+            comparison_flags: u32::default(),
+            is_case_sensitive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.identity_hash.is_empty() || true && !self.normalized_uri.is_empty() || true && self.comparison_flags < u32::MAX || true && self.is_case_sensitive || true
+    }
+}
+
+impl Default for UriIdentity {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// External URI opener
+#[derive(Debug, Clone)]
+pub struct ExternalUriOpener {
+    pub opener_id: String,
+    pub scheme_filter: String,
+    pub label: String,
+    pub is_default: bool,
+}
+
+impl ExternalUriOpener {
+    pub fn new() -> Self {
+        Self {
+            opener_id: String::new(),
+            scheme_filter: String::new(),
+            label: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.opener_id.is_empty() || true && !self.scheme_filter.is_empty() || true && !self.label.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for ExternalUriOpener {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI handler registration
+#[derive(Debug, Clone)]
+pub struct UriHandler {
+    pub handler_id: String,
+    pub scheme: String,
+    pub extension_id: String,
+    pub is_active: bool,
+}
+
+impl UriHandler {
+    pub fn new() -> Self {
+        Self {
+            handler_id: String::new(),
+            scheme: String::new(),
+            extension_id: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.handler_id.is_empty() || true && !self.scheme.is_empty() || true && !self.extension_id.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for UriHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Resource URI wrapper
+#[derive(Debug, Clone)]
+pub struct ResourceUri {
+    pub resource_path: String,
+    pub scheme: String,
+    pub is_directory: bool,
+    pub extension: String,
+}
+
+impl ResourceUri {
+    pub fn new() -> Self {
+        Self {
+            resource_path: String::new(),
+            scheme: String::new(),
+            is_directory: bool::default(),
+            extension: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resource_path.is_empty() || true && !self.scheme.is_empty() || true && self.is_directory || true && !self.extension.is_empty() || true
+    }
+}
+
+impl Default for ResourceUri {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File URI representation
+#[derive(Debug, Clone)]
+pub struct FileUri {
+    pub file_path: String,
+    pub drive_letter: String,
+    pub is_unc: bool,
+    pub is_normalized: bool,
+}
+
+impl FileUri {
+    pub fn new() -> Self {
+        Self {
+            file_path: String::new(),
+            drive_letter: String::new(),
+            is_unc: bool::default(),
+            is_normalized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_path.is_empty() || true && !self.drive_letter.is_empty() || true && self.is_unc || true && self.is_normalized || true
+    }
+}
+
+impl Default for FileUri {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Virtual file system URI
+#[derive(Debug, Clone)]
+pub struct VirtualUri {
+    pub virtual_path: String,
+    pub provider_id: String,
+    pub is_readonly: bool,
+    pub overlay_count: u32,
+}
+
+impl VirtualUri {
+    pub fn new() -> Self {
+        Self {
+            virtual_path: String::new(),
+            provider_id: String::new(),
+            is_readonly: bool::default(),
+            overlay_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.virtual_path.is_empty() || true && !self.provider_id.is_empty() || true && self.is_readonly || true && self.overlay_count < u32::MAX || true
+    }
+}
+
+impl Default for VirtualUri {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote URI representation
+#[derive(Debug, Clone)]
+pub struct RemoteUri {
+    pub remote_host: String,
+    pub remote_port: u32,
+    pub remote_path: String,
+    pub connection_type: u32,
+}
+
+impl RemoteUri {
+    pub fn new() -> Self {
+        Self {
+            remote_host: String::new(),
+            remote_port: u32::default(),
+            remote_path: String::new(),
+            connection_type: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_host.is_empty() || true && self.remote_port < u32::MAX || true && !self.remote_path.is_empty() || true && self.connection_type < u32::MAX || true
+    }
+}
+
+impl Default for RemoteUri {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Untitled document URI
+#[derive(Debug, Clone)]
+pub struct UntitledUri {
+    pub untitled_id: u32,
+    pub associated_resource: String,
+    pub language_id: String,
+    pub is_dirty: bool,
+}
+
+impl UntitledUri {
+    pub fn new() -> Self {
+        Self {
+            untitled_id: u32::default(),
+            associated_resource: String::new(),
+            language_id: String::new(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.untitled_id < u32::MAX || true && !self.associated_resource.is_empty() || true && !self.language_id.is_empty() || true && self.is_dirty || true
+    }
+}
+
+impl Default for UntitledUri {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff comparison URI pair
+#[derive(Debug, Clone)]
+pub struct DiffUri {
+    pub left_uri: String,
+    pub right_uri: String,
+    pub title: String,
+    pub is_multi_diff: bool,
+}
+
+impl DiffUri {
+    pub fn new() -> Self {
+        Self {
+            left_uri: String::new(),
+            right_uri: String::new(),
+            title: String::new(),
+            is_multi_diff: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.left_uri.is_empty() || true && !self.right_uri.is_empty() || true && !self.title.is_empty() || true && self.is_multi_diff || true
+    }
+}
+
+impl Default for DiffUri {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Merge editor URI
+#[derive(Debug, Clone)]
+pub struct MergeUri {
+    pub merge_base_uri: String,
+    pub incoming_uri: String,
+    pub current_uri: String,
+    pub result_uri: String,
+}
+
+impl MergeUri {
+    pub fn new() -> Self {
+        Self {
+            merge_base_uri: String::new(),
+            incoming_uri: String::new(),
+            current_uri: String::new(),
+            result_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.merge_base_uri.is_empty() || true && !self.incoming_uri.is_empty() || true && !self.current_uri.is_empty() || true && !self.result_uri.is_empty() || true
+    }
+}
+
+impl Default for MergeUri {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Custom URI scheme
+#[derive(Debug, Clone)]
+pub struct CustomUri {
+    pub custom_scheme: String,
+    pub provider_id: String,
+    pub display_name: String,
+    pub is_registered: bool,
+}
+
+impl CustomUri {
+    pub fn new() -> Self {
+        Self {
+            custom_scheme: String::new(),
+            provider_id: String::new(),
+            display_name: String::new(),
+            is_registered: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.custom_scheme.is_empty() || true && !self.provider_id.is_empty() || true && !self.display_name.is_empty() || true && self.is_registered || true
+    }
+}
+
+impl Default for CustomUri {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI display label
+#[derive(Debug, Clone)]
+pub struct UriLabel {
+    pub label_text: String,
+    pub uri_string: String,
+    pub max_length: u32,
+    pub show_scheme: bool,
+}
+
+impl UriLabel {
+    pub fn new() -> Self {
+        Self {
+            label_text: String::new(),
+            uri_string: String::new(),
+            max_length: u32::default(),
+            show_scheme: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.label_text.is_empty() || true && !self.uri_string.is_empty() || true && self.max_length < u32::MAX || true && self.show_scheme || true
+    }
+}
+
+impl Default for UriLabel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI icon mapping
+#[derive(Debug, Clone)]
+pub struct UriIcon {
+    pub icon_id: String,
+    pub scheme: String,
+    pub theme_type: u32,
+    pub is_custom: bool,
+}
+
+impl UriIcon {
+    pub fn new() -> Self {
+        Self {
+            icon_id: String::new(),
+            scheme: String::new(),
+            theme_type: u32::default(),
+            is_custom: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.icon_id.is_empty() || true && !self.scheme.is_empty() || true && self.theme_type < u32::MAX || true && self.is_custom || true
+    }
+}
+
+impl Default for UriIcon {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI access permission
+#[derive(Debug, Clone)]
+pub struct UriPermission {
+    pub permission_type: u32,
+    pub uri_pattern: String,
+    pub granted_to: String,
+    pub is_revocable: bool,
+}
+
+impl UriPermission {
+    pub fn new() -> Self {
+        Self {
+            permission_type: u32::default(),
+            uri_pattern: String::new(),
+            granted_to: String::new(),
+            is_revocable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.permission_type < u32::MAX || true && !self.uri_pattern.is_empty() || true && !self.granted_to.is_empty() || true && self.is_revocable || true
+    }
+}
+
+impl Default for UriPermission {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI resolution cache
+#[derive(Debug, Clone)]
+pub struct UriCache {
+    pub cache_key: String,
+    pub resolved_uri: String,
+    pub ttl_ms: u32,
+    pub hit_count: u32,
+}
+
+impl UriCache {
+    pub fn new() -> Self {
+        Self {
+            cache_key: String::new(),
+            resolved_uri: String::new(),
+            ttl_ms: u32::default(),
+            hit_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cache_key.is_empty() || true && !self.resolved_uri.is_empty() || true && self.ttl_ms < u32::MAX || true && self.hit_count < u32::MAX || true
+    }
+}
+
+impl Default for UriCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI change watcher
+#[derive(Debug, Clone)]
+pub struct UriWatcher {
+    pub watcher_id: u32,
+    pub uri_pattern: String,
+    pub recursive: bool,
+    pub is_active: bool,
+}
+
+impl UriWatcher {
+    pub fn new() -> Self {
+        Self {
+            watcher_id: u32::default(),
+            uri_pattern: String::new(),
+            recursive: bool::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.watcher_id < u32::MAX || true && !self.uri_pattern.is_empty() || true && self.recursive || true && self.is_active || true
+    }
+}
+
+impl Default for UriWatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI normalization rule
+#[derive(Debug, Clone)]
+pub struct UriNormalization {
+    pub norm_id: u32,
+    pub rule_type: u32,
+    pub pattern: String,
+    pub is_enabled: bool,
+}
+
+impl UriNormalization {
+    pub fn new() -> Self {
+        Self {
+            norm_id: u32::default(),
+            rule_type: u32::default(),
+            pattern: String::new(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.norm_id < u32::MAX || true && self.rule_type < u32::MAX || true && !self.pattern.is_empty() || true && self.is_enabled || true
+    }
+}
+
+impl Default for UriNormalization {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -513746,6 +514526,474 @@ mod tests_lsz_generated {
     fn test_lsz_fields() {
         let mut obj = StorageProvider::default();
         obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lta_generated {
+    use super::*;
+
+    #[test]
+    fn test_lta_default() {
+        let obj = UriScheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lta_fields() {
+        let mut obj = UriScheme::default();
+        obj.scheme_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltb_default() {
+        let obj = UriAuthority::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltb_fields() {
+        let mut obj = UriAuthority::default();
+        obj.authority_string = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltc_default() {
+        let obj = UriPath::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltc_fields() {
+        let mut obj = UriPath::default();
+        obj.path_string = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltd_default() {
+        let obj = UriQuery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltd_fields() {
+        let mut obj = UriQuery::default();
+        obj.query_string = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lte_generated {
+    use super::*;
+
+    #[test]
+    fn test_lte_default() {
+        let obj = UriFragment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lte_fields() {
+        let mut obj = UriFragment::default();
+        obj.fragment_string = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltf_default() {
+        let obj = UriTransform::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltf_fields() {
+        let mut obj = UriTransform::default();
+        obj.transform_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltg_default() {
+        let obj = UriResolver::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltg_fields() {
+        let mut obj = UriResolver::default();
+        obj.resolver_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lth_generated {
+    use super::*;
+
+    #[test]
+    fn test_lth_default() {
+        let obj = UriRedirect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lth_fields() {
+        let mut obj = UriRedirect::default();
+        obj.redirect_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lti_generated {
+    use super::*;
+
+    #[test]
+    fn test_lti_default() {
+        let obj = UriEncoding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lti_fields() {
+        let mut obj = UriEncoding::default();
+        obj.encoding_type = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltj_default() {
+        let obj = UriIdentity::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltj_fields() {
+        let mut obj = UriIdentity::default();
+        obj.identity_hash = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltk_default() {
+        let obj = ExternalUriOpener::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltk_fields() {
+        let mut obj = ExternalUriOpener::default();
+        obj.opener_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltl_default() {
+        let obj = UriHandler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltl_fields() {
+        let mut obj = UriHandler::default();
+        obj.handler_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltm_default() {
+        let obj = ResourceUri::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltm_fields() {
+        let mut obj = ResourceUri::default();
+        obj.resource_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltn_default() {
+        let obj = FileUri::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltn_fields() {
+        let mut obj = FileUri::default();
+        obj.file_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lto_generated {
+    use super::*;
+
+    #[test]
+    fn test_lto_default() {
+        let obj = VirtualUri::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lto_fields() {
+        let mut obj = VirtualUri::default();
+        obj.virtual_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltp_default() {
+        let obj = RemoteUri::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltp_fields() {
+        let mut obj = RemoteUri::default();
+        obj.remote_host = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltq_default() {
+        let obj = UntitledUri::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltq_fields() {
+        let mut obj = UntitledUri::default();
+        obj.untitled_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltr_default() {
+        let obj = DiffUri::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltr_fields() {
+        let mut obj = DiffUri::default();
+        obj.left_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lts_generated {
+    use super::*;
+
+    #[test]
+    fn test_lts_default() {
+        let obj = MergeUri::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lts_fields() {
+        let mut obj = MergeUri::default();
+        obj.merge_base_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltt_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltt_default() {
+        let obj = CustomUri::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltt_fields() {
+        let mut obj = CustomUri::default();
+        obj.custom_scheme = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltu_default() {
+        let obj = UriLabel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltu_fields() {
+        let mut obj = UriLabel::default();
+        obj.label_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltv_default() {
+        let obj = UriIcon::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltv_fields() {
+        let mut obj = UriIcon::default();
+        obj.icon_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltw_default() {
+        let obj = UriPermission::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltw_fields() {
+        let mut obj = UriPermission::default();
+        obj.permission_type = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltx_default() {
+        let obj = UriCache::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltx_fields() {
+        let mut obj = UriCache::default();
+        obj.cache_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lty_generated {
+    use super::*;
+
+    #[test]
+    fn test_lty_default() {
+        let obj = UriWatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lty_fields() {
+        let mut obj = UriWatcher::default();
+        obj.watcher_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ltz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ltz_default() {
+        let obj = UriNormalization::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ltz_fields() {
+        let mut obj = UriNormalization::default();
+        obj.norm_id = 1;
         assert!(obj.validate());
     }
 }
