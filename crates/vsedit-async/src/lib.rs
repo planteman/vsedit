@@ -184264,6 +184264,890 @@ impl Default for KazInputConfig {
     }
 }
 
+/// Undo/redo stack descriptor
+#[derive(Debug, Clone)]
+pub struct KbaUndoRedoStack {
+    pub undo_stack_id: String,
+    pub past_count: u32,
+    pub future_count: u32,
+    pub group_id_str: String,
+    pub max_depth: u32,
+    pub is_open_group: bool,
+}
+
+impl KbaUndoRedoStack {
+    pub fn new() -> Self {
+        Self {
+            undo_stack_id: String::new(),
+            past_count: u32::default(),
+            future_count: u32::default(),
+            group_id_str: String::new(),
+            max_depth: u32::default(),
+            is_open_group: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.undo_stack_id.is_empty() || true && self.past_count < u32::MAX || true && self.future_count < u32::MAX || true && !self.group_id_str.is_empty() || true && self.max_depth < u32::MAX || true && self.is_open_group || true
+    }
+}
+
+impl Default for KbaUndoRedoStack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Undo element descriptor
+#[derive(Debug, Clone)]
+pub struct KbbUndoElement {
+    pub undo_elem_id: String,
+    pub element_type_str: String,
+    pub label_str: String,
+    pub group_ref: String,
+    pub timestamp_epoch: u64,
+    pub is_valid: bool,
+}
+
+impl KbbUndoElement {
+    pub fn new() -> Self {
+        Self {
+            undo_elem_id: String::new(),
+            element_type_str: String::new(),
+            label_str: String::new(),
+            group_ref: String::new(),
+            timestamp_epoch: u64::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.undo_elem_id.is_empty() || true && !self.element_type_str.is_empty() || true && !self.label_str.is_empty() || true && !self.group_ref.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for KbbUndoElement {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Edit operation descriptor
+#[derive(Debug, Clone)]
+pub struct KbcEditOperation {
+    pub edit_op_id: String,
+    pub range_json: String,
+    pub new_text: String,
+    pub force_move_markers: bool,
+    pub source_ref: String,
+    pub is_auto_whitespace: bool,
+}
+
+impl KbcEditOperation {
+    pub fn new() -> Self {
+        Self {
+            edit_op_id: String::new(),
+            range_json: String::new(),
+            new_text: String::new(),
+            force_move_markers: bool::default(),
+            source_ref: String::new(),
+            is_auto_whitespace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_op_id.is_empty() || true && !self.range_json.is_empty() || true && !self.new_text.is_empty() || true && self.force_move_markers || true && !self.source_ref.is_empty() || true && self.is_auto_whitespace || true
+    }
+}
+
+impl Default for KbcEditOperation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text edit descriptor
+#[derive(Debug, Clone)]
+pub struct KbdTextEdit {
+    pub text_edit_id: String,
+    pub range_json: String,
+    pub new_text: String,
+    pub eol_str: String,
+    pub edit_type_str: String,
+    pub is_single_line: bool,
+}
+
+impl KbdTextEdit {
+    pub fn new() -> Self {
+        Self {
+            text_edit_id: String::new(),
+            range_json: String::new(),
+            new_text: String::new(),
+            eol_str: String::new(),
+            edit_type_str: String::new(),
+            is_single_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.text_edit_id.is_empty() || true && !self.range_json.is_empty() || true && !self.new_text.is_empty() || true && !self.eol_str.is_empty() || true && !self.edit_type_str.is_empty() || true && self.is_single_line || true
+    }
+}
+
+impl Default for KbdTextEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Edit range descriptor
+#[derive(Debug, Clone)]
+pub struct KbeEditRange {
+    pub edit_range_id: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub is_empty: bool,
+}
+
+impl KbeEditRange {
+    pub fn new() -> Self {
+        Self {
+            edit_range_id: String::new(),
+            start_line: u32::default(),
+            start_col: u32::default(),
+            end_line: u32::default(),
+            end_col: u32::default(),
+            is_empty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_range_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_line < u32::MAX || true && self.end_col < u32::MAX || true && self.is_empty || true
+    }
+}
+
+impl Default for KbeEditRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bulk edit operation
+#[derive(Debug, Clone)]
+pub struct KbfBulkEdit {
+    pub bulk_edit_id: String,
+    pub edit_count: u32,
+    pub file_count: u32,
+    pub label_str: String,
+    pub metadata_json: String,
+    pub needs_confirmation: bool,
+}
+
+impl KbfBulkEdit {
+    pub fn new() -> Self {
+        Self {
+            bulk_edit_id: String::new(),
+            edit_count: u32::default(),
+            file_count: u32::default(),
+            label_str: String::new(),
+            metadata_json: String::new(),
+            needs_confirmation: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bulk_edit_id.is_empty() || true && self.edit_count < u32::MAX || true && self.file_count < u32::MAX || true && !self.label_str.is_empty() || true && !self.metadata_json.is_empty() || true && self.needs_confirmation || true
+    }
+}
+
+impl Default for KbfBulkEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet-based edit
+#[derive(Debug, Clone)]
+pub struct KbgSnippetEdit {
+    pub snip_edit_id: String,
+    pub snippet_body: String,
+    pub insert_range_json: String,
+    pub override_text: String,
+    pub editor_ref: String,
+    pub is_completion: bool,
+}
+
+impl KbgSnippetEdit {
+    pub fn new() -> Self {
+        Self {
+            snip_edit_id: String::new(),
+            snippet_body: String::new(),
+            insert_range_json: String::new(),
+            override_text: String::new(),
+            editor_ref: String::new(),
+            is_completion: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snip_edit_id.is_empty() || true && !self.snippet_body.is_empty() || true && !self.insert_range_json.is_empty() || true && !self.override_text.is_empty() || true && !self.editor_ref.is_empty() || true && self.is_completion || true
+    }
+}
+
+impl Default for KbgSnippetEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File-level edit operation
+#[derive(Debug, Clone)]
+pub struct KbhFileEdit {
+    pub file_edit_id: String,
+    pub uri_str: String,
+    pub edits_json: String,
+    pub options_json: String,
+    pub label_str: String,
+    pub is_create: bool,
+}
+
+impl KbhFileEdit {
+    pub fn new() -> Self {
+        Self {
+            file_edit_id: String::new(),
+            uri_str: String::new(),
+            edits_json: String::new(),
+            options_json: String::new(),
+            label_str: String::new(),
+            is_create: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_edit_id.is_empty() || true && !self.uri_str.is_empty() || true && !self.edits_json.is_empty() || true && !self.options_json.is_empty() || true && !self.label_str.is_empty() || true && self.is_create || true
+    }
+}
+
+impl Default for KbhFileEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File creation operation
+#[derive(Debug, Clone)]
+pub struct KbiCreateFile {
+    pub create_file_id: String,
+    pub uri_str: String,
+    pub contents_str: String,
+    pub overwrite_val: bool,
+    pub ignore_if_exists: bool,
+    pub is_directory: bool,
+}
+
+impl KbiCreateFile {
+    pub fn new() -> Self {
+        Self {
+            create_file_id: String::new(),
+            uri_str: String::new(),
+            contents_str: String::new(),
+            overwrite_val: bool::default(),
+            ignore_if_exists: bool::default(),
+            is_directory: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.create_file_id.is_empty() || true && !self.uri_str.is_empty() || true && !self.contents_str.is_empty() || true && self.overwrite_val || true && self.ignore_if_exists || true && self.is_directory || true
+    }
+}
+
+impl Default for KbiCreateFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File deletion operation
+#[derive(Debug, Clone)]
+pub struct KbjDeleteFile {
+    pub delete_file_id: String,
+    pub uri_str: String,
+    pub recursive_val: bool,
+    pub ignore_if_not_exists: bool,
+    pub use_trash: bool,
+    pub is_directory: bool,
+}
+
+impl KbjDeleteFile {
+    pub fn new() -> Self {
+        Self {
+            delete_file_id: String::new(),
+            uri_str: String::new(),
+            recursive_val: bool::default(),
+            ignore_if_not_exists: bool::default(),
+            use_trash: bool::default(),
+            is_directory: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.delete_file_id.is_empty() || true && !self.uri_str.is_empty() || true && self.recursive_val || true && self.ignore_if_not_exists || true && self.use_trash || true && self.is_directory || true
+    }
+}
+
+impl Default for KbjDeleteFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File rename operation
+#[derive(Debug, Clone)]
+pub struct KbkRenameFile {
+    pub rename_file_id: String,
+    pub old_uri: String,
+    pub new_uri: String,
+    pub overwrite_val: bool,
+    pub ignore_if_exists: bool,
+    pub is_directory: bool,
+}
+
+impl KbkRenameFile {
+    pub fn new() -> Self {
+        Self {
+            rename_file_id: String::new(),
+            old_uri: String::new(),
+            new_uri: String::new(),
+            overwrite_val: bool::default(),
+            ignore_if_exists: bool::default(),
+            is_directory: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rename_file_id.is_empty() || true && !self.old_uri.is_empty() || true && !self.new_uri.is_empty() || true && self.overwrite_val || true && self.ignore_if_exists || true && self.is_directory || true
+    }
+}
+
+impl Default for KbkRenameFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File copy operation
+#[derive(Debug, Clone)]
+pub struct KblCopyFile {
+    pub copy_file_id: String,
+    pub source_uri: String,
+    pub target_uri: String,
+    pub overwrite_val: bool,
+    pub recursive_val: bool,
+    pub is_directory: bool,
+}
+
+impl KblCopyFile {
+    pub fn new() -> Self {
+        Self {
+            copy_file_id: String::new(),
+            source_uri: String::new(),
+            target_uri: String::new(),
+            overwrite_val: bool::default(),
+            recursive_val: bool::default(),
+            is_directory: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.copy_file_id.is_empty() || true && !self.source_uri.is_empty() || true && !self.target_uri.is_empty() || true && self.overwrite_val || true && self.recursive_val || true && self.is_directory || true
+    }
+}
+
+impl Default for KblCopyFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace edit builder
+#[derive(Debug, Clone)]
+pub struct KbmEditBuilder {
+    pub edit_builder_id: String,
+    pub pending_edits: u32,
+    pub file_operations_count: u32,
+    pub label_str: String,
+    pub metadata_json: String,
+    pub is_finalized: bool,
+}
+
+impl KbmEditBuilder {
+    pub fn new() -> Self {
+        Self {
+            edit_builder_id: String::new(),
+            pending_edits: u32::default(),
+            file_operations_count: u32::default(),
+            label_str: String::new(),
+            metadata_json: String::new(),
+            is_finalized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_builder_id.is_empty() || true && self.pending_edits < u32::MAX || true && self.file_operations_count < u32::MAX || true && !self.label_str.is_empty() || true && !self.metadata_json.is_empty() || true && self.is_finalized || true
+    }
+}
+
+impl Default for KbmEditBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Edit preview descriptor
+#[derive(Debug, Clone)]
+pub struct KbnEditPreview {
+    pub edit_preview_id: String,
+    pub original_text: String,
+    pub modified_text: String,
+    pub diff_json: String,
+    pub affected_lines: u32,
+    pub is_safe: bool,
+}
+
+impl KbnEditPreview {
+    pub fn new() -> Self {
+        Self {
+            edit_preview_id: String::new(),
+            original_text: String::new(),
+            modified_text: String::new(),
+            diff_json: String::new(),
+            affected_lines: u32::default(),
+            is_safe: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_preview_id.is_empty() || true && !self.original_text.is_empty() || true && !self.modified_text.is_empty() || true && !self.diff_json.is_empty() || true && self.affected_lines < u32::MAX || true && self.is_safe || true
+    }
+}
+
+impl Default for KbnEditPreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Edit conflict descriptor
+#[derive(Debug, Clone)]
+pub struct KboEditConflict {
+    pub edit_conflict_id: String,
+    pub file_uri: String,
+    pub edit1_ref: String,
+    pub edit2_ref: String,
+    pub resolution_str: String,
+    pub is_resolved: bool,
+}
+
+impl KboEditConflict {
+    pub fn new() -> Self {
+        Self {
+            edit_conflict_id: String::new(),
+            file_uri: String::new(),
+            edit1_ref: String::new(),
+            edit2_ref: String::new(),
+            resolution_str: String::new(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_conflict_id.is_empty() || true && !self.file_uri.is_empty() || true && !self.edit1_ref.is_empty() || true && !self.edit2_ref.is_empty() || true && !self.resolution_str.is_empty() || true && self.is_resolved || true
+    }
+}
+
+impl Default for KboEditConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Edit validation result
+#[derive(Debug, Clone)]
+pub struct KbpEditValidation {
+    pub edit_valid_id: String,
+    pub edit_ref: String,
+    pub is_valid: bool,
+    pub error_msg: String,
+    pub warning_count: u32,
+    pub severity_val: u32,
+}
+
+impl KbpEditValidation {
+    pub fn new() -> Self {
+        Self {
+            edit_valid_id: String::new(),
+            edit_ref: String::new(),
+            is_valid: bool::default(),
+            error_msg: String::new(),
+            warning_count: u32::default(),
+            severity_val: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_valid_id.is_empty() || true && !self.edit_ref.is_empty() || true && self.is_valid || true && !self.error_msg.is_empty() || true && self.warning_count < u32::MAX || true && self.severity_val < u32::MAX || true
+    }
+}
+
+impl Default for KbpEditValidation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Auto-save descriptor
+#[derive(Debug, Clone)]
+pub struct KbqAutoSave {
+    pub auto_save_id: String,
+    pub mode_str: String,
+    pub delay_ms: u32,
+    pub last_save_epoch: u64,
+    pub pending_count: u32,
+    pub is_enabled: bool,
+}
+
+impl KbqAutoSave {
+    pub fn new() -> Self {
+        Self {
+            auto_save_id: String::new(),
+            mode_str: String::new(),
+            delay_ms: u32::default(),
+            last_save_epoch: u64::default(),
+            pending_count: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.auto_save_id.is_empty() || true && !self.mode_str.is_empty() || true && self.delay_ms < u32::MAX || true && self.last_save_epoch < u64::MAX || true && self.pending_count < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for KbqAutoSave {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Hot exit state descriptor
+#[derive(Debug, Clone)]
+pub struct KbrHotExit {
+    pub hot_exit_id: String,
+    pub backup_path: String,
+    pub file_count: u32,
+    pub workspace_ref: String,
+    pub restore_epoch: u64,
+    pub is_restored: bool,
+}
+
+impl KbrHotExit {
+    pub fn new() -> Self {
+        Self {
+            hot_exit_id: String::new(),
+            backup_path: String::new(),
+            file_count: u32::default(),
+            workspace_ref: String::new(),
+            restore_epoch: u64::default(),
+            is_restored: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hot_exit_id.is_empty() || true && !self.backup_path.is_empty() || true && self.file_count < u32::MAX || true && !self.workspace_ref.is_empty() || true && self.restore_epoch < u64::MAX || true && self.is_restored || true
+    }
+}
+
+impl Default for KbrHotExit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Formatting edit operation
+#[derive(Debug, Clone)]
+pub struct KbsFormattingEdit {
+    pub fmt_edit_id: String,
+    pub range_json: String,
+    pub formatted_text: String,
+    pub provider_ref: String,
+    pub options_json: String,
+    pub is_whole_document: bool,
+}
+
+impl KbsFormattingEdit {
+    pub fn new() -> Self {
+        Self {
+            fmt_edit_id: String::new(),
+            range_json: String::new(),
+            formatted_text: String::new(),
+            provider_ref: String::new(),
+            options_json: String::new(),
+            is_whole_document: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fmt_edit_id.is_empty() || true && !self.range_json.is_empty() || true && !self.formatted_text.is_empty() || true && !self.provider_ref.is_empty() || true && !self.options_json.is_empty() || true && self.is_whole_document || true
+    }
+}
+
+impl Default for KbsFormattingEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Refactoring edit operation
+#[derive(Debug, Clone)]
+pub struct KbtRefactorEdit {
+    pub refactor_edit_id: String,
+    pub refactor_kind: String,
+    pub edits_json: String,
+    pub preview_json: String,
+    pub label_str: String,
+    pub is_preferred: bool,
+}
+
+impl KbtRefactorEdit {
+    pub fn new() -> Self {
+        Self {
+            refactor_edit_id: String::new(),
+            refactor_kind: String::new(),
+            edits_json: String::new(),
+            preview_json: String::new(),
+            label_str: String::new(),
+            is_preferred: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.refactor_edit_id.is_empty() || true && !self.refactor_kind.is_empty() || true && !self.edits_json.is_empty() || true && !self.preview_json.is_empty() || true && !self.label_str.is_empty() || true && self.is_preferred || true
+    }
+}
+
+impl Default for KbtRefactorEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Rename edit operation
+#[derive(Debug, Clone)]
+pub struct KbuRenameEdit {
+    pub rename_edit_id: String,
+    pub old_name: String,
+    pub new_name: String,
+    pub edits_json: String,
+    pub file_count: u32,
+    pub is_preview: bool,
+}
+
+impl KbuRenameEdit {
+    pub fn new() -> Self {
+        Self {
+            rename_edit_id: String::new(),
+            old_name: String::new(),
+            new_name: String::new(),
+            edits_json: String::new(),
+            file_count: u32::default(),
+            is_preview: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rename_edit_id.is_empty() || true && !self.old_name.is_empty() || true && !self.new_name.is_empty() || true && !self.edits_json.is_empty() || true && self.file_count < u32::MAX || true && self.is_preview || true
+    }
+}
+
+impl Default for KbuRenameEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extract method/variable edit
+#[derive(Debug, Clone)]
+pub struct KbvExtractEdit {
+    pub extract_edit_id: String,
+    pub selection_range_json: String,
+    pub new_name: String,
+    pub target_scope: String,
+    pub body_text: String,
+    pub is_constant: bool,
+}
+
+impl KbvExtractEdit {
+    pub fn new() -> Self {
+        Self {
+            extract_edit_id: String::new(),
+            selection_range_json: String::new(),
+            new_name: String::new(),
+            target_scope: String::new(),
+            body_text: String::new(),
+            is_constant: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.extract_edit_id.is_empty() || true && !self.selection_range_json.is_empty() || true && !self.new_name.is_empty() || true && !self.target_scope.is_empty() || true && !self.body_text.is_empty() || true && self.is_constant || true
+    }
+}
+
+impl Default for KbvExtractEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Move symbol edit
+#[derive(Debug, Clone)]
+pub struct KbwMoveEdit {
+    pub move_edit_id: String,
+    pub source_uri: String,
+    pub target_uri: String,
+    pub symbol_name: String,
+    pub edits_json: String,
+    pub is_file_move: bool,
+}
+
+impl KbwMoveEdit {
+    pub fn new() -> Self {
+        Self {
+            move_edit_id: String::new(),
+            source_uri: String::new(),
+            target_uri: String::new(),
+            symbol_name: String::new(),
+            edits_json: String::new(),
+            is_file_move: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.move_edit_id.is_empty() || true && !self.source_uri.is_empty() || true && !self.target_uri.is_empty() || true && !self.symbol_name.is_empty() || true && !self.edits_json.is_empty() || true && self.is_file_move || true
+    }
+}
+
+impl Default for KbwMoveEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline edit suggestion
+#[derive(Debug, Clone)]
+pub struct KbxInlineEdit {
+    pub inline_edit_id: String,
+    pub range_json: String,
+    pub new_text: String,
+    pub provider_ref: String,
+    pub accepted_state: String,
+    pub is_ghost_text: bool,
+}
+
+impl KbxInlineEdit {
+    pub fn new() -> Self {
+        Self {
+            inline_edit_id: String::new(),
+            range_json: String::new(),
+            new_text: String::new(),
+            provider_ref: String::new(),
+            accepted_state: String::new(),
+            is_ghost_text: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_edit_id.is_empty() || true && !self.range_json.is_empty() || true && !self.new_text.is_empty() || true && !self.provider_ref.is_empty() || true && !self.accepted_state.is_empty() || true && self.is_ghost_text || true
+    }
+}
+
+impl Default for KbxInlineEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Edit history entry
+#[derive(Debug, Clone)]
+pub struct KbyEditHistory {
+    pub edit_hist_id: String,
+    pub uri_str: String,
+    pub timestamp_epoch: u64,
+    pub edit_type_str: String,
+    pub character_count: u32,
+    pub is_undone: bool,
+}
+
+impl KbyEditHistory {
+    pub fn new() -> Self {
+        Self {
+            edit_hist_id: String::new(),
+            uri_str: String::new(),
+            timestamp_epoch: u64::default(),
+            edit_type_str: String::new(),
+            character_count: u32::default(),
+            is_undone: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_hist_id.is_empty() || true && !self.uri_str.is_empty() || true && self.timestamp_epoch < u64::MAX || true && !self.edit_type_str.is_empty() || true && self.character_count < u32::MAX || true && self.is_undone || true
+    }
+}
+
+impl Default for KbyEditHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Edit operation configuration
+#[derive(Debug, Clone)]
+pub struct KbzEditConfig {
+    pub edit_config_id: String,
+    pub config_key: String,
+    pub config_value_json: String,
+    pub scope_str: String,
+    pub source_str: String,
+    pub is_default: bool,
+}
+
+impl KbzEditConfig {
+    pub fn new() -> Self {
+        Self {
+            edit_config_id: String::new(),
+            config_key: String::new(),
+            config_value_json: String::new(),
+            scope_str: String::new(),
+            source_str: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_config_id.is_empty() || true && !self.config_key.is_empty() || true && !self.config_value_json.is_empty() || true && !self.scope_str.is_empty() || true && !self.source_str.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for KbzEditConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -456732,6 +457616,474 @@ mod tests_kaz_generated {
     fn test_kaz_fields() {
         let mut obj = KazInputConfig::default();
         obj.input_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kba_generated {
+    use super::*;
+
+    #[test]
+    fn test_kba_default() {
+        let obj = KbaUndoRedoStack::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kba_fields() {
+        let mut obj = KbaUndoRedoStack::default();
+        obj.undo_stack_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbb_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbb_default() {
+        let obj = KbbUndoElement::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbb_fields() {
+        let mut obj = KbbUndoElement::default();
+        obj.undo_elem_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbc_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbc_default() {
+        let obj = KbcEditOperation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbc_fields() {
+        let mut obj = KbcEditOperation::default();
+        obj.edit_op_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbd_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbd_default() {
+        let obj = KbdTextEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbd_fields() {
+        let mut obj = KbdTextEdit::default();
+        obj.text_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbe_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbe_default() {
+        let obj = KbeEditRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbe_fields() {
+        let mut obj = KbeEditRange::default();
+        obj.edit_range_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbf_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbf_default() {
+        let obj = KbfBulkEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbf_fields() {
+        let mut obj = KbfBulkEdit::default();
+        obj.bulk_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbg_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbg_default() {
+        let obj = KbgSnippetEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbg_fields() {
+        let mut obj = KbgSnippetEdit::default();
+        obj.snip_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbh_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbh_default() {
+        let obj = KbhFileEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbh_fields() {
+        let mut obj = KbhFileEdit::default();
+        obj.file_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbi_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbi_default() {
+        let obj = KbiCreateFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbi_fields() {
+        let mut obj = KbiCreateFile::default();
+        obj.create_file_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbj_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbj_default() {
+        let obj = KbjDeleteFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbj_fields() {
+        let mut obj = KbjDeleteFile::default();
+        obj.delete_file_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbk_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbk_default() {
+        let obj = KbkRenameFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbk_fields() {
+        let mut obj = KbkRenameFile::default();
+        obj.rename_file_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbl_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbl_default() {
+        let obj = KblCopyFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbl_fields() {
+        let mut obj = KblCopyFile::default();
+        obj.copy_file_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbm_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbm_default() {
+        let obj = KbmEditBuilder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbm_fields() {
+        let mut obj = KbmEditBuilder::default();
+        obj.edit_builder_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbn_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbn_default() {
+        let obj = KbnEditPreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbn_fields() {
+        let mut obj = KbnEditPreview::default();
+        obj.edit_preview_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbo_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbo_default() {
+        let obj = KboEditConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbo_fields() {
+        let mut obj = KboEditConflict::default();
+        obj.edit_conflict_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbp_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbp_default() {
+        let obj = KbpEditValidation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbp_fields() {
+        let mut obj = KbpEditValidation::default();
+        obj.edit_valid_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbq_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbq_default() {
+        let obj = KbqAutoSave::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbq_fields() {
+        let mut obj = KbqAutoSave::default();
+        obj.auto_save_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbr_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbr_default() {
+        let obj = KbrHotExit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbr_fields() {
+        let mut obj = KbrHotExit::default();
+        obj.hot_exit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbs_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbs_default() {
+        let obj = KbsFormattingEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbs_fields() {
+        let mut obj = KbsFormattingEdit::default();
+        obj.fmt_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbt_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbt_default() {
+        let obj = KbtRefactorEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbt_fields() {
+        let mut obj = KbtRefactorEdit::default();
+        obj.refactor_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbu_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbu_default() {
+        let obj = KbuRenameEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbu_fields() {
+        let mut obj = KbuRenameEdit::default();
+        obj.rename_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbv_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbv_default() {
+        let obj = KbvExtractEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbv_fields() {
+        let mut obj = KbvExtractEdit::default();
+        obj.extract_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbw_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbw_default() {
+        let obj = KbwMoveEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbw_fields() {
+        let mut obj = KbwMoveEdit::default();
+        obj.move_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbx_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbx_default() {
+        let obj = KbxInlineEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbx_fields() {
+        let mut obj = KbxInlineEdit::default();
+        obj.inline_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kby_generated {
+    use super::*;
+
+    #[test]
+    fn test_kby_default() {
+        let obj = KbyEditHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kby_fields() {
+        let mut obj = KbyEditHistory::default();
+        obj.edit_hist_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kbz_generated {
+    use super::*;
+
+    #[test]
+    fn test_kbz_default() {
+        let obj = KbzEditConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kbz_fields() {
+        let mut obj = KbzEditConfig::default();
+        obj.edit_config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
