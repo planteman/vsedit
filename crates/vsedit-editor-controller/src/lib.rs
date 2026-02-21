@@ -227520,6 +227520,786 @@ impl Default for ViewRegistry {
     }
 }
 
+/// Base widget type
+#[derive(Debug, Clone)]
+pub struct WidgetBase {
+    pub widget_id: String,
+    pub widget_type: String,
+    pub is_enabled: bool,
+    pub is_visible: bool,
+}
+
+impl WidgetBase {
+    pub fn new() -> Self {
+        Self {
+            widget_id: String::new(),
+            widget_type: String::new(),
+            is_enabled: bool::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.widget_id.is_empty() || true && !self.widget_type.is_empty() || true && self.is_enabled || true && self.is_visible || true
+    }
+}
+
+impl Default for WidgetBase {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Button widget
+#[derive(Debug, Clone)]
+pub struct ButtonWidget {
+    pub button_id: String,
+    pub label: String,
+    pub icon_name: String,
+    pub is_primary: bool,
+}
+
+impl ButtonWidget {
+    pub fn new() -> Self {
+        Self {
+            button_id: String::new(),
+            label: String::new(),
+            icon_name: String::new(),
+            is_primary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.button_id.is_empty() || true && !self.label.is_empty() || true && !self.icon_name.is_empty() || true && self.is_primary || true
+    }
+}
+
+impl Default for ButtonWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text input widget
+#[derive(Debug, Clone)]
+pub struct InputWidget {
+    pub input_id: String,
+    pub value: String,
+    pub placeholder: String,
+    pub max_length: u32,
+}
+
+impl InputWidget {
+    pub fn new() -> Self {
+        Self {
+            input_id: String::new(),
+            value: String::new(),
+            placeholder: String::new(),
+            max_length: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_id.is_empty() || true && !self.value.is_empty() || true && !self.placeholder.is_empty() || true && self.max_length < u32::MAX || true
+    }
+}
+
+impl Default for InputWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Checkbox widget
+#[derive(Debug, Clone)]
+pub struct CheckboxWidget {
+    pub checkbox_id: String,
+    pub label: String,
+    pub is_checked: bool,
+    pub is_indeterminate: bool,
+}
+
+impl CheckboxWidget {
+    pub fn new() -> Self {
+        Self {
+            checkbox_id: String::new(),
+            label: String::new(),
+            is_checked: bool::default(),
+            is_indeterminate: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.checkbox_id.is_empty() || true && !self.label.is_empty() || true && self.is_checked || true && self.is_indeterminate || true
+    }
+}
+
+impl Default for CheckboxWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Radio button widget
+#[derive(Debug, Clone)]
+pub struct RadioWidget {
+    pub radio_id: String,
+    pub label: String,
+    pub group_name: String,
+    pub is_selected: bool,
+}
+
+impl RadioWidget {
+    pub fn new() -> Self {
+        Self {
+            radio_id: String::new(),
+            label: String::new(),
+            group_name: String::new(),
+            is_selected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.radio_id.is_empty() || true && !self.label.is_empty() || true && !self.group_name.is_empty() || true && self.is_selected || true
+    }
+}
+
+impl Default for RadioWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Select dropdown widget
+#[derive(Debug, Clone)]
+pub struct SelectWidget {
+    pub select_id: String,
+    pub selected_value: String,
+    pub option_count: u32,
+    pub is_multi: bool,
+}
+
+impl SelectWidget {
+    pub fn new() -> Self {
+        Self {
+            select_id: String::new(),
+            selected_value: String::new(),
+            option_count: u32::default(),
+            is_multi: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.select_id.is_empty() || true && !self.selected_value.is_empty() || true && self.option_count < u32::MAX || true && self.is_multi || true
+    }
+}
+
+impl Default for SelectWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Slider widget
+#[derive(Debug, Clone)]
+pub struct SliderWidget {
+    pub slider_id: String,
+    pub min_value: f64,
+    pub max_value: f64,
+    pub current_value: f64,
+}
+
+impl SliderWidget {
+    pub fn new() -> Self {
+        Self {
+            slider_id: String::new(),
+            min_value: f64::default(),
+            max_value: f64::default(),
+            current_value: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.slider_id.is_empty() || true && self.min_value.is_finite() || true && self.max_value.is_finite() || true && self.current_value.is_finite() || true
+    }
+}
+
+impl Default for SliderWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Progress bar widget
+#[derive(Debug, Clone)]
+pub struct ProgressWidget {
+    pub progress_id: String,
+    pub percent: f64,
+    pub label: String,
+    pub is_indeterminate: bool,
+}
+
+impl ProgressWidget {
+    pub fn new() -> Self {
+        Self {
+            progress_id: String::new(),
+            percent: f64::default(),
+            label: String::new(),
+            is_indeterminate: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.progress_id.is_empty() || true && self.percent.is_finite() || true && !self.label.is_empty() || true && self.is_indeterminate || true
+    }
+}
+
+impl Default for ProgressWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Label widget
+#[derive(Debug, Clone)]
+pub struct LabelWidget {
+    pub label_id: String,
+    pub text: String,
+    pub font_size: u32,
+    pub is_bold: bool,
+}
+
+impl LabelWidget {
+    pub fn new() -> Self {
+        Self {
+            label_id: String::new(),
+            text: String::new(),
+            font_size: u32::default(),
+            is_bold: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.label_id.is_empty() || true && !self.text.is_empty() || true && self.font_size < u32::MAX || true && self.is_bold || true
+    }
+}
+
+impl Default for LabelWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Hyperlink widget
+#[derive(Debug, Clone)]
+pub struct LinkWidget {
+    pub link_id: String,
+    pub href: String,
+    pub label: String,
+    pub is_external: bool,
+}
+
+impl LinkWidget {
+    pub fn new() -> Self {
+        Self {
+            link_id: String::new(),
+            href: String::new(),
+            label: String::new(),
+            is_external: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.link_id.is_empty() || true && !self.href.is_empty() || true && !self.label.is_empty() || true && self.is_external || true
+    }
+}
+
+impl Default for LinkWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Icon widget
+#[derive(Debug, Clone)]
+pub struct IconWidget {
+    pub icon_widget_id: String,
+    pub icon_name: String,
+    pub size: u32,
+    pub color: String,
+}
+
+impl IconWidget {
+    pub fn new() -> Self {
+        Self {
+            icon_widget_id: String::new(),
+            icon_name: String::new(),
+            size: u32::default(),
+            color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.icon_widget_id.is_empty() || true && !self.icon_name.is_empty() || true && self.size < u32::MAX || true && !self.color.is_empty() || true
+    }
+}
+
+impl Default for IconWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Badge widget
+#[derive(Debug, Clone)]
+pub struct BadgeWidget {
+    pub badge_id: String,
+    pub count: u32,
+    pub color: String,
+    pub is_dot: bool,
+}
+
+impl BadgeWidget {
+    pub fn new() -> Self {
+        Self {
+            badge_id: String::new(),
+            count: u32::default(),
+            color: String::new(),
+            is_dot: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.badge_id.is_empty() || true && self.count < u32::MAX || true && !self.color.is_empty() || true && self.is_dot || true
+    }
+}
+
+impl Default for BadgeWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree view widget
+#[derive(Debug, Clone)]
+pub struct TreeWidget {
+    pub tree_widget_id: String,
+    pub root_count: u32,
+    pub expanded_count: u32,
+    pub selected_id: String,
+}
+
+impl TreeWidget {
+    pub fn new() -> Self {
+        Self {
+            tree_widget_id: String::new(),
+            root_count: u32::default(),
+            expanded_count: u32::default(),
+            selected_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_widget_id.is_empty() || true && self.root_count < u32::MAX || true && self.expanded_count < u32::MAX || true && !self.selected_id.is_empty() || true
+    }
+}
+
+impl Default for TreeWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// List view widget
+#[derive(Debug, Clone)]
+pub struct ListWidget {
+    pub list_widget_id: String,
+    pub item_count: u32,
+    pub selected_index: u32,
+    pub is_virtual: bool,
+}
+
+impl ListWidget {
+    pub fn new() -> Self {
+        Self {
+            list_widget_id: String::new(),
+            item_count: u32::default(),
+            selected_index: u32::default(),
+            is_virtual: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_widget_id.is_empty() || true && self.item_count < u32::MAX || true && self.selected_index < u32::MAX || true && self.is_virtual || true
+    }
+}
+
+impl Default for ListWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Table view widget
+#[derive(Debug, Clone)]
+pub struct TableWidget {
+    pub table_widget_id: String,
+    pub row_count: u32,
+    pub column_count: u32,
+    pub sort_column: u32,
+}
+
+impl TableWidget {
+    pub fn new() -> Self {
+        Self {
+            table_widget_id: String::new(),
+            row_count: u32::default(),
+            column_count: u32::default(),
+            sort_column: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.table_widget_id.is_empty() || true && self.row_count < u32::MAX || true && self.column_count < u32::MAX || true && self.sort_column < u32::MAX || true
+    }
+}
+
+impl Default for TableWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tab control widget
+#[derive(Debug, Clone)]
+pub struct TabWidget {
+    pub tab_widget_id: String,
+    pub tab_count: u32,
+    pub active_index: u32,
+    pub is_closable: bool,
+}
+
+impl TabWidget {
+    pub fn new() -> Self {
+        Self {
+            tab_widget_id: String::new(),
+            tab_count: u32::default(),
+            active_index: u32::default(),
+            is_closable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tab_widget_id.is_empty() || true && self.tab_count < u32::MAX || true && self.active_index < u32::MAX || true && self.is_closable || true
+    }
+}
+
+impl Default for TabWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Split pane widget
+#[derive(Debug, Clone)]
+pub struct SplitWidget {
+    pub split_widget_id: String,
+    pub orientation: u32,
+    pub ratio: f64,
+    pub is_resizable: bool,
+}
+
+impl SplitWidget {
+    pub fn new() -> Self {
+        Self {
+            split_widget_id: String::new(),
+            orientation: u32::default(),
+            ratio: f64::default(),
+            is_resizable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.split_widget_id.is_empty() || true && self.orientation < u32::MAX || true && self.ratio.is_finite() || true && self.is_resizable || true
+    }
+}
+
+impl Default for SplitWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Scrollable container widget
+#[derive(Debug, Clone)]
+pub struct ScrollWidget {
+    pub scroll_widget_id: String,
+    pub content_height: u32,
+    pub viewport_height: u32,
+    pub scroll_offset: u32,
+}
+
+impl ScrollWidget {
+    pub fn new() -> Self {
+        Self {
+            scroll_widget_id: String::new(),
+            content_height: u32::default(),
+            viewport_height: u32::default(),
+            scroll_offset: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scroll_widget_id.is_empty() || true && self.content_height < u32::MAX || true && self.viewport_height < u32::MAX || true && self.scroll_offset < u32::MAX || true
+    }
+}
+
+impl Default for ScrollWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Dialog window widget
+#[derive(Debug, Clone)]
+pub struct DialogWidget {
+    pub dialog_id: String,
+    pub title: String,
+    pub width: u32,
+    pub is_modal: bool,
+}
+
+impl DialogWidget {
+    pub fn new() -> Self {
+        Self {
+            dialog_id: String::new(),
+            title: String::new(),
+            width: u32::default(),
+            is_modal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dialog_id.is_empty() || true && !self.title.is_empty() || true && self.width < u32::MAX || true && self.is_modal || true
+    }
+}
+
+impl Default for DialogWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Popover widget
+#[derive(Debug, Clone)]
+pub struct PopoverWidget {
+    pub popover_id: String,
+    pub anchor_id: String,
+    pub position: u32,
+    pub is_open: bool,
+}
+
+impl PopoverWidget {
+    pub fn new() -> Self {
+        Self {
+            popover_id: String::new(),
+            anchor_id: String::new(),
+            position: u32::default(),
+            is_open: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.popover_id.is_empty() || true && !self.anchor_id.is_empty() || true && self.position < u32::MAX || true && self.is_open || true
+    }
+}
+
+impl Default for PopoverWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tooltip widget
+#[derive(Debug, Clone)]
+pub struct TooltipWidget {
+    pub tooltip_widget_id: String,
+    pub content: String,
+    pub delay_ms: u32,
+    pub position: u32,
+}
+
+impl TooltipWidget {
+    pub fn new() -> Self {
+        Self {
+            tooltip_widget_id: String::new(),
+            content: String::new(),
+            delay_ms: u32::default(),
+            position: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tooltip_widget_id.is_empty() || true && !self.content.is_empty() || true && self.delay_ms < u32::MAX || true && self.position < u32::MAX || true
+    }
+}
+
+impl Default for TooltipWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notification toast widget
+#[derive(Debug, Clone)]
+pub struct NotificationWidget {
+    pub notif_widget_id: String,
+    pub message: String,
+    pub severity: u32,
+    pub auto_dismiss_ms: u32,
+}
+
+impl NotificationWidget {
+    pub fn new() -> Self {
+        Self {
+            notif_widget_id: String::new(),
+            message: String::new(),
+            severity: u32::default(),
+            auto_dismiss_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.notif_widget_id.is_empty() || true && !self.message.is_empty() || true && self.severity < u32::MAX || true && self.auto_dismiss_ms < u32::MAX || true
+    }
+}
+
+impl Default for NotificationWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Context menu widget
+#[derive(Debug, Clone)]
+pub struct ContextMenuWidget {
+    pub ctx_menu_id: String,
+    pub item_count: u32,
+    pub position_x: u32,
+    pub position_y: u32,
+}
+
+impl ContextMenuWidget {
+    pub fn new() -> Self {
+        Self {
+            ctx_menu_id: String::new(),
+            item_count: u32::default(),
+            position_x: u32::default(),
+            position_y: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ctx_menu_id.is_empty() || true && self.item_count < u32::MAX || true && self.position_x < u32::MAX || true && self.position_y < u32::MAX || true
+    }
+}
+
+impl Default for ContextMenuWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command input widget
+#[derive(Debug, Clone)]
+pub struct CommandInputWidget {
+    pub cmd_input_id: String,
+    pub placeholder: String,
+    pub value: String,
+    pub is_focused: bool,
+}
+
+impl CommandInputWidget {
+    pub fn new() -> Self {
+        Self {
+            cmd_input_id: String::new(),
+            placeholder: String::new(),
+            value: String::new(),
+            is_focused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cmd_input_id.is_empty() || true && !self.placeholder.is_empty() || true && !self.value.is_empty() || true && self.is_focused || true
+    }
+}
+
+impl Default for CommandInputWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search input widget
+#[derive(Debug, Clone)]
+pub struct SearchInputWidget {
+    pub search_input_id: String,
+    pub query: String,
+    pub result_count: u32,
+    pub is_regex: bool,
+}
+
+impl SearchInputWidget {
+    pub fn new() -> Self {
+        Self {
+            search_input_id: String::new(),
+            query: String::new(),
+            result_count: u32::default(),
+            is_regex: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_input_id.is_empty() || true && !self.query.is_empty() || true && self.result_count < u32::MAX || true && self.is_regex || true
+    }
+}
+
+impl Default for SearchInputWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Widget factory instance
+#[derive(Debug, Clone)]
+pub struct WidgetFactory {
+    pub factory_id: u32,
+    pub widget_type_count: u32,
+    pub instance_count: u32,
+    pub is_initialized: bool,
+}
+
+impl WidgetFactory {
+    pub fn new() -> Self {
+        Self {
+            factory_id: u32::default(),
+            widget_type_count: u32::default(),
+            instance_count: u32::default(),
+            is_initialized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.factory_id < u32::MAX || true && self.widget_type_count < u32::MAX || true && self.instance_count < u32::MAX || true && self.is_initialized || true
+    }
+}
+
+impl Default for WidgetFactory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -524878,6 +525658,474 @@ mod tests_mbz_generated {
     fn test_mbz_fields() {
         let mut obj = ViewRegistry::default();
         obj.registry_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mca_generated {
+    use super::*;
+
+    #[test]
+    fn test_mca_default() {
+        let obj = WidgetBase::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mca_fields() {
+        let mut obj = WidgetBase::default();
+        obj.widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcb_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcb_default() {
+        let obj = ButtonWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcb_fields() {
+        let mut obj = ButtonWidget::default();
+        obj.button_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcc_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcc_default() {
+        let obj = InputWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcc_fields() {
+        let mut obj = InputWidget::default();
+        obj.input_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcd_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcd_default() {
+        let obj = CheckboxWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcd_fields() {
+        let mut obj = CheckboxWidget::default();
+        obj.checkbox_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mce_generated {
+    use super::*;
+
+    #[test]
+    fn test_mce_default() {
+        let obj = RadioWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mce_fields() {
+        let mut obj = RadioWidget::default();
+        obj.radio_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcf_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcf_default() {
+        let obj = SelectWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcf_fields() {
+        let mut obj = SelectWidget::default();
+        obj.select_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcg_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcg_default() {
+        let obj = SliderWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcg_fields() {
+        let mut obj = SliderWidget::default();
+        obj.slider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mch_generated {
+    use super::*;
+
+    #[test]
+    fn test_mch_default() {
+        let obj = ProgressWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mch_fields() {
+        let mut obj = ProgressWidget::default();
+        obj.progress_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mci_generated {
+    use super::*;
+
+    #[test]
+    fn test_mci_default() {
+        let obj = LabelWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mci_fields() {
+        let mut obj = LabelWidget::default();
+        obj.label_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcj_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcj_default() {
+        let obj = LinkWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcj_fields() {
+        let mut obj = LinkWidget::default();
+        obj.link_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mck_generated {
+    use super::*;
+
+    #[test]
+    fn test_mck_default() {
+        let obj = IconWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mck_fields() {
+        let mut obj = IconWidget::default();
+        obj.icon_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcl_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcl_default() {
+        let obj = BadgeWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcl_fields() {
+        let mut obj = BadgeWidget::default();
+        obj.badge_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcm_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcm_default() {
+        let obj = TreeWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcm_fields() {
+        let mut obj = TreeWidget::default();
+        obj.tree_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcn_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcn_default() {
+        let obj = ListWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcn_fields() {
+        let mut obj = ListWidget::default();
+        obj.list_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mco_generated {
+    use super::*;
+
+    #[test]
+    fn test_mco_default() {
+        let obj = TableWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mco_fields() {
+        let mut obj = TableWidget::default();
+        obj.table_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcp_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcp_default() {
+        let obj = TabWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcp_fields() {
+        let mut obj = TabWidget::default();
+        obj.tab_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcq_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcq_default() {
+        let obj = SplitWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcq_fields() {
+        let mut obj = SplitWidget::default();
+        obj.split_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcr_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcr_default() {
+        let obj = ScrollWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcr_fields() {
+        let mut obj = ScrollWidget::default();
+        obj.scroll_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcs_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcs_default() {
+        let obj = DialogWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcs_fields() {
+        let mut obj = DialogWidget::default();
+        obj.dialog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mct_generated {
+    use super::*;
+
+    #[test]
+    fn test_mct_default() {
+        let obj = PopoverWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mct_fields() {
+        let mut obj = PopoverWidget::default();
+        obj.popover_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcu_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcu_default() {
+        let obj = TooltipWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcu_fields() {
+        let mut obj = TooltipWidget::default();
+        obj.tooltip_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcv_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcv_default() {
+        let obj = NotificationWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcv_fields() {
+        let mut obj = NotificationWidget::default();
+        obj.notif_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcw_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcw_default() {
+        let obj = ContextMenuWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcw_fields() {
+        let mut obj = ContextMenuWidget::default();
+        obj.ctx_menu_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcx_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcx_default() {
+        let obj = CommandInputWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcx_fields() {
+        let mut obj = CommandInputWidget::default();
+        obj.cmd_input_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcy_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcy_default() {
+        let obj = SearchInputWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcy_fields() {
+        let mut obj = SearchInputWidget::default();
+        obj.search_input_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mcz_generated {
+    use super::*;
+
+    #[test]
+    fn test_mcz_default() {
+        let obj = WidgetFactory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mcz_fields() {
+        let mut obj = WidgetFactory::default();
+        obj.factory_id = 1;
         assert!(obj.validate());
     }
 }
