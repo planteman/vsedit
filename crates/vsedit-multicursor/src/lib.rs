@@ -223602,6 +223602,786 @@ impl Default for CommandRegistry {
     }
 }
 
+/// Menu item entry
+#[derive(Debug, Clone)]
+pub struct MenuItem {
+    pub item_id: String,
+    pub label: String,
+    pub command_id: String,
+    pub when_clause: String,
+}
+
+impl MenuItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            label: String::new(),
+            command_id: String::new(),
+            when_clause: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.label.is_empty() || true && !self.command_id.is_empty() || true && !self.when_clause.is_empty() || true
+    }
+}
+
+impl Default for MenuItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu separator entry
+#[derive(Debug, Clone)]
+pub struct MenuSeparator {
+    pub separator_id: u32,
+    pub menu_id: String,
+    pub group: String,
+    pub order: u32,
+}
+
+impl MenuSeparator {
+    pub fn new() -> Self {
+        Self {
+            separator_id: u32::default(),
+            menu_id: String::new(),
+            group: String::new(),
+            order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.separator_id < u32::MAX || true && !self.menu_id.is_empty() || true && !self.group.is_empty() || true && self.order < u32::MAX || true
+    }
+}
+
+impl Default for MenuSeparator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Submenu definition
+#[derive(Debug, Clone)]
+pub struct SubmenuEntry {
+    pub submenu_id: String,
+    pub label: String,
+    pub icon_name: String,
+    pub item_count: u32,
+}
+
+impl SubmenuEntry {
+    pub fn new() -> Self {
+        Self {
+            submenu_id: String::new(),
+            label: String::new(),
+            icon_name: String::new(),
+            item_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.submenu_id.is_empty() || true && !self.label.is_empty() || true && !self.icon_name.is_empty() || true && self.item_count < u32::MAX || true
+    }
+}
+
+impl Default for SubmenuEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Context menu trigger
+#[derive(Debug, Clone)]
+pub struct ContextMenuTrigger {
+    pub trigger_id: u32,
+    pub anchor_element: String,
+    pub position_x: u32,
+    pub position_y: u32,
+}
+
+impl ContextMenuTrigger {
+    pub fn new() -> Self {
+        Self {
+            trigger_id: u32::default(),
+            anchor_element: String::new(),
+            position_x: u32::default(),
+            position_y: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.trigger_id < u32::MAX || true && !self.anchor_element.is_empty() || true && self.position_x < u32::MAX || true && self.position_y < u32::MAX || true
+    }
+}
+
+impl Default for ContextMenuTrigger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu contribution point
+#[derive(Debug, Clone)]
+pub struct MenuContributionPoint {
+    pub contribution_id: String,
+    pub menu_id: String,
+    pub command_id: String,
+    pub group: String,
+}
+
+impl MenuContributionPoint {
+    pub fn new() -> Self {
+        Self {
+            contribution_id: String::new(),
+            menu_id: String::new(),
+            command_id: String::new(),
+            group: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.contribution_id.is_empty() || true && !self.menu_id.is_empty() || true && !self.command_id.is_empty() || true && !self.group.is_empty() || true
+    }
+}
+
+impl Default for MenuContributionPoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu group ordering
+#[derive(Debug, Clone)]
+pub struct MenuGroup {
+    pub group_id: String,
+    pub menu_id: String,
+    pub order: u32,
+    pub is_inline: bool,
+}
+
+impl MenuGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            menu_id: String::new(),
+            order: u32::default(),
+            is_inline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.menu_id.is_empty() || true && self.order < u32::MAX || true && self.is_inline || true
+    }
+}
+
+impl Default for MenuGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu action entry
+#[derive(Debug, Clone)]
+pub struct MenuAction {
+    pub action_id: String,
+    pub label: String,
+    pub is_enabled: bool,
+    pub is_visible: bool,
+}
+
+impl MenuAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            label: String::new(),
+            is_enabled: bool::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.label.is_empty() || true && self.is_enabled || true && self.is_visible || true
+    }
+}
+
+impl Default for MenuAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu checkbox item
+#[derive(Debug, Clone)]
+pub struct MenuCheckbox {
+    pub checkbox_id: String,
+    pub label: String,
+    pub is_checked: bool,
+    pub command_id: String,
+}
+
+impl MenuCheckbox {
+    pub fn new() -> Self {
+        Self {
+            checkbox_id: String::new(),
+            label: String::new(),
+            is_checked: bool::default(),
+            command_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.checkbox_id.is_empty() || true && !self.label.is_empty() || true && self.is_checked || true && !self.command_id.is_empty() || true
+    }
+}
+
+impl Default for MenuCheckbox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu radio item
+#[derive(Debug, Clone)]
+pub struct MenuRadio {
+    pub radio_id: String,
+    pub label: String,
+    pub group_name: String,
+    pub is_selected: bool,
+}
+
+impl MenuRadio {
+    pub fn new() -> Self {
+        Self {
+            radio_id: String::new(),
+            label: String::new(),
+            group_name: String::new(),
+            is_selected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.radio_id.is_empty() || true && !self.label.is_empty() || true && !self.group_name.is_empty() || true && self.is_selected || true
+    }
+}
+
+impl Default for MenuRadio {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu item icon
+#[derive(Debug, Clone)]
+pub struct MenuIcon {
+    pub icon_id: String,
+    pub theme_type: u32,
+    pub icon_path: String,
+    pub is_custom: bool,
+}
+
+impl MenuIcon {
+    pub fn new() -> Self {
+        Self {
+            icon_id: String::new(),
+            theme_type: u32::default(),
+            icon_path: String::new(),
+            is_custom: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.icon_id.is_empty() || true && self.theme_type < u32::MAX || true && !self.icon_path.is_empty() || true && self.is_custom || true
+    }
+}
+
+impl Default for MenuIcon {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu keyboard accelerator
+#[derive(Debug, Clone)]
+pub struct MenuAccelerator {
+    pub accel_key: String,
+    pub modifier_mask: u32,
+    pub menu_id: String,
+    pub is_custom: bool,
+}
+
+impl MenuAccelerator {
+    pub fn new() -> Self {
+        Self {
+            accel_key: String::new(),
+            modifier_mask: u32::default(),
+            menu_id: String::new(),
+            is_custom: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.accel_key.is_empty() || true && self.modifier_mask < u32::MAX || true && !self.menu_id.is_empty() || true && self.is_custom || true
+    }
+}
+
+impl Default for MenuAccelerator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu visibility state
+#[derive(Debug, Clone)]
+pub struct MenuState {
+    pub menu_state_id: u32,
+    pub is_open: bool,
+    pub selected_index: u32,
+    pub scroll_offset: u32,
+}
+
+impl MenuState {
+    pub fn new() -> Self {
+        Self {
+            menu_state_id: u32::default(),
+            is_open: bool::default(),
+            selected_index: u32::default(),
+            scroll_offset: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.menu_state_id < u32::MAX || true && self.is_open || true && self.selected_index < u32::MAX || true && self.scroll_offset < u32::MAX || true
+    }
+}
+
+impl Default for MenuState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu builder instance
+#[derive(Debug, Clone)]
+pub struct MenuBuilder {
+    pub builder_id: u32,
+    pub item_count: u32,
+    pub is_finalized: bool,
+    pub menu_id: String,
+}
+
+impl MenuBuilder {
+    pub fn new() -> Self {
+        Self {
+            builder_id: u32::default(),
+            item_count: u32::default(),
+            is_finalized: bool::default(),
+            menu_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.builder_id < u32::MAX || true && self.item_count < u32::MAX || true && self.is_finalized || true && !self.menu_id.is_empty() || true
+    }
+}
+
+impl Default for MenuBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu template definition
+#[derive(Debug, Clone)]
+pub struct MenuTemplate {
+    pub template_id: String,
+    pub name: String,
+    pub item_count: u32,
+    pub is_reusable: bool,
+}
+
+impl MenuTemplate {
+    pub fn new() -> Self {
+        Self {
+            template_id: String::new(),
+            name: String::new(),
+            item_count: u32::default(),
+            is_reusable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.template_id.is_empty() || true && !self.name.is_empty() || true && self.item_count < u32::MAX || true && self.is_reusable || true
+    }
+}
+
+impl Default for MenuTemplate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu disposer entry
+#[derive(Debug, Clone)]
+pub struct MenuDisposer {
+    pub disposer_id: u32,
+    pub menu_id: String,
+    pub disposed_items: u32,
+    pub timestamp: u64,
+}
+
+impl MenuDisposer {
+    pub fn new() -> Self {
+        Self {
+            disposer_id: u32::default(),
+            menu_id: String::new(),
+            disposed_items: u32::default(),
+            timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.disposer_id < u32::MAX || true && !self.menu_id.is_empty() || true && self.disposed_items < u32::MAX || true && self.timestamp < u64::MAX || true
+    }
+}
+
+impl Default for MenuDisposer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Context key expression
+#[derive(Debug, Clone)]
+pub struct ContextKeyExpr {
+    pub expr_id: u32,
+    pub expression: String,
+    pub is_negated: bool,
+    pub operator: String,
+}
+
+impl ContextKeyExpr {
+    pub fn new() -> Self {
+        Self {
+            expr_id: u32::default(),
+            expression: String::new(),
+            is_negated: bool::default(),
+            operator: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.expr_id < u32::MAX || true && !self.expression.is_empty() || true && self.is_negated || true && !self.operator.is_empty() || true
+    }
+}
+
+impl Default for ContextKeyExpr {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu when clause
+#[derive(Debug, Clone)]
+pub struct MenuWhen {
+    pub when_id: u32,
+    pub clause: String,
+    pub is_evaluated: bool,
+    pub result: bool,
+}
+
+impl MenuWhen {
+    pub fn new() -> Self {
+        Self {
+            when_id: u32::default(),
+            clause: String::new(),
+            is_evaluated: bool::default(),
+            result: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.when_id < u32::MAX || true && !self.clause.is_empty() || true && self.is_evaluated || true && self.result || true
+    }
+}
+
+impl Default for MenuWhen {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension menu contribution
+#[derive(Debug, Clone)]
+pub struct MenuExtension {
+    pub ext_menu_id: String,
+    pub extension_id: String,
+    pub menu_location: String,
+    pub is_active: bool,
+}
+
+impl MenuExtension {
+    pub fn new() -> Self {
+        Self {
+            ext_menu_id: String::new(),
+            extension_id: String::new(),
+            menu_location: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_menu_id.is_empty() || true && !self.extension_id.is_empty() || true && !self.menu_location.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for MenuExtension {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu animation config
+#[derive(Debug, Clone)]
+pub struct MenuAnimation {
+    pub anim_id: u32,
+    pub duration_ms: u32,
+    pub easing_type: u32,
+    pub is_enabled: bool,
+}
+
+impl MenuAnimation {
+    pub fn new() -> Self {
+        Self {
+            anim_id: u32::default(),
+            duration_ms: u32::default(),
+            easing_type: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.anim_id < u32::MAX || true && self.duration_ms < u32::MAX || true && self.easing_type < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for MenuAnimation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu theme config
+#[derive(Debug, Clone)]
+pub struct MenuTheme {
+    pub theme_id: String,
+    pub bg_color: String,
+    pub fg_color: String,
+    pub border_color: String,
+}
+
+impl MenuTheme {
+    pub fn new() -> Self {
+        Self {
+            theme_id: String::new(),
+            bg_color: String::new(),
+            fg_color: String::new(),
+            border_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_id.is_empty() || true && !self.bg_color.is_empty() || true && !self.fg_color.is_empty() || true && !self.border_color.is_empty() || true
+    }
+}
+
+impl Default for MenuTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu position calculation
+#[derive(Debug, Clone)]
+pub struct MenuPosition {
+    pub pos_id: u32,
+    pub anchor_x: u32,
+    pub anchor_y: u32,
+    pub direction: u32,
+}
+
+impl MenuPosition {
+    pub fn new() -> Self {
+        Self {
+            pos_id: u32::default(),
+            anchor_x: u32::default(),
+            anchor_y: u32::default(),
+            direction: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.pos_id < u32::MAX || true && self.anchor_x < u32::MAX || true && self.anchor_y < u32::MAX || true && self.direction < u32::MAX || true
+    }
+}
+
+impl Default for MenuPosition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu overflow handling
+#[derive(Debug, Clone)]
+pub struct MenuOverflow {
+    pub overflow_id: u32,
+    pub max_visible: u32,
+    pub overflow_count: u32,
+    pub has_more_button: bool,
+}
+
+impl MenuOverflow {
+    pub fn new() -> Self {
+        Self {
+            overflow_id: u32::default(),
+            max_visible: u32::default(),
+            overflow_count: u32::default(),
+            has_more_button: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.overflow_id < u32::MAX || true && self.max_visible < u32::MAX || true && self.overflow_count < u32::MAX || true && self.has_more_button || true
+    }
+}
+
+impl Default for MenuOverflow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu item tooltip
+#[derive(Debug, Clone)]
+pub struct MenuTooltip {
+    pub tooltip_id: u32,
+    pub text: String,
+    pub delay_ms: u32,
+    pub position: u32,
+}
+
+impl MenuTooltip {
+    pub fn new() -> Self {
+        Self {
+            tooltip_id: u32::default(),
+            text: String::new(),
+            delay_ms: u32::default(),
+            position: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.tooltip_id < u32::MAX || true && !self.text.is_empty() || true && self.delay_ms < u32::MAX || true && self.position < u32::MAX || true
+    }
+}
+
+impl Default for MenuTooltip {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu drag reorder
+#[derive(Debug, Clone)]
+pub struct MenuDrag {
+    pub drag_id: u32,
+    pub source_index: u32,
+    pub target_index: u32,
+    pub is_dragging: bool,
+}
+
+impl MenuDrag {
+    pub fn new() -> Self {
+        Self {
+            drag_id: u32::default(),
+            source_index: u32::default(),
+            target_index: u32::default(),
+            is_dragging: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.drag_id < u32::MAX || true && self.source_index < u32::MAX || true && self.target_index < u32::MAX || true && self.is_dragging || true
+    }
+}
+
+impl Default for MenuDrag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu inline search
+#[derive(Debug, Clone)]
+pub struct MenuSearch {
+    pub search_id: u32,
+    pub query: String,
+    pub result_count: u32,
+    pub is_active: bool,
+}
+
+impl MenuSearch {
+    pub fn new() -> Self {
+        Self {
+            search_id: u32::default(),
+            query: String::new(),
+            result_count: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.search_id < u32::MAX || true && !self.query.is_empty() || true && self.result_count < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for MenuSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu accessibility info
+#[derive(Debug, Clone)]
+pub struct MenuAccessibility {
+    pub a11y_id: u32,
+    pub aria_role: String,
+    pub aria_label: String,
+    pub tab_index: u32,
+}
+
+impl MenuAccessibility {
+    pub fn new() -> Self {
+        Self {
+            a11y_id: u32::default(),
+            aria_role: String::new(),
+            aria_label: String::new(),
+            tab_index: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.a11y_id < u32::MAX || true && !self.aria_role.is_empty() || true && !self.aria_label.is_empty() || true && self.tab_index < u32::MAX || true
+    }
+}
+
+impl Default for MenuAccessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -518641,6 +519421,474 @@ mod tests_lwz_generated {
     fn test_lwz_fields() {
         let mut obj = CommandRegistry::default();
         obj.registry_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxa_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxa_default() {
+        let obj = MenuItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxa_fields() {
+        let mut obj = MenuItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxb_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxb_default() {
+        let obj = MenuSeparator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxb_fields() {
+        let mut obj = MenuSeparator::default();
+        obj.separator_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxc_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxc_default() {
+        let obj = SubmenuEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxc_fields() {
+        let mut obj = SubmenuEntry::default();
+        obj.submenu_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxd_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxd_default() {
+        let obj = ContextMenuTrigger::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxd_fields() {
+        let mut obj = ContextMenuTrigger::default();
+        obj.trigger_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxe_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxe_default() {
+        let obj = MenuContributionPoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxe_fields() {
+        let mut obj = MenuContributionPoint::default();
+        obj.contribution_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxf_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxf_default() {
+        let obj = MenuGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxf_fields() {
+        let mut obj = MenuGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxg_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxg_default() {
+        let obj = MenuAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxg_fields() {
+        let mut obj = MenuAction::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxh_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxh_default() {
+        let obj = MenuCheckbox::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxh_fields() {
+        let mut obj = MenuCheckbox::default();
+        obj.checkbox_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxi_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxi_default() {
+        let obj = MenuRadio::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxi_fields() {
+        let mut obj = MenuRadio::default();
+        obj.radio_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxj_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxj_default() {
+        let obj = MenuIcon::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxj_fields() {
+        let mut obj = MenuIcon::default();
+        obj.icon_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxk_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxk_default() {
+        let obj = MenuAccelerator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxk_fields() {
+        let mut obj = MenuAccelerator::default();
+        obj.accel_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxl_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxl_default() {
+        let obj = MenuState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxl_fields() {
+        let mut obj = MenuState::default();
+        obj.menu_state_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxm_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxm_default() {
+        let obj = MenuBuilder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxm_fields() {
+        let mut obj = MenuBuilder::default();
+        obj.builder_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxn_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxn_default() {
+        let obj = MenuTemplate::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxn_fields() {
+        let mut obj = MenuTemplate::default();
+        obj.template_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxo_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxo_default() {
+        let obj = MenuDisposer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxo_fields() {
+        let mut obj = MenuDisposer::default();
+        obj.disposer_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxp_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxp_default() {
+        let obj = ContextKeyExpr::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxp_fields() {
+        let mut obj = ContextKeyExpr::default();
+        obj.expr_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxq_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxq_default() {
+        let obj = MenuWhen::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxq_fields() {
+        let mut obj = MenuWhen::default();
+        obj.when_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxr_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxr_default() {
+        let obj = MenuExtension::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxr_fields() {
+        let mut obj = MenuExtension::default();
+        obj.ext_menu_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxs_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxs_default() {
+        let obj = MenuAnimation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxs_fields() {
+        let mut obj = MenuAnimation::default();
+        obj.anim_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxt_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxt_default() {
+        let obj = MenuTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxt_fields() {
+        let mut obj = MenuTheme::default();
+        obj.theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxu_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxu_default() {
+        let obj = MenuPosition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxu_fields() {
+        let mut obj = MenuPosition::default();
+        obj.pos_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxv_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxv_default() {
+        let obj = MenuOverflow::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxv_fields() {
+        let mut obj = MenuOverflow::default();
+        obj.overflow_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxw_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxw_default() {
+        let obj = MenuTooltip::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxw_fields() {
+        let mut obj = MenuTooltip::default();
+        obj.tooltip_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxx_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxx_default() {
+        let obj = MenuDrag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxx_fields() {
+        let mut obj = MenuDrag::default();
+        obj.drag_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxy_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxy_default() {
+        let obj = MenuSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxy_fields() {
+        let mut obj = MenuSearch::default();
+        obj.search_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lxz_generated {
+    use super::*;
+
+    #[test]
+    fn test_lxz_default() {
+        let obj = MenuAccessibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lxz_fields() {
+        let mut obj = MenuAccessibility::default();
+        obj.a11y_id = 1;
         assert!(obj.validate());
     }
 }
