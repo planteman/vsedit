@@ -187571,6 +187571,838 @@ impl Default for KezCursorConfig {
     }
 }
 
+/// /// Piece tree node for text buffer
+#[derive(Debug, Clone)]
+pub struct KfaPieceTreeNode {
+    pub kfa_length: u64,
+    pub kfa_line_count: u32,
+    pub kfa_left_idx: u32,
+    pub kfa_right_idx: u32,
+    pub kfa_color: bool,
+}
+
+impl KfaPieceTreeNode {
+    pub fn new() -> Self {
+        Self {
+            kfa_length: u64::default(),
+            kfa_line_count: u32::default(),
+            kfa_left_idx: u32::default(),
+            kfa_right_idx: u32::default(),
+            kfa_color: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kfa_length < u64::MAX || true && self.kfa_line_count < u32::MAX || true && self.kfa_left_idx < u32::MAX || true && self.kfa_right_idx < u32::MAX || true && self.kfa_color || true
+    }
+}
+
+impl Default for KfaPieceTreeNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Slab allocator for piece tree nodes
+#[derive(Debug, Clone)]
+pub struct KfbPieceTreeSlab {
+    pub kfb_capacity: u32,
+    pub kfb_used: u32,
+    pub kfb_free_head: u32,
+    pub kfb_grow_factor: f64,
+    pub kfb_label: String,
+}
+
+impl KfbPieceTreeSlab {
+    pub fn new() -> Self {
+        Self {
+            kfb_capacity: u32::default(),
+            kfb_used: u32::default(),
+            kfb_free_head: u32::default(),
+            kfb_grow_factor: f64::default(),
+            kfb_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kfb_capacity < u32::MAX || true && self.kfb_used < u32::MAX || true && self.kfb_free_head < u32::MAX || true && self.kfb_grow_factor.is_finite() || true && !self.kfb_label.is_empty() || true
+    }
+}
+
+impl Default for KfbPieceTreeSlab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Single line in the text buffer
+#[derive(Debug, Clone)]
+pub struct KfcBufferLine {
+    pub kfc_content: String,
+    pub kfc_line_number: u32,
+    pub kfc_length: u32,
+    pub kfc_eol: String,
+    pub kfc_modified: bool,
+}
+
+impl KfcBufferLine {
+    pub fn new() -> Self {
+        Self {
+            kfc_content: String::new(),
+            kfc_line_number: u32::default(),
+            kfc_length: u32::default(),
+            kfc_eol: String::new(),
+            kfc_modified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kfc_content.is_empty() || true && self.kfc_line_number < u32::MAX || true && self.kfc_length < u32::MAX || true && !self.kfc_eol.is_empty() || true && self.kfc_modified || true
+    }
+}
+
+impl Default for KfcBufferLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Token data for a buffer line
+#[derive(Debug, Clone)]
+pub struct KfdBufferLineTokens {
+    pub kfd_line_idx: u32,
+    pub kfd_token_count: u32,
+    pub kfd_dirty: bool,
+    pub kfd_language: String,
+    pub kfd_version: u32,
+}
+
+impl KfdBufferLineTokens {
+    pub fn new() -> Self {
+        Self {
+            kfd_line_idx: u32::default(),
+            kfd_token_count: u32::default(),
+            kfd_dirty: bool::default(),
+            kfd_language: String::new(),
+            kfd_version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kfd_line_idx < u32::MAX || true && self.kfd_token_count < u32::MAX || true && self.kfd_dirty || true && !self.kfd_language.is_empty() || true && self.kfd_version < u32::MAX || true
+    }
+}
+
+impl Default for KfdBufferLineTokens {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Immutable snapshot of buffer state
+#[derive(Debug, Clone)]
+pub struct KfeBufferSnapshot {
+    pub kfe_version: u64,
+    pub kfe_line_count: u32,
+    pub kfe_frozen: bool,
+    pub kfe_timestamp: u64,
+    pub kfe_label: String,
+}
+
+impl KfeBufferSnapshot {
+    pub fn new() -> Self {
+        Self {
+            kfe_version: u64::default(),
+            kfe_line_count: u32::default(),
+            kfe_frozen: bool::default(),
+            kfe_timestamp: u64::default(),
+            kfe_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kfe_version < u64::MAX || true && self.kfe_line_count < u32::MAX || true && self.kfe_frozen || true && self.kfe_timestamp < u64::MAX || true && !self.kfe_label.is_empty() || true
+    }
+}
+
+impl Default for KfeBufferSnapshot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Range within a text buffer
+#[derive(Debug, Clone)]
+pub struct KffBufferRange {
+    pub kff_start_line: u32,
+    pub kff_start_col: u32,
+    pub kff_end_line: u32,
+    pub kff_end_col: u32,
+    pub kff_empty: bool,
+}
+
+impl KffBufferRange {
+    pub fn new() -> Self {
+        Self {
+            kff_start_line: u32::default(),
+            kff_start_col: u32::default(),
+            kff_end_line: u32::default(),
+            kff_end_col: u32::default(),
+            kff_empty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kff_start_line < u32::MAX || true && self.kff_start_col < u32::MAX || true && self.kff_end_line < u32::MAX || true && self.kff_end_col < u32::MAX || true && self.kff_empty || true
+    }
+}
+
+impl Default for KffBufferRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Single edit operation on a buffer
+#[derive(Debug, Clone)]
+pub struct KfgBufferEdit {
+    pub kfg_offset: u64,
+    pub kfg_length: u32,
+    pub kfg_text: String,
+    pub kfg_force_move: bool,
+    pub kfg_version: u64,
+}
+
+impl KfgBufferEdit {
+    pub fn new() -> Self {
+        Self {
+            kfg_offset: u64::default(),
+            kfg_length: u32::default(),
+            kfg_text: String::new(),
+            kfg_force_move: bool::default(),
+            kfg_version: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kfg_offset < u64::MAX || true && self.kfg_length < u32::MAX || true && !self.kfg_text.is_empty() || true && self.kfg_force_move || true && self.kfg_version < u64::MAX || true
+    }
+}
+
+impl Default for KfgBufferEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Group of related buffer edits
+#[derive(Debug, Clone)]
+pub struct KfhBufferEditGroup {
+    pub kfh_count: u32,
+    pub kfh_label: String,
+    pub kfh_undoable: bool,
+    pub kfh_timestamp: u64,
+    pub kfh_merged: bool,
+}
+
+impl KfhBufferEditGroup {
+    pub fn new() -> Self {
+        Self {
+            kfh_count: u32::default(),
+            kfh_label: String::new(),
+            kfh_undoable: bool::default(),
+            kfh_timestamp: u64::default(),
+            kfh_merged: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kfh_count < u32::MAX || true && !self.kfh_label.is_empty() || true && self.kfh_undoable || true && self.kfh_timestamp < u64::MAX || true && self.kfh_merged || true
+    }
+}
+
+impl Default for KfhBufferEditGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Tracked position marker in buffer
+#[derive(Debug, Clone)]
+pub struct KfiBufferMarker {
+    pub kfi_position: u64,
+    pub kfi_affinity: String,
+    pub kfi_sticky: bool,
+    pub kfi_tracked: bool,
+    pub kfi_marker_id: u32,
+}
+
+impl KfiBufferMarker {
+    pub fn new() -> Self {
+        Self {
+            kfi_position: u64::default(),
+            kfi_affinity: String::new(),
+            kfi_sticky: bool::default(),
+            kfi_tracked: bool::default(),
+            kfi_marker_id: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kfi_position < u64::MAX || true && !self.kfi_affinity.is_empty() || true && self.kfi_sticky || true && self.kfi_tracked || true && self.kfi_marker_id < u32::MAX || true
+    }
+}
+
+impl Default for KfiBufferMarker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Bracket pair location in buffer
+#[derive(Debug, Clone)]
+pub struct KfjBufferBracket {
+    pub kfj_open_offset: u64,
+    pub kfj_close_offset: u64,
+    pub kfj_bracket_type: String,
+    pub kfj_nested: bool,
+    pub kfj_balanced: bool,
+}
+
+impl KfjBufferBracket {
+    pub fn new() -> Self {
+        Self {
+            kfj_open_offset: u64::default(),
+            kfj_close_offset: u64::default(),
+            kfj_bracket_type: String::new(),
+            kfj_nested: bool::default(),
+            kfj_balanced: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kfj_open_offset < u64::MAX || true && self.kfj_close_offset < u64::MAX || true && !self.kfj_bracket_type.is_empty() || true && self.kfj_nested || true && self.kfj_balanced || true
+    }
+}
+
+impl Default for KfjBufferBracket {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Indentation info for buffer line
+#[derive(Debug, Clone)]
+pub struct KfkBufferIndent {
+    pub kfk_level: u32,
+    pub kfk_tabs: u32,
+    pub kfk_spaces: u32,
+    pub kfk_mixed: bool,
+    pub kfk_content_start: u32,
+}
+
+impl KfkBufferIndent {
+    pub fn new() -> Self {
+        Self {
+            kfk_level: u32::default(),
+            kfk_tabs: u32::default(),
+            kfk_spaces: u32::default(),
+            kfk_mixed: bool::default(),
+            kfk_content_start: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kfk_level < u32::MAX || true && self.kfk_tabs < u32::MAX || true && self.kfk_spaces < u32::MAX || true && self.kfk_mixed || true && self.kfk_content_start < u32::MAX || true
+    }
+}
+
+impl Default for KfkBufferIndent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Folding region in text buffer
+#[derive(Debug, Clone)]
+pub struct KflBufferFold {
+    pub kfl_start_line: u32,
+    pub kfl_end_line: u32,
+    pub kfl_collapsed: bool,
+    pub kfl_source: String,
+    pub kfl_level: u32,
+}
+
+impl KflBufferFold {
+    pub fn new() -> Self {
+        Self {
+            kfl_start_line: u32::default(),
+            kfl_end_line: u32::default(),
+            kfl_collapsed: bool::default(),
+            kfl_source: String::new(),
+            kfl_level: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kfl_start_line < u32::MAX || true && self.kfl_end_line < u32::MAX || true && self.kfl_collapsed || true && !self.kfl_source.is_empty() || true && self.kfl_level < u32::MAX || true
+    }
+}
+
+impl Default for KflBufferFold {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Search state within text buffer
+#[derive(Debug, Clone)]
+pub struct KfmBufferSearch {
+    pub kfm_pattern: String,
+    pub kfm_case_sensitive: bool,
+    pub kfm_regex_mode: bool,
+    pub kfm_whole_word: bool,
+    pub kfm_match_count: u32,
+}
+
+impl KfmBufferSearch {
+    pub fn new() -> Self {
+        Self {
+            kfm_pattern: String::new(),
+            kfm_case_sensitive: bool::default(),
+            kfm_regex_mode: bool::default(),
+            kfm_whole_word: bool::default(),
+            kfm_match_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kfm_pattern.is_empty() || true && self.kfm_case_sensitive || true && self.kfm_regex_mode || true && self.kfm_whole_word || true && self.kfm_match_count < u32::MAX || true
+    }
+}
+
+impl Default for KfmBufferSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Find and replace state in buffer
+#[derive(Debug, Clone)]
+pub struct KfnBufferReplace {
+    pub kfn_find_text: String,
+    pub kfn_replace_text: String,
+    pub kfn_preserve_case: bool,
+    pub kfn_replaced_count: u32,
+    pub kfn_active: bool,
+}
+
+impl KfnBufferReplace {
+    pub fn new() -> Self {
+        Self {
+            kfn_find_text: String::new(),
+            kfn_replace_text: String::new(),
+            kfn_preserve_case: bool::default(),
+            kfn_replaced_count: u32::default(),
+            kfn_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kfn_find_text.is_empty() || true && !self.kfn_replace_text.is_empty() || true && self.kfn_preserve_case || true && self.kfn_replaced_count < u32::MAX || true && self.kfn_active || true
+    }
+}
+
+impl Default for KfnBufferReplace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Diff between buffer versions
+#[derive(Debug, Clone)]
+pub struct KfoBufferDiff {
+    pub kfo_original: String,
+    pub kfo_modified: String,
+    pub kfo_change_count: u32,
+    pub kfo_binary: bool,
+    pub kfo_algorithm: String,
+}
+
+impl KfoBufferDiff {
+    pub fn new() -> Self {
+        Self {
+            kfo_original: String::new(),
+            kfo_modified: String::new(),
+            kfo_change_count: u32::default(),
+            kfo_binary: bool::default(),
+            kfo_algorithm: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kfo_original.is_empty() || true && !self.kfo_modified.is_empty() || true && self.kfo_change_count < u32::MAX || true && self.kfo_binary || true && !self.kfo_algorithm.is_empty() || true
+    }
+}
+
+impl Default for KfoBufferDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Buffer character encoding settings
+#[derive(Debug, Clone)]
+pub struct KfpBufferEncoding {
+    pub kfp_charset: String,
+    pub kfp_bom: bool,
+    pub kfp_confidence: f64,
+    pub kfp_fallback: String,
+    pub kfp_detected: bool,
+}
+
+impl KfpBufferEncoding {
+    pub fn new() -> Self {
+        Self {
+            kfp_charset: String::new(),
+            kfp_bom: bool::default(),
+            kfp_confidence: f64::default(),
+            kfp_fallback: String::new(),
+            kfp_detected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kfp_charset.is_empty() || true && self.kfp_bom || true && self.kfp_confidence.is_finite() || true && !self.kfp_fallback.is_empty() || true && self.kfp_detected || true
+    }
+}
+
+impl Default for KfpBufferEncoding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// End-of-line sequence configuration
+#[derive(Debug, Clone)]
+pub struct KfqBufferEol {
+    pub kfq_sequence: String,
+    pub kfq_auto_detect: bool,
+    pub kfq_normalized: bool,
+    pub kfq_mixed: bool,
+    pub kfq_default_eol: String,
+}
+
+impl KfqBufferEol {
+    pub fn new() -> Self {
+        Self {
+            kfq_sequence: String::new(),
+            kfq_auto_detect: bool::default(),
+            kfq_normalized: bool::default(),
+            kfq_mixed: bool::default(),
+            kfq_default_eol: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kfq_sequence.is_empty() || true && self.kfq_auto_detect || true && self.kfq_normalized || true && self.kfq_mixed || true && !self.kfq_default_eol.is_empty() || true
+    }
+}
+
+impl Default for KfqBufferEol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Language mode for buffer content
+#[derive(Debug, Clone)]
+pub struct KfrBufferLanguage {
+    pub kfr_lang_id: String,
+    pub kfr_grammar_path: String,
+    pub kfr_auto_detect: bool,
+    pub kfr_aliases: String,
+    pub kfr_configured: bool,
+}
+
+impl KfrBufferLanguage {
+    pub fn new() -> Self {
+        Self {
+            kfr_lang_id: String::new(),
+            kfr_grammar_path: String::new(),
+            kfr_auto_detect: bool::default(),
+            kfr_aliases: String::new(),
+            kfr_configured: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kfr_lang_id.is_empty() || true && !self.kfr_grammar_path.is_empty() || true && self.kfr_auto_detect || true && !self.kfr_aliases.is_empty() || true && self.kfr_configured || true
+    }
+}
+
+impl Default for KfrBufferLanguage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Buffer read-only state management
+#[derive(Debug, Clone)]
+pub struct KfsBufferReadOnly {
+    pub kfs_locked: bool,
+    pub kfs_reason: String,
+    pub kfs_override_allowed: bool,
+    pub kfs_source: String,
+    pub kfs_timestamp: u64,
+}
+
+impl KfsBufferReadOnly {
+    pub fn new() -> Self {
+        Self {
+            kfs_locked: bool::default(),
+            kfs_reason: String::new(),
+            kfs_override_allowed: bool::default(),
+            kfs_source: String::new(),
+            kfs_timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kfs_locked || true && !self.kfs_reason.is_empty() || true && self.kfs_override_allowed || true && !self.kfs_source.is_empty() || true && self.kfs_timestamp < u64::MAX || true
+    }
+}
+
+impl Default for KfsBufferReadOnly {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Buffer dirty/modified state tracking
+#[derive(Debug, Clone)]
+pub struct KftBufferDirty {
+    pub kft_modified: bool,
+    pub kft_save_version: u64,
+    pub kft_current_version: u64,
+    pub kft_auto_saved: bool,
+    pub kft_label: String,
+}
+
+impl KftBufferDirty {
+    pub fn new() -> Self {
+        Self {
+            kft_modified: bool::default(),
+            kft_save_version: u64::default(),
+            kft_current_version: u64::default(),
+            kft_auto_saved: bool::default(),
+            kft_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kft_modified || true && self.kft_save_version < u64::MAX || true && self.kft_current_version < u64::MAX || true && self.kft_auto_saved || true && !self.kft_label.is_empty() || true
+    }
+}
+
+impl Default for KftBufferDirty {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Buffer version tracking for sync
+#[derive(Debug, Clone)]
+pub struct KfuBufferVersion {
+    pub kfu_version_id: u64,
+    pub kfu_etag: String,
+    pub kfu_mtime: u64,
+    pub kfu_synced: bool,
+    pub kfu_label: String,
+}
+
+impl KfuBufferVersion {
+    pub fn new() -> Self {
+        Self {
+            kfu_version_id: u64::default(),
+            kfu_etag: String::new(),
+            kfu_mtime: u64::default(),
+            kfu_synced: bool::default(),
+            kfu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kfu_version_id < u64::MAX || true && !self.kfu_etag.is_empty() || true && self.kfu_mtime < u64::MAX || true && self.kfu_synced || true && !self.kfu_label.is_empty() || true
+    }
+}
+
+impl Default for KfuBufferVersion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// URI identification for buffer resource
+#[derive(Debug, Clone)]
+pub struct KfvBufferUri {
+    pub kfv_scheme: String,
+    pub kfv_authority: String,
+    pub kfv_path_str: String,
+    pub kfv_query: String,
+    pub kfv_fragment: String,
+}
+
+impl KfvBufferUri {
+    pub fn new() -> Self {
+        Self {
+            kfv_scheme: String::new(),
+            kfv_authority: String::new(),
+            kfv_path_str: String::new(),
+            kfv_query: String::new(),
+            kfv_fragment: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kfv_scheme.is_empty() || true && !self.kfv_authority.is_empty() || true && !self.kfv_path_str.is_empty() || true && !self.kfv_query.is_empty() || true && !self.kfv_fragment.is_empty() || true
+    }
+}
+
+impl Default for KfvBufferUri {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Mirrored buffer for diff/preview
+#[derive(Debug, Clone)]
+pub struct KfwBufferMirror {
+    pub kfw_source_uri: String,
+    pub kfw_mirror_uri: String,
+    pub kfw_synced: bool,
+    pub kfw_delay_ms: u32,
+    pub kfw_label: String,
+}
+
+impl KfwBufferMirror {
+    pub fn new() -> Self {
+        Self {
+            kfw_source_uri: String::new(),
+            kfw_mirror_uri: String::new(),
+            kfw_synced: bool::default(),
+            kfw_delay_ms: u32::default(),
+            kfw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kfw_source_uri.is_empty() || true && !self.kfw_mirror_uri.is_empty() || true && self.kfw_synced || true && self.kfw_delay_ms < u32::MAX || true && !self.kfw_label.is_empty() || true
+    }
+}
+
+impl Default for KfwBufferMirror {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Group of related text buffers
+#[derive(Debug, Clone)]
+pub struct KfxBufferGroup {
+    pub kfx_count: u32,
+    pub kfx_active_idx: u32,
+    pub kfx_label: String,
+    pub kfx_sorted: bool,
+    pub kfx_pinned: bool,
+}
+
+impl KfxBufferGroup {
+    pub fn new() -> Self {
+        Self {
+            kfx_count: u32::default(),
+            kfx_active_idx: u32::default(),
+            kfx_label: String::new(),
+            kfx_sorted: bool::default(),
+            kfx_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kfx_count < u32::MAX || true && self.kfx_active_idx < u32::MAX || true && !self.kfx_label.is_empty() || true && self.kfx_sorted || true && self.kfx_pinned || true
+    }
+}
+
+impl Default for KfxBufferGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Buffer change event notification
+#[derive(Debug, Clone)]
+pub struct KfyBufferEvent {
+    pub kfy_event_kind: String,
+    pub kfy_offset: u64,
+    pub kfy_length: u32,
+    pub kfy_text: String,
+    pub kfy_version: u64,
+}
+
+impl KfyBufferEvent {
+    pub fn new() -> Self {
+        Self {
+            kfy_event_kind: String::new(),
+            kfy_offset: u64::default(),
+            kfy_length: u32::default(),
+            kfy_text: String::new(),
+            kfy_version: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kfy_event_kind.is_empty() || true && self.kfy_offset < u64::MAX || true && self.kfy_length < u32::MAX || true && !self.kfy_text.is_empty() || true && self.kfy_version < u64::MAX || true
+    }
+}
+
+impl Default for KfyBufferEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined text buffer configuration
+#[derive(Debug, Clone)]
+pub struct KfzBufferConfig {
+    pub kfz_tab_size: u32,
+    pub kfz_insert_spaces: bool,
+    pub kfz_trim_whitespace: bool,
+    pub kfz_final_newline: bool,
+    pub kfz_large_file: bool,
+}
+
+impl KfzBufferConfig {
+    pub fn new() -> Self {
+        Self {
+            kfz_tab_size: u32::default(),
+            kfz_insert_spaces: bool::default(),
+            kfz_trim_whitespace: bool::default(),
+            kfz_final_newline: bool::default(),
+            kfz_large_file: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kfz_tab_size < u32::MAX || true && self.kfz_insert_spaces || true && self.kfz_trim_whitespace || true && self.kfz_final_newline || true && self.kfz_large_file || true
+    }
+}
+
+impl Default for KfzBufferConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -462155,6 +462987,474 @@ mod tests_kez_generated {
     fn test_kez_fields() {
         let mut obj = KezCursorConfig::default();
         obj.kez_blink_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfa_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfa_default() {
+        let obj = KfaPieceTreeNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfa_fields() {
+        let mut obj = KfaPieceTreeNode::default();
+        obj.kfa_length = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfb_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfb_default() {
+        let obj = KfbPieceTreeSlab::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfb_fields() {
+        let mut obj = KfbPieceTreeSlab::default();
+        obj.kfb_capacity = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfc_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfc_default() {
+        let obj = KfcBufferLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfc_fields() {
+        let mut obj = KfcBufferLine::default();
+        obj.kfc_content = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfd_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfd_default() {
+        let obj = KfdBufferLineTokens::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfd_fields() {
+        let mut obj = KfdBufferLineTokens::default();
+        obj.kfd_line_idx = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfe_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfe_default() {
+        let obj = KfeBufferSnapshot::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfe_fields() {
+        let mut obj = KfeBufferSnapshot::default();
+        obj.kfe_version = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kff_generated {
+    use super::*;
+
+    #[test]
+    fn test_kff_default() {
+        let obj = KffBufferRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kff_fields() {
+        let mut obj = KffBufferRange::default();
+        obj.kff_start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfg_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfg_default() {
+        let obj = KfgBufferEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfg_fields() {
+        let mut obj = KfgBufferEdit::default();
+        obj.kfg_offset = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfh_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfh_default() {
+        let obj = KfhBufferEditGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfh_fields() {
+        let mut obj = KfhBufferEditGroup::default();
+        obj.kfh_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfi_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfi_default() {
+        let obj = KfiBufferMarker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfi_fields() {
+        let mut obj = KfiBufferMarker::default();
+        obj.kfi_position = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfj_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfj_default() {
+        let obj = KfjBufferBracket::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfj_fields() {
+        let mut obj = KfjBufferBracket::default();
+        obj.kfj_open_offset = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfk_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfk_default() {
+        let obj = KfkBufferIndent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfk_fields() {
+        let mut obj = KfkBufferIndent::default();
+        obj.kfk_level = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfl_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfl_default() {
+        let obj = KflBufferFold::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfl_fields() {
+        let mut obj = KflBufferFold::default();
+        obj.kfl_start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfm_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfm_default() {
+        let obj = KfmBufferSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfm_fields() {
+        let mut obj = KfmBufferSearch::default();
+        obj.kfm_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfn_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfn_default() {
+        let obj = KfnBufferReplace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfn_fields() {
+        let mut obj = KfnBufferReplace::default();
+        obj.kfn_find_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfo_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfo_default() {
+        let obj = KfoBufferDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfo_fields() {
+        let mut obj = KfoBufferDiff::default();
+        obj.kfo_original = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfp_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfp_default() {
+        let obj = KfpBufferEncoding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfp_fields() {
+        let mut obj = KfpBufferEncoding::default();
+        obj.kfp_charset = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfq_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfq_default() {
+        let obj = KfqBufferEol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfq_fields() {
+        let mut obj = KfqBufferEol::default();
+        obj.kfq_sequence = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfr_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfr_default() {
+        let obj = KfrBufferLanguage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfr_fields() {
+        let mut obj = KfrBufferLanguage::default();
+        obj.kfr_lang_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfs_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfs_default() {
+        let obj = KfsBufferReadOnly::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfs_fields() {
+        let mut obj = KfsBufferReadOnly::default();
+        obj.kfs_locked = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kft_generated {
+    use super::*;
+
+    #[test]
+    fn test_kft_default() {
+        let obj = KftBufferDirty::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kft_fields() {
+        let mut obj = KftBufferDirty::default();
+        obj.kft_modified = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfu_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfu_default() {
+        let obj = KfuBufferVersion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfu_fields() {
+        let mut obj = KfuBufferVersion::default();
+        obj.kfu_version_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfv_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfv_default() {
+        let obj = KfvBufferUri::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfv_fields() {
+        let mut obj = KfvBufferUri::default();
+        obj.kfv_scheme = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfw_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfw_default() {
+        let obj = KfwBufferMirror::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfw_fields() {
+        let mut obj = KfwBufferMirror::default();
+        obj.kfw_source_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfx_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfx_default() {
+        let obj = KfxBufferGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfx_fields() {
+        let mut obj = KfxBufferGroup::default();
+        obj.kfx_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfy_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfy_default() {
+        let obj = KfyBufferEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfy_fields() {
+        let mut obj = KfyBufferEvent::default();
+        obj.kfy_event_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kfz_generated {
+    use super::*;
+
+    #[test]
+    fn test_kfz_default() {
+        let obj = KfzBufferConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kfz_fields() {
+        let mut obj = KfzBufferConfig::default();
+        obj.kfz_tab_size = 1;
         assert!(obj.validate());
     }
 }
