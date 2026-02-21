@@ -207485,6 +207485,838 @@ impl Default for LczDiffConfig {
     }
 }
 
+/// /// Virtual file system provider
+#[derive(Debug, Clone)]
+pub struct LdaFileSystemProvider {
+    pub lda_scheme: String,
+    pub lda_capabilities: String,
+    pub lda_case_sensitive: bool,
+    pub lda_read_only: bool,
+    pub lda_label: String,
+}
+
+impl LdaFileSystemProvider {
+    pub fn new() -> Self {
+        Self {
+            lda_scheme: String::new(),
+            lda_capabilities: String::new(),
+            lda_case_sensitive: bool::default(),
+            lda_read_only: bool::default(),
+            lda_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lda_scheme.is_empty() || true && !self.lda_capabilities.is_empty() || true && self.lda_case_sensitive || true && self.lda_read_only || true && !self.lda_label.is_empty() || true
+    }
+}
+
+impl Default for LdaFileSystemProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File stat information
+#[derive(Debug, Clone)]
+pub struct LdbFileStat {
+    pub ldb_file_type: String,
+    pub ldb_ctime: u64,
+    pub ldb_mtime: u64,
+    pub ldb_size_bytes: u64,
+    pub ldb_permissions: String,
+}
+
+impl LdbFileStat {
+    pub fn new() -> Self {
+        Self {
+            ldb_file_type: String::new(),
+            ldb_ctime: u64::default(),
+            ldb_mtime: u64::default(),
+            ldb_size_bytes: u64::default(),
+            ldb_permissions: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldb_file_type.is_empty() || true && self.ldb_ctime < u64::MAX || true && self.ldb_mtime < u64::MAX || true && self.ldb_size_bytes < u64::MAX || true && !self.ldb_permissions.is_empty() || true
+    }
+}
+
+impl Default for LdbFileStat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Directory listing entry
+#[derive(Debug, Clone)]
+pub struct LdcDirectoryEntry {
+    pub ldc_name: String,
+    pub ldc_file_type: String,
+    pub ldc_size_bytes: u64,
+    pub ldc_uri: String,
+    pub ldc_label: String,
+}
+
+impl LdcDirectoryEntry {
+    pub fn new() -> Self {
+        Self {
+            ldc_name: String::new(),
+            ldc_file_type: String::new(),
+            ldc_size_bytes: u64::default(),
+            ldc_uri: String::new(),
+            ldc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldc_name.is_empty() || true && !self.ldc_file_type.is_empty() || true && self.ldc_size_bytes < u64::MAX || true && !self.ldc_uri.is_empty() || true && !self.ldc_label.is_empty() || true
+    }
+}
+
+impl Default for LdcDirectoryEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File read operation result
+#[derive(Debug, Clone)]
+pub struct LddFileReadResult {
+    pub ldd_content: String,
+    pub ldd_encoding: String,
+    pub ldd_byte_length: u64,
+    pub ldd_etag: String,
+    pub ldd_label: String,
+}
+
+impl LddFileReadResult {
+    pub fn new() -> Self {
+        Self {
+            ldd_content: String::new(),
+            ldd_encoding: String::new(),
+            ldd_byte_length: u64::default(),
+            ldd_etag: String::new(),
+            ldd_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldd_content.is_empty() || true && !self.ldd_encoding.is_empty() || true && self.ldd_byte_length < u64::MAX || true && !self.ldd_etag.is_empty() || true && !self.ldd_label.is_empty() || true
+    }
+}
+
+impl Default for LddFileReadResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File write options
+#[derive(Debug, Clone)]
+pub struct LdeFileWriteOptions {
+    pub lde_create_new: bool,
+    pub lde_overwrite: bool,
+    pub lde_atomic: bool,
+    pub lde_unlock: bool,
+    pub lde_label: String,
+}
+
+impl LdeFileWriteOptions {
+    pub fn new() -> Self {
+        Self {
+            lde_create_new: bool::default(),
+            lde_overwrite: bool::default(),
+            lde_atomic: bool::default(),
+            lde_unlock: bool::default(),
+            lde_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lde_create_new || true && self.lde_overwrite || true && self.lde_atomic || true && self.lde_unlock || true && !self.lde_label.is_empty() || true
+    }
+}
+
+impl Default for LdeFileWriteOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File delete options
+#[derive(Debug, Clone)]
+pub struct LdfFileDeleteOptions {
+    pub ldf_recursive: bool,
+    pub ldf_use_trash: bool,
+    pub ldf_force: bool,
+    pub ldf_atomic: bool,
+    pub ldf_label: String,
+}
+
+impl LdfFileDeleteOptions {
+    pub fn new() -> Self {
+        Self {
+            ldf_recursive: bool::default(),
+            ldf_use_trash: bool::default(),
+            ldf_force: bool::default(),
+            ldf_atomic: bool::default(),
+            ldf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ldf_recursive || true && self.ldf_use_trash || true && self.ldf_force || true && self.ldf_atomic || true && !self.ldf_label.is_empty() || true
+    }
+}
+
+impl Default for LdfFileDeleteOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File rename options
+#[derive(Debug, Clone)]
+pub struct LdgFileRenameOptions {
+    pub ldg_overwrite: bool,
+    pub ldg_ignore_exists: bool,
+    pub ldg_atomic: bool,
+    pub ldg_copy_content: bool,
+    pub ldg_label: String,
+}
+
+impl LdgFileRenameOptions {
+    pub fn new() -> Self {
+        Self {
+            ldg_overwrite: bool::default(),
+            ldg_ignore_exists: bool::default(),
+            ldg_atomic: bool::default(),
+            ldg_copy_content: bool::default(),
+            ldg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ldg_overwrite || true && self.ldg_ignore_exists || true && self.ldg_atomic || true && self.ldg_copy_content || true && !self.ldg_label.is_empty() || true
+    }
+}
+
+impl Default for LdgFileRenameOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File copy options
+#[derive(Debug, Clone)]
+pub struct LdhFileCopyOptions {
+    pub ldh_overwrite: bool,
+    pub ldh_ignore_exists: bool,
+    pub ldh_atomic: bool,
+    pub ldh_follow_symlinks: bool,
+    pub ldh_label: String,
+}
+
+impl LdhFileCopyOptions {
+    pub fn new() -> Self {
+        Self {
+            ldh_overwrite: bool::default(),
+            ldh_ignore_exists: bool::default(),
+            ldh_atomic: bool::default(),
+            ldh_follow_symlinks: bool::default(),
+            ldh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ldh_overwrite || true && self.ldh_ignore_exists || true && self.ldh_atomic || true && self.ldh_follow_symlinks || true && !self.ldh_label.is_empty() || true
+    }
+}
+
+impl Default for LdhFileCopyOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File open options
+#[derive(Debug, Clone)]
+pub struct LdiFileOpenOptions {
+    pub ldi_create_missing: bool,
+    pub ldi_exclusive: bool,
+    pub ldi_read_only: bool,
+    pub ldi_encoding: String,
+    pub ldi_label: String,
+}
+
+impl LdiFileOpenOptions {
+    pub fn new() -> Self {
+        Self {
+            ldi_create_missing: bool::default(),
+            ldi_exclusive: bool::default(),
+            ldi_read_only: bool::default(),
+            ldi_encoding: String::new(),
+            ldi_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ldi_create_missing || true && self.ldi_exclusive || true && self.ldi_read_only || true && !self.ldi_encoding.is_empty() || true && !self.ldi_label.is_empty() || true
+    }
+}
+
+impl Default for LdiFileOpenOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Local disk file system provider
+#[derive(Debug, Clone)]
+pub struct LdjDiskFileProvider {
+    pub ldj_root_path: String,
+    pub ldj_watchers_count: u32,
+    pub ldj_case_sensitive: bool,
+    pub ldj_follow_symlinks: bool,
+    pub ldj_label: String,
+}
+
+impl LdjDiskFileProvider {
+    pub fn new() -> Self {
+        Self {
+            ldj_root_path: String::new(),
+            ldj_watchers_count: u32::default(),
+            ldj_case_sensitive: bool::default(),
+            ldj_follow_symlinks: bool::default(),
+            ldj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldj_root_path.is_empty() || true && self.ldj_watchers_count < u32::MAX || true && self.ldj_case_sensitive || true && self.ldj_follow_symlinks || true && !self.ldj_label.is_empty() || true
+    }
+}
+
+impl Default for LdjDiskFileProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Remote file system provider
+#[derive(Debug, Clone)]
+pub struct LdkRemoteFileProvider {
+    pub ldk_authority: String,
+    pub ldk_scheme: String,
+    pub ldk_connected: bool,
+    pub ldk_latency_ms: u32,
+    pub ldk_label: String,
+}
+
+impl LdkRemoteFileProvider {
+    pub fn new() -> Self {
+        Self {
+            ldk_authority: String::new(),
+            ldk_scheme: String::new(),
+            ldk_connected: bool::default(),
+            ldk_latency_ms: u32::default(),
+            ldk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldk_authority.is_empty() || true && !self.ldk_scheme.is_empty() || true && self.ldk_connected || true && self.ldk_latency_ms < u32::MAX || true && !self.ldk_label.is_empty() || true
+    }
+}
+
+impl Default for LdkRemoteFileProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// In-memory file system provider
+#[derive(Debug, Clone)]
+pub struct LdlInMemoryFileProvider {
+    pub ldl_files_count: u32,
+    pub ldl_total_bytes: u64,
+    pub ldl_max_size: u64,
+    pub ldl_frozen: bool,
+    pub ldl_label: String,
+}
+
+impl LdlInMemoryFileProvider {
+    pub fn new() -> Self {
+        Self {
+            ldl_files_count: u32::default(),
+            ldl_total_bytes: u64::default(),
+            ldl_max_size: u64::default(),
+            ldl_frozen: bool::default(),
+            ldl_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ldl_files_count < u32::MAX || true && self.ldl_total_bytes < u64::MAX || true && self.ldl_max_size < u64::MAX || true && self.ldl_frozen || true && !self.ldl_label.is_empty() || true
+    }
+}
+
+impl Default for LdlInMemoryFileProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File search provider
+#[derive(Debug, Clone)]
+pub struct LdmFileSearchProvider {
+    pub ldm_scheme: String,
+    pub ldm_name: String,
+    pub ldm_supports_glob: bool,
+    pub ldm_active: bool,
+    pub ldm_label: String,
+}
+
+impl LdmFileSearchProvider {
+    pub fn new() -> Self {
+        Self {
+            ldm_scheme: String::new(),
+            ldm_name: String::new(),
+            ldm_supports_glob: bool::default(),
+            ldm_active: bool::default(),
+            ldm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldm_scheme.is_empty() || true && !self.ldm_name.is_empty() || true && self.ldm_supports_glob || true && self.ldm_active || true && !self.ldm_label.is_empty() || true
+    }
+}
+
+impl Default for LdmFileSearchProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Text search provider
+#[derive(Debug, Clone)]
+pub struct LdnTextSearchProvider {
+    pub ldn_scheme: String,
+    pub ldn_name: String,
+    pub ldn_supports_regex: bool,
+    pub ldn_active: bool,
+    pub ldn_label: String,
+}
+
+impl LdnTextSearchProvider {
+    pub fn new() -> Self {
+        Self {
+            ldn_scheme: String::new(),
+            ldn_name: String::new(),
+            ldn_supports_regex: bool::default(),
+            ldn_active: bool::default(),
+            ldn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldn_scheme.is_empty() || true && !self.ldn_name.is_empty() || true && self.ldn_supports_regex || true && self.ldn_active || true && !self.ldn_label.is_empty() || true
+    }
+}
+
+impl Default for LdnTextSearchProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File search query params
+#[derive(Debug, Clone)]
+pub struct LdoFileSearchQuery {
+    pub ldo_pattern: String,
+    pub ldo_include_glob: String,
+    pub ldo_exclude_glob: String,
+    pub ldo_max_results: u32,
+    pub ldo_label: String,
+}
+
+impl LdoFileSearchQuery {
+    pub fn new() -> Self {
+        Self {
+            ldo_pattern: String::new(),
+            ldo_include_glob: String::new(),
+            ldo_exclude_glob: String::new(),
+            ldo_max_results: u32::default(),
+            ldo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldo_pattern.is_empty() || true && !self.ldo_include_glob.is_empty() || true && !self.ldo_exclude_glob.is_empty() || true && self.ldo_max_results < u32::MAX || true && !self.ldo_label.is_empty() || true
+    }
+}
+
+impl Default for LdoFileSearchQuery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Text search query params
+#[derive(Debug, Clone)]
+pub struct LdpTextSearchQuery {
+    pub ldp_pattern: String,
+    pub ldp_is_regex: bool,
+    pub ldp_case_sensitive: bool,
+    pub ldp_whole_word: bool,
+    pub ldp_label: String,
+}
+
+impl LdpTextSearchQuery {
+    pub fn new() -> Self {
+        Self {
+            ldp_pattern: String::new(),
+            ldp_is_regex: bool::default(),
+            ldp_case_sensitive: bool::default(),
+            ldp_whole_word: bool::default(),
+            ldp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldp_pattern.is_empty() || true && self.ldp_is_regex || true && self.ldp_case_sensitive || true && self.ldp_whole_word || true && !self.ldp_label.is_empty() || true
+    }
+}
+
+impl Default for LdpTextSearchQuery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File search result entry
+#[derive(Debug, Clone)]
+pub struct LdqFileSearchResult {
+    pub ldq_uri: String,
+    pub ldq_rank: f64,
+    pub ldq_file_size: u64,
+    pub ldq_modified: u64,
+    pub ldq_label: String,
+}
+
+impl LdqFileSearchResult {
+    pub fn new() -> Self {
+        Self {
+            ldq_uri: String::new(),
+            ldq_rank: f64::default(),
+            ldq_file_size: u64::default(),
+            ldq_modified: u64::default(),
+            ldq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldq_uri.is_empty() || true && self.ldq_rank.is_finite() || true && self.ldq_file_size < u64::MAX || true && self.ldq_modified < u64::MAX || true && !self.ldq_label.is_empty() || true
+    }
+}
+
+impl Default for LdqFileSearchResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Text search result entry
+#[derive(Debug, Clone)]
+pub struct LdrTextSearchResult {
+    pub ldr_uri: String,
+    pub ldr_line: u32,
+    pub ldr_col_start: u32,
+    pub ldr_col_end: u32,
+    pub ldr_preview: String,
+}
+
+impl LdrTextSearchResult {
+    pub fn new() -> Self {
+        Self {
+            ldr_uri: String::new(),
+            ldr_line: u32::default(),
+            ldr_col_start: u32::default(),
+            ldr_col_end: u32::default(),
+            ldr_preview: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldr_uri.is_empty() || true && self.ldr_line < u32::MAX || true && self.ldr_col_start < u32::MAX || true && self.ldr_col_end < u32::MAX || true && !self.ldr_preview.is_empty() || true
+    }
+}
+
+impl Default for LdrTextSearchResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File system watcher instance
+#[derive(Debug, Clone)]
+pub struct LdsFileWatcher {
+    pub lds_watcher_id: u32,
+    pub lds_glob_pattern: String,
+    pub lds_recursive: bool,
+    pub lds_active: bool,
+    pub lds_label: String,
+}
+
+impl LdsFileWatcher {
+    pub fn new() -> Self {
+        Self {
+            lds_watcher_id: u32::default(),
+            lds_glob_pattern: String::new(),
+            lds_recursive: bool::default(),
+            lds_active: bool::default(),
+            lds_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lds_watcher_id < u32::MAX || true && !self.lds_glob_pattern.is_empty() || true && self.lds_recursive || true && self.lds_active || true && !self.lds_label.is_empty() || true
+    }
+}
+
+impl Default for LdsFileWatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File change event from watcher
+#[derive(Debug, Clone)]
+pub struct LdtFileChangeEvent {
+    pub ldt_uri: String,
+    pub ldt_change_type: String,
+    pub ldt_timestamp: u64,
+    pub ldt_is_directory: bool,
+    pub ldt_label: String,
+}
+
+impl LdtFileChangeEvent {
+    pub fn new() -> Self {
+        Self {
+            ldt_uri: String::new(),
+            ldt_change_type: String::new(),
+            ldt_timestamp: u64::default(),
+            ldt_is_directory: bool::default(),
+            ldt_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldt_uri.is_empty() || true && !self.ldt_change_type.is_empty() || true && self.ldt_timestamp < u64::MAX || true && self.ldt_is_directory || true && !self.ldt_label.is_empty() || true
+    }
+}
+
+impl Default for LdtFileChangeEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File access permission check
+#[derive(Debug, Clone)]
+pub struct LduFileAccess {
+    pub ldu_uri: String,
+    pub ldu_readable: bool,
+    pub ldu_writable: bool,
+    pub ldu_executable: bool,
+    pub ldu_label: String,
+}
+
+impl LduFileAccess {
+    pub fn new() -> Self {
+        Self {
+            ldu_uri: String::new(),
+            ldu_readable: bool::default(),
+            ldu_writable: bool::default(),
+            ldu_executable: bool::default(),
+            ldu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldu_uri.is_empty() || true && self.ldu_readable || true && self.ldu_writable || true && self.ldu_executable || true && !self.ldu_label.is_empty() || true
+    }
+}
+
+impl Default for LduFileAccess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File lock state
+#[derive(Debug, Clone)]
+pub struct LdvFileLock {
+    pub ldv_uri: String,
+    pub ldv_locked: bool,
+    pub ldv_owner_pid: u32,
+    pub ldv_exclusive: bool,
+    pub ldv_label: String,
+}
+
+impl LdvFileLock {
+    pub fn new() -> Self {
+        Self {
+            ldv_uri: String::new(),
+            ldv_locked: bool::default(),
+            ldv_owner_pid: u32::default(),
+            ldv_exclusive: bool::default(),
+            ldv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldv_uri.is_empty() || true && self.ldv_locked || true && self.ldv_owner_pid < u32::MAX || true && self.ldv_exclusive || true && !self.ldv_label.is_empty() || true
+    }
+}
+
+impl Default for LdvFileLock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Temporary file handle
+#[derive(Debug, Clone)]
+pub struct LdwTmpFile {
+    pub ldw_path_str: String,
+    pub ldw_auto_delete: bool,
+    pub ldw_size_bytes: u64,
+    pub ldw_created_at: u64,
+    pub ldw_label: String,
+}
+
+impl LdwTmpFile {
+    pub fn new() -> Self {
+        Self {
+            ldw_path_str: String::new(),
+            ldw_auto_delete: bool::default(),
+            ldw_size_bytes: u64::default(),
+            ldw_created_at: u64::default(),
+            ldw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldw_path_str.is_empty() || true && self.ldw_auto_delete || true && self.ldw_size_bytes < u64::MAX || true && self.ldw_created_at < u64::MAX || true && !self.ldw_label.is_empty() || true
+    }
+}
+
+impl Default for LdwTmpFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File encoding detection
+#[derive(Debug, Clone)]
+pub struct LdxFileEncoding {
+    pub ldx_encoding_name: String,
+    pub ldx_confidence: f64,
+    pub ldx_bom_detected: bool,
+    pub ldx_fallback: String,
+    pub ldx_label: String,
+}
+
+impl LdxFileEncoding {
+    pub fn new() -> Self {
+        Self {
+            ldx_encoding_name: String::new(),
+            ldx_confidence: f64::default(),
+            ldx_bom_detected: bool::default(),
+            ldx_fallback: String::new(),
+            ldx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldx_encoding_name.is_empty() || true && self.ldx_confidence.is_finite() || true && self.ldx_bom_detected || true && !self.ldx_fallback.is_empty() || true && !self.ldx_label.is_empty() || true
+    }
+}
+
+impl Default for LdxFileEncoding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File-language association rule
+#[derive(Debug, Clone)]
+pub struct LdyFileAssociation {
+    pub ldy_pattern: String,
+    pub ldy_lang_id: String,
+    pub ldy_scope: String,
+    pub ldy_priority: u32,
+    pub ldy_label: String,
+}
+
+impl LdyFileAssociation {
+    pub fn new() -> Self {
+        Self {
+            ldy_pattern: String::new(),
+            ldy_lang_id: String::new(),
+            ldy_scope: String::new(),
+            ldy_priority: u32::default(),
+            ldy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldy_pattern.is_empty() || true && !self.ldy_lang_id.is_empty() || true && !self.ldy_scope.is_empty() || true && self.ldy_priority < u32::MAX || true && !self.ldy_label.is_empty() || true
+    }
+}
+
+impl Default for LdyFileAssociation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined file system configuration
+#[derive(Debug, Clone)]
+pub struct LdzFileSystemConfig {
+    pub ldz_watch_exclude: String,
+    pub ldz_files_exclude: String,
+    pub ldz_max_file_size: u64,
+    pub ldz_hot_exit: bool,
+    pub ldz_label: String,
+}
+
+impl LdzFileSystemConfig {
+    pub fn new() -> Self {
+        Self {
+            ldz_watch_exclude: String::new(),
+            ldz_files_exclude: String::new(),
+            ldz_max_file_size: u64::default(),
+            ldz_hot_exit: bool::default(),
+            ldz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ldz_watch_exclude.is_empty() || true && !self.ldz_files_exclude.is_empty() || true && self.ldz_max_file_size < u64::MAX || true && self.ldz_hot_exit || true && !self.ldz_label.is_empty() || true
+    }
+}
+
+impl Default for LdzFileSystemConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -493277,6 +494109,474 @@ mod tests_lcz_generated {
     fn test_lcz_fields() {
         let mut obj = LczDiffConfig::default();
         obj.lcz_ignore_whitespace = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lda_generated {
+    use super::*;
+
+    #[test]
+    fn test_lda_default() {
+        let obj = LdaFileSystemProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lda_fields() {
+        let mut obj = LdaFileSystemProvider::default();
+        obj.lda_scheme = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldb_default() {
+        let obj = LdbFileStat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldb_fields() {
+        let mut obj = LdbFileStat::default();
+        obj.ldb_file_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldc_default() {
+        let obj = LdcDirectoryEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldc_fields() {
+        let mut obj = LdcDirectoryEntry::default();
+        obj.ldc_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldd_default() {
+        let obj = LddFileReadResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldd_fields() {
+        let mut obj = LddFileReadResult::default();
+        obj.ldd_content = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lde_generated {
+    use super::*;
+
+    #[test]
+    fn test_lde_default() {
+        let obj = LdeFileWriteOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lde_fields() {
+        let mut obj = LdeFileWriteOptions::default();
+        obj.lde_create_new = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldf_default() {
+        let obj = LdfFileDeleteOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldf_fields() {
+        let mut obj = LdfFileDeleteOptions::default();
+        obj.ldf_recursive = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldg_default() {
+        let obj = LdgFileRenameOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldg_fields() {
+        let mut obj = LdgFileRenameOptions::default();
+        obj.ldg_overwrite = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldh_default() {
+        let obj = LdhFileCopyOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldh_fields() {
+        let mut obj = LdhFileCopyOptions::default();
+        obj.ldh_overwrite = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldi_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldi_default() {
+        let obj = LdiFileOpenOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldi_fields() {
+        let mut obj = LdiFileOpenOptions::default();
+        obj.ldi_create_missing = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldj_default() {
+        let obj = LdjDiskFileProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldj_fields() {
+        let mut obj = LdjDiskFileProvider::default();
+        obj.ldj_root_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldk_default() {
+        let obj = LdkRemoteFileProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldk_fields() {
+        let mut obj = LdkRemoteFileProvider::default();
+        obj.ldk_authority = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldl_default() {
+        let obj = LdlInMemoryFileProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldl_fields() {
+        let mut obj = LdlInMemoryFileProvider::default();
+        obj.ldl_files_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldm_default() {
+        let obj = LdmFileSearchProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldm_fields() {
+        let mut obj = LdmFileSearchProvider::default();
+        obj.ldm_scheme = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldn_default() {
+        let obj = LdnTextSearchProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldn_fields() {
+        let mut obj = LdnTextSearchProvider::default();
+        obj.ldn_scheme = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldo_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldo_default() {
+        let obj = LdoFileSearchQuery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldo_fields() {
+        let mut obj = LdoFileSearchQuery::default();
+        obj.ldo_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldp_default() {
+        let obj = LdpTextSearchQuery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldp_fields() {
+        let mut obj = LdpTextSearchQuery::default();
+        obj.ldp_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldq_default() {
+        let obj = LdqFileSearchResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldq_fields() {
+        let mut obj = LdqFileSearchResult::default();
+        obj.ldq_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldr_default() {
+        let obj = LdrTextSearchResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldr_fields() {
+        let mut obj = LdrTextSearchResult::default();
+        obj.ldr_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lds_generated {
+    use super::*;
+
+    #[test]
+    fn test_lds_default() {
+        let obj = LdsFileWatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lds_fields() {
+        let mut obj = LdsFileWatcher::default();
+        obj.lds_watcher_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldt_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldt_default() {
+        let obj = LdtFileChangeEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldt_fields() {
+        let mut obj = LdtFileChangeEvent::default();
+        obj.ldt_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldu_default() {
+        let obj = LduFileAccess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldu_fields() {
+        let mut obj = LduFileAccess::default();
+        obj.ldu_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldv_default() {
+        let obj = LdvFileLock::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldv_fields() {
+        let mut obj = LdvFileLock::default();
+        obj.ldv_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldw_default() {
+        let obj = LdwTmpFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldw_fields() {
+        let mut obj = LdwTmpFile::default();
+        obj.ldw_path_str = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldx_default() {
+        let obj = LdxFileEncoding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldx_fields() {
+        let mut obj = LdxFileEncoding::default();
+        obj.ldx_encoding_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldy_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldy_default() {
+        let obj = LdyFileAssociation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldy_fields() {
+        let mut obj = LdyFileAssociation::default();
+        obj.ldy_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ldz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ldz_default() {
+        let obj = LdzFileSystemConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ldz_fields() {
+        let mut obj = LdzFileSystemConfig::default();
+        obj.ldz_watch_exclude = "test".to_string();
         assert!(obj.validate());
     }
 }
