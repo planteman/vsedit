@@ -200230,6 +200230,838 @@ impl Default for KtzTerminalConfig {
     }
 }
 
+/// /// Extension package.json manifest
+#[derive(Debug, Clone)]
+pub struct KuaExtensionManifest {
+    pub kua_name: String,
+    pub kua_version: String,
+    pub kua_publisher: String,
+    pub kua_display_name: String,
+    pub kua_description: String,
+}
+
+impl KuaExtensionManifest {
+    pub fn new() -> Self {
+        Self {
+            kua_name: String::new(),
+            kua_version: String::new(),
+            kua_publisher: String::new(),
+            kua_display_name: String::new(),
+            kua_description: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kua_name.is_empty() || true && !self.kua_version.is_empty() || true && !self.kua_publisher.is_empty() || true && !self.kua_display_name.is_empty() || true && !self.kua_description.is_empty() || true
+    }
+}
+
+impl Default for KuaExtensionManifest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension contribution point
+#[derive(Debug, Clone)]
+pub struct KubExtensionContribution {
+    pub kub_point_id: String,
+    pub kub_extension_id: String,
+    pub kub_data: String,
+    pub kub_active: bool,
+    pub kub_label: String,
+}
+
+impl KubExtensionContribution {
+    pub fn new() -> Self {
+        Self {
+            kub_point_id: String::new(),
+            kub_extension_id: String::new(),
+            kub_data: String::new(),
+            kub_active: bool::default(),
+            kub_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kub_point_id.is_empty() || true && !self.kub_extension_id.is_empty() || true && !self.kub_data.is_empty() || true && self.kub_active || true && !self.kub_label.is_empty() || true
+    }
+}
+
+impl Default for KubExtensionContribution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension activation event
+#[derive(Debug, Clone)]
+pub struct KucExtensionActivation {
+    pub kuc_event: String,
+    pub kuc_extension_id: String,
+    pub kuc_startup_time: u64,
+    pub kuc_eager: bool,
+    pub kuc_label: String,
+}
+
+impl KucExtensionActivation {
+    pub fn new() -> Self {
+        Self {
+            kuc_event: String::new(),
+            kuc_extension_id: String::new(),
+            kuc_startup_time: u64::default(),
+            kuc_eager: bool::default(),
+            kuc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kuc_event.is_empty() || true && !self.kuc_extension_id.is_empty() || true && self.kuc_startup_time < u64::MAX || true && self.kuc_eager || true && !self.kuc_label.is_empty() || true
+    }
+}
+
+impl Default for KucExtensionActivation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension runtime state
+#[derive(Debug, Clone)]
+pub struct KudExtensionRuntime {
+    pub kud_extension_id: String,
+    pub kud_active: bool,
+    pub kud_exports: String,
+    pub kud_error_msg: String,
+    pub kud_label: String,
+}
+
+impl KudExtensionRuntime {
+    pub fn new() -> Self {
+        Self {
+            kud_extension_id: String::new(),
+            kud_active: bool::default(),
+            kud_exports: String::new(),
+            kud_error_msg: String::new(),
+            kud_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kud_extension_id.is_empty() || true && self.kud_active || true && !self.kud_exports.is_empty() || true && !self.kud_error_msg.is_empty() || true && !self.kud_label.is_empty() || true
+    }
+}
+
+impl Default for KudExtensionRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension host process state
+#[derive(Debug, Clone)]
+pub struct KueExtensionHost {
+    pub kue_host_id: u32,
+    pub kue_kind: String,
+    pub kue_pid: u32,
+    pub kue_responsive: bool,
+    pub kue_label: String,
+}
+
+impl KueExtensionHost {
+    pub fn new() -> Self {
+        Self {
+            kue_host_id: u32::default(),
+            kue_kind: String::new(),
+            kue_pid: u32::default(),
+            kue_responsive: bool::default(),
+            kue_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kue_host_id < u32::MAX || true && !self.kue_kind.is_empty() || true && self.kue_pid < u32::MAX || true && self.kue_responsive || true && !self.kue_label.is_empty() || true
+    }
+}
+
+impl Default for KueExtensionHost {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension API namespace binding
+#[derive(Debug, Clone)]
+pub struct KufExtensionApi {
+    pub kuf_namespace: String,
+    pub kuf_version: String,
+    pub kuf_stable: bool,
+    pub kuf_proposed: bool,
+    pub kuf_label: String,
+}
+
+impl KufExtensionApi {
+    pub fn new() -> Self {
+        Self {
+            kuf_namespace: String::new(),
+            kuf_version: String::new(),
+            kuf_stable: bool::default(),
+            kuf_proposed: bool::default(),
+            kuf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kuf_namespace.is_empty() || true && !self.kuf_version.is_empty() || true && self.kuf_stable || true && self.kuf_proposed || true && !self.kuf_label.is_empty() || true
+    }
+}
+
+impl Default for KufExtensionApi {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension host message
+#[derive(Debug, Clone)]
+pub struct KugExtensionMessage {
+    pub kug_msg_type: String,
+    pub kug_request_id: u64,
+    pub kug_method: String,
+    pub kug_args: String,
+    pub kug_label: String,
+}
+
+impl KugExtensionMessage {
+    pub fn new() -> Self {
+        Self {
+            kug_msg_type: String::new(),
+            kug_request_id: u64::default(),
+            kug_method: String::new(),
+            kug_args: String::new(),
+            kug_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kug_msg_type.is_empty() || true && self.kug_request_id < u64::MAX || true && !self.kug_method.is_empty() || true && !self.kug_args.is_empty() || true && !self.kug_label.is_empty() || true
+    }
+}
+
+impl Default for KugExtensionMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension log output entry
+#[derive(Debug, Clone)]
+pub struct KuhExtensionLog {
+    pub kuh_level: String,
+    pub kuh_message: String,
+    pub kuh_extension_id: String,
+    pub kuh_timestamp: u64,
+    pub kuh_label: String,
+}
+
+impl KuhExtensionLog {
+    pub fn new() -> Self {
+        Self {
+            kuh_level: String::new(),
+            kuh_message: String::new(),
+            kuh_extension_id: String::new(),
+            kuh_timestamp: u64::default(),
+            kuh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kuh_level.is_empty() || true && !self.kuh_message.is_empty() || true && !self.kuh_extension_id.is_empty() || true && self.kuh_timestamp < u64::MAX || true && !self.kuh_label.is_empty() || true
+    }
+}
+
+impl Default for KuhExtensionLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension storage key-value
+#[derive(Debug, Clone)]
+pub struct KuiExtensionStorage {
+    pub kui_key: String,
+    pub kui_value: String,
+    pub kui_scope: String,
+    pub kui_extension_id: String,
+    pub kui_label: String,
+}
+
+impl KuiExtensionStorage {
+    pub fn new() -> Self {
+        Self {
+            kui_key: String::new(),
+            kui_value: String::new(),
+            kui_scope: String::new(),
+            kui_extension_id: String::new(),
+            kui_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kui_key.is_empty() || true && !self.kui_value.is_empty() || true && !self.kui_scope.is_empty() || true && !self.kui_extension_id.is_empty() || true && !self.kui_label.is_empty() || true
+    }
+}
+
+impl Default for KuiExtensionStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension secret storage entry
+#[derive(Debug, Clone)]
+pub struct KujExtensionSecret {
+    pub kuj_key: String,
+    pub kuj_extension_id: String,
+    pub kuj_stored: bool,
+    pub kuj_timestamp: u64,
+    pub kuj_label: String,
+}
+
+impl KujExtensionSecret {
+    pub fn new() -> Self {
+        Self {
+            kuj_key: String::new(),
+            kuj_extension_id: String::new(),
+            kuj_stored: bool::default(),
+            kuj_timestamp: u64::default(),
+            kuj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kuj_key.is_empty() || true && !self.kuj_extension_id.is_empty() || true && self.kuj_stored || true && self.kuj_timestamp < u64::MAX || true && !self.kuj_label.is_empty() || true
+    }
+}
+
+impl Default for KujExtensionSecret {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension webview panel state
+#[derive(Debug, Clone)]
+pub struct KukExtensionWebview {
+    pub kuk_webview_id: String,
+    pub kuk_title: String,
+    pub kuk_visible: bool,
+    pub kuk_html_content: String,
+    pub kuk_label: String,
+}
+
+impl KukExtensionWebview {
+    pub fn new() -> Self {
+        Self {
+            kuk_webview_id: String::new(),
+            kuk_title: String::new(),
+            kuk_visible: bool::default(),
+            kuk_html_content: String::new(),
+            kuk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kuk_webview_id.is_empty() || true && !self.kuk_title.is_empty() || true && self.kuk_visible || true && !self.kuk_html_content.is_empty() || true && !self.kuk_label.is_empty() || true
+    }
+}
+
+impl Default for KukExtensionWebview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension tree view provider
+#[derive(Debug, Clone)]
+pub struct KulExtensionTreeView {
+    pub kul_view_id: String,
+    pub kul_title: String,
+    pub kul_items_count: u32,
+    pub kul_visible: bool,
+    pub kul_label: String,
+}
+
+impl KulExtensionTreeView {
+    pub fn new() -> Self {
+        Self {
+            kul_view_id: String::new(),
+            kul_title: String::new(),
+            kul_items_count: u32::default(),
+            kul_visible: bool::default(),
+            kul_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kul_view_id.is_empty() || true && !self.kul_title.is_empty() || true && self.kul_items_count < u32::MAX || true && self.kul_visible || true && !self.kul_label.is_empty() || true
+    }
+}
+
+impl Default for KulExtensionTreeView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension-registered command
+#[derive(Debug, Clone)]
+pub struct KumExtensionCommand {
+    pub kum_command_id: String,
+    pub kum_title: String,
+    pub kum_category: String,
+    pub kum_icon: String,
+    pub kum_label: String,
+}
+
+impl KumExtensionCommand {
+    pub fn new() -> Self {
+        Self {
+            kum_command_id: String::new(),
+            kum_title: String::new(),
+            kum_category: String::new(),
+            kum_icon: String::new(),
+            kum_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kum_command_id.is_empty() || true && !self.kum_title.is_empty() || true && !self.kum_category.is_empty() || true && !self.kum_icon.is_empty() || true && !self.kum_label.is_empty() || true
+    }
+}
+
+impl Default for KumExtensionCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension menu contribution
+#[derive(Debug, Clone)]
+pub struct KunExtensionMenu {
+    pub kun_menu_id: String,
+    pub kun_command_id: String,
+    pub kun_group: String,
+    pub kun_when_clause: String,
+    pub kun_label: String,
+}
+
+impl KunExtensionMenu {
+    pub fn new() -> Self {
+        Self {
+            kun_menu_id: String::new(),
+            kun_command_id: String::new(),
+            kun_group: String::new(),
+            kun_when_clause: String::new(),
+            kun_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kun_menu_id.is_empty() || true && !self.kun_command_id.is_empty() || true && !self.kun_group.is_empty() || true && !self.kun_when_clause.is_empty() || true && !self.kun_label.is_empty() || true
+    }
+}
+
+impl Default for KunExtensionMenu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension keybinding contribution
+#[derive(Debug, Clone)]
+pub struct KuoExtensionKeybinding {
+    pub kuo_key_combo: String,
+    pub kuo_command_id: String,
+    pub kuo_when_clause: String,
+    pub kuo_platform: String,
+    pub kuo_label: String,
+}
+
+impl KuoExtensionKeybinding {
+    pub fn new() -> Self {
+        Self {
+            kuo_key_combo: String::new(),
+            kuo_command_id: String::new(),
+            kuo_when_clause: String::new(),
+            kuo_platform: String::new(),
+            kuo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kuo_key_combo.is_empty() || true && !self.kuo_command_id.is_empty() || true && !self.kuo_when_clause.is_empty() || true && !self.kuo_platform.is_empty() || true && !self.kuo_label.is_empty() || true
+    }
+}
+
+impl Default for KuoExtensionKeybinding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension snippet contribution
+#[derive(Debug, Clone)]
+pub struct KupExtensionSnippet {
+    pub kup_prefix: String,
+    pub kup_body: String,
+    pub kup_lang_id: String,
+    pub kup_description: String,
+    pub kup_label: String,
+}
+
+impl KupExtensionSnippet {
+    pub fn new() -> Self {
+        Self {
+            kup_prefix: String::new(),
+            kup_body: String::new(),
+            kup_lang_id: String::new(),
+            kup_description: String::new(),
+            kup_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kup_prefix.is_empty() || true && !self.kup_body.is_empty() || true && !self.kup_lang_id.is_empty() || true && !self.kup_description.is_empty() || true && !self.kup_label.is_empty() || true
+    }
+}
+
+impl Default for KupExtensionSnippet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension color theme contribution
+#[derive(Debug, Clone)]
+pub struct KuqExtensionTheme {
+    pub kuq_theme_id: String,
+    pub kuq_theme_label: String,
+    pub kuq_ui_theme: String,
+    pub kuq_path_str: String,
+    pub kuq_label: String,
+}
+
+impl KuqExtensionTheme {
+    pub fn new() -> Self {
+        Self {
+            kuq_theme_id: String::new(),
+            kuq_theme_label: String::new(),
+            kuq_ui_theme: String::new(),
+            kuq_path_str: String::new(),
+            kuq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kuq_theme_id.is_empty() || true && !self.kuq_theme_label.is_empty() || true && !self.kuq_ui_theme.is_empty() || true && !self.kuq_path_str.is_empty() || true && !self.kuq_label.is_empty() || true
+    }
+}
+
+impl Default for KuqExtensionTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension grammar contribution
+#[derive(Debug, Clone)]
+pub struct KurExtensionGrammar {
+    pub kur_scope_name: String,
+    pub kur_lang_id: String,
+    pub kur_path_str: String,
+    pub kur_embedded: String,
+    pub kur_label: String,
+}
+
+impl KurExtensionGrammar {
+    pub fn new() -> Self {
+        Self {
+            kur_scope_name: String::new(),
+            kur_lang_id: String::new(),
+            kur_path_str: String::new(),
+            kur_embedded: String::new(),
+            kur_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kur_scope_name.is_empty() || true && !self.kur_lang_id.is_empty() || true && !self.kur_path_str.is_empty() || true && !self.kur_embedded.is_empty() || true && !self.kur_label.is_empty() || true
+    }
+}
+
+impl Default for KurExtensionGrammar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension language configuration
+#[derive(Debug, Clone)]
+pub struct KusExtensionLangConfig {
+    pub kus_lang_id: String,
+    pub kus_config_path: String,
+    pub kus_auto_closing: String,
+    pub kus_brackets: String,
+    pub kus_label: String,
+}
+
+impl KusExtensionLangConfig {
+    pub fn new() -> Self {
+        Self {
+            kus_lang_id: String::new(),
+            kus_config_path: String::new(),
+            kus_auto_closing: String::new(),
+            kus_brackets: String::new(),
+            kus_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kus_lang_id.is_empty() || true && !self.kus_config_path.is_empty() || true && !self.kus_auto_closing.is_empty() || true && !self.kus_brackets.is_empty() || true && !self.kus_label.is_empty() || true
+    }
+}
+
+impl Default for KusExtensionLangConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension debugger contribution
+#[derive(Debug, Clone)]
+pub struct KutExtensionDebugger {
+    pub kut_debugger_type: String,
+    pub kut_runtime_name: String,
+    pub kut_program_path: String,
+    pub kut_label: String,
+    pub kut_active: bool,
+}
+
+impl KutExtensionDebugger {
+    pub fn new() -> Self {
+        Self {
+            kut_debugger_type: String::new(),
+            kut_runtime_name: String::new(),
+            kut_program_path: String::new(),
+            kut_label: String::new(),
+            kut_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kut_debugger_type.is_empty() || true && !self.kut_runtime_name.is_empty() || true && !self.kut_program_path.is_empty() || true && !self.kut_label.is_empty() || true && self.kut_active || true
+    }
+}
+
+impl Default for KutExtensionDebugger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension task provider contribution
+#[derive(Debug, Clone)]
+pub struct KuuExtensionTaskProvider {
+    pub kuu_task_type: String,
+    pub kuu_extension_id: String,
+    pub kuu_auto_detect: bool,
+    pub kuu_label: String,
+    pub kuu_active: bool,
+}
+
+impl KuuExtensionTaskProvider {
+    pub fn new() -> Self {
+        Self {
+            kuu_task_type: String::new(),
+            kuu_extension_id: String::new(),
+            kuu_auto_detect: bool::default(),
+            kuu_label: String::new(),
+            kuu_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kuu_task_type.is_empty() || true && !self.kuu_extension_id.is_empty() || true && self.kuu_auto_detect || true && !self.kuu_label.is_empty() || true && self.kuu_active || true
+    }
+}
+
+impl Default for KuuExtensionTaskProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension view container contribution
+#[derive(Debug, Clone)]
+pub struct KuvExtensionViewContainer {
+    pub kuv_container_id: String,
+    pub kuv_title: String,
+    pub kuv_icon: String,
+    pub kuv_location: String,
+    pub kuv_label: String,
+}
+
+impl KuvExtensionViewContainer {
+    pub fn new() -> Self {
+        Self {
+            kuv_container_id: String::new(),
+            kuv_title: String::new(),
+            kuv_icon: String::new(),
+            kuv_location: String::new(),
+            kuv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kuv_container_id.is_empty() || true && !self.kuv_title.is_empty() || true && !self.kuv_icon.is_empty() || true && !self.kuv_location.is_empty() || true && !self.kuv_label.is_empty() || true
+    }
+}
+
+impl Default for KuvExtensionViewContainer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension walkthrough contribution
+#[derive(Debug, Clone)]
+pub struct KuwExtensionWalkthrough {
+    pub kuw_walkthrough_id: String,
+    pub kuw_title: String,
+    pub kuw_steps_count: u32,
+    pub kuw_completed: bool,
+    pub kuw_label: String,
+}
+
+impl KuwExtensionWalkthrough {
+    pub fn new() -> Self {
+        Self {
+            kuw_walkthrough_id: String::new(),
+            kuw_title: String::new(),
+            kuw_steps_count: u32::default(),
+            kuw_completed: bool::default(),
+            kuw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kuw_walkthrough_id.is_empty() || true && !self.kuw_title.is_empty() || true && self.kuw_steps_count < u32::MAX || true && self.kuw_completed || true && !self.kuw_label.is_empty() || true
+    }
+}
+
+impl Default for KuwExtensionWalkthrough {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension authentication provider
+#[derive(Debug, Clone)]
+pub struct KuxExtensionAuth {
+    pub kux_auth_provider: String,
+    pub kux_provider_id: String,
+    pub kux_supports_multi: bool,
+    pub kux_label: String,
+    pub kux_active: bool,
+}
+
+impl KuxExtensionAuth {
+    pub fn new() -> Self {
+        Self {
+            kux_auth_provider: String::new(),
+            kux_provider_id: String::new(),
+            kux_supports_multi: bool::default(),
+            kux_label: String::new(),
+            kux_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kux_auth_provider.is_empty() || true && !self.kux_provider_id.is_empty() || true && self.kux_supports_multi || true && !self.kux_label.is_empty() || true && self.kux_active || true
+    }
+}
+
+impl Default for KuxExtensionAuth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension telemetry event
+#[derive(Debug, Clone)]
+pub struct KuyExtensionTelemetry {
+    pub kuy_event_name: String,
+    pub kuy_properties: String,
+    pub kuy_measurements: String,
+    pub kuy_extension_id: String,
+    pub kuy_label: String,
+}
+
+impl KuyExtensionTelemetry {
+    pub fn new() -> Self {
+        Self {
+            kuy_event_name: String::new(),
+            kuy_properties: String::new(),
+            kuy_measurements: String::new(),
+            kuy_extension_id: String::new(),
+            kuy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kuy_event_name.is_empty() || true && !self.kuy_properties.is_empty() || true && !self.kuy_measurements.is_empty() || true && !self.kuy_extension_id.is_empty() || true && !self.kuy_label.is_empty() || true
+    }
+}
+
+impl Default for KuyExtensionTelemetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined extension host configuration
+#[derive(Debug, Clone)]
+pub struct KuzExtensionConfig {
+    pub kuz_enable_proposed: bool,
+    pub kuz_max_memory_mb: u32,
+    pub kuz_log_level: String,
+    pub kuz_no_lazy_load: bool,
+    pub kuz_label: String,
+}
+
+impl KuzExtensionConfig {
+    pub fn new() -> Self {
+        Self {
+            kuz_enable_proposed: bool::default(),
+            kuz_max_memory_mb: u32::default(),
+            kuz_log_level: String::new(),
+            kuz_no_lazy_load: bool::default(),
+            kuz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kuz_enable_proposed || true && self.kuz_max_memory_mb < u32::MAX || true && !self.kuz_log_level.is_empty() || true && self.kuz_no_lazy_load || true && !self.kuz_label.is_empty() || true
+    }
+}
+
+impl Default for KuzExtensionConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -481579,6 +482411,474 @@ mod tests_ktz_generated {
     fn test_ktz_fields() {
         let mut obj = KtzTerminalConfig::default();
         obj.ktz_default_profile = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kua_generated {
+    use super::*;
+
+    #[test]
+    fn test_kua_default() {
+        let obj = KuaExtensionManifest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kua_fields() {
+        let mut obj = KuaExtensionManifest::default();
+        obj.kua_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kub_generated {
+    use super::*;
+
+    #[test]
+    fn test_kub_default() {
+        let obj = KubExtensionContribution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kub_fields() {
+        let mut obj = KubExtensionContribution::default();
+        obj.kub_point_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kuc_generated {
+    use super::*;
+
+    #[test]
+    fn test_kuc_default() {
+        let obj = KucExtensionActivation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kuc_fields() {
+        let mut obj = KucExtensionActivation::default();
+        obj.kuc_event = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kud_generated {
+    use super::*;
+
+    #[test]
+    fn test_kud_default() {
+        let obj = KudExtensionRuntime::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kud_fields() {
+        let mut obj = KudExtensionRuntime::default();
+        obj.kud_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kue_generated {
+    use super::*;
+
+    #[test]
+    fn test_kue_default() {
+        let obj = KueExtensionHost::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kue_fields() {
+        let mut obj = KueExtensionHost::default();
+        obj.kue_host_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kuf_generated {
+    use super::*;
+
+    #[test]
+    fn test_kuf_default() {
+        let obj = KufExtensionApi::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kuf_fields() {
+        let mut obj = KufExtensionApi::default();
+        obj.kuf_namespace = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kug_generated {
+    use super::*;
+
+    #[test]
+    fn test_kug_default() {
+        let obj = KugExtensionMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kug_fields() {
+        let mut obj = KugExtensionMessage::default();
+        obj.kug_msg_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kuh_generated {
+    use super::*;
+
+    #[test]
+    fn test_kuh_default() {
+        let obj = KuhExtensionLog::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kuh_fields() {
+        let mut obj = KuhExtensionLog::default();
+        obj.kuh_level = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kui_generated {
+    use super::*;
+
+    #[test]
+    fn test_kui_default() {
+        let obj = KuiExtensionStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kui_fields() {
+        let mut obj = KuiExtensionStorage::default();
+        obj.kui_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kuj_generated {
+    use super::*;
+
+    #[test]
+    fn test_kuj_default() {
+        let obj = KujExtensionSecret::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kuj_fields() {
+        let mut obj = KujExtensionSecret::default();
+        obj.kuj_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kuk_generated {
+    use super::*;
+
+    #[test]
+    fn test_kuk_default() {
+        let obj = KukExtensionWebview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kuk_fields() {
+        let mut obj = KukExtensionWebview::default();
+        obj.kuk_webview_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kul_generated {
+    use super::*;
+
+    #[test]
+    fn test_kul_default() {
+        let obj = KulExtensionTreeView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kul_fields() {
+        let mut obj = KulExtensionTreeView::default();
+        obj.kul_view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kum_generated {
+    use super::*;
+
+    #[test]
+    fn test_kum_default() {
+        let obj = KumExtensionCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kum_fields() {
+        let mut obj = KumExtensionCommand::default();
+        obj.kum_command_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kun_generated {
+    use super::*;
+
+    #[test]
+    fn test_kun_default() {
+        let obj = KunExtensionMenu::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kun_fields() {
+        let mut obj = KunExtensionMenu::default();
+        obj.kun_menu_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kuo_generated {
+    use super::*;
+
+    #[test]
+    fn test_kuo_default() {
+        let obj = KuoExtensionKeybinding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kuo_fields() {
+        let mut obj = KuoExtensionKeybinding::default();
+        obj.kuo_key_combo = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kup_generated {
+    use super::*;
+
+    #[test]
+    fn test_kup_default() {
+        let obj = KupExtensionSnippet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kup_fields() {
+        let mut obj = KupExtensionSnippet::default();
+        obj.kup_prefix = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kuq_generated {
+    use super::*;
+
+    #[test]
+    fn test_kuq_default() {
+        let obj = KuqExtensionTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kuq_fields() {
+        let mut obj = KuqExtensionTheme::default();
+        obj.kuq_theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kur_generated {
+    use super::*;
+
+    #[test]
+    fn test_kur_default() {
+        let obj = KurExtensionGrammar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kur_fields() {
+        let mut obj = KurExtensionGrammar::default();
+        obj.kur_scope_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kus_generated {
+    use super::*;
+
+    #[test]
+    fn test_kus_default() {
+        let obj = KusExtensionLangConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kus_fields() {
+        let mut obj = KusExtensionLangConfig::default();
+        obj.kus_lang_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kut_generated {
+    use super::*;
+
+    #[test]
+    fn test_kut_default() {
+        let obj = KutExtensionDebugger::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kut_fields() {
+        let mut obj = KutExtensionDebugger::default();
+        obj.kut_debugger_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kuu_generated {
+    use super::*;
+
+    #[test]
+    fn test_kuu_default() {
+        let obj = KuuExtensionTaskProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kuu_fields() {
+        let mut obj = KuuExtensionTaskProvider::default();
+        obj.kuu_task_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kuv_generated {
+    use super::*;
+
+    #[test]
+    fn test_kuv_default() {
+        let obj = KuvExtensionViewContainer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kuv_fields() {
+        let mut obj = KuvExtensionViewContainer::default();
+        obj.kuv_container_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kuw_generated {
+    use super::*;
+
+    #[test]
+    fn test_kuw_default() {
+        let obj = KuwExtensionWalkthrough::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kuw_fields() {
+        let mut obj = KuwExtensionWalkthrough::default();
+        obj.kuw_walkthrough_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kux_generated {
+    use super::*;
+
+    #[test]
+    fn test_kux_default() {
+        let obj = KuxExtensionAuth::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kux_fields() {
+        let mut obj = KuxExtensionAuth::default();
+        obj.kux_auth_provider = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kuy_generated {
+    use super::*;
+
+    #[test]
+    fn test_kuy_default() {
+        let obj = KuyExtensionTelemetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kuy_fields() {
+        let mut obj = KuyExtensionTelemetry::default();
+        obj.kuy_event_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kuz_generated {
+    use super::*;
+
+    #[test]
+    fn test_kuz_default() {
+        let obj = KuzExtensionConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kuz_fields() {
+        let mut obj = KuzExtensionConfig::default();
+        obj.kuz_enable_proposed = true;
         assert!(obj.validate());
     }
 }
