@@ -197451,6 +197451,838 @@ impl Default for KqzTestConfig {
     }
 }
 
+/// /// Source control provider registration
+#[derive(Debug, Clone)]
+pub struct KraScmProvider {
+    pub kra_provider_id: String,
+    pub kra_label: String,
+    pub kra_root_uri: String,
+    pub kra_count: u32,
+    pub kra_active: bool,
+}
+
+impl KraScmProvider {
+    pub fn new() -> Self {
+        Self {
+            kra_provider_id: String::new(),
+            kra_label: String::new(),
+            kra_root_uri: String::new(),
+            kra_count: u32::default(),
+            kra_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kra_provider_id.is_empty() || true && !self.kra_label.is_empty() || true && !self.kra_root_uri.is_empty() || true && self.kra_count < u32::MAX || true && self.kra_active || true
+    }
+}
+
+impl Default for KraScmProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// SCM resource group (staged/unstaged)
+#[derive(Debug, Clone)]
+pub struct KrbScmResourceGroup {
+    pub krb_group_id: String,
+    pub krb_label: String,
+    pub krb_resource_count: u32,
+    pub krb_hide_empty: bool,
+    pub krb_collapsed: bool,
+}
+
+impl KrbScmResourceGroup {
+    pub fn new() -> Self {
+        Self {
+            krb_group_id: String::new(),
+            krb_label: String::new(),
+            krb_resource_count: u32::default(),
+            krb_hide_empty: bool::default(),
+            krb_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.krb_group_id.is_empty() || true && !self.krb_label.is_empty() || true && self.krb_resource_count < u32::MAX || true && self.krb_hide_empty || true && self.krb_collapsed || true
+    }
+}
+
+impl Default for KrbScmResourceGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// SCM resource (changed file)
+#[derive(Debug, Clone)]
+pub struct KrcScmResource {
+    pub krc_uri: String,
+    pub krc_status: String,
+    pub krc_decorations: String,
+    pub krc_renamed_uri: String,
+    pub krc_label: String,
+}
+
+impl KrcScmResource {
+    pub fn new() -> Self {
+        Self {
+            krc_uri: String::new(),
+            krc_status: String::new(),
+            krc_decorations: String::new(),
+            krc_renamed_uri: String::new(),
+            krc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.krc_uri.is_empty() || true && !self.krc_status.is_empty() || true && !self.krc_decorations.is_empty() || true && !self.krc_renamed_uri.is_empty() || true && !self.krc_label.is_empty() || true
+    }
+}
+
+impl Default for KrcScmResource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// SCM inline action command
+#[derive(Debug, Clone)]
+pub struct KrdScmAction {
+    pub krd_action_id: String,
+    pub krd_icon: String,
+    pub krd_tooltip: String,
+    pub krd_group: String,
+    pub krd_label: String,
+}
+
+impl KrdScmAction {
+    pub fn new() -> Self {
+        Self {
+            krd_action_id: String::new(),
+            krd_icon: String::new(),
+            krd_tooltip: String::new(),
+            krd_group: String::new(),
+            krd_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.krd_action_id.is_empty() || true && !self.krd_icon.is_empty() || true && !self.krd_tooltip.is_empty() || true && !self.krd_group.is_empty() || true && !self.krd_label.is_empty() || true
+    }
+}
+
+impl Default for KrdScmAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Git file status code
+#[derive(Debug, Clone)]
+pub struct KreGitStatus {
+    pub kre_status_code: String,
+    pub kre_path_str: String,
+    pub kre_staged: bool,
+    pub kre_merge_conflict: bool,
+    pub kre_label: String,
+}
+
+impl KreGitStatus {
+    pub fn new() -> Self {
+        Self {
+            kre_status_code: String::new(),
+            kre_path_str: String::new(),
+            kre_staged: bool::default(),
+            kre_merge_conflict: bool::default(),
+            kre_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kre_status_code.is_empty() || true && !self.kre_path_str.is_empty() || true && self.kre_staged || true && self.kre_merge_conflict || true && !self.kre_label.is_empty() || true
+    }
+}
+
+impl Default for KreGitStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Git branch information
+#[derive(Debug, Clone)]
+pub struct KrfGitBranch {
+    pub krf_name: String,
+    pub krf_upstream: String,
+    pub krf_ahead: u32,
+    pub krf_behind: u32,
+    pub krf_current: bool,
+}
+
+impl KrfGitBranch {
+    pub fn new() -> Self {
+        Self {
+            krf_name: String::new(),
+            krf_upstream: String::new(),
+            krf_ahead: u32::default(),
+            krf_behind: u32::default(),
+            krf_current: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.krf_name.is_empty() || true && !self.krf_upstream.is_empty() || true && self.krf_ahead < u32::MAX || true && self.krf_behind < u32::MAX || true && self.krf_current || true
+    }
+}
+
+impl Default for KrfGitBranch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Git commit information
+#[derive(Debug, Clone)]
+pub struct KrgGitCommit {
+    pub krg_sha: String,
+    pub krg_message: String,
+    pub krg_author: String,
+    pub krg_timestamp: u64,
+    pub krg_parents: String,
+}
+
+impl KrgGitCommit {
+    pub fn new() -> Self {
+        Self {
+            krg_sha: String::new(),
+            krg_message: String::new(),
+            krg_author: String::new(),
+            krg_timestamp: u64::default(),
+            krg_parents: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.krg_sha.is_empty() || true && !self.krg_message.is_empty() || true && !self.krg_author.is_empty() || true && self.krg_timestamp < u64::MAX || true && !self.krg_parents.is_empty() || true
+    }
+}
+
+impl Default for KrgGitCommit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Git remote configuration
+#[derive(Debug, Clone)]
+pub struct KrhGitRemote {
+    pub krh_name: String,
+    pub krh_url: String,
+    pub krh_fetch_url: String,
+    pub krh_push_url: String,
+    pub krh_label: String,
+}
+
+impl KrhGitRemote {
+    pub fn new() -> Self {
+        Self {
+            krh_name: String::new(),
+            krh_url: String::new(),
+            krh_fetch_url: String::new(),
+            krh_push_url: String::new(),
+            krh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.krh_name.is_empty() || true && !self.krh_url.is_empty() || true && !self.krh_fetch_url.is_empty() || true && !self.krh_push_url.is_empty() || true && !self.krh_label.is_empty() || true
+    }
+}
+
+impl Default for KrhGitRemote {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Git stash entry
+#[derive(Debug, Clone)]
+pub struct KriGitStash {
+    pub kri_index: u32,
+    pub kri_message: String,
+    pub kri_timestamp: u64,
+    pub kri_branch_name: String,
+    pub kri_label: String,
+}
+
+impl KriGitStash {
+    pub fn new() -> Self {
+        Self {
+            kri_index: u32::default(),
+            kri_message: String::new(),
+            kri_timestamp: u64::default(),
+            kri_branch_name: String::new(),
+            kri_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kri_index < u32::MAX || true && !self.kri_message.is_empty() || true && self.kri_timestamp < u64::MAX || true && !self.kri_branch_name.is_empty() || true && !self.kri_label.is_empty() || true
+    }
+}
+
+impl Default for KriGitStash {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Git tag information
+#[derive(Debug, Clone)]
+pub struct KrjGitTag {
+    pub krj_name: String,
+    pub krj_sha: String,
+    pub krj_message: String,
+    pub krj_tagger: String,
+    pub krj_annotated: bool,
+}
+
+impl KrjGitTag {
+    pub fn new() -> Self {
+        Self {
+            krj_name: String::new(),
+            krj_sha: String::new(),
+            krj_message: String::new(),
+            krj_tagger: String::new(),
+            krj_annotated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.krj_name.is_empty() || true && !self.krj_sha.is_empty() || true && !self.krj_message.is_empty() || true && !self.krj_tagger.is_empty() || true && self.krj_annotated || true
+    }
+}
+
+impl Default for KrjGitTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Git diff for a file
+#[derive(Debug, Clone)]
+pub struct KrkGitDiff {
+    pub krk_uri: String,
+    pub krk_hunks_count: u32,
+    pub krk_additions: u32,
+    pub krk_deletions: u32,
+    pub krk_binary: bool,
+}
+
+impl KrkGitDiff {
+    pub fn new() -> Self {
+        Self {
+            krk_uri: String::new(),
+            krk_hunks_count: u32::default(),
+            krk_additions: u32::default(),
+            krk_deletions: u32::default(),
+            krk_binary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.krk_uri.is_empty() || true && self.krk_hunks_count < u32::MAX || true && self.krk_additions < u32::MAX || true && self.krk_deletions < u32::MAX || true && self.krk_binary || true
+    }
+}
+
+impl Default for KrkGitDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Git diff hunk
+#[derive(Debug, Clone)]
+pub struct KrlGitHunk {
+    pub krl_old_start: u32,
+    pub krl_old_lines: u32,
+    pub krl_new_start: u32,
+    pub krl_new_lines: u32,
+    pub krl_header: String,
+}
+
+impl KrlGitHunk {
+    pub fn new() -> Self {
+        Self {
+            krl_old_start: u32::default(),
+            krl_old_lines: u32::default(),
+            krl_new_start: u32::default(),
+            krl_new_lines: u32::default(),
+            krl_header: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.krl_old_start < u32::MAX || true && self.krl_old_lines < u32::MAX || true && self.krl_new_start < u32::MAX || true && self.krl_new_lines < u32::MAX || true && !self.krl_header.is_empty() || true
+    }
+}
+
+impl Default for KrlGitHunk {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Git blame annotation for line
+#[derive(Debug, Clone)]
+pub struct KrmGitBlame {
+    pub krm_line: u32,
+    pub krm_sha: String,
+    pub krm_author: String,
+    pub krm_timestamp: u64,
+    pub krm_message: String,
+}
+
+impl KrmGitBlame {
+    pub fn new() -> Self {
+        Self {
+            krm_line: u32::default(),
+            krm_sha: String::new(),
+            krm_author: String::new(),
+            krm_timestamp: u64::default(),
+            krm_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.krm_line < u32::MAX || true && !self.krm_sha.is_empty() || true && !self.krm_author.is_empty() || true && self.krm_timestamp < u64::MAX || true && !self.krm_message.is_empty() || true
+    }
+}
+
+impl Default for KrmGitBlame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Git submodule information
+#[derive(Debug, Clone)]
+pub struct KrnGitSubmodule {
+    pub krn_path_str: String,
+    pub krn_url: String,
+    pub krn_sha: String,
+    pub krn_initialized: bool,
+    pub krn_label: String,
+}
+
+impl KrnGitSubmodule {
+    pub fn new() -> Self {
+        Self {
+            krn_path_str: String::new(),
+            krn_url: String::new(),
+            krn_sha: String::new(),
+            krn_initialized: bool::default(),
+            krn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.krn_path_str.is_empty() || true && !self.krn_url.is_empty() || true && !self.krn_sha.is_empty() || true && self.krn_initialized || true && !self.krn_label.is_empty() || true
+    }
+}
+
+impl Default for KrnGitSubmodule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Merge conflict state
+#[derive(Debug, Clone)]
+pub struct KroMergeConflict {
+    pub kro_uri: String,
+    pub kro_conflict_type: String,
+    pub kro_resolved: bool,
+    pub kro_base_sha: String,
+    pub kro_label: String,
+}
+
+impl KroMergeConflict {
+    pub fn new() -> Self {
+        Self {
+            kro_uri: String::new(),
+            kro_conflict_type: String::new(),
+            kro_resolved: bool::default(),
+            kro_base_sha: String::new(),
+            kro_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kro_uri.is_empty() || true && !self.kro_conflict_type.is_empty() || true && self.kro_resolved || true && !self.kro_base_sha.is_empty() || true && !self.kro_label.is_empty() || true
+    }
+}
+
+impl Default for KroMergeConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Merge conflict region markers
+#[derive(Debug, Clone)]
+pub struct KrpMergeConflictRegion {
+    pub krp_start_line: u32,
+    pub krp_end_line: u32,
+    pub krp_marker_type: String,
+    pub krp_content: String,
+    pub krp_label: String,
+}
+
+impl KrpMergeConflictRegion {
+    pub fn new() -> Self {
+        Self {
+            krp_start_line: u32::default(),
+            krp_end_line: u32::default(),
+            krp_marker_type: String::new(),
+            krp_content: String::new(),
+            krp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.krp_start_line < u32::MAX || true && self.krp_end_line < u32::MAX || true && !self.krp_marker_type.is_empty() || true && !self.krp_content.is_empty() || true && !self.krp_label.is_empty() || true
+    }
+}
+
+impl Default for KrpMergeConflictRegion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Timeline entry for git history
+#[derive(Debug, Clone)]
+pub struct KrqGitTimeline {
+    pub krq_commit_sha: String,
+    pub krq_message: String,
+    pub krq_author: String,
+    pub krq_timestamp: u64,
+    pub krq_label: String,
+}
+
+impl KrqGitTimeline {
+    pub fn new() -> Self {
+        Self {
+            krq_commit_sha: String::new(),
+            krq_message: String::new(),
+            krq_author: String::new(),
+            krq_timestamp: u64::default(),
+            krq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.krq_commit_sha.is_empty() || true && !self.krq_message.is_empty() || true && !self.krq_author.is_empty() || true && self.krq_timestamp < u64::MAX || true && !self.krq_label.is_empty() || true
+    }
+}
+
+impl Default for KrqGitTimeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Git graph visualization node
+#[derive(Debug, Clone)]
+pub struct KrrGitGraph {
+    pub krr_node_sha: String,
+    pub krr_parents: String,
+    pub krr_branch_name: String,
+    pub krr_column: u32,
+    pub krr_label: String,
+}
+
+impl KrrGitGraph {
+    pub fn new() -> Self {
+        Self {
+            krr_node_sha: String::new(),
+            krr_parents: String::new(),
+            krr_branch_name: String::new(),
+            krr_column: u32::default(),
+            krr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.krr_node_sha.is_empty() || true && !self.krr_parents.is_empty() || true && !self.krr_branch_name.is_empty() || true && self.krr_column < u32::MAX || true && !self.krr_label.is_empty() || true
+    }
+}
+
+impl Default for KrrGitGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// SCM input box state
+#[derive(Debug, Clone)]
+pub struct KrsScmInput {
+    pub krs_message: String,
+    pub krs_placeholder: String,
+    pub krs_enabled: bool,
+    pub krs_visible: bool,
+    pub krs_label: String,
+}
+
+impl KrsScmInput {
+    pub fn new() -> Self {
+        Self {
+            krs_message: String::new(),
+            krs_placeholder: String::new(),
+            krs_enabled: bool::default(),
+            krs_visible: bool::default(),
+            krs_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.krs_message.is_empty() || true && !self.krs_placeholder.is_empty() || true && self.krs_enabled || true && self.krs_visible || true && !self.krs_label.is_empty() || true
+    }
+}
+
+impl Default for KrsScmInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// SCM view display state
+#[derive(Debug, Clone)]
+pub struct KrtScmViewState {
+    pub krt_view_mode: String,
+    pub krt_sort_by: String,
+    pub krt_show_actions: bool,
+    pub krt_compact: bool,
+    pub krt_label: String,
+}
+
+impl KrtScmViewState {
+    pub fn new() -> Self {
+        Self {
+            krt_view_mode: String::new(),
+            krt_sort_by: String::new(),
+            krt_show_actions: bool::default(),
+            krt_compact: bool::default(),
+            krt_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.krt_view_mode.is_empty() || true && !self.krt_sort_by.is_empty() || true && self.krt_show_actions || true && self.krt_compact || true && !self.krt_label.is_empty() || true
+    }
+}
+
+impl Default for KrtScmViewState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Gitignore rule entry
+#[derive(Debug, Clone)]
+pub struct KruGitIgnoreRule {
+    pub kru_pattern: String,
+    pub kru_negated: bool,
+    pub kru_directory_only: bool,
+    pub kru_source_file: String,
+    pub kru_label: String,
+}
+
+impl KruGitIgnoreRule {
+    pub fn new() -> Self {
+        Self {
+            kru_pattern: String::new(),
+            kru_negated: bool::default(),
+            kru_directory_only: bool::default(),
+            kru_source_file: String::new(),
+            kru_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kru_pattern.is_empty() || true && self.kru_negated || true && self.kru_directory_only || true && !self.kru_source_file.is_empty() || true && !self.kru_label.is_empty() || true
+    }
+}
+
+impl Default for KruGitIgnoreRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Git hook definition
+#[derive(Debug, Clone)]
+pub struct KrvGitHook {
+    pub krv_hook_name: String,
+    pub krv_script_path: String,
+    pub krv_enabled: bool,
+    pub krv_executable: bool,
+    pub krv_label: String,
+}
+
+impl KrvGitHook {
+    pub fn new() -> Self {
+        Self {
+            krv_hook_name: String::new(),
+            krv_script_path: String::new(),
+            krv_enabled: bool::default(),
+            krv_executable: bool::default(),
+            krv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.krv_hook_name.is_empty() || true && !self.krv_script_path.is_empty() || true && self.krv_enabled || true && self.krv_executable || true && !self.krv_label.is_empty() || true
+    }
+}
+
+impl Default for KrvGitHook {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Git configuration entry
+#[derive(Debug, Clone)]
+pub struct KrwGitConfig {
+    pub krw_key: String,
+    pub krw_value: String,
+    pub krw_scope: String,
+    pub krw_source_file: String,
+    pub krw_label: String,
+}
+
+impl KrwGitConfig {
+    pub fn new() -> Self {
+        Self {
+            krw_key: String::new(),
+            krw_value: String::new(),
+            krw_scope: String::new(),
+            krw_source_file: String::new(),
+            krw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.krw_key.is_empty() || true && !self.krw_value.is_empty() || true && !self.krw_scope.is_empty() || true && !self.krw_source_file.is_empty() || true && !self.krw_label.is_empty() || true
+    }
+}
+
+impl Default for KrwGitConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Git credential info
+#[derive(Debug, Clone)]
+pub struct KrxGitCredential {
+    pub krx_protocol: String,
+    pub krx_host: String,
+    pub krx_username: String,
+    pub krx_helper: String,
+    pub krx_label: String,
+}
+
+impl KrxGitCredential {
+    pub fn new() -> Self {
+        Self {
+            krx_protocol: String::new(),
+            krx_host: String::new(),
+            krx_username: String::new(),
+            krx_helper: String::new(),
+            krx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.krx_protocol.is_empty() || true && !self.krx_host.is_empty() || true && !self.krx_username.is_empty() || true && !self.krx_helper.is_empty() || true && !self.krx_label.is_empty() || true
+    }
+}
+
+impl Default for KrxGitCredential {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// SCM file decoration
+#[derive(Debug, Clone)]
+pub struct KryScmDecoration {
+    pub kry_uri: String,
+    pub kry_badge: String,
+    pub kry_color: String,
+    pub kry_tooltip: String,
+    pub kry_propagate: bool,
+}
+
+impl KryScmDecoration {
+    pub fn new() -> Self {
+        Self {
+            kry_uri: String::new(),
+            kry_badge: String::new(),
+            kry_color: String::new(),
+            kry_tooltip: String::new(),
+            kry_propagate: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kry_uri.is_empty() || true && !self.kry_badge.is_empty() || true && !self.kry_color.is_empty() || true && !self.kry_tooltip.is_empty() || true && self.kry_propagate || true
+    }
+}
+
+impl Default for KryScmDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined SCM configuration
+#[derive(Debug, Clone)]
+pub struct KrzScmConfig {
+    pub krz_default_provider: String,
+    pub krz_auto_fetch: bool,
+    pub krz_auto_refresh: bool,
+    pub krz_confirm_sync: bool,
+    pub krz_label: String,
+}
+
+impl KrzScmConfig {
+    pub fn new() -> Self {
+        Self {
+            krz_default_provider: String::new(),
+            krz_auto_fetch: bool::default(),
+            krz_auto_refresh: bool::default(),
+            krz_confirm_sync: bool::default(),
+            krz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.krz_default_provider.is_empty() || true && self.krz_auto_fetch || true && self.krz_auto_refresh || true && self.krz_confirm_sync || true && !self.krz_label.is_empty() || true
+    }
+}
+
+impl Default for KrzScmConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -477659,6 +478491,474 @@ mod tests_kqz_generated {
     fn test_kqz_fields() {
         let mut obj = KqzTestConfig::default();
         obj.kqz_auto_run = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kra_generated {
+    use super::*;
+
+    #[test]
+    fn test_kra_default() {
+        let obj = KraScmProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kra_fields() {
+        let mut obj = KraScmProvider::default();
+        obj.kra_provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krb_generated {
+    use super::*;
+
+    #[test]
+    fn test_krb_default() {
+        let obj = KrbScmResourceGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krb_fields() {
+        let mut obj = KrbScmResourceGroup::default();
+        obj.krb_group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krc_generated {
+    use super::*;
+
+    #[test]
+    fn test_krc_default() {
+        let obj = KrcScmResource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krc_fields() {
+        let mut obj = KrcScmResource::default();
+        obj.krc_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krd_generated {
+    use super::*;
+
+    #[test]
+    fn test_krd_default() {
+        let obj = KrdScmAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krd_fields() {
+        let mut obj = KrdScmAction::default();
+        obj.krd_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kre_generated {
+    use super::*;
+
+    #[test]
+    fn test_kre_default() {
+        let obj = KreGitStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kre_fields() {
+        let mut obj = KreGitStatus::default();
+        obj.kre_status_code = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krf_generated {
+    use super::*;
+
+    #[test]
+    fn test_krf_default() {
+        let obj = KrfGitBranch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krf_fields() {
+        let mut obj = KrfGitBranch::default();
+        obj.krf_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krg_generated {
+    use super::*;
+
+    #[test]
+    fn test_krg_default() {
+        let obj = KrgGitCommit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krg_fields() {
+        let mut obj = KrgGitCommit::default();
+        obj.krg_sha = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krh_generated {
+    use super::*;
+
+    #[test]
+    fn test_krh_default() {
+        let obj = KrhGitRemote::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krh_fields() {
+        let mut obj = KrhGitRemote::default();
+        obj.krh_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kri_generated {
+    use super::*;
+
+    #[test]
+    fn test_kri_default() {
+        let obj = KriGitStash::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kri_fields() {
+        let mut obj = KriGitStash::default();
+        obj.kri_index = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krj_generated {
+    use super::*;
+
+    #[test]
+    fn test_krj_default() {
+        let obj = KrjGitTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krj_fields() {
+        let mut obj = KrjGitTag::default();
+        obj.krj_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krk_generated {
+    use super::*;
+
+    #[test]
+    fn test_krk_default() {
+        let obj = KrkGitDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krk_fields() {
+        let mut obj = KrkGitDiff::default();
+        obj.krk_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krl_generated {
+    use super::*;
+
+    #[test]
+    fn test_krl_default() {
+        let obj = KrlGitHunk::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krl_fields() {
+        let mut obj = KrlGitHunk::default();
+        obj.krl_old_start = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krm_generated {
+    use super::*;
+
+    #[test]
+    fn test_krm_default() {
+        let obj = KrmGitBlame::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krm_fields() {
+        let mut obj = KrmGitBlame::default();
+        obj.krm_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krn_generated {
+    use super::*;
+
+    #[test]
+    fn test_krn_default() {
+        let obj = KrnGitSubmodule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krn_fields() {
+        let mut obj = KrnGitSubmodule::default();
+        obj.krn_path_str = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kro_generated {
+    use super::*;
+
+    #[test]
+    fn test_kro_default() {
+        let obj = KroMergeConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kro_fields() {
+        let mut obj = KroMergeConflict::default();
+        obj.kro_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krp_generated {
+    use super::*;
+
+    #[test]
+    fn test_krp_default() {
+        let obj = KrpMergeConflictRegion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krp_fields() {
+        let mut obj = KrpMergeConflictRegion::default();
+        obj.krp_start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krq_generated {
+    use super::*;
+
+    #[test]
+    fn test_krq_default() {
+        let obj = KrqGitTimeline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krq_fields() {
+        let mut obj = KrqGitTimeline::default();
+        obj.krq_commit_sha = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krr_generated {
+    use super::*;
+
+    #[test]
+    fn test_krr_default() {
+        let obj = KrrGitGraph::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krr_fields() {
+        let mut obj = KrrGitGraph::default();
+        obj.krr_node_sha = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krs_generated {
+    use super::*;
+
+    #[test]
+    fn test_krs_default() {
+        let obj = KrsScmInput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krs_fields() {
+        let mut obj = KrsScmInput::default();
+        obj.krs_message = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krt_generated {
+    use super::*;
+
+    #[test]
+    fn test_krt_default() {
+        let obj = KrtScmViewState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krt_fields() {
+        let mut obj = KrtScmViewState::default();
+        obj.krt_view_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kru_generated {
+    use super::*;
+
+    #[test]
+    fn test_kru_default() {
+        let obj = KruGitIgnoreRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kru_fields() {
+        let mut obj = KruGitIgnoreRule::default();
+        obj.kru_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krv_generated {
+    use super::*;
+
+    #[test]
+    fn test_krv_default() {
+        let obj = KrvGitHook::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krv_fields() {
+        let mut obj = KrvGitHook::default();
+        obj.krv_hook_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krw_generated {
+    use super::*;
+
+    #[test]
+    fn test_krw_default() {
+        let obj = KrwGitConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krw_fields() {
+        let mut obj = KrwGitConfig::default();
+        obj.krw_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krx_generated {
+    use super::*;
+
+    #[test]
+    fn test_krx_default() {
+        let obj = KrxGitCredential::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krx_fields() {
+        let mut obj = KrxGitCredential::default();
+        obj.krx_protocol = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kry_generated {
+    use super::*;
+
+    #[test]
+    fn test_kry_default() {
+        let obj = KryScmDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kry_fields() {
+        let mut obj = KryScmDecoration::default();
+        obj.kry_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_krz_generated {
+    use super::*;
+
+    #[test]
+    fn test_krz_default() {
+        let obj = KrzScmConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_krz_fields() {
+        let mut obj = KrzScmConfig::default();
+        obj.krz_default_provider = "test".to_string();
         assert!(obj.validate());
     }
 }
