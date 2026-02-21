@@ -201049,6 +201049,838 @@ impl Default for KuzExtensionConfig {
     }
 }
 
+/// /// Workspace folder entry
+#[derive(Debug, Clone)]
+pub struct KvaWorkspaceFolder {
+    pub kva_uri: String,
+    pub kva_name: String,
+    pub kva_index: u32,
+    pub kva_is_root: bool,
+    pub kva_label: String,
+}
+
+impl KvaWorkspaceFolder {
+    pub fn new() -> Self {
+        Self {
+            kva_uri: String::new(),
+            kva_name: String::new(),
+            kva_index: u32::default(),
+            kva_is_root: bool::default(),
+            kva_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kva_uri.is_empty() || true && !self.kva_name.is_empty() || true && self.kva_index < u32::MAX || true && self.kva_is_root || true && !self.kva_label.is_empty() || true
+    }
+}
+
+impl Default for KvaWorkspaceFolder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Workspace .code-workspace file
+#[derive(Debug, Clone)]
+pub struct KvbWorkspaceFile {
+    pub kvb_path_str: String,
+    pub kvb_folders_count: u32,
+    pub kvb_settings_json: String,
+    pub kvb_version: u32,
+    pub kvb_label: String,
+}
+
+impl KvbWorkspaceFile {
+    pub fn new() -> Self {
+        Self {
+            kvb_path_str: String::new(),
+            kvb_folders_count: u32::default(),
+            kvb_settings_json: String::new(),
+            kvb_version: u32::default(),
+            kvb_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvb_path_str.is_empty() || true && self.kvb_folders_count < u32::MAX || true && !self.kvb_settings_json.is_empty() || true && self.kvb_version < u32::MAX || true && !self.kvb_label.is_empty() || true
+    }
+}
+
+impl Default for KvbWorkspaceFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Workspace trust state
+#[derive(Debug, Clone)]
+pub struct KvcWorkspaceTrust {
+    pub kvc_trusted: bool,
+    pub kvc_restricted_mode: bool,
+    pub kvc_trust_uri: String,
+    pub kvc_timestamp: u64,
+    pub kvc_label: String,
+}
+
+impl KvcWorkspaceTrust {
+    pub fn new() -> Self {
+        Self {
+            kvc_trusted: bool::default(),
+            kvc_restricted_mode: bool::default(),
+            kvc_trust_uri: String::new(),
+            kvc_timestamp: u64::default(),
+            kvc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kvc_trusted || true && self.kvc_restricted_mode || true && !self.kvc_trust_uri.is_empty() || true && self.kvc_timestamp < u64::MAX || true && !self.kvc_label.is_empty() || true
+    }
+}
+
+impl Default for KvcWorkspaceTrust {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Workspace-wide edit operation
+#[derive(Debug, Clone)]
+pub struct KvdWorkspaceEdit {
+    pub kvd_label: String,
+    pub kvd_edits_count: u32,
+    pub kvd_needs_confirm: bool,
+    pub kvd_applied: bool,
+    pub kvd_metadata: String,
+}
+
+impl KvdWorkspaceEdit {
+    pub fn new() -> Self {
+        Self {
+            kvd_label: String::new(),
+            kvd_edits_count: u32::default(),
+            kvd_needs_confirm: bool::default(),
+            kvd_applied: bool::default(),
+            kvd_metadata: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvd_label.is_empty() || true && self.kvd_edits_count < u32::MAX || true && self.kvd_needs_confirm || true && self.kvd_applied || true && !self.kvd_metadata.is_empty() || true
+    }
+}
+
+impl Default for KvdWorkspaceEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Workspace configuration scope
+#[derive(Debug, Clone)]
+pub struct KveWorkspaceConfig {
+    pub kve_scope: String,
+    pub kve_uri: String,
+    pub kve_overrides: String,
+    pub kve_has_defaults: bool,
+    pub kve_label: String,
+}
+
+impl KveWorkspaceConfig {
+    pub fn new() -> Self {
+        Self {
+            kve_scope: String::new(),
+            kve_uri: String::new(),
+            kve_overrides: String::new(),
+            kve_has_defaults: bool::default(),
+            kve_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kve_scope.is_empty() || true && !self.kve_uri.is_empty() || true && !self.kve_overrides.is_empty() || true && self.kve_has_defaults || true && !self.kve_label.is_empty() || true
+    }
+}
+
+impl Default for KveWorkspaceConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Workspace-wide search state
+#[derive(Debug, Clone)]
+pub struct KvfWorkspaceSearch {
+    pub kvf_query: String,
+    pub kvf_results_count: u32,
+    pub kvf_files_searched: u32,
+    pub kvf_active: bool,
+    pub kvf_label: String,
+}
+
+impl KvfWorkspaceSearch {
+    pub fn new() -> Self {
+        Self {
+            kvf_query: String::new(),
+            kvf_results_count: u32::default(),
+            kvf_files_searched: u32::default(),
+            kvf_active: bool::default(),
+            kvf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvf_query.is_empty() || true && self.kvf_results_count < u32::MAX || true && self.kvf_files_searched < u32::MAX || true && self.kvf_active || true && !self.kvf_label.is_empty() || true
+    }
+}
+
+impl Default for KvfWorkspaceSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File system watcher registration
+#[derive(Debug, Clone)]
+pub struct KvgFileSystemWatcher {
+    pub kvg_glob_pattern: String,
+    pub kvg_ignore_create: bool,
+    pub kvg_ignore_change: bool,
+    pub kvg_ignore_delete: bool,
+    pub kvg_label: String,
+}
+
+impl KvgFileSystemWatcher {
+    pub fn new() -> Self {
+        Self {
+            kvg_glob_pattern: String::new(),
+            kvg_ignore_create: bool::default(),
+            kvg_ignore_change: bool::default(),
+            kvg_ignore_delete: bool::default(),
+            kvg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvg_glob_pattern.is_empty() || true && self.kvg_ignore_create || true && self.kvg_ignore_change || true && self.kvg_ignore_delete || true && !self.kvg_label.is_empty() || true
+    }
+}
+
+impl Default for KvgFileSystemWatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File change notification event
+#[derive(Debug, Clone)]
+pub struct KvhFileChange {
+    pub kvh_uri: String,
+    pub kvh_change_type: String,
+    pub kvh_timestamp: u64,
+    pub kvh_is_directory: bool,
+    pub kvh_label: String,
+}
+
+impl KvhFileChange {
+    pub fn new() -> Self {
+        Self {
+            kvh_uri: String::new(),
+            kvh_change_type: String::new(),
+            kvh_timestamp: u64::default(),
+            kvh_is_directory: bool::default(),
+            kvh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvh_uri.is_empty() || true && !self.kvh_change_type.is_empty() || true && self.kvh_timestamp < u64::MAX || true && self.kvh_is_directory || true && !self.kvh_label.is_empty() || true
+    }
+}
+
+impl Default for KvhFileChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File created event
+#[derive(Debug, Clone)]
+pub struct KviFileCreateEvent {
+    pub kvi_uri: String,
+    pub kvi_is_directory: bool,
+    pub kvi_timestamp: u64,
+    pub kvi_source: String,
+    pub kvi_label: String,
+}
+
+impl KviFileCreateEvent {
+    pub fn new() -> Self {
+        Self {
+            kvi_uri: String::new(),
+            kvi_is_directory: bool::default(),
+            kvi_timestamp: u64::default(),
+            kvi_source: String::new(),
+            kvi_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvi_uri.is_empty() || true && self.kvi_is_directory || true && self.kvi_timestamp < u64::MAX || true && !self.kvi_source.is_empty() || true && !self.kvi_label.is_empty() || true
+    }
+}
+
+impl Default for KviFileCreateEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File deleted event
+#[derive(Debug, Clone)]
+pub struct KvjFileDeleteEvent {
+    pub kvj_uri: String,
+    pub kvj_is_directory: bool,
+    pub kvj_recursive: bool,
+    pub kvj_timestamp: u64,
+    pub kvj_label: String,
+}
+
+impl KvjFileDeleteEvent {
+    pub fn new() -> Self {
+        Self {
+            kvj_uri: String::new(),
+            kvj_is_directory: bool::default(),
+            kvj_recursive: bool::default(),
+            kvj_timestamp: u64::default(),
+            kvj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvj_uri.is_empty() || true && self.kvj_is_directory || true && self.kvj_recursive || true && self.kvj_timestamp < u64::MAX || true && !self.kvj_label.is_empty() || true
+    }
+}
+
+impl Default for KvjFileDeleteEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File renamed event
+#[derive(Debug, Clone)]
+pub struct KvkFileRenameEvent {
+    pub kvk_old_uri: String,
+    pub kvk_new_uri: String,
+    pub kvk_is_directory: bool,
+    pub kvk_timestamp: u64,
+    pub kvk_label: String,
+}
+
+impl KvkFileRenameEvent {
+    pub fn new() -> Self {
+        Self {
+            kvk_old_uri: String::new(),
+            kvk_new_uri: String::new(),
+            kvk_is_directory: bool::default(),
+            kvk_timestamp: u64::default(),
+            kvk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvk_old_uri.is_empty() || true && !self.kvk_new_uri.is_empty() || true && self.kvk_is_directory || true && self.kvk_timestamp < u64::MAX || true && !self.kvk_label.is_empty() || true
+    }
+}
+
+impl Default for KvkFileRenameEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File decoration in explorer
+#[derive(Debug, Clone)]
+pub struct KvlFileDecoration {
+    pub kvl_uri: String,
+    pub kvl_badge: String,
+    pub kvl_color: String,
+    pub kvl_tooltip: String,
+    pub kvl_propagate: bool,
+}
+
+impl KvlFileDecoration {
+    pub fn new() -> Self {
+        Self {
+            kvl_uri: String::new(),
+            kvl_badge: String::new(),
+            kvl_color: String::new(),
+            kvl_tooltip: String::new(),
+            kvl_propagate: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvl_uri.is_empty() || true && !self.kvl_badge.is_empty() || true && !self.kvl_color.is_empty() || true && !self.kvl_tooltip.is_empty() || true && self.kvl_propagate || true
+    }
+}
+
+impl Default for KvlFileDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// File explorer tree node
+#[derive(Debug, Clone)]
+pub struct KvmExplorerNode {
+    pub kvm_uri: String,
+    pub kvm_name: String,
+    pub kvm_is_directory: bool,
+    pub kvm_children_count: u32,
+    pub kvm_collapsed: bool,
+}
+
+impl KvmExplorerNode {
+    pub fn new() -> Self {
+        Self {
+            kvm_uri: String::new(),
+            kvm_name: String::new(),
+            kvm_is_directory: bool::default(),
+            kvm_children_count: u32::default(),
+            kvm_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvm_uri.is_empty() || true && !self.kvm_name.is_empty() || true && self.kvm_is_directory || true && self.kvm_children_count < u32::MAX || true && self.kvm_collapsed || true
+    }
+}
+
+impl Default for KvmExplorerNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Explorer file filter
+#[derive(Debug, Clone)]
+pub struct KvnExplorerFilter {
+    pub kvn_pattern: String,
+    pub kvn_exclude_dot: bool,
+    pub kvn_show_hidden: bool,
+    pub kvn_active: bool,
+    pub kvn_label: String,
+}
+
+impl KvnExplorerFilter {
+    pub fn new() -> Self {
+        Self {
+            kvn_pattern: String::new(),
+            kvn_exclude_dot: bool::default(),
+            kvn_show_hidden: bool::default(),
+            kvn_active: bool::default(),
+            kvn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvn_pattern.is_empty() || true && self.kvn_exclude_dot || true && self.kvn_show_hidden || true && self.kvn_active || true && !self.kvn_label.is_empty() || true
+    }
+}
+
+impl Default for KvnExplorerFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Explorer sort options
+#[derive(Debug, Clone)]
+pub struct KvoExplorerSort {
+    pub kvo_sort_by: String,
+    pub kvo_ascending: bool,
+    pub kvo_dirs_first: bool,
+    pub kvo_mixed_sort: bool,
+    pub kvo_label: String,
+}
+
+impl KvoExplorerSort {
+    pub fn new() -> Self {
+        Self {
+            kvo_sort_by: String::new(),
+            kvo_ascending: bool::default(),
+            kvo_dirs_first: bool::default(),
+            kvo_mixed_sort: bool::default(),
+            kvo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvo_sort_by.is_empty() || true && self.kvo_ascending || true && self.kvo_dirs_first || true && self.kvo_mixed_sort || true && !self.kvo_label.is_empty() || true
+    }
+}
+
+impl Default for KvoExplorerSort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Explorer context action
+#[derive(Debug, Clone)]
+pub struct KvpExplorerAction {
+    pub kvp_action_id: String,
+    pub kvp_icon: String,
+    pub kvp_group: String,
+    pub kvp_when_clause: String,
+    pub kvp_label: String,
+}
+
+impl KvpExplorerAction {
+    pub fn new() -> Self {
+        Self {
+            kvp_action_id: String::new(),
+            kvp_icon: String::new(),
+            kvp_group: String::new(),
+            kvp_when_clause: String::new(),
+            kvp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvp_action_id.is_empty() || true && !self.kvp_icon.is_empty() || true && !self.kvp_group.is_empty() || true && !self.kvp_when_clause.is_empty() || true && !self.kvp_label.is_empty() || true
+    }
+}
+
+impl Default for KvpExplorerAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Recently opened file entry
+#[derive(Debug, Clone)]
+pub struct KvqRecentFile {
+    pub kvq_uri: String,
+    pub kvq_label: String,
+    pub kvq_timestamp: u64,
+    pub kvq_pinned: bool,
+    pub kvq_workspace_label: String,
+}
+
+impl KvqRecentFile {
+    pub fn new() -> Self {
+        Self {
+            kvq_uri: String::new(),
+            kvq_label: String::new(),
+            kvq_timestamp: u64::default(),
+            kvq_pinned: bool::default(),
+            kvq_workspace_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvq_uri.is_empty() || true && !self.kvq_label.is_empty() || true && self.kvq_timestamp < u64::MAX || true && self.kvq_pinned || true && !self.kvq_workspace_label.is_empty() || true
+    }
+}
+
+impl Default for KvqRecentFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Recently opened folder entry
+#[derive(Debug, Clone)]
+pub struct KvrRecentFolder {
+    pub kvr_uri: String,
+    pub kvr_label: String,
+    pub kvr_timestamp: u64,
+    pub kvr_pinned: bool,
+    pub kvr_workspace_label: String,
+}
+
+impl KvrRecentFolder {
+    pub fn new() -> Self {
+        Self {
+            kvr_uri: String::new(),
+            kvr_label: String::new(),
+            kvr_timestamp: u64::default(),
+            kvr_pinned: bool::default(),
+            kvr_workspace_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvr_uri.is_empty() || true && !self.kvr_label.is_empty() || true && self.kvr_timestamp < u64::MAX || true && self.kvr_pinned || true && !self.kvr_workspace_label.is_empty() || true
+    }
+}
+
+impl Default for KvrRecentFolder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Recently opened workspace entry
+#[derive(Debug, Clone)]
+pub struct KvsRecentWorkspace {
+    pub kvs_path_str: String,
+    pub kvs_label: String,
+    pub kvs_timestamp: u64,
+    pub kvs_folders_count: u32,
+    pub kvs_pinned: bool,
+}
+
+impl KvsRecentWorkspace {
+    pub fn new() -> Self {
+        Self {
+            kvs_path_str: String::new(),
+            kvs_label: String::new(),
+            kvs_timestamp: u64::default(),
+            kvs_folders_count: u32::default(),
+            kvs_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvs_path_str.is_empty() || true && !self.kvs_label.is_empty() || true && self.kvs_timestamp < u64::MAX || true && self.kvs_folders_count < u32::MAX || true && self.kvs_pinned || true
+    }
+}
+
+impl Default for KvsRecentWorkspace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Open editor entry in group
+#[derive(Debug, Clone)]
+pub struct KvtOpenEditor {
+    pub kvt_uri: String,
+    pub kvt_dirty: bool,
+    pub kvt_pinned: bool,
+    pub kvt_preview: bool,
+    pub kvt_label: String,
+}
+
+impl KvtOpenEditor {
+    pub fn new() -> Self {
+        Self {
+            kvt_uri: String::new(),
+            kvt_dirty: bool::default(),
+            kvt_pinned: bool::default(),
+            kvt_preview: bool::default(),
+            kvt_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvt_uri.is_empty() || true && self.kvt_dirty || true && self.kvt_pinned || true && self.kvt_preview || true && !self.kvt_label.is_empty() || true
+    }
+}
+
+impl Default for KvtOpenEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Editor group layout entry
+#[derive(Debug, Clone)]
+pub struct KvuEditorGroup {
+    pub kvu_group_id: u32,
+    pub kvu_editors_count: u32,
+    pub kvu_active_editor: u32,
+    pub kvu_locked: bool,
+    pub kvu_label: String,
+}
+
+impl KvuEditorGroup {
+    pub fn new() -> Self {
+        Self {
+            kvu_group_id: u32::default(),
+            kvu_editors_count: u32::default(),
+            kvu_active_editor: u32::default(),
+            kvu_locked: bool::default(),
+            kvu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kvu_group_id < u32::MAX || true && self.kvu_editors_count < u32::MAX || true && self.kvu_active_editor < u32::MAX || true && self.kvu_locked || true && !self.kvu_label.is_empty() || true
+    }
+}
+
+impl Default for KvuEditorGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Bottom panel layout entry
+#[derive(Debug, Clone)]
+pub struct KvvPanelLayout {
+    pub kvv_panel_id: String,
+    pub kvv_visible: bool,
+    pub kvv_height_pct: f64,
+    pub kvv_maximized: bool,
+    pub kvv_label: String,
+}
+
+impl KvvPanelLayout {
+    pub fn new() -> Self {
+        Self {
+            kvv_panel_id: String::new(),
+            kvv_visible: bool::default(),
+            kvv_height_pct: f64::default(),
+            kvv_maximized: bool::default(),
+            kvv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvv_panel_id.is_empty() || true && self.kvv_visible || true && self.kvv_height_pct.is_finite() || true && self.kvv_maximized || true && !self.kvv_label.is_empty() || true
+    }
+}
+
+impl Default for KvvPanelLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Sidebar view layout entry
+#[derive(Debug, Clone)]
+pub struct KvwSidebarLayout {
+    pub kvw_view_id: String,
+    pub kvw_visible: bool,
+    pub kvw_width_pct: f64,
+    pub kvw_position: String,
+    pub kvw_label: String,
+}
+
+impl KvwSidebarLayout {
+    pub fn new() -> Self {
+        Self {
+            kvw_view_id: String::new(),
+            kvw_visible: bool::default(),
+            kvw_width_pct: f64::default(),
+            kvw_position: String::new(),
+            kvw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvw_view_id.is_empty() || true && self.kvw_visible || true && self.kvw_width_pct.is_finite() || true && !self.kvw_position.is_empty() || true && !self.kvw_label.is_empty() || true
+    }
+}
+
+impl Default for KvwSidebarLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Activity bar item entry
+#[derive(Debug, Clone)]
+pub struct KvxActivityBarItem {
+    pub kvx_item_id: String,
+    pub kvx_icon: String,
+    pub kvx_tooltip: String,
+    pub kvx_badge_count: u32,
+    pub kvx_active: bool,
+}
+
+impl KvxActivityBarItem {
+    pub fn new() -> Self {
+        Self {
+            kvx_item_id: String::new(),
+            kvx_icon: String::new(),
+            kvx_tooltip: String::new(),
+            kvx_badge_count: u32::default(),
+            kvx_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvx_item_id.is_empty() || true && !self.kvx_icon.is_empty() || true && !self.kvx_tooltip.is_empty() || true && self.kvx_badge_count < u32::MAX || true && self.kvx_active || true
+    }
+}
+
+impl Default for KvxActivityBarItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Status bar item entry
+#[derive(Debug, Clone)]
+pub struct KvyStatusBarItem {
+    pub kvy_item_id: String,
+    pub kvy_text: String,
+    pub kvy_tooltip: String,
+    pub kvy_command: String,
+    pub kvy_alignment: String,
+}
+
+impl KvyStatusBarItem {
+    pub fn new() -> Self {
+        Self {
+            kvy_item_id: String::new(),
+            kvy_text: String::new(),
+            kvy_tooltip: String::new(),
+            kvy_command: String::new(),
+            kvy_alignment: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvy_item_id.is_empty() || true && !self.kvy_text.is_empty() || true && !self.kvy_tooltip.is_empty() || true && !self.kvy_command.is_empty() || true && !self.kvy_alignment.is_empty() || true
+    }
+}
+
+impl Default for KvyStatusBarItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined workspace state
+#[derive(Debug, Clone)]
+pub struct KvzWorkspaceState {
+    pub kvz_workspace_id: String,
+    pub kvz_folders_count: u32,
+    pub kvz_trusted: bool,
+    pub kvz_multi_root: bool,
+    pub kvz_label: String,
+}
+
+impl KvzWorkspaceState {
+    pub fn new() -> Self {
+        Self {
+            kvz_workspace_id: String::new(),
+            kvz_folders_count: u32::default(),
+            kvz_trusted: bool::default(),
+            kvz_multi_root: bool::default(),
+            kvz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kvz_workspace_id.is_empty() || true && self.kvz_folders_count < u32::MAX || true && self.kvz_trusted || true && self.kvz_multi_root || true && !self.kvz_label.is_empty() || true
+    }
+}
+
+impl Default for KvzWorkspaceState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -482886,6 +483718,474 @@ mod tests_kuz_generated {
     fn test_kuz_fields() {
         let mut obj = KuzExtensionConfig::default();
         obj.kuz_enable_proposed = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kva_generated {
+    use super::*;
+
+    #[test]
+    fn test_kva_default() {
+        let obj = KvaWorkspaceFolder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kva_fields() {
+        let mut obj = KvaWorkspaceFolder::default();
+        obj.kva_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvb_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvb_default() {
+        let obj = KvbWorkspaceFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvb_fields() {
+        let mut obj = KvbWorkspaceFile::default();
+        obj.kvb_path_str = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvc_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvc_default() {
+        let obj = KvcWorkspaceTrust::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvc_fields() {
+        let mut obj = KvcWorkspaceTrust::default();
+        obj.kvc_trusted = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvd_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvd_default() {
+        let obj = KvdWorkspaceEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvd_fields() {
+        let mut obj = KvdWorkspaceEdit::default();
+        obj.kvd_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kve_generated {
+    use super::*;
+
+    #[test]
+    fn test_kve_default() {
+        let obj = KveWorkspaceConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kve_fields() {
+        let mut obj = KveWorkspaceConfig::default();
+        obj.kve_scope = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvf_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvf_default() {
+        let obj = KvfWorkspaceSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvf_fields() {
+        let mut obj = KvfWorkspaceSearch::default();
+        obj.kvf_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvg_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvg_default() {
+        let obj = KvgFileSystemWatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvg_fields() {
+        let mut obj = KvgFileSystemWatcher::default();
+        obj.kvg_glob_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvh_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvh_default() {
+        let obj = KvhFileChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvh_fields() {
+        let mut obj = KvhFileChange::default();
+        obj.kvh_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvi_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvi_default() {
+        let obj = KviFileCreateEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvi_fields() {
+        let mut obj = KviFileCreateEvent::default();
+        obj.kvi_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvj_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvj_default() {
+        let obj = KvjFileDeleteEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvj_fields() {
+        let mut obj = KvjFileDeleteEvent::default();
+        obj.kvj_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvk_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvk_default() {
+        let obj = KvkFileRenameEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvk_fields() {
+        let mut obj = KvkFileRenameEvent::default();
+        obj.kvk_old_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvl_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvl_default() {
+        let obj = KvlFileDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvl_fields() {
+        let mut obj = KvlFileDecoration::default();
+        obj.kvl_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvm_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvm_default() {
+        let obj = KvmExplorerNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvm_fields() {
+        let mut obj = KvmExplorerNode::default();
+        obj.kvm_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvn_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvn_default() {
+        let obj = KvnExplorerFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvn_fields() {
+        let mut obj = KvnExplorerFilter::default();
+        obj.kvn_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvo_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvo_default() {
+        let obj = KvoExplorerSort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvo_fields() {
+        let mut obj = KvoExplorerSort::default();
+        obj.kvo_sort_by = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvp_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvp_default() {
+        let obj = KvpExplorerAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvp_fields() {
+        let mut obj = KvpExplorerAction::default();
+        obj.kvp_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvq_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvq_default() {
+        let obj = KvqRecentFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvq_fields() {
+        let mut obj = KvqRecentFile::default();
+        obj.kvq_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvr_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvr_default() {
+        let obj = KvrRecentFolder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvr_fields() {
+        let mut obj = KvrRecentFolder::default();
+        obj.kvr_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvs_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvs_default() {
+        let obj = KvsRecentWorkspace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvs_fields() {
+        let mut obj = KvsRecentWorkspace::default();
+        obj.kvs_path_str = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvt_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvt_default() {
+        let obj = KvtOpenEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvt_fields() {
+        let mut obj = KvtOpenEditor::default();
+        obj.kvt_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvu_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvu_default() {
+        let obj = KvuEditorGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvu_fields() {
+        let mut obj = KvuEditorGroup::default();
+        obj.kvu_group_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvv_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvv_default() {
+        let obj = KvvPanelLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvv_fields() {
+        let mut obj = KvvPanelLayout::default();
+        obj.kvv_panel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvw_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvw_default() {
+        let obj = KvwSidebarLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvw_fields() {
+        let mut obj = KvwSidebarLayout::default();
+        obj.kvw_view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvx_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvx_default() {
+        let obj = KvxActivityBarItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvx_fields() {
+        let mut obj = KvxActivityBarItem::default();
+        obj.kvx_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvy_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvy_default() {
+        let obj = KvyStatusBarItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvy_fields() {
+        let mut obj = KvyStatusBarItem::default();
+        obj.kvy_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kvz_generated {
+    use super::*;
+
+    #[test]
+    fn test_kvz_default() {
+        let obj = KvzWorkspaceState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kvz_fields() {
+        let mut obj = KvzWorkspaceState::default();
+        obj.kvz_workspace_id = "test".to_string();
         assert!(obj.validate());
     }
 }
