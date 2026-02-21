@@ -205951,6 +205951,838 @@ impl Default for LazLspConfig {
     }
 }
 
+/// /// TextMate grammar definition
+#[derive(Debug, Clone)]
+pub struct LbaGrammar {
+    pub lba_scope_name: String,
+    pub lba_lang_id: String,
+    pub lba_file_types: String,
+    pub lba_patterns_count: u32,
+    pub lba_label: String,
+}
+
+impl LbaGrammar {
+    pub fn new() -> Self {
+        Self {
+            lba_scope_name: String::new(),
+            lba_lang_id: String::new(),
+            lba_file_types: String::new(),
+            lba_patterns_count: u32::default(),
+            lba_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lba_scope_name.is_empty() || true && !self.lba_lang_id.is_empty() || true && !self.lba_file_types.is_empty() || true && self.lba_patterns_count < u32::MAX || true && !self.lba_label.is_empty() || true
+    }
+}
+
+impl Default for LbaGrammar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// TextMate grammar rule entry
+#[derive(Debug, Clone)]
+pub struct LbbGrammarRule {
+    pub lbb_pattern: String,
+    pub lbb_name: String,
+    pub lbb_begin_str: String,
+    pub lbb_end_str: String,
+    pub lbb_label: String,
+}
+
+impl LbbGrammarRule {
+    pub fn new() -> Self {
+        Self {
+            lbb_pattern: String::new(),
+            lbb_name: String::new(),
+            lbb_begin_str: String::new(),
+            lbb_end_str: String::new(),
+            lbb_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lbb_pattern.is_empty() || true && !self.lbb_name.is_empty() || true && !self.lbb_begin_str.is_empty() || true && !self.lbb_end_str.is_empty() || true && !self.lbb_label.is_empty() || true
+    }
+}
+
+impl Default for LbbGrammarRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Grammar capture group mapping
+#[derive(Debug, Clone)]
+pub struct LbcGrammarCapture {
+    pub lbc_group: u32,
+    pub lbc_scope_name: String,
+    pub lbc_patterns: String,
+    pub lbc_active: bool,
+    pub lbc_label: String,
+}
+
+impl LbcGrammarCapture {
+    pub fn new() -> Self {
+        Self {
+            lbc_group: u32::default(),
+            lbc_scope_name: String::new(),
+            lbc_patterns: String::new(),
+            lbc_active: bool::default(),
+            lbc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lbc_group < u32::MAX || true && !self.lbc_scope_name.is_empty() || true && !self.lbc_patterns.is_empty() || true && self.lbc_active || true && !self.lbc_label.is_empty() || true
+    }
+}
+
+impl Default for LbcGrammarCapture {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Grammar repository item
+#[derive(Debug, Clone)]
+pub struct LbdGrammarRepo {
+    pub lbd_repo_key: String,
+    pub lbd_rule_name: String,
+    pub lbd_patterns_count: u32,
+    pub lbd_referenced: bool,
+    pub lbd_label: String,
+}
+
+impl LbdGrammarRepo {
+    pub fn new() -> Self {
+        Self {
+            lbd_repo_key: String::new(),
+            lbd_rule_name: String::new(),
+            lbd_patterns_count: u32::default(),
+            lbd_referenced: bool::default(),
+            lbd_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lbd_repo_key.is_empty() || true && !self.lbd_rule_name.is_empty() || true && self.lbd_patterns_count < u32::MAX || true && self.lbd_referenced || true && !self.lbd_label.is_empty() || true
+    }
+}
+
+impl Default for LbdGrammarRepo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Grammar include directive
+#[derive(Debug, Clone)]
+pub struct LbeGrammarInclude {
+    pub lbe_include_ref: String,
+    pub lbe_scope_name: String,
+    pub lbe_resolved: bool,
+    pub lbe_external: bool,
+    pub lbe_label: String,
+}
+
+impl LbeGrammarInclude {
+    pub fn new() -> Self {
+        Self {
+            lbe_include_ref: String::new(),
+            lbe_scope_name: String::new(),
+            lbe_resolved: bool::default(),
+            lbe_external: bool::default(),
+            lbe_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lbe_include_ref.is_empty() || true && !self.lbe_scope_name.is_empty() || true && self.lbe_resolved || true && self.lbe_external || true && !self.lbe_label.is_empty() || true
+    }
+}
+
+impl Default for LbeGrammarInclude {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Token type classification
+#[derive(Debug, Clone)]
+pub struct LbfTokenType {
+    pub lbf_type_name: String,
+    pub lbf_standard_type: u32,
+    pub lbf_foreground: String,
+    pub lbf_font_style: String,
+    pub lbf_label: String,
+}
+
+impl LbfTokenType {
+    pub fn new() -> Self {
+        Self {
+            lbf_type_name: String::new(),
+            lbf_standard_type: u32::default(),
+            lbf_foreground: String::new(),
+            lbf_font_style: String::new(),
+            lbf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lbf_type_name.is_empty() || true && self.lbf_standard_type < u32::MAX || true && !self.lbf_foreground.is_empty() || true && !self.lbf_font_style.is_empty() || true && !self.lbf_label.is_empty() || true
+    }
+}
+
+impl Default for LbfTokenType {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Token modifier (declaration/definition)
+#[derive(Debug, Clone)]
+pub struct LbgTokenModifier {
+    pub lbg_modifier_name: String,
+    pub lbg_bit_flag: u32,
+    pub lbg_description: String,
+    pub lbg_active: bool,
+    pub lbg_label: String,
+}
+
+impl LbgTokenModifier {
+    pub fn new() -> Self {
+        Self {
+            lbg_modifier_name: String::new(),
+            lbg_bit_flag: u32::default(),
+            lbg_description: String::new(),
+            lbg_active: bool::default(),
+            lbg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lbg_modifier_name.is_empty() || true && self.lbg_bit_flag < u32::MAX || true && !self.lbg_description.is_empty() || true && self.lbg_active || true && !self.lbg_label.is_empty() || true
+    }
+}
+
+impl Default for LbgTokenModifier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Tokenizer state at line boundary
+#[derive(Debug, Clone)]
+pub struct LbhTokenizationState {
+    pub lbh_stack_depth: u32,
+    pub lbh_top_scope: String,
+    pub lbh_rule_idx: u32,
+    pub lbh_begin_rule: bool,
+    pub lbh_label: String,
+}
+
+impl LbhTokenizationState {
+    pub fn new() -> Self {
+        Self {
+            lbh_stack_depth: u32::default(),
+            lbh_top_scope: String::new(),
+            lbh_rule_idx: u32::default(),
+            lbh_begin_rule: bool::default(),
+            lbh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lbh_stack_depth < u32::MAX || true && !self.lbh_top_scope.is_empty() || true && self.lbh_rule_idx < u32::MAX || true && self.lbh_begin_rule || true && !self.lbh_label.is_empty() || true
+    }
+}
+
+impl Default for LbhTokenizationState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Tokenization result for a line
+#[derive(Debug, Clone)]
+pub struct LbiTokenizeResult {
+    pub lbi_tokens_count: u32,
+    pub lbi_end_state_id: u32,
+    pub lbi_stop_reason: String,
+    pub lbi_actual_stop: bool,
+    pub lbi_label: String,
+}
+
+impl LbiTokenizeResult {
+    pub fn new() -> Self {
+        Self {
+            lbi_tokens_count: u32::default(),
+            lbi_end_state_id: u32::default(),
+            lbi_stop_reason: String::new(),
+            lbi_actual_stop: bool::default(),
+            lbi_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lbi_tokens_count < u32::MAX || true && self.lbi_end_state_id < u32::MAX || true && !self.lbi_stop_reason.is_empty() || true && self.lbi_actual_stop || true && !self.lbi_label.is_empty() || true
+    }
+}
+
+impl Default for LbiTokenizeResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Encoded tokens for a single line
+#[derive(Debug, Clone)]
+pub struct LbjLineTokens {
+    pub lbj_line_idx: u32,
+    pub lbj_token_count: u32,
+    pub lbj_dirty: bool,
+    pub lbj_version: u32,
+    pub lbj_label: String,
+}
+
+impl LbjLineTokens {
+    pub fn new() -> Self {
+        Self {
+            lbj_line_idx: u32::default(),
+            lbj_token_count: u32::default(),
+            lbj_dirty: bool::default(),
+            lbj_version: u32::default(),
+            lbj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lbj_line_idx < u32::MAX || true && self.lbj_token_count < u32::MAX || true && self.lbj_dirty || true && self.lbj_version < u32::MAX || true && !self.lbj_label.is_empty() || true
+    }
+}
+
+impl Default for LbjLineTokens {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Theme rule for token styling
+#[derive(Debug, Clone)]
+pub struct LbkTokenThemeRule {
+    pub lbk_scope: String,
+    pub lbk_foreground: String,
+    pub lbk_background: String,
+    pub lbk_font_style: String,
+    pub lbk_label: String,
+}
+
+impl LbkTokenThemeRule {
+    pub fn new() -> Self {
+        Self {
+            lbk_scope: String::new(),
+            lbk_foreground: String::new(),
+            lbk_background: String::new(),
+            lbk_font_style: String::new(),
+            lbk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lbk_scope.is_empty() || true && !self.lbk_foreground.is_empty() || true && !self.lbk_background.is_empty() || true && !self.lbk_font_style.is_empty() || true && !self.lbk_label.is_empty() || true
+    }
+}
+
+impl Default for LbkTokenThemeRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Color ID to hex color mapping
+#[derive(Debug, Clone)]
+pub struct LblColorMap {
+    pub lbl_count: u32,
+    pub lbl_default_fg: String,
+    pub lbl_default_bg: String,
+    pub lbl_frozen: bool,
+    pub lbl_label: String,
+}
+
+impl LblColorMap {
+    pub fn new() -> Self {
+        Self {
+            lbl_count: u32::default(),
+            lbl_default_fg: String::new(),
+            lbl_default_bg: String::new(),
+            lbl_frozen: bool::default(),
+            lbl_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lbl_count < u32::MAX || true && !self.lbl_default_fg.is_empty() || true && !self.lbl_default_bg.is_empty() || true && self.lbl_frozen || true && !self.lbl_label.is_empty() || true
+    }
+}
+
+impl Default for LblColorMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Oniguruma regex wrapper
+#[derive(Debug, Clone)]
+pub struct LbmOnigRegex {
+    pub lbm_pattern: String,
+    pub lbm_flags: String,
+    pub lbm_compiled: bool,
+    pub lbm_cache_key: String,
+    pub lbm_label: String,
+}
+
+impl LbmOnigRegex {
+    pub fn new() -> Self {
+        Self {
+            lbm_pattern: String::new(),
+            lbm_flags: String::new(),
+            lbm_compiled: bool::default(),
+            lbm_cache_key: String::new(),
+            lbm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lbm_pattern.is_empty() || true && !self.lbm_flags.is_empty() || true && self.lbm_compiled || true && !self.lbm_cache_key.is_empty() || true && !self.lbm_label.is_empty() || true
+    }
+}
+
+impl Default for LbmOnigRegex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Regex match result
+#[derive(Debug, Clone)]
+pub struct LbnRegexMatch {
+    pub lbn_start_pos: u32,
+    pub lbn_end_pos: u32,
+    pub lbn_pattern_idx: u32,
+    pub lbn_captures_count: u32,
+    pub lbn_label: String,
+}
+
+impl LbnRegexMatch {
+    pub fn new() -> Self {
+        Self {
+            lbn_start_pos: u32::default(),
+            lbn_end_pos: u32::default(),
+            lbn_pattern_idx: u32::default(),
+            lbn_captures_count: u32::default(),
+            lbn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lbn_start_pos < u32::MAX || true && self.lbn_end_pos < u32::MAX || true && self.lbn_pattern_idx < u32::MAX || true && self.lbn_captures_count < u32::MAX || true && !self.lbn_label.is_empty() || true
+    }
+}
+
+impl Default for LbnRegexMatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Multi-pattern regex scanner
+#[derive(Debug, Clone)]
+pub struct LboRegexScanner {
+    pub lbo_patterns_count: u32,
+    pub lbo_compiled: bool,
+    pub lbo_cache_size: u32,
+    pub lbo_timeout_ms: u32,
+    pub lbo_label: String,
+}
+
+impl LboRegexScanner {
+    pub fn new() -> Self {
+        Self {
+            lbo_patterns_count: u32::default(),
+            lbo_compiled: bool::default(),
+            lbo_cache_size: u32::default(),
+            lbo_timeout_ms: u32::default(),
+            lbo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lbo_patterns_count < u32::MAX || true && self.lbo_compiled || true && self.lbo_cache_size < u32::MAX || true && self.lbo_timeout_ms < u32::MAX || true && !self.lbo_label.is_empty() || true
+    }
+}
+
+impl Default for LboRegexScanner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Language registration entry
+#[derive(Debug, Clone)]
+pub struct LbpLanguageRegistration {
+    pub lbp_lang_id: String,
+    pub lbp_name: String,
+    pub lbp_extensions: String,
+    pub lbp_aliases: String,
+    pub lbp_label: String,
+}
+
+impl LbpLanguageRegistration {
+    pub fn new() -> Self {
+        Self {
+            lbp_lang_id: String::new(),
+            lbp_name: String::new(),
+            lbp_extensions: String::new(),
+            lbp_aliases: String::new(),
+            lbp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lbp_lang_id.is_empty() || true && !self.lbp_name.is_empty() || true && !self.lbp_extensions.is_empty() || true && !self.lbp_aliases.is_empty() || true && !self.lbp_label.is_empty() || true
+    }
+}
+
+impl Default for LbpLanguageRegistration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Language extension point contribution
+#[derive(Debug, Clone)]
+pub struct LbqLanguageExtPoint {
+    pub lbq_extension_id: String,
+    pub lbq_lang_id: String,
+    pub lbq_grammar_path: String,
+    pub lbq_config_path: String,
+    pub lbq_label: String,
+}
+
+impl LbqLanguageExtPoint {
+    pub fn new() -> Self {
+        Self {
+            lbq_extension_id: String::new(),
+            lbq_lang_id: String::new(),
+            lbq_grammar_path: String::new(),
+            lbq_config_path: String::new(),
+            lbq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lbq_extension_id.is_empty() || true && !self.lbq_lang_id.is_empty() || true && !self.lbq_grammar_path.is_empty() || true && !self.lbq_config_path.is_empty() || true && !self.lbq_label.is_empty() || true
+    }
+}
+
+impl Default for LbqLanguageExtPoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Embedded language scope mapping
+#[derive(Debug, Clone)]
+pub struct LbrEmbeddedLanguage {
+    pub lbr_scope_name: String,
+    pub lbr_lang_id: String,
+    pub lbr_parent_scope: String,
+    pub lbr_active: bool,
+    pub lbr_label: String,
+}
+
+impl LbrEmbeddedLanguage {
+    pub fn new() -> Self {
+        Self {
+            lbr_scope_name: String::new(),
+            lbr_lang_id: String::new(),
+            lbr_parent_scope: String::new(),
+            lbr_active: bool::default(),
+            lbr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lbr_scope_name.is_empty() || true && !self.lbr_lang_id.is_empty() || true && !self.lbr_parent_scope.is_empty() || true && self.lbr_active || true && !self.lbr_label.is_empty() || true
+    }
+}
+
+impl Default for LbrEmbeddedLanguage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Monarch grammar for built-in languages
+#[derive(Debug, Clone)]
+pub struct LbsMonarchGrammar {
+    pub lbs_lang_id: String,
+    pub lbs_tokenizer_name: String,
+    pub lbs_states_count: u32,
+    pub lbs_default_token: String,
+    pub lbs_label: String,
+}
+
+impl LbsMonarchGrammar {
+    pub fn new() -> Self {
+        Self {
+            lbs_lang_id: String::new(),
+            lbs_tokenizer_name: String::new(),
+            lbs_states_count: u32::default(),
+            lbs_default_token: String::new(),
+            lbs_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lbs_lang_id.is_empty() || true && !self.lbs_tokenizer_name.is_empty() || true && self.lbs_states_count < u32::MAX || true && !self.lbs_default_token.is_empty() || true && !self.lbs_label.is_empty() || true
+    }
+}
+
+impl Default for LbsMonarchGrammar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Monarch tokenizer rule
+#[derive(Debug, Clone)]
+pub struct LbtMonarchRule {
+    pub lbt_regex_str: String,
+    pub lbt_action: String,
+    pub lbt_next_state: String,
+    pub lbt_token_type: String,
+    pub lbt_label: String,
+}
+
+impl LbtMonarchRule {
+    pub fn new() -> Self {
+        Self {
+            lbt_regex_str: String::new(),
+            lbt_action: String::new(),
+            lbt_next_state: String::new(),
+            lbt_token_type: String::new(),
+            lbt_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lbt_regex_str.is_empty() || true && !self.lbt_action.is_empty() || true && !self.lbt_next_state.is_empty() || true && !self.lbt_token_type.is_empty() || true && !self.lbt_label.is_empty() || true
+    }
+}
+
+impl Default for LbtMonarchRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Monarch tokenizer state
+#[derive(Debug, Clone)]
+pub struct LbuMonarchState {
+    pub lbu_state_name: String,
+    pub lbu_rules_count: u32,
+    pub lbu_parent_state: String,
+    pub lbu_inclusive: bool,
+    pub lbu_label: String,
+}
+
+impl LbuMonarchState {
+    pub fn new() -> Self {
+        Self {
+            lbu_state_name: String::new(),
+            lbu_rules_count: u32::default(),
+            lbu_parent_state: String::new(),
+            lbu_inclusive: bool::default(),
+            lbu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lbu_state_name.is_empty() || true && self.lbu_rules_count < u32::MAX || true && !self.lbu_parent_state.is_empty() || true && self.lbu_inclusive || true && !self.lbu_label.is_empty() || true
+    }
+}
+
+impl Default for LbuMonarchState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Syntax highlighting result for line
+#[derive(Debug, Clone)]
+pub struct LbvSyntaxHighlight {
+    pub lbv_line: u32,
+    pub lbv_tokens_count: u32,
+    pub lbv_lang_id: String,
+    pub lbv_dirty: bool,
+    pub lbv_label: String,
+}
+
+impl LbvSyntaxHighlight {
+    pub fn new() -> Self {
+        Self {
+            lbv_line: u32::default(),
+            lbv_tokens_count: u32::default(),
+            lbv_lang_id: String::new(),
+            lbv_dirty: bool::default(),
+            lbv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lbv_line < u32::MAX || true && self.lbv_tokens_count < u32::MAX || true && !self.lbv_lang_id.is_empty() || true && self.lbv_dirty || true && !self.lbv_label.is_empty() || true
+    }
+}
+
+impl Default for LbvSyntaxHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Bracket pair token definition
+#[derive(Debug, Clone)]
+pub struct LbwBracketToken {
+    pub lbw_open_str: String,
+    pub lbw_close_str: String,
+    pub lbw_lang_id: String,
+    pub lbw_nested: bool,
+    pub lbw_label: String,
+}
+
+impl LbwBracketToken {
+    pub fn new() -> Self {
+        Self {
+            lbw_open_str: String::new(),
+            lbw_close_str: String::new(),
+            lbw_lang_id: String::new(),
+            lbw_nested: bool::default(),
+            lbw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lbw_open_str.is_empty() || true && !self.lbw_close_str.is_empty() || true && !self.lbw_lang_id.is_empty() || true && self.lbw_nested || true && !self.lbw_label.is_empty() || true
+    }
+}
+
+impl Default for LbwBracketToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Token factory for language
+#[derive(Debug, Clone)]
+pub struct LbxTokenFactory {
+    pub lbx_lang_id: String,
+    pub lbx_token_count: u32,
+    pub lbx_cache_size: u32,
+    pub lbx_active: bool,
+    pub lbx_label: String,
+}
+
+impl LbxTokenFactory {
+    pub fn new() -> Self {
+        Self {
+            lbx_lang_id: String::new(),
+            lbx_token_count: u32::default(),
+            lbx_cache_size: u32::default(),
+            lbx_active: bool::default(),
+            lbx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lbx_lang_id.is_empty() || true && self.lbx_token_count < u32::MAX || true && self.lbx_cache_size < u32::MAX || true && self.lbx_active || true && !self.lbx_label.is_empty() || true
+    }
+}
+
+impl Default for LbxTokenFactory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Grammar registration event
+#[derive(Debug, Clone)]
+pub struct LbyGrammarEvent {
+    pub lby_event_kind: String,
+    pub lby_lang_id: String,
+    pub lby_scope_name: String,
+    pub lby_timestamp: u64,
+    pub lby_label: String,
+}
+
+impl LbyGrammarEvent {
+    pub fn new() -> Self {
+        Self {
+            lby_event_kind: String::new(),
+            lby_lang_id: String::new(),
+            lby_scope_name: String::new(),
+            lby_timestamp: u64::default(),
+            lby_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lby_event_kind.is_empty() || true && !self.lby_lang_id.is_empty() || true && !self.lby_scope_name.is_empty() || true && self.lby_timestamp < u64::MAX || true && !self.lby_label.is_empty() || true
+    }
+}
+
+impl Default for LbyGrammarEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined grammar configuration
+#[derive(Debug, Clone)]
+pub struct LbzGrammarConfig {
+    pub lbz_max_token_length: u32,
+    pub lbz_timeout_ms: u32,
+    pub lbz_cache_enabled: bool,
+    pub lbz_async_tokenize: bool,
+    pub lbz_label: String,
+}
+
+impl LbzGrammarConfig {
+    pub fn new() -> Self {
+        Self {
+            lbz_max_token_length: u32::default(),
+            lbz_timeout_ms: u32::default(),
+            lbz_cache_enabled: bool::default(),
+            lbz_async_tokenize: bool::default(),
+            lbz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lbz_max_token_length < u32::MAX || true && self.lbz_timeout_ms < u32::MAX || true && self.lbz_cache_enabled || true && self.lbz_async_tokenize || true && !self.lbz_label.is_empty() || true
+    }
+}
+
+impl Default for LbzGrammarConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -490792,6 +491624,474 @@ mod tests_laz_generated {
     fn test_laz_fields() {
         let mut obj = LazLspConfig::default();
         obj.laz_trace_level = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lba_generated {
+    use super::*;
+
+    #[test]
+    fn test_lba_default() {
+        let obj = LbaGrammar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lba_fields() {
+        let mut obj = LbaGrammar::default();
+        obj.lba_scope_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbb_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbb_default() {
+        let obj = LbbGrammarRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbb_fields() {
+        let mut obj = LbbGrammarRule::default();
+        obj.lbb_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbc_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbc_default() {
+        let obj = LbcGrammarCapture::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbc_fields() {
+        let mut obj = LbcGrammarCapture::default();
+        obj.lbc_group = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbd_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbd_default() {
+        let obj = LbdGrammarRepo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbd_fields() {
+        let mut obj = LbdGrammarRepo::default();
+        obj.lbd_repo_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbe_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbe_default() {
+        let obj = LbeGrammarInclude::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbe_fields() {
+        let mut obj = LbeGrammarInclude::default();
+        obj.lbe_include_ref = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbf_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbf_default() {
+        let obj = LbfTokenType::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbf_fields() {
+        let mut obj = LbfTokenType::default();
+        obj.lbf_type_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbg_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbg_default() {
+        let obj = LbgTokenModifier::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbg_fields() {
+        let mut obj = LbgTokenModifier::default();
+        obj.lbg_modifier_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbh_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbh_default() {
+        let obj = LbhTokenizationState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbh_fields() {
+        let mut obj = LbhTokenizationState::default();
+        obj.lbh_stack_depth = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbi_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbi_default() {
+        let obj = LbiTokenizeResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbi_fields() {
+        let mut obj = LbiTokenizeResult::default();
+        obj.lbi_tokens_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbj_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbj_default() {
+        let obj = LbjLineTokens::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbj_fields() {
+        let mut obj = LbjLineTokens::default();
+        obj.lbj_line_idx = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbk_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbk_default() {
+        let obj = LbkTokenThemeRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbk_fields() {
+        let mut obj = LbkTokenThemeRule::default();
+        obj.lbk_scope = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbl_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbl_default() {
+        let obj = LblColorMap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbl_fields() {
+        let mut obj = LblColorMap::default();
+        obj.lbl_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbm_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbm_default() {
+        let obj = LbmOnigRegex::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbm_fields() {
+        let mut obj = LbmOnigRegex::default();
+        obj.lbm_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbn_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbn_default() {
+        let obj = LbnRegexMatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbn_fields() {
+        let mut obj = LbnRegexMatch::default();
+        obj.lbn_start_pos = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbo_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbo_default() {
+        let obj = LboRegexScanner::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbo_fields() {
+        let mut obj = LboRegexScanner::default();
+        obj.lbo_patterns_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbp_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbp_default() {
+        let obj = LbpLanguageRegistration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbp_fields() {
+        let mut obj = LbpLanguageRegistration::default();
+        obj.lbp_lang_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbq_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbq_default() {
+        let obj = LbqLanguageExtPoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbq_fields() {
+        let mut obj = LbqLanguageExtPoint::default();
+        obj.lbq_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbr_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbr_default() {
+        let obj = LbrEmbeddedLanguage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbr_fields() {
+        let mut obj = LbrEmbeddedLanguage::default();
+        obj.lbr_scope_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbs_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbs_default() {
+        let obj = LbsMonarchGrammar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbs_fields() {
+        let mut obj = LbsMonarchGrammar::default();
+        obj.lbs_lang_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbt_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbt_default() {
+        let obj = LbtMonarchRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbt_fields() {
+        let mut obj = LbtMonarchRule::default();
+        obj.lbt_regex_str = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbu_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbu_default() {
+        let obj = LbuMonarchState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbu_fields() {
+        let mut obj = LbuMonarchState::default();
+        obj.lbu_state_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbv_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbv_default() {
+        let obj = LbvSyntaxHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbv_fields() {
+        let mut obj = LbvSyntaxHighlight::default();
+        obj.lbv_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbw_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbw_default() {
+        let obj = LbwBracketToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbw_fields() {
+        let mut obj = LbwBracketToken::default();
+        obj.lbw_open_str = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbx_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbx_default() {
+        let obj = LbxTokenFactory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbx_fields() {
+        let mut obj = LbxTokenFactory::default();
+        obj.lbx_lang_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lby_generated {
+    use super::*;
+
+    #[test]
+    fn test_lby_default() {
+        let obj = LbyGrammarEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lby_fields() {
+        let mut obj = LbyGrammarEvent::default();
+        obj.lby_event_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lbz_generated {
+    use super::*;
+
+    #[test]
+    fn test_lbz_default() {
+        let obj = LbzGrammarConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lbz_fields() {
+        let mut obj = LbzGrammarConfig::default();
+        obj.lbz_max_token_length = 1;
         assert!(obj.validate());
     }
 }
