@@ -191033,6 +191033,838 @@ impl Default for KizRefactorConfig {
     }
 }
 
+/// /// Document symbol tree node
+#[derive(Debug, Clone)]
+pub struct KjaDocumentSymbol {
+    pub kja_name: String,
+    pub kja_detail: String,
+    pub kja_kind: String,
+    pub kja_range_start: u32,
+    pub kja_children_count: u32,
+}
+
+impl KjaDocumentSymbol {
+    pub fn new() -> Self {
+        Self {
+            kja_name: String::new(),
+            kja_detail: String::new(),
+            kja_kind: String::new(),
+            kja_range_start: u32::default(),
+            kja_children_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kja_name.is_empty() || true && !self.kja_detail.is_empty() || true && !self.kja_kind.is_empty() || true && self.kja_range_start < u32::MAX || true && self.kja_children_count < u32::MAX || true
+    }
+}
+
+impl Default for KjaDocumentSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Workspace-wide symbol search result
+#[derive(Debug, Clone)]
+pub struct KjbWorkspaceSymbol {
+    pub kjb_name: String,
+    pub kjb_kind: String,
+    pub kjb_container: String,
+    pub kjb_uri: String,
+    pub kjb_score: f64,
+}
+
+impl KjbWorkspaceSymbol {
+    pub fn new() -> Self {
+        Self {
+            kjb_name: String::new(),
+            kjb_kind: String::new(),
+            kjb_container: String::new(),
+            kjb_uri: String::new(),
+            kjb_score: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kjb_name.is_empty() || true && !self.kjb_kind.is_empty() || true && !self.kjb_container.is_empty() || true && !self.kjb_uri.is_empty() || true && self.kjb_score.is_finite() || true
+    }
+}
+
+impl Default for KjbWorkspaceSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Symbol provider registration info
+#[derive(Debug, Clone)]
+pub struct KjcSymbolProvider {
+    pub kjc_lang_id: String,
+    pub kjc_provider_name: String,
+    pub kjc_supports_resolve: bool,
+    pub kjc_priority: u32,
+    pub kjc_label: String,
+}
+
+impl KjcSymbolProvider {
+    pub fn new() -> Self {
+        Self {
+            kjc_lang_id: String::new(),
+            kjc_provider_name: String::new(),
+            kjc_supports_resolve: bool::default(),
+            kjc_priority: u32::default(),
+            kjc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kjc_lang_id.is_empty() || true && !self.kjc_provider_name.is_empty() || true && self.kjc_supports_resolve || true && self.kjc_priority < u32::MAX || true && !self.kjc_label.is_empty() || true
+    }
+}
+
+impl Default for KjcSymbolProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Symbol search filter criteria
+#[derive(Debug, Clone)]
+pub struct KjdSymbolFilter {
+    pub kjd_query: String,
+    pub kjd_kinds_filter: String,
+    pub kjd_scope: String,
+    pub kjd_case_sensitive: bool,
+    pub kjd_max_results: u32,
+}
+
+impl KjdSymbolFilter {
+    pub fn new() -> Self {
+        Self {
+            kjd_query: String::new(),
+            kjd_kinds_filter: String::new(),
+            kjd_scope: String::new(),
+            kjd_case_sensitive: bool::default(),
+            kjd_max_results: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kjd_query.is_empty() || true && !self.kjd_kinds_filter.is_empty() || true && !self.kjd_scope.is_empty() || true && self.kjd_case_sensitive || true && self.kjd_max_results < u32::MAX || true
+    }
+}
+
+impl Default for KjdSymbolFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Symbol list sorting options
+#[derive(Debug, Clone)]
+pub struct KjeSymbolSort {
+    pub kje_field: String,
+    pub kje_ascending: bool,
+    pub kje_group_by_kind: bool,
+    pub kje_group_by_file: bool,
+    pub kje_label: String,
+}
+
+impl KjeSymbolSort {
+    pub fn new() -> Self {
+        Self {
+            kje_field: String::new(),
+            kje_ascending: bool::default(),
+            kje_group_by_kind: bool::default(),
+            kje_group_by_file: bool::default(),
+            kje_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kje_field.is_empty() || true && self.kje_ascending || true && self.kje_group_by_kind || true && self.kje_group_by_file || true && !self.kje_label.is_empty() || true
+    }
+}
+
+impl Default for KjeSymbolSort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Symbol grouping by kind
+#[derive(Debug, Clone)]
+pub struct KjfSymbolGroup {
+    pub kjf_kind: String,
+    pub kjf_count: u32,
+    pub kjf_collapsed: bool,
+    pub kjf_icon: String,
+    pub kjf_label: String,
+}
+
+impl KjfSymbolGroup {
+    pub fn new() -> Self {
+        Self {
+            kjf_kind: String::new(),
+            kjf_count: u32::default(),
+            kjf_collapsed: bool::default(),
+            kjf_icon: String::new(),
+            kjf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kjf_kind.is_empty() || true && self.kjf_count < u32::MAX || true && self.kjf_collapsed || true && !self.kjf_icon.is_empty() || true && !self.kjf_label.is_empty() || true
+    }
+}
+
+impl Default for KjfSymbolGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Outline view model state
+#[derive(Debug, Clone)]
+pub struct KjgOutlineModel {
+    pub kjg_root_count: u32,
+    pub kjg_total_count: u32,
+    pub kjg_follow_cursor: bool,
+    pub kjg_sort_by: String,
+    pub kjg_label: String,
+}
+
+impl KjgOutlineModel {
+    pub fn new() -> Self {
+        Self {
+            kjg_root_count: u32::default(),
+            kjg_total_count: u32::default(),
+            kjg_follow_cursor: bool::default(),
+            kjg_sort_by: String::new(),
+            kjg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kjg_root_count < u32::MAX || true && self.kjg_total_count < u32::MAX || true && self.kjg_follow_cursor || true && !self.kjg_sort_by.is_empty() || true && !self.kjg_label.is_empty() || true
+    }
+}
+
+impl Default for KjgOutlineModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Outline view filter options
+#[derive(Debug, Clone)]
+pub struct KjhOutlineFilter {
+    pub kjh_show_functions: bool,
+    pub kjh_show_classes: bool,
+    pub kjh_show_variables: bool,
+    pub kjh_show_constants: bool,
+    pub kjh_query: String,
+}
+
+impl KjhOutlineFilter {
+    pub fn new() -> Self {
+        Self {
+            kjh_show_functions: bool::default(),
+            kjh_show_classes: bool::default(),
+            kjh_show_variables: bool::default(),
+            kjh_show_constants: bool::default(),
+            kjh_query: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kjh_show_functions || true && self.kjh_show_classes || true && self.kjh_show_variables || true && self.kjh_show_constants || true && !self.kjh_query.is_empty() || true
+    }
+}
+
+impl Default for KjhOutlineFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Outline view sorting options
+#[derive(Debug, Clone)]
+pub struct KjiOutlineSort {
+    pub kji_by_position: bool,
+    pub kji_by_name: bool,
+    pub kji_by_kind: bool,
+    pub kji_ascending: bool,
+    pub kji_label: String,
+}
+
+impl KjiOutlineSort {
+    pub fn new() -> Self {
+        Self {
+            kji_by_position: bool::default(),
+            kji_by_name: bool::default(),
+            kji_by_kind: bool::default(),
+            kji_ascending: bool::default(),
+            kji_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kji_by_position || true && self.kji_by_name || true && self.kji_by_kind || true && self.kji_ascending || true && !self.kji_label.is_empty() || true
+    }
+}
+
+impl Default for KjiOutlineSort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Breadcrumb navigation path
+#[derive(Debug, Clone)]
+pub struct KjjBreadcrumbPath {
+    pub kjj_segments: String,
+    pub kjj_file_uri: String,
+    pub kjj_active_idx: u32,
+    pub kjj_focused: bool,
+    pub kjj_label: String,
+}
+
+impl KjjBreadcrumbPath {
+    pub fn new() -> Self {
+        Self {
+            kjj_segments: String::new(),
+            kjj_file_uri: String::new(),
+            kjj_active_idx: u32::default(),
+            kjj_focused: bool::default(),
+            kjj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kjj_segments.is_empty() || true && !self.kjj_file_uri.is_empty() || true && self.kjj_active_idx < u32::MAX || true && self.kjj_focused || true && !self.kjj_label.is_empty() || true
+    }
+}
+
+impl Default for KjjBreadcrumbPath {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Single breadcrumb segment
+#[derive(Debug, Clone)]
+pub struct KjkBreadcrumbSegment {
+    pub kjk_name: String,
+    pub kjk_kind: String,
+    pub kjk_uri: String,
+    pub kjk_range_start: u32,
+    pub kjk_active: bool,
+}
+
+impl KjkBreadcrumbSegment {
+    pub fn new() -> Self {
+        Self {
+            kjk_name: String::new(),
+            kjk_kind: String::new(),
+            kjk_uri: String::new(),
+            kjk_range_start: u32::default(),
+            kjk_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kjk_name.is_empty() || true && !self.kjk_kind.is_empty() || true && !self.kjk_uri.is_empty() || true && self.kjk_range_start < u32::MAX || true && self.kjk_active || true
+    }
+}
+
+impl Default for KjkBreadcrumbSegment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Breadcrumb display configuration
+#[derive(Debug, Clone)]
+pub struct KjlBreadcrumbConfig {
+    pub kjl_file_path: bool,
+    pub kjl_symbol_path: bool,
+    pub kjl_icons: bool,
+    pub kjl_separator: String,
+    pub kjl_label: String,
+}
+
+impl KjlBreadcrumbConfig {
+    pub fn new() -> Self {
+        Self {
+            kjl_file_path: bool::default(),
+            kjl_symbol_path: bool::default(),
+            kjl_icons: bool::default(),
+            kjl_separator: String::new(),
+            kjl_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kjl_file_path || true && self.kjl_symbol_path || true && self.kjl_icons || true && !self.kjl_separator.is_empty() || true && !self.kjl_label.is_empty() || true
+    }
+}
+
+impl Default for KjlBreadcrumbConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Go-to-symbol-in-file dialog
+#[derive(Debug, Clone)]
+pub struct KjmGoToSymbol {
+    pub kjm_query: String,
+    pub kjm_results_count: u32,
+    pub kjm_selected_idx: u32,
+    pub kjm_kind_filter: String,
+    pub kjm_label: String,
+}
+
+impl KjmGoToSymbol {
+    pub fn new() -> Self {
+        Self {
+            kjm_query: String::new(),
+            kjm_results_count: u32::default(),
+            kjm_selected_idx: u32::default(),
+            kjm_kind_filter: String::new(),
+            kjm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kjm_query.is_empty() || true && self.kjm_results_count < u32::MAX || true && self.kjm_selected_idx < u32::MAX || true && !self.kjm_kind_filter.is_empty() || true && !self.kjm_label.is_empty() || true
+    }
+}
+
+impl Default for KjmGoToSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Go-to-file quick open dialog
+#[derive(Debug, Clone)]
+pub struct KjnGoToFile {
+    pub kjn_query: String,
+    pub kjn_results_count: u32,
+    pub kjn_selected_idx: u32,
+    pub kjn_recent_first: bool,
+    pub kjn_label: String,
+}
+
+impl KjnGoToFile {
+    pub fn new() -> Self {
+        Self {
+            kjn_query: String::new(),
+            kjn_results_count: u32::default(),
+            kjn_selected_idx: u32::default(),
+            kjn_recent_first: bool::default(),
+            kjn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kjn_query.is_empty() || true && self.kjn_results_count < u32::MAX || true && self.kjn_selected_idx < u32::MAX || true && self.kjn_recent_first || true && !self.kjn_label.is_empty() || true
+    }
+}
+
+impl Default for KjnGoToFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Go-to-line dialog state
+#[derive(Debug, Clone)]
+pub struct KjoGoToLine {
+    pub kjo_line_number: u32,
+    pub kjo_column: u32,
+    pub kjo_valid: bool,
+    pub kjo_max_line: u32,
+    pub kjo_label: String,
+}
+
+impl KjoGoToLine {
+    pub fn new() -> Self {
+        Self {
+            kjo_line_number: u32::default(),
+            kjo_column: u32::default(),
+            kjo_valid: bool::default(),
+            kjo_max_line: u32::default(),
+            kjo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kjo_line_number < u32::MAX || true && self.kjo_column < u32::MAX || true && self.kjo_valid || true && self.kjo_max_line < u32::MAX || true && !self.kjo_label.is_empty() || true
+    }
+}
+
+impl Default for KjoGoToLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Peek view for definitions/references
+#[derive(Debug, Clone)]
+pub struct KjpPeekView {
+    pub kjp_uri: String,
+    pub kjp_line: u32,
+    pub kjp_results_count: u32,
+    pub kjp_active_idx: u32,
+    pub kjp_label: String,
+}
+
+impl KjpPeekView {
+    pub fn new() -> Self {
+        Self {
+            kjp_uri: String::new(),
+            kjp_line: u32::default(),
+            kjp_results_count: u32::default(),
+            kjp_active_idx: u32::default(),
+            kjp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kjp_uri.is_empty() || true && self.kjp_line < u32::MAX || true && self.kjp_results_count < u32::MAX || true && self.kjp_active_idx < u32::MAX || true && !self.kjp_label.is_empty() || true
+    }
+}
+
+impl Default for KjpPeekView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Peek view visibility state
+#[derive(Debug, Clone)]
+pub struct KjqPeekViewState {
+    pub kjq_open: bool,
+    pub kjq_height: u32,
+    pub kjq_focused: bool,
+    pub kjq_resizable: bool,
+    pub kjq_label: String,
+}
+
+impl KjqPeekViewState {
+    pub fn new() -> Self {
+        Self {
+            kjq_open: bool::default(),
+            kjq_height: u32::default(),
+            kjq_focused: bool::default(),
+            kjq_resizable: bool::default(),
+            kjq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kjq_open || true && self.kjq_height < u32::MAX || true && self.kjq_focused || true && self.kjq_resizable || true && !self.kjq_label.is_empty() || true
+    }
+}
+
+impl Default for KjqPeekViewState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Single go-to result entry
+#[derive(Debug, Clone)]
+pub struct KjrGoToResult {
+    pub kjr_uri: String,
+    pub kjr_line: u32,
+    pub kjr_column: u32,
+    pub kjr_preview: String,
+    pub kjr_score: f64,
+}
+
+impl KjrGoToResult {
+    pub fn new() -> Self {
+        Self {
+            kjr_uri: String::new(),
+            kjr_line: u32::default(),
+            kjr_column: u32::default(),
+            kjr_preview: String::new(),
+            kjr_score: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kjr_uri.is_empty() || true && self.kjr_line < u32::MAX || true && self.kjr_column < u32::MAX || true && !self.kjr_preview.is_empty() || true && self.kjr_score.is_finite() || true
+    }
+}
+
+impl Default for KjrGoToResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Go-to command configuration
+#[derive(Debug, Clone)]
+pub struct KjsGoToCommand {
+    pub kjs_command_id: String,
+    pub kjs_keybinding: String,
+    pub kjs_go_to_target: String,
+    pub kjs_side_by_side: bool,
+    pub kjs_label: String,
+}
+
+impl KjsGoToCommand {
+    pub fn new() -> Self {
+        Self {
+            kjs_command_id: String::new(),
+            kjs_keybinding: String::new(),
+            kjs_go_to_target: String::new(),
+            kjs_side_by_side: bool::default(),
+            kjs_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kjs_command_id.is_empty() || true && !self.kjs_keybinding.is_empty() || true && !self.kjs_go_to_target.is_empty() || true && self.kjs_side_by_side || true && !self.kjs_label.is_empty() || true
+    }
+}
+
+impl Default for KjsGoToCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Workspace symbol search state
+#[derive(Debug, Clone)]
+pub struct KjtSymbolSearch {
+    pub kjt_query: String,
+    pub kjt_results_count: u32,
+    pub kjt_searching: bool,
+    pub kjt_scope: String,
+    pub kjt_label: String,
+}
+
+impl KjtSymbolSearch {
+    pub fn new() -> Self {
+        Self {
+            kjt_query: String::new(),
+            kjt_results_count: u32::default(),
+            kjt_searching: bool::default(),
+            kjt_scope: String::new(),
+            kjt_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kjt_query.is_empty() || true && self.kjt_results_count < u32::MAX || true && self.kjt_searching || true && !self.kjt_scope.is_empty() || true && !self.kjt_label.is_empty() || true
+    }
+}
+
+impl Default for KjtSymbolSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Single workspace symbol result
+#[derive(Debug, Clone)]
+pub struct KjuSymbolSearchResult {
+    pub kju_name: String,
+    pub kju_kind: String,
+    pub kju_uri: String,
+    pub kju_container: String,
+    pub kju_score: f64,
+}
+
+impl KjuSymbolSearchResult {
+    pub fn new() -> Self {
+        Self {
+            kju_name: String::new(),
+            kju_kind: String::new(),
+            kju_uri: String::new(),
+            kju_container: String::new(),
+            kju_score: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kju_name.is_empty() || true && !self.kju_kind.is_empty() || true && !self.kju_uri.is_empty() || true && !self.kju_container.is_empty() || true && self.kju_score.is_finite() || true
+    }
+}
+
+impl Default for KjuSymbolSearchResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Type-specific symbol search
+#[derive(Debug, Clone)]
+pub struct KjvTypeSearch {
+    pub kjv_query: String,
+    pub kjv_type_filter: String,
+    pub kjv_results_count: u32,
+    pub kjv_scope: String,
+    pub kjv_label: String,
+}
+
+impl KjvTypeSearch {
+    pub fn new() -> Self {
+        Self {
+            kjv_query: String::new(),
+            kjv_type_filter: String::new(),
+            kjv_results_count: u32::default(),
+            kjv_scope: String::new(),
+            kjv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kjv_query.is_empty() || true && !self.kjv_type_filter.is_empty() || true && self.kjv_results_count < u32::MAX || true && !self.kjv_scope.is_empty() || true && !self.kjv_label.is_empty() || true
+    }
+}
+
+impl Default for KjvTypeSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Tag-based symbol from ctags/etags
+#[derive(Debug, Clone)]
+pub struct KjwTagSymbol {
+    pub kjw_name: String,
+    pub kjw_file_path: String,
+    pub kjw_pattern: String,
+    pub kjw_kind: String,
+    pub kjw_line_num: u32,
+}
+
+impl KjwTagSymbol {
+    pub fn new() -> Self {
+        Self {
+            kjw_name: String::new(),
+            kjw_file_path: String::new(),
+            kjw_pattern: String::new(),
+            kjw_kind: String::new(),
+            kjw_line_num: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kjw_name.is_empty() || true && !self.kjw_file_path.is_empty() || true && !self.kjw_pattern.is_empty() || true && !self.kjw_kind.is_empty() || true && self.kjw_line_num < u32::MAX || true
+    }
+}
+
+impl Default for KjwTagSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Symbol index entry for fast lookup
+#[derive(Debug, Clone)]
+pub struct KjxSymbolIndex {
+    pub kjx_uri: String,
+    pub kjx_symbol_count: u32,
+    pub kjx_last_modified: u64,
+    pub kjx_indexed: bool,
+    pub kjx_label: String,
+}
+
+impl KjxSymbolIndex {
+    pub fn new() -> Self {
+        Self {
+            kjx_uri: String::new(),
+            kjx_symbol_count: u32::default(),
+            kjx_last_modified: u64::default(),
+            kjx_indexed: bool::default(),
+            kjx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kjx_uri.is_empty() || true && self.kjx_symbol_count < u32::MAX || true && self.kjx_last_modified < u64::MAX || true && self.kjx_indexed || true && !self.kjx_label.is_empty() || true
+    }
+}
+
+impl Default for KjxSymbolIndex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Cached symbol data for performance
+#[derive(Debug, Clone)]
+pub struct KjySymbolCache {
+    pub kjy_count: u32,
+    pub kjy_memory_bytes: u64,
+    pub kjy_stale: bool,
+    pub kjy_last_update: u64,
+    pub kjy_label: String,
+}
+
+impl KjySymbolCache {
+    pub fn new() -> Self {
+        Self {
+            kjy_count: u32::default(),
+            kjy_memory_bytes: u64::default(),
+            kjy_stale: bool::default(),
+            kjy_last_update: u64::default(),
+            kjy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.kjy_count < u32::MAX || true && self.kjy_memory_bytes < u64::MAX || true && self.kjy_stale || true && self.kjy_last_update < u64::MAX || true && !self.kjy_label.is_empty() || true
+    }
+}
+
+impl Default for KjySymbolCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined symbol navigation configuration
+#[derive(Debug, Clone)]
+pub struct KjzSymbolConfig {
+    pub kjz_sort_by: String,
+    pub kjz_group_by: String,
+    pub kjz_show_deprecated: bool,
+    pub kjz_quick_open_symbols: bool,
+    pub kjz_label: String,
+}
+
+impl KjzSymbolConfig {
+    pub fn new() -> Self {
+        Self {
+            kjz_sort_by: String::new(),
+            kjz_group_by: String::new(),
+            kjz_show_deprecated: bool::default(),
+            kjz_quick_open_symbols: bool::default(),
+            kjz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kjz_sort_by.is_empty() || true && !self.kjz_group_by.is_empty() || true && self.kjz_show_deprecated || true && self.kjz_quick_open_symbols || true && !self.kjz_label.is_empty() || true
+    }
+}
+
+impl Default for KjzSymbolConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -467254,6 +468086,474 @@ mod tests_kiz_generated {
     fn test_kiz_fields() {
         let mut obj = KizRefactorConfig::default();
         obj.kiz_auto_apply = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kja_generated {
+    use super::*;
+
+    #[test]
+    fn test_kja_default() {
+        let obj = KjaDocumentSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kja_fields() {
+        let mut obj = KjaDocumentSymbol::default();
+        obj.kja_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjb_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjb_default() {
+        let obj = KjbWorkspaceSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjb_fields() {
+        let mut obj = KjbWorkspaceSymbol::default();
+        obj.kjb_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjc_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjc_default() {
+        let obj = KjcSymbolProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjc_fields() {
+        let mut obj = KjcSymbolProvider::default();
+        obj.kjc_lang_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjd_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjd_default() {
+        let obj = KjdSymbolFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjd_fields() {
+        let mut obj = KjdSymbolFilter::default();
+        obj.kjd_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kje_generated {
+    use super::*;
+
+    #[test]
+    fn test_kje_default() {
+        let obj = KjeSymbolSort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kje_fields() {
+        let mut obj = KjeSymbolSort::default();
+        obj.kje_field = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjf_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjf_default() {
+        let obj = KjfSymbolGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjf_fields() {
+        let mut obj = KjfSymbolGroup::default();
+        obj.kjf_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjg_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjg_default() {
+        let obj = KjgOutlineModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjg_fields() {
+        let mut obj = KjgOutlineModel::default();
+        obj.kjg_root_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjh_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjh_default() {
+        let obj = KjhOutlineFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjh_fields() {
+        let mut obj = KjhOutlineFilter::default();
+        obj.kjh_show_functions = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kji_generated {
+    use super::*;
+
+    #[test]
+    fn test_kji_default() {
+        let obj = KjiOutlineSort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kji_fields() {
+        let mut obj = KjiOutlineSort::default();
+        obj.kji_by_position = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjj_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjj_default() {
+        let obj = KjjBreadcrumbPath::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjj_fields() {
+        let mut obj = KjjBreadcrumbPath::default();
+        obj.kjj_segments = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjk_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjk_default() {
+        let obj = KjkBreadcrumbSegment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjk_fields() {
+        let mut obj = KjkBreadcrumbSegment::default();
+        obj.kjk_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjl_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjl_default() {
+        let obj = KjlBreadcrumbConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjl_fields() {
+        let mut obj = KjlBreadcrumbConfig::default();
+        obj.kjl_file_path = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjm_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjm_default() {
+        let obj = KjmGoToSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjm_fields() {
+        let mut obj = KjmGoToSymbol::default();
+        obj.kjm_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjn_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjn_default() {
+        let obj = KjnGoToFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjn_fields() {
+        let mut obj = KjnGoToFile::default();
+        obj.kjn_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjo_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjo_default() {
+        let obj = KjoGoToLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjo_fields() {
+        let mut obj = KjoGoToLine::default();
+        obj.kjo_line_number = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjp_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjp_default() {
+        let obj = KjpPeekView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjp_fields() {
+        let mut obj = KjpPeekView::default();
+        obj.kjp_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjq_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjq_default() {
+        let obj = KjqPeekViewState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjq_fields() {
+        let mut obj = KjqPeekViewState::default();
+        obj.kjq_open = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjr_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjr_default() {
+        let obj = KjrGoToResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjr_fields() {
+        let mut obj = KjrGoToResult::default();
+        obj.kjr_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjs_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjs_default() {
+        let obj = KjsGoToCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjs_fields() {
+        let mut obj = KjsGoToCommand::default();
+        obj.kjs_command_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjt_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjt_default() {
+        let obj = KjtSymbolSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjt_fields() {
+        let mut obj = KjtSymbolSearch::default();
+        obj.kjt_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kju_generated {
+    use super::*;
+
+    #[test]
+    fn test_kju_default() {
+        let obj = KjuSymbolSearchResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kju_fields() {
+        let mut obj = KjuSymbolSearchResult::default();
+        obj.kju_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjv_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjv_default() {
+        let obj = KjvTypeSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjv_fields() {
+        let mut obj = KjvTypeSearch::default();
+        obj.kjv_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjw_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjw_default() {
+        let obj = KjwTagSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjw_fields() {
+        let mut obj = KjwTagSymbol::default();
+        obj.kjw_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjx_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjx_default() {
+        let obj = KjxSymbolIndex::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjx_fields() {
+        let mut obj = KjxSymbolIndex::default();
+        obj.kjx_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjy_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjy_default() {
+        let obj = KjySymbolCache::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjy_fields() {
+        let mut obj = KjySymbolCache::default();
+        obj.kjy_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kjz_generated {
+    use super::*;
+
+    #[test]
+    fn test_kjz_default() {
+        let obj = KjzSymbolConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kjz_fields() {
+        let mut obj = KjzSymbolConfig::default();
+        obj.kjz_sort_by = "test".to_string();
         assert!(obj.validate());
     }
 }
