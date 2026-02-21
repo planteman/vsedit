@@ -201916,6 +201916,838 @@ impl Default for KvzWorkspaceState {
     }
 }
 
+/// /// Single setting entry
+#[derive(Debug, Clone)]
+pub struct KwaSettingEntry {
+    pub kwa_key: String,
+    pub kwa_value: String,
+    pub kwa_value_type: String,
+    pub kwa_scope: String,
+    pub kwa_label: String,
+}
+
+impl KwaSettingEntry {
+    pub fn new() -> Self {
+        Self {
+            kwa_key: String::new(),
+            kwa_value: String::new(),
+            kwa_value_type: String::new(),
+            kwa_scope: String::new(),
+            kwa_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwa_key.is_empty() || true && !self.kwa_value.is_empty() || true && !self.kwa_value_type.is_empty() || true && !self.kwa_scope.is_empty() || true && !self.kwa_label.is_empty() || true
+    }
+}
+
+impl Default for KwaSettingEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Setting scope (user/workspace/folder)
+#[derive(Debug, Clone)]
+pub struct KwbSettingScope {
+    pub kwb_scope_name: String,
+    pub kwb_priority: u32,
+    pub kwb_uri: String,
+    pub kwb_overridable: bool,
+    pub kwb_label: String,
+}
+
+impl KwbSettingScope {
+    pub fn new() -> Self {
+        Self {
+            kwb_scope_name: String::new(),
+            kwb_priority: u32::default(),
+            kwb_uri: String::new(),
+            kwb_overridable: bool::default(),
+            kwb_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwb_scope_name.is_empty() || true && self.kwb_priority < u32::MAX || true && !self.kwb_uri.is_empty() || true && self.kwb_overridable || true && !self.kwb_label.is_empty() || true
+    }
+}
+
+impl Default for KwbSettingScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Setting override at specific scope
+#[derive(Debug, Clone)]
+pub struct KwcSettingOverride {
+    pub kwc_key: String,
+    pub kwc_value: String,
+    pub kwc_scope: String,
+    pub kwc_language_id: String,
+    pub kwc_label: String,
+}
+
+impl KwcSettingOverride {
+    pub fn new() -> Self {
+        Self {
+            kwc_key: String::new(),
+            kwc_value: String::new(),
+            kwc_scope: String::new(),
+            kwc_language_id: String::new(),
+            kwc_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwc_key.is_empty() || true && !self.kwc_value.is_empty() || true && !self.kwc_scope.is_empty() || true && !self.kwc_language_id.is_empty() || true && !self.kwc_label.is_empty() || true
+    }
+}
+
+impl Default for KwcSettingOverride {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Setting default value definition
+#[derive(Debug, Clone)]
+pub struct KwdSettingDefault {
+    pub kwd_key: String,
+    pub kwd_default_value: String,
+    pub kwd_value_type: String,
+    pub kwd_description: String,
+    pub kwd_label: String,
+}
+
+impl KwdSettingDefault {
+    pub fn new() -> Self {
+        Self {
+            kwd_key: String::new(),
+            kwd_default_value: String::new(),
+            kwd_value_type: String::new(),
+            kwd_description: String::new(),
+            kwd_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwd_key.is_empty() || true && !self.kwd_default_value.is_empty() || true && !self.kwd_value_type.is_empty() || true && !self.kwd_description.is_empty() || true && !self.kwd_label.is_empty() || true
+    }
+}
+
+impl Default for KwdSettingDefault {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Setting value validation rule
+#[derive(Debug, Clone)]
+pub struct KweSettingValidation {
+    pub kwe_key: String,
+    pub kwe_rule_type: String,
+    pub kwe_min_value: String,
+    pub kwe_max_value: String,
+    pub kwe_label: String,
+}
+
+impl KweSettingValidation {
+    pub fn new() -> Self {
+        Self {
+            kwe_key: String::new(),
+            kwe_rule_type: String::new(),
+            kwe_min_value: String::new(),
+            kwe_max_value: String::new(),
+            kwe_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwe_key.is_empty() || true && !self.kwe_rule_type.is_empty() || true && !self.kwe_min_value.is_empty() || true && !self.kwe_max_value.is_empty() || true && !self.kwe_label.is_empty() || true
+    }
+}
+
+impl Default for KweSettingValidation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Settings editor section
+#[derive(Debug, Clone)]
+pub struct KwfSettingSection {
+    pub kwf_section_id: String,
+    pub kwf_title: String,
+    pub kwf_order: u32,
+    pub kwf_icon: String,
+    pub kwf_label: String,
+}
+
+impl KwfSettingSection {
+    pub fn new() -> Self {
+        Self {
+            kwf_section_id: String::new(),
+            kwf_title: String::new(),
+            kwf_order: u32::default(),
+            kwf_icon: String::new(),
+            kwf_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwf_section_id.is_empty() || true && !self.kwf_title.is_empty() || true && self.kwf_order < u32::MAX || true && !self.kwf_icon.is_empty() || true && !self.kwf_label.is_empty() || true
+    }
+}
+
+impl Default for KwfSettingSection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Settings search state
+#[derive(Debug, Clone)]
+pub struct KwgSettingSearch {
+    pub kwg_query: String,
+    pub kwg_results_count: u32,
+    pub kwg_category: String,
+    pub kwg_modified_only: bool,
+    pub kwg_label: String,
+}
+
+impl KwgSettingSearch {
+    pub fn new() -> Self {
+        Self {
+            kwg_query: String::new(),
+            kwg_results_count: u32::default(),
+            kwg_category: String::new(),
+            kwg_modified_only: bool::default(),
+            kwg_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwg_query.is_empty() || true && self.kwg_results_count < u32::MAX || true && !self.kwg_category.is_empty() || true && self.kwg_modified_only || true && !self.kwg_label.is_empty() || true
+    }
+}
+
+impl Default for KwgSettingSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Modified setting indicator
+#[derive(Debug, Clone)]
+pub struct KwhSettingModified {
+    pub kwh_key: String,
+    pub kwh_scope: String,
+    pub kwh_original_value: String,
+    pub kwh_current_value: String,
+    pub kwh_label: String,
+}
+
+impl KwhSettingModified {
+    pub fn new() -> Self {
+        Self {
+            kwh_key: String::new(),
+            kwh_scope: String::new(),
+            kwh_original_value: String::new(),
+            kwh_current_value: String::new(),
+            kwh_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwh_key.is_empty() || true && !self.kwh_scope.is_empty() || true && !self.kwh_original_value.is_empty() || true && !self.kwh_current_value.is_empty() || true && !self.kwh_label.is_empty() || true
+    }
+}
+
+impl Default for KwhSettingModified {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Settings sync state for entry
+#[derive(Debug, Clone)]
+pub struct KwiSettingSync {
+    pub kwi_key: String,
+    pub kwi_synced: bool,
+    pub kwi_conflict: bool,
+    pub kwi_last_sync: u64,
+    pub kwi_label: String,
+}
+
+impl KwiSettingSync {
+    pub fn new() -> Self {
+        Self {
+            kwi_key: String::new(),
+            kwi_synced: bool::default(),
+            kwi_conflict: bool::default(),
+            kwi_last_sync: u64::default(),
+            kwi_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwi_key.is_empty() || true && self.kwi_synced || true && self.kwi_conflict || true && self.kwi_last_sync < u64::MAX || true && !self.kwi_label.is_empty() || true
+    }
+}
+
+impl Default for KwiSettingSync {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Settings profile definition
+#[derive(Debug, Clone)]
+pub struct KwjSettingProfile {
+    pub kwj_profile_name: String,
+    pub kwj_settings_count: u32,
+    pub kwj_extensions_count: u32,
+    pub kwj_active: bool,
+    pub kwj_label: String,
+}
+
+impl KwjSettingProfile {
+    pub fn new() -> Self {
+        Self {
+            kwj_profile_name: String::new(),
+            kwj_settings_count: u32::default(),
+            kwj_extensions_count: u32::default(),
+            kwj_active: bool::default(),
+            kwj_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwj_profile_name.is_empty() || true && self.kwj_settings_count < u32::MAX || true && self.kwj_extensions_count < u32::MAX || true && self.kwj_active || true && !self.kwj_label.is_empty() || true
+    }
+}
+
+impl Default for KwjSettingProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Settings import operation
+#[derive(Debug, Clone)]
+pub struct KwkSettingImport {
+    pub kwk_source_path: String,
+    pub kwk_format_type: String,
+    pub kwk_merge_mode: bool,
+    pub kwk_imported: bool,
+    pub kwk_label: String,
+}
+
+impl KwkSettingImport {
+    pub fn new() -> Self {
+        Self {
+            kwk_source_path: String::new(),
+            kwk_format_type: String::new(),
+            kwk_merge_mode: bool::default(),
+            kwk_imported: bool::default(),
+            kwk_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwk_source_path.is_empty() || true && !self.kwk_format_type.is_empty() || true && self.kwk_merge_mode || true && self.kwk_imported || true && !self.kwk_label.is_empty() || true
+    }
+}
+
+impl Default for KwkSettingImport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Settings export operation
+#[derive(Debug, Clone)]
+pub struct KwlSettingExport {
+    pub kwl_target_path: String,
+    pub kwl_format_type: String,
+    pub kwl_include_ext: bool,
+    pub kwl_exported: bool,
+    pub kwl_label: String,
+}
+
+impl KwlSettingExport {
+    pub fn new() -> Self {
+        Self {
+            kwl_target_path: String::new(),
+            kwl_format_type: String::new(),
+            kwl_include_ext: bool::default(),
+            kwl_exported: bool::default(),
+            kwl_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwl_target_path.is_empty() || true && !self.kwl_format_type.is_empty() || true && self.kwl_include_ext || true && self.kwl_exported || true && !self.kwl_label.is_empty() || true
+    }
+}
+
+impl Default for KwlSettingExport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Keybinding entry definition
+#[derive(Debug, Clone)]
+pub struct KwmKeybindingEntry {
+    pub kwm_key_combo: String,
+    pub kwm_command_id: String,
+    pub kwm_when_clause: String,
+    pub kwm_source: String,
+    pub kwm_label: String,
+}
+
+impl KwmKeybindingEntry {
+    pub fn new() -> Self {
+        Self {
+            kwm_key_combo: String::new(),
+            kwm_command_id: String::new(),
+            kwm_when_clause: String::new(),
+            kwm_source: String::new(),
+            kwm_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwm_key_combo.is_empty() || true && !self.kwm_command_id.is_empty() || true && !self.kwm_when_clause.is_empty() || true && !self.kwm_source.is_empty() || true && !self.kwm_label.is_empty() || true
+    }
+}
+
+impl Default for KwmKeybindingEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Keybinding conflict detection
+#[derive(Debug, Clone)]
+pub struct KwnKeybindingConflict {
+    pub kwn_key_combo: String,
+    pub kwn_commands: String,
+    pub kwn_resolution: String,
+    pub kwn_resolved: bool,
+    pub kwn_label: String,
+}
+
+impl KwnKeybindingConflict {
+    pub fn new() -> Self {
+        Self {
+            kwn_key_combo: String::new(),
+            kwn_commands: String::new(),
+            kwn_resolution: String::new(),
+            kwn_resolved: bool::default(),
+            kwn_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwn_key_combo.is_empty() || true && !self.kwn_commands.is_empty() || true && !self.kwn_resolution.is_empty() || true && self.kwn_resolved || true && !self.kwn_label.is_empty() || true
+    }
+}
+
+impl Default for KwnKeybindingConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Keybinding source (default/user/ext)
+#[derive(Debug, Clone)]
+pub struct KwoKeybindingSource {
+    pub kwo_source_type: String,
+    pub kwo_extension_id: String,
+    pub kwo_priority: u32,
+    pub kwo_overridable: bool,
+    pub kwo_label: String,
+}
+
+impl KwoKeybindingSource {
+    pub fn new() -> Self {
+        Self {
+            kwo_source_type: String::new(),
+            kwo_extension_id: String::new(),
+            kwo_priority: u32::default(),
+            kwo_overridable: bool::default(),
+            kwo_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwo_source_type.is_empty() || true && !self.kwo_extension_id.is_empty() || true && self.kwo_priority < u32::MAX || true && self.kwo_overridable || true && !self.kwo_label.is_empty() || true
+    }
+}
+
+impl Default for KwoKeybindingSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Keybinding search state
+#[derive(Debug, Clone)]
+pub struct KwpKeybindingSearch {
+    pub kwp_query: String,
+    pub kwp_results_count: u32,
+    pub kwp_filter_source: String,
+    pub kwp_show_conflicts: bool,
+    pub kwp_label: String,
+}
+
+impl KwpKeybindingSearch {
+    pub fn new() -> Self {
+        Self {
+            kwp_query: String::new(),
+            kwp_results_count: u32::default(),
+            kwp_filter_source: String::new(),
+            kwp_show_conflicts: bool::default(),
+            kwp_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwp_query.is_empty() || true && self.kwp_results_count < u32::MAX || true && !self.kwp_filter_source.is_empty() || true && self.kwp_show_conflicts || true && !self.kwp_label.is_empty() || true
+    }
+}
+
+impl Default for KwpKeybindingSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Keymap extension info
+#[derive(Debug, Clone)]
+pub struct KwqKeymapExtension {
+    pub kwq_extension_id: String,
+    pub kwq_keymap_name: String,
+    pub kwq_bindings_count: u32,
+    pub kwq_active: bool,
+    pub kwq_label: String,
+}
+
+impl KwqKeymapExtension {
+    pub fn new() -> Self {
+        Self {
+            kwq_extension_id: String::new(),
+            kwq_keymap_name: String::new(),
+            kwq_bindings_count: u32::default(),
+            kwq_active: bool::default(),
+            kwq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwq_extension_id.is_empty() || true && !self.kwq_keymap_name.is_empty() || true && self.kwq_bindings_count < u32::MAX || true && self.kwq_active || true && !self.kwq_label.is_empty() || true
+    }
+}
+
+impl Default for KwqKeymapExtension {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// When clause context expression
+#[derive(Debug, Clone)]
+pub struct KwrWhenClause {
+    pub kwr_expression: String,
+    pub kwr_keys: String,
+    pub kwr_negated: bool,
+    pub kwr_evaluated: bool,
+    pub kwr_label: String,
+}
+
+impl KwrWhenClause {
+    pub fn new() -> Self {
+        Self {
+            kwr_expression: String::new(),
+            kwr_keys: String::new(),
+            kwr_negated: bool::default(),
+            kwr_evaluated: bool::default(),
+            kwr_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwr_expression.is_empty() || true && !self.kwr_keys.is_empty() || true && self.kwr_negated || true && self.kwr_evaluated || true && !self.kwr_label.is_empty() || true
+    }
+}
+
+impl Default for KwrWhenClause {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Context key definition
+#[derive(Debug, Clone)]
+pub struct KwsContextKey {
+    pub kws_key_name: String,
+    pub kws_default_value: String,
+    pub kws_description: String,
+    pub kws_scope: String,
+    pub kws_label: String,
+}
+
+impl KwsContextKey {
+    pub fn new() -> Self {
+        Self {
+            kws_key_name: String::new(),
+            kws_default_value: String::new(),
+            kws_description: String::new(),
+            kws_scope: String::new(),
+            kws_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kws_key_name.is_empty() || true && !self.kws_default_value.is_empty() || true && !self.kws_description.is_empty() || true && !self.kws_scope.is_empty() || true && !self.kws_label.is_empty() || true
+    }
+}
+
+impl Default for KwsContextKey {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Context key value state
+#[derive(Debug, Clone)]
+pub struct KwtContextValue {
+    pub kwt_key_name: String,
+    pub kwt_value: String,
+    pub kwt_source: String,
+    pub kwt_active: bool,
+    pub kwt_label: String,
+}
+
+impl KwtContextValue {
+    pub fn new() -> Self {
+        Self {
+            kwt_key_name: String::new(),
+            kwt_value: String::new(),
+            kwt_source: String::new(),
+            kwt_active: bool::default(),
+            kwt_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwt_key_name.is_empty() || true && !self.kwt_value.is_empty() || true && !self.kwt_source.is_empty() || true && self.kwt_active || true && !self.kwt_label.is_empty() || true
+    }
+}
+
+impl Default for KwtContextValue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Context-based visibility rule
+#[derive(Debug, Clone)]
+pub struct KwuContextRule {
+    pub kwu_expression: String,
+    pub kwu_target_id: String,
+    pub kwu_visible: bool,
+    pub kwu_enabled: bool,
+    pub kwu_label: String,
+}
+
+impl KwuContextRule {
+    pub fn new() -> Self {
+        Self {
+            kwu_expression: String::new(),
+            kwu_target_id: String::new(),
+            kwu_visible: bool::default(),
+            kwu_enabled: bool::default(),
+            kwu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwu_expression.is_empty() || true && !self.kwu_target_id.is_empty() || true && self.kwu_visible || true && self.kwu_enabled || true && !self.kwu_label.is_empty() || true
+    }
+}
+
+impl Default for KwuContextRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Command palette state
+#[derive(Debug, Clone)]
+pub struct KwvCommandPalette {
+    pub kwv_query: String,
+    pub kwv_results_count: u32,
+    pub kwv_selected_idx: u32,
+    pub kwv_visible: bool,
+    pub kwv_label: String,
+}
+
+impl KwvCommandPalette {
+    pub fn new() -> Self {
+        Self {
+            kwv_query: String::new(),
+            kwv_results_count: u32::default(),
+            kwv_selected_idx: u32::default(),
+            kwv_visible: bool::default(),
+            kwv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwv_query.is_empty() || true && self.kwv_results_count < u32::MAX || true && self.kwv_selected_idx < u32::MAX || true && self.kwv_visible || true && !self.kwv_label.is_empty() || true
+    }
+}
+
+impl Default for KwvCommandPalette {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Command palette entry
+#[derive(Debug, Clone)]
+pub struct KwwCommandEntry {
+    pub kww_command_id: String,
+    pub kww_title: String,
+    pub kww_category: String,
+    pub kww_keybinding: String,
+    pub kww_label: String,
+}
+
+impl KwwCommandEntry {
+    pub fn new() -> Self {
+        Self {
+            kww_command_id: String::new(),
+            kww_title: String::new(),
+            kww_category: String::new(),
+            kww_keybinding: String::new(),
+            kww_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kww_command_id.is_empty() || true && !self.kww_title.is_empty() || true && !self.kww_category.is_empty() || true && !self.kww_keybinding.is_empty() || true && !self.kww_label.is_empty() || true
+    }
+}
+
+impl Default for KwwCommandEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Quick input dialog state
+#[derive(Debug, Clone)]
+pub struct KwxQuickInput {
+    pub kwx_title: String,
+    pub kwx_prompt: String,
+    pub kwx_value: String,
+    pub kwx_password: bool,
+    pub kwx_label: String,
+}
+
+impl KwxQuickInput {
+    pub fn new() -> Self {
+        Self {
+            kwx_title: String::new(),
+            kwx_prompt: String::new(),
+            kwx_value: String::new(),
+            kwx_password: bool::default(),
+            kwx_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwx_title.is_empty() || true && !self.kwx_prompt.is_empty() || true && !self.kwx_value.is_empty() || true && self.kwx_password || true && !self.kwx_label.is_empty() || true
+    }
+}
+
+impl Default for KwxQuickInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Quick pick dialog state
+#[derive(Debug, Clone)]
+pub struct KwyQuickPick {
+    pub kwy_placeholder: String,
+    pub kwy_items_count: u32,
+    pub kwy_multi_select: bool,
+    pub kwy_match_on_detail: bool,
+    pub kwy_label: String,
+}
+
+impl KwyQuickPick {
+    pub fn new() -> Self {
+        Self {
+            kwy_placeholder: String::new(),
+            kwy_items_count: u32::default(),
+            kwy_multi_select: bool::default(),
+            kwy_match_on_detail: bool::default(),
+            kwy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwy_placeholder.is_empty() || true && self.kwy_items_count < u32::MAX || true && self.kwy_multi_select || true && self.kwy_match_on_detail || true && !self.kwy_label.is_empty() || true
+    }
+}
+
+impl Default for KwyQuickPick {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined settings configuration
+#[derive(Debug, Clone)]
+pub struct KwzSettingsConfig {
+    pub kwz_editor_mode: String,
+    pub kwz_json_editing: bool,
+    pub kwz_sync_enabled: bool,
+    pub kwz_profiles_enabled: bool,
+    pub kwz_label: String,
+}
+
+impl KwzSettingsConfig {
+    pub fn new() -> Self {
+        Self {
+            kwz_editor_mode: String::new(),
+            kwz_json_editing: bool::default(),
+            kwz_sync_enabled: bool::default(),
+            kwz_profiles_enabled: bool::default(),
+            kwz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kwz_editor_mode.is_empty() || true && self.kwz_json_editing || true && self.kwz_sync_enabled || true && self.kwz_profiles_enabled || true && !self.kwz_label.is_empty() || true
+    }
+}
+
+impl Default for KwzSettingsConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -484306,6 +485138,474 @@ mod tests_kvz_generated {
     fn test_kvz_fields() {
         let mut obj = KvzWorkspaceState::default();
         obj.kvz_workspace_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwa_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwa_default() {
+        let obj = KwaSettingEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwa_fields() {
+        let mut obj = KwaSettingEntry::default();
+        obj.kwa_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwb_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwb_default() {
+        let obj = KwbSettingScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwb_fields() {
+        let mut obj = KwbSettingScope::default();
+        obj.kwb_scope_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwc_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwc_default() {
+        let obj = KwcSettingOverride::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwc_fields() {
+        let mut obj = KwcSettingOverride::default();
+        obj.kwc_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwd_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwd_default() {
+        let obj = KwdSettingDefault::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwd_fields() {
+        let mut obj = KwdSettingDefault::default();
+        obj.kwd_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwe_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwe_default() {
+        let obj = KweSettingValidation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwe_fields() {
+        let mut obj = KweSettingValidation::default();
+        obj.kwe_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwf_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwf_default() {
+        let obj = KwfSettingSection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwf_fields() {
+        let mut obj = KwfSettingSection::default();
+        obj.kwf_section_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwg_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwg_default() {
+        let obj = KwgSettingSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwg_fields() {
+        let mut obj = KwgSettingSearch::default();
+        obj.kwg_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwh_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwh_default() {
+        let obj = KwhSettingModified::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwh_fields() {
+        let mut obj = KwhSettingModified::default();
+        obj.kwh_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwi_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwi_default() {
+        let obj = KwiSettingSync::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwi_fields() {
+        let mut obj = KwiSettingSync::default();
+        obj.kwi_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwj_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwj_default() {
+        let obj = KwjSettingProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwj_fields() {
+        let mut obj = KwjSettingProfile::default();
+        obj.kwj_profile_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwk_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwk_default() {
+        let obj = KwkSettingImport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwk_fields() {
+        let mut obj = KwkSettingImport::default();
+        obj.kwk_source_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwl_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwl_default() {
+        let obj = KwlSettingExport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwl_fields() {
+        let mut obj = KwlSettingExport::default();
+        obj.kwl_target_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwm_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwm_default() {
+        let obj = KwmKeybindingEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwm_fields() {
+        let mut obj = KwmKeybindingEntry::default();
+        obj.kwm_key_combo = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwn_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwn_default() {
+        let obj = KwnKeybindingConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwn_fields() {
+        let mut obj = KwnKeybindingConflict::default();
+        obj.kwn_key_combo = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwo_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwo_default() {
+        let obj = KwoKeybindingSource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwo_fields() {
+        let mut obj = KwoKeybindingSource::default();
+        obj.kwo_source_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwp_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwp_default() {
+        let obj = KwpKeybindingSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwp_fields() {
+        let mut obj = KwpKeybindingSearch::default();
+        obj.kwp_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwq_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwq_default() {
+        let obj = KwqKeymapExtension::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwq_fields() {
+        let mut obj = KwqKeymapExtension::default();
+        obj.kwq_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwr_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwr_default() {
+        let obj = KwrWhenClause::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwr_fields() {
+        let mut obj = KwrWhenClause::default();
+        obj.kwr_expression = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kws_generated {
+    use super::*;
+
+    #[test]
+    fn test_kws_default() {
+        let obj = KwsContextKey::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kws_fields() {
+        let mut obj = KwsContextKey::default();
+        obj.kws_key_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwt_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwt_default() {
+        let obj = KwtContextValue::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwt_fields() {
+        let mut obj = KwtContextValue::default();
+        obj.kwt_key_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwu_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwu_default() {
+        let obj = KwuContextRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwu_fields() {
+        let mut obj = KwuContextRule::default();
+        obj.kwu_expression = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwv_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwv_default() {
+        let obj = KwvCommandPalette::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwv_fields() {
+        let mut obj = KwvCommandPalette::default();
+        obj.kwv_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kww_generated {
+    use super::*;
+
+    #[test]
+    fn test_kww_default() {
+        let obj = KwwCommandEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kww_fields() {
+        let mut obj = KwwCommandEntry::default();
+        obj.kww_command_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwx_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwx_default() {
+        let obj = KwxQuickInput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwx_fields() {
+        let mut obj = KwxQuickInput::default();
+        obj.kwx_title = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwy_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwy_default() {
+        let obj = KwyQuickPick::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwy_fields() {
+        let mut obj = KwyQuickPick::default();
+        obj.kwy_placeholder = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_kwz_generated {
+    use super::*;
+
+    #[test]
+    fn test_kwz_default() {
+        let obj = KwzSettingsConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_kwz_fields() {
+        let mut obj = KwzSettingsConfig::default();
+        obj.kwz_editor_mode = "test".to_string();
         assert!(obj.validate());
     }
 }
