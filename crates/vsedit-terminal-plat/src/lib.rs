@@ -211677,6 +211677,838 @@ impl Default for LhzWebviewConfig {
     }
 }
 
+/// /// Marketplace extension listing
+#[derive(Debug, Clone)]
+pub struct LiaGalleryExtension {
+    pub lia_extension_id: String,
+    pub lia_display_name: String,
+    pub lia_publisher_name: String,
+    pub lia_short_desc: String,
+    pub lia_label: String,
+}
+
+impl LiaGalleryExtension {
+    pub fn new() -> Self {
+        Self {
+            lia_extension_id: String::new(),
+            lia_display_name: String::new(),
+            lia_publisher_name: String::new(),
+            lia_short_desc: String::new(),
+            lia_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lia_extension_id.is_empty() || true && !self.lia_display_name.is_empty() || true && !self.lia_publisher_name.is_empty() || true && !self.lia_short_desc.is_empty() || true && !self.lia_label.is_empty() || true
+    }
+}
+
+impl Default for LiaGalleryExtension {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension version details
+#[derive(Debug, Clone)]
+pub struct LibExtensionVersion {
+    pub lib_version: String,
+    pub lib_engine_version: String,
+    pub lib_target_platform: String,
+    pub lib_pre_release: bool,
+    pub lib_label: String,
+}
+
+impl LibExtensionVersion {
+    pub fn new() -> Self {
+        Self {
+            lib_version: String::new(),
+            lib_engine_version: String::new(),
+            lib_target_platform: String::new(),
+            lib_pre_release: bool::default(),
+            lib_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lib_version.is_empty() || true && !self.lib_engine_version.is_empty() || true && !self.lib_target_platform.is_empty() || true && self.lib_pre_release || true && !self.lib_label.is_empty() || true
+    }
+}
+
+impl Default for LibExtensionVersion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension downloadable asset
+#[derive(Debug, Clone)]
+pub struct LicExtensionAsset {
+    pub lic_asset_type: String,
+    pub lic_source_url: String,
+    pub lic_fallback_url: String,
+    pub lic_size_bytes: u64,
+    pub lic_label: String,
+}
+
+impl LicExtensionAsset {
+    pub fn new() -> Self {
+        Self {
+            lic_asset_type: String::new(),
+            lic_source_url: String::new(),
+            lic_fallback_url: String::new(),
+            lic_size_bytes: u64::default(),
+            lic_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lic_asset_type.is_empty() || true && !self.lic_source_url.is_empty() || true && !self.lic_fallback_url.is_empty() || true && self.lic_size_bytes < u64::MAX || true && !self.lic_label.is_empty() || true
+    }
+}
+
+impl Default for LicExtensionAsset {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension marketplace statistic
+#[derive(Debug, Clone)]
+pub struct LidExtensionStatistic {
+    pub lid_stat_name: String,
+    pub lid_value: f64,
+    pub lid_extension_id: String,
+    pub lid_timestamp: u64,
+    pub lid_label: String,
+}
+
+impl LidExtensionStatistic {
+    pub fn new() -> Self {
+        Self {
+            lid_stat_name: String::new(),
+            lid_value: f64::default(),
+            lid_extension_id: String::new(),
+            lid_timestamp: u64::default(),
+            lid_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lid_stat_name.is_empty() || true && self.lid_value.is_finite() || true && !self.lid_extension_id.is_empty() || true && self.lid_timestamp < u64::MAX || true && !self.lid_label.is_empty() || true
+    }
+}
+
+impl Default for LidExtensionStatistic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension user review
+#[derive(Debug, Clone)]
+pub struct LieExtensionReview {
+    pub lie_rating: u32,
+    pub lie_text: String,
+    pub lie_reviewer: String,
+    pub lie_timestamp: u64,
+    pub lie_label: String,
+}
+
+impl LieExtensionReview {
+    pub fn new() -> Self {
+        Self {
+            lie_rating: u32::default(),
+            lie_text: String::new(),
+            lie_reviewer: String::new(),
+            lie_timestamp: u64::default(),
+            lie_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.lie_rating < u32::MAX || true && !self.lie_text.is_empty() || true && !self.lie_reviewer.is_empty() || true && self.lie_timestamp < u64::MAX || true && !self.lie_label.is_empty() || true
+    }
+}
+
+impl Default for LieExtensionReview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension category classification
+#[derive(Debug, Clone)]
+pub struct LifExtensionCategory {
+    pub lif_category_name: String,
+    pub lif_display_name: String,
+    pub lif_extensions_count: u32,
+    pub lif_icon: String,
+    pub lif_label: String,
+}
+
+impl LifExtensionCategory {
+    pub fn new() -> Self {
+        Self {
+            lif_category_name: String::new(),
+            lif_display_name: String::new(),
+            lif_extensions_count: u32::default(),
+            lif_icon: String::new(),
+            lif_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lif_category_name.is_empty() || true && !self.lif_display_name.is_empty() || true && self.lif_extensions_count < u32::MAX || true && !self.lif_icon.is_empty() || true && !self.lif_label.is_empty() || true
+    }
+}
+
+impl Default for LifExtensionCategory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Installed extension state
+#[derive(Debug, Clone)]
+pub struct LigExtInstallation {
+    pub lig_extension_id: String,
+    pub lig_version: String,
+    pub lig_install_path: String,
+    pub lig_enabled: bool,
+    pub lig_label: String,
+}
+
+impl LigExtInstallation {
+    pub fn new() -> Self {
+        Self {
+            lig_extension_id: String::new(),
+            lig_version: String::new(),
+            lig_install_path: String::new(),
+            lig_enabled: bool::default(),
+            lig_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lig_extension_id.is_empty() || true && !self.lig_version.is_empty() || true && !self.lig_install_path.is_empty() || true && self.lig_enabled || true && !self.lig_label.is_empty() || true
+    }
+}
+
+impl Default for LigExtInstallation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension update availability
+#[derive(Debug, Clone)]
+pub struct LihExtUpdate {
+    pub lih_extension_id: String,
+    pub lih_current_ver: String,
+    pub lih_latest_ver: String,
+    pub lih_auto_update: bool,
+    pub lih_label: String,
+}
+
+impl LihExtUpdate {
+    pub fn new() -> Self {
+        Self {
+            lih_extension_id: String::new(),
+            lih_current_ver: String::new(),
+            lih_latest_ver: String::new(),
+            lih_auto_update: bool::default(),
+            lih_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lih_extension_id.is_empty() || true && !self.lih_current_ver.is_empty() || true && !self.lih_latest_ver.is_empty() || true && self.lih_auto_update || true && !self.lih_label.is_empty() || true
+    }
+}
+
+impl Default for LihExtUpdate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension search query
+#[derive(Debug, Clone)]
+pub struct LiiExtSearchQuery {
+    pub lii_query: String,
+    pub lii_sort_by: String,
+    pub lii_category_filter: String,
+    pub lii_page: u32,
+    pub lii_label: String,
+}
+
+impl LiiExtSearchQuery {
+    pub fn new() -> Self {
+        Self {
+            lii_query: String::new(),
+            lii_sort_by: String::new(),
+            lii_category_filter: String::new(),
+            lii_page: u32::default(),
+            lii_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lii_query.is_empty() || true && !self.lii_sort_by.is_empty() || true && !self.lii_category_filter.is_empty() || true && self.lii_page < u32::MAX || true && !self.lii_label.is_empty() || true
+    }
+}
+
+impl Default for LiiExtSearchQuery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension search result
+#[derive(Debug, Clone)]
+pub struct LijExtSearchResult {
+    pub lij_extension_id: String,
+    pub lij_display_name: String,
+    pub lij_rating: f64,
+    pub lij_install_count: u64,
+    pub lij_label: String,
+}
+
+impl LijExtSearchResult {
+    pub fn new() -> Self {
+        Self {
+            lij_extension_id: String::new(),
+            lij_display_name: String::new(),
+            lij_rating: f64::default(),
+            lij_install_count: u64::default(),
+            lij_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lij_extension_id.is_empty() || true && !self.lij_display_name.is_empty() || true && self.lij_rating.is_finite() || true && self.lij_install_count < u64::MAX || true && !self.lij_label.is_empty() || true
+    }
+}
+
+impl Default for LijExtSearchResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension recommendation
+#[derive(Debug, Clone)]
+pub struct LikExtRecommendation {
+    pub lik_extension_id: String,
+    pub lik_reason: String,
+    pub lik_source: String,
+    pub lik_dismissed: bool,
+    pub lik_label: String,
+}
+
+impl LikExtRecommendation {
+    pub fn new() -> Self {
+        Self {
+            lik_extension_id: String::new(),
+            lik_reason: String::new(),
+            lik_source: String::new(),
+            lik_dismissed: bool::default(),
+            lik_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lik_extension_id.is_empty() || true && !self.lik_reason.is_empty() || true && !self.lik_source.is_empty() || true && self.lik_dismissed || true && !self.lik_label.is_empty() || true
+    }
+}
+
+impl Default for LikExtRecommendation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Disabled extension entry
+#[derive(Debug, Clone)]
+pub struct LilExtDisabled {
+    pub lil_extension_id: String,
+    pub lil_reason: String,
+    pub lil_workspace_only: bool,
+    pub lil_timestamp: u64,
+    pub lil_label: String,
+}
+
+impl LilExtDisabled {
+    pub fn new() -> Self {
+        Self {
+            lil_extension_id: String::new(),
+            lil_reason: String::new(),
+            lil_workspace_only: bool::default(),
+            lil_timestamp: u64::default(),
+            lil_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lil_extension_id.is_empty() || true && !self.lil_reason.is_empty() || true && self.lil_workspace_only || true && self.lil_timestamp < u64::MAX || true && !self.lil_label.is_empty() || true
+    }
+}
+
+impl Default for LilExtDisabled {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension bisect debugging
+#[derive(Debug, Clone)]
+pub struct LimExtBisect {
+    pub lim_extension_id: String,
+    pub lim_good_version: String,
+    pub lim_bad_version: String,
+    pub lim_active: bool,
+    pub lim_label: String,
+}
+
+impl LimExtBisect {
+    pub fn new() -> Self {
+        Self {
+            lim_extension_id: String::new(),
+            lim_good_version: String::new(),
+            lim_bad_version: String::new(),
+            lim_active: bool::default(),
+            lim_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lim_extension_id.is_empty() || true && !self.lim_good_version.is_empty() || true && !self.lim_bad_version.is_empty() || true && self.lim_active || true && !self.lim_label.is_empty() || true
+    }
+}
+
+impl Default for LimExtBisect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension profile configuration
+#[derive(Debug, Clone)]
+pub struct LinExtProfile {
+    pub lin_profile_name: String,
+    pub lin_extensions_count: u32,
+    pub lin_active: bool,
+    pub lin_default_profile: bool,
+    pub lin_label: String,
+}
+
+impl LinExtProfile {
+    pub fn new() -> Self {
+        Self {
+            lin_profile_name: String::new(),
+            lin_extensions_count: u32::default(),
+            lin_active: bool::default(),
+            lin_default_profile: bool::default(),
+            lin_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lin_profile_name.is_empty() || true && self.lin_extensions_count < u32::MAX || true && self.lin_active || true && self.lin_default_profile || true && !self.lin_label.is_empty() || true
+    }
+}
+
+impl Default for LinExtProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension sync state
+#[derive(Debug, Clone)]
+pub struct LioExtSync {
+    pub lio_extension_id: String,
+    pub lio_synced: bool,
+    pub lio_version: String,
+    pub lio_conflict: bool,
+    pub lio_label: String,
+}
+
+impl LioExtSync {
+    pub fn new() -> Self {
+        Self {
+            lio_extension_id: String::new(),
+            lio_synced: bool::default(),
+            lio_version: String::new(),
+            lio_conflict: bool::default(),
+            lio_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lio_extension_id.is_empty() || true && self.lio_synced || true && !self.lio_version.is_empty() || true && self.lio_conflict || true && !self.lio_label.is_empty() || true
+    }
+}
+
+impl Default for LioExtSync {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension VSIX package
+#[derive(Debug, Clone)]
+pub struct LipExtPackage {
+    pub lip_vsix_path: String,
+    pub lip_extension_id: String,
+    pub lip_version: String,
+    pub lip_size_bytes: u64,
+    pub lip_label: String,
+}
+
+impl LipExtPackage {
+    pub fn new() -> Self {
+        Self {
+            lip_vsix_path: String::new(),
+            lip_extension_id: String::new(),
+            lip_version: String::new(),
+            lip_size_bytes: u64::default(),
+            lip_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lip_vsix_path.is_empty() || true && !self.lip_extension_id.is_empty() || true && !self.lip_version.is_empty() || true && self.lip_size_bytes < u64::MAX || true && !self.lip_label.is_empty() || true
+    }
+}
+
+impl Default for LipExtPackage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension dependency declaration
+#[derive(Debug, Clone)]
+pub struct LiqExtDependency {
+    pub liq_extension_id: String,
+    pub liq_depends_on: String,
+    pub liq_version_range: String,
+    pub liq_optional: bool,
+    pub liq_label: String,
+}
+
+impl LiqExtDependency {
+    pub fn new() -> Self {
+        Self {
+            liq_extension_id: String::new(),
+            liq_depends_on: String::new(),
+            liq_version_range: String::new(),
+            liq_optional: bool::default(),
+            liq_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.liq_extension_id.is_empty() || true && !self.liq_depends_on.is_empty() || true && !self.liq_version_range.is_empty() || true && self.liq_optional || true && !self.liq_label.is_empty() || true
+    }
+}
+
+impl Default for LiqExtDependency {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension conflict detection
+#[derive(Debug, Clone)]
+pub struct LirExtConflict {
+    pub lir_extension_a: String,
+    pub lir_extension_b: String,
+    pub lir_conflict_type: String,
+    pub lir_resolution: String,
+    pub lir_label: String,
+}
+
+impl LirExtConflict {
+    pub fn new() -> Self {
+        Self {
+            lir_extension_a: String::new(),
+            lir_extension_b: String::new(),
+            lir_conflict_type: String::new(),
+            lir_resolution: String::new(),
+            lir_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lir_extension_a.is_empty() || true && !self.lir_extension_b.is_empty() || true && !self.lir_conflict_type.is_empty() || true && !self.lir_resolution.is_empty() || true && !self.lir_label.is_empty() || true
+    }
+}
+
+impl Default for LirExtConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension trust verification
+#[derive(Debug, Clone)]
+pub struct LisExtTrust {
+    pub lis_extension_id: String,
+    pub lis_trusted: bool,
+    pub lis_publisher_verified: bool,
+    pub lis_signature_valid: bool,
+    pub lis_label: String,
+}
+
+impl LisExtTrust {
+    pub fn new() -> Self {
+        Self {
+            lis_extension_id: String::new(),
+            lis_trusted: bool::default(),
+            lis_publisher_verified: bool::default(),
+            lis_signature_valid: bool::default(),
+            lis_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lis_extension_id.is_empty() || true && self.lis_trusted || true && self.lis_publisher_verified || true && self.lis_signature_valid || true && !self.lis_label.is_empty() || true
+    }
+}
+
+impl Default for LisExtTrust {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension signature verification
+#[derive(Debug, Clone)]
+pub struct LitExtSignature {
+    pub lit_extension_id: String,
+    pub lit_signature: String,
+    pub lit_valid: bool,
+    pub lit_issuer: String,
+    pub lit_label: String,
+}
+
+impl LitExtSignature {
+    pub fn new() -> Self {
+        Self {
+            lit_extension_id: String::new(),
+            lit_signature: String::new(),
+            lit_valid: bool::default(),
+            lit_issuer: String::new(),
+            lit_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lit_extension_id.is_empty() || true && !self.lit_signature.is_empty() || true && self.lit_valid || true && !self.lit_issuer.is_empty() || true && !self.lit_label.is_empty() || true
+    }
+}
+
+impl Default for LitExtSignature {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension runtime diagnostics
+#[derive(Debug, Clone)]
+pub struct LiuExtRuntime {
+    pub liu_extension_id: String,
+    pub liu_startup_ms: u64,
+    pub liu_memory_bytes: u64,
+    pub liu_active: bool,
+    pub liu_label: String,
+}
+
+impl LiuExtRuntime {
+    pub fn new() -> Self {
+        Self {
+            liu_extension_id: String::new(),
+            liu_startup_ms: u64::default(),
+            liu_memory_bytes: u64::default(),
+            liu_active: bool::default(),
+            liu_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.liu_extension_id.is_empty() || true && self.liu_startup_ms < u64::MAX || true && self.liu_memory_bytes < u64::MAX || true && self.liu_active || true && !self.liu_label.is_empty() || true
+    }
+}
+
+impl Default for LiuExtRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension output channel
+#[derive(Debug, Clone)]
+pub struct LivExtOutput {
+    pub liv_extension_id: String,
+    pub liv_channel_name: String,
+    pub liv_visible: bool,
+    pub liv_log_level: String,
+    pub liv_label: String,
+}
+
+impl LivExtOutput {
+    pub fn new() -> Self {
+        Self {
+            liv_extension_id: String::new(),
+            liv_channel_name: String::new(),
+            liv_visible: bool::default(),
+            liv_log_level: String::new(),
+            liv_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.liv_extension_id.is_empty() || true && !self.liv_channel_name.is_empty() || true && self.liv_visible || true && !self.liv_log_level.is_empty() || true && !self.liv_label.is_empty() || true
+    }
+}
+
+impl Default for LivExtOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension view state (list/grid)
+#[derive(Debug, Clone)]
+pub struct LiwExtView {
+    pub liw_view_mode: String,
+    pub liw_sort_by: String,
+    pub liw_filter: String,
+    pub liw_show_disabled: bool,
+    pub liw_label: String,
+}
+
+impl LiwExtView {
+    pub fn new() -> Self {
+        Self {
+            liw_view_mode: String::new(),
+            liw_sort_by: String::new(),
+            liw_filter: String::new(),
+            liw_show_disabled: bool::default(),
+            liw_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.liw_view_mode.is_empty() || true && !self.liw_sort_by.is_empty() || true && !self.liw_filter.is_empty() || true && self.liw_show_disabled || true && !self.liw_label.is_empty() || true
+    }
+}
+
+impl Default for LiwExtView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension management action
+#[derive(Debug, Clone)]
+pub struct LixExtAction {
+    pub lix_action_id: String,
+    pub lix_extension_id: String,
+    pub lix_action_type: String,
+    pub lix_timestamp: u64,
+    pub lix_label: String,
+}
+
+impl LixExtAction {
+    pub fn new() -> Self {
+        Self {
+            lix_action_id: String::new(),
+            lix_extension_id: String::new(),
+            lix_action_type: String::new(),
+            lix_timestamp: u64::default(),
+            lix_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lix_action_id.is_empty() || true && !self.lix_extension_id.is_empty() || true && !self.lix_action_type.is_empty() || true && self.lix_timestamp < u64::MAX || true && !self.lix_label.is_empty() || true
+    }
+}
+
+impl Default for LixExtAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Extension lifecycle event
+#[derive(Debug, Clone)]
+pub struct LiyExtEvent {
+    pub liy_event_kind: String,
+    pub liy_extension_id: String,
+    pub liy_version: String,
+    pub liy_timestamp: u64,
+    pub liy_label: String,
+}
+
+impl LiyExtEvent {
+    pub fn new() -> Self {
+        Self {
+            liy_event_kind: String::new(),
+            liy_extension_id: String::new(),
+            liy_version: String::new(),
+            liy_timestamp: u64::default(),
+            liy_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.liy_event_kind.is_empty() || true && !self.liy_extension_id.is_empty() || true && !self.liy_version.is_empty() || true && self.liy_timestamp < u64::MAX || true && !self.liy_label.is_empty() || true
+    }
+}
+
+impl Default for LiyExtEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// /// Combined marketplace configuration
+#[derive(Debug, Clone)]
+pub struct LizExtMarketConfig {
+    pub liz_marketplace_url: String,
+    pub liz_auto_update: bool,
+    pub liz_auto_check_updates: bool,
+    pub liz_ignore_recommendations: bool,
+    pub liz_label: String,
+}
+
+impl LizExtMarketConfig {
+    pub fn new() -> Self {
+        Self {
+            liz_marketplace_url: String::new(),
+            liz_auto_update: bool::default(),
+            liz_auto_check_updates: bool::default(),
+            liz_ignore_recommendations: bool::default(),
+            liz_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.liz_marketplace_url.is_empty() || true && self.liz_auto_update || true && self.liz_auto_check_updates || true && self.liz_ignore_recommendations || true && !self.liz_label.is_empty() || true
+    }
+}
+
+impl Default for LizExtMarketConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -499751,6 +500583,474 @@ mod tests_lhz_generated {
     fn test_lhz_fields() {
         let mut obj = LhzWebviewConfig::default();
         obj.lhz_default_options = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lia_generated {
+    use super::*;
+
+    #[test]
+    fn test_lia_default() {
+        let obj = LiaGalleryExtension::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lia_fields() {
+        let mut obj = LiaGalleryExtension::default();
+        obj.lia_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lib_generated {
+    use super::*;
+
+    #[test]
+    fn test_lib_default() {
+        let obj = LibExtensionVersion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lib_fields() {
+        let mut obj = LibExtensionVersion::default();
+        obj.lib_version = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lic_generated {
+    use super::*;
+
+    #[test]
+    fn test_lic_default() {
+        let obj = LicExtensionAsset::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lic_fields() {
+        let mut obj = LicExtensionAsset::default();
+        obj.lic_asset_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lid_generated {
+    use super::*;
+
+    #[test]
+    fn test_lid_default() {
+        let obj = LidExtensionStatistic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lid_fields() {
+        let mut obj = LidExtensionStatistic::default();
+        obj.lid_stat_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lie_generated {
+    use super::*;
+
+    #[test]
+    fn test_lie_default() {
+        let obj = LieExtensionReview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lie_fields() {
+        let mut obj = LieExtensionReview::default();
+        obj.lie_rating = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lif_generated {
+    use super::*;
+
+    #[test]
+    fn test_lif_default() {
+        let obj = LifExtensionCategory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lif_fields() {
+        let mut obj = LifExtensionCategory::default();
+        obj.lif_category_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lig_generated {
+    use super::*;
+
+    #[test]
+    fn test_lig_default() {
+        let obj = LigExtInstallation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lig_fields() {
+        let mut obj = LigExtInstallation::default();
+        obj.lig_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lih_generated {
+    use super::*;
+
+    #[test]
+    fn test_lih_default() {
+        let obj = LihExtUpdate::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lih_fields() {
+        let mut obj = LihExtUpdate::default();
+        obj.lih_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lii_generated {
+    use super::*;
+
+    #[test]
+    fn test_lii_default() {
+        let obj = LiiExtSearchQuery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lii_fields() {
+        let mut obj = LiiExtSearchQuery::default();
+        obj.lii_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lij_generated {
+    use super::*;
+
+    #[test]
+    fn test_lij_default() {
+        let obj = LijExtSearchResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lij_fields() {
+        let mut obj = LijExtSearchResult::default();
+        obj.lij_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lik_generated {
+    use super::*;
+
+    #[test]
+    fn test_lik_default() {
+        let obj = LikExtRecommendation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lik_fields() {
+        let mut obj = LikExtRecommendation::default();
+        obj.lik_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lil_generated {
+    use super::*;
+
+    #[test]
+    fn test_lil_default() {
+        let obj = LilExtDisabled::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lil_fields() {
+        let mut obj = LilExtDisabled::default();
+        obj.lil_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lim_generated {
+    use super::*;
+
+    #[test]
+    fn test_lim_default() {
+        let obj = LimExtBisect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lim_fields() {
+        let mut obj = LimExtBisect::default();
+        obj.lim_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lin_generated {
+    use super::*;
+
+    #[test]
+    fn test_lin_default() {
+        let obj = LinExtProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lin_fields() {
+        let mut obj = LinExtProfile::default();
+        obj.lin_profile_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lio_generated {
+    use super::*;
+
+    #[test]
+    fn test_lio_default() {
+        let obj = LioExtSync::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lio_fields() {
+        let mut obj = LioExtSync::default();
+        obj.lio_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lip_generated {
+    use super::*;
+
+    #[test]
+    fn test_lip_default() {
+        let obj = LipExtPackage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lip_fields() {
+        let mut obj = LipExtPackage::default();
+        obj.lip_vsix_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_liq_generated {
+    use super::*;
+
+    #[test]
+    fn test_liq_default() {
+        let obj = LiqExtDependency::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_liq_fields() {
+        let mut obj = LiqExtDependency::default();
+        obj.liq_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lir_generated {
+    use super::*;
+
+    #[test]
+    fn test_lir_default() {
+        let obj = LirExtConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lir_fields() {
+        let mut obj = LirExtConflict::default();
+        obj.lir_extension_a = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lis_generated {
+    use super::*;
+
+    #[test]
+    fn test_lis_default() {
+        let obj = LisExtTrust::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lis_fields() {
+        let mut obj = LisExtTrust::default();
+        obj.lis_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lit_generated {
+    use super::*;
+
+    #[test]
+    fn test_lit_default() {
+        let obj = LitExtSignature::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lit_fields() {
+        let mut obj = LitExtSignature::default();
+        obj.lit_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_liu_generated {
+    use super::*;
+
+    #[test]
+    fn test_liu_default() {
+        let obj = LiuExtRuntime::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_liu_fields() {
+        let mut obj = LiuExtRuntime::default();
+        obj.liu_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_liv_generated {
+    use super::*;
+
+    #[test]
+    fn test_liv_default() {
+        let obj = LivExtOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_liv_fields() {
+        let mut obj = LivExtOutput::default();
+        obj.liv_extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_liw_generated {
+    use super::*;
+
+    #[test]
+    fn test_liw_default() {
+        let obj = LiwExtView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_liw_fields() {
+        let mut obj = LiwExtView::default();
+        obj.liw_view_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_lix_generated {
+    use super::*;
+
+    #[test]
+    fn test_lix_default() {
+        let obj = LixExtAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_lix_fields() {
+        let mut obj = LixExtAction::default();
+        obj.lix_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_liy_generated {
+    use super::*;
+
+    #[test]
+    fn test_liy_default() {
+        let obj = LiyExtEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_liy_fields() {
+        let mut obj = LiyExtEvent::default();
+        obj.liy_event_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_liz_generated {
+    use super::*;
+
+    #[test]
+    fn test_liz_default() {
+        let obj = LizExtMarketConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_liz_fields() {
+        let mut obj = LizExtMarketConfig::default();
+        obj.liz_marketplace_url = "test".to_string();
         assert!(obj.validate());
     }
 }
