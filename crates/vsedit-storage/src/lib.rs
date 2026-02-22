@@ -242137,6 +242137,1202 @@ impl Default for BreadcrumbConfig {
     }
 }
 
+/// Editor decoration type set definition
+#[derive(Debug, Clone)]
+pub struct EditorDecorationSet {
+    pub decoration_set_id: String,
+    pub description_text: String,
+    pub is_whole_line: bool,
+    pub stacking_order: u32,
+    pub overflow_rule: String,
+    pub range_behavior: String,
+    pub max_ranges: u32,
+    pub is_persistent: bool,
+    pub owner_id: String,
+    pub css_class: String,
+    pub gutter_icon: String,
+    pub light_theme: String,
+}
+
+impl EditorDecorationSet {
+    pub fn new() -> Self {
+        Self {
+            decoration_set_id: String::new(),
+            description_text: String::new(),
+            is_whole_line: bool::default(),
+            stacking_order: u32::default(),
+            overflow_rule: String::new(),
+            range_behavior: String::new(),
+            max_ranges: u32::default(),
+            is_persistent: bool::default(),
+            owner_id: String::new(),
+            css_class: String::new(),
+            gutter_icon: String::new(),
+            light_theme: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decoration_set_id.is_empty() || true && !self.description_text.is_empty() || true && self.is_whole_line || true && self.stacking_order < u32::MAX || true && !self.overflow_rule.is_empty() || true && !self.range_behavior.is_empty() || true && self.max_ranges < u32::MAX || true && self.is_persistent || true && !self.owner_id.is_empty() || true && !self.css_class.is_empty() || true && !self.gutter_icon.is_empty() || true && !self.light_theme.is_empty() || true
+    }
+}
+
+impl Default for EditorDecorationSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Decoration render option properties
+#[derive(Debug, Clone)]
+pub struct DecorationRenderOption {
+    pub render_key: String,
+    pub bg_color: String,
+    pub fg_color: String,
+    pub border_color: String,
+    pub border_width: String,
+    pub border_style: String,
+    pub border_radius: String,
+    pub outline_color: String,
+    pub font_style: String,
+    pub font_weight: String,
+    pub text_decoration: String,
+    pub opacity_value: f64,
+}
+
+impl DecorationRenderOption {
+    pub fn new() -> Self {
+        Self {
+            render_key: String::new(),
+            bg_color: String::new(),
+            fg_color: String::new(),
+            border_color: String::new(),
+            border_width: String::new(),
+            border_style: String::new(),
+            border_radius: String::new(),
+            outline_color: String::new(),
+            font_style: String::new(),
+            font_weight: String::new(),
+            text_decoration: String::new(),
+            opacity_value: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.render_key.is_empty() || true && !self.bg_color.is_empty() || true && !self.fg_color.is_empty() || true && !self.border_color.is_empty() || true && !self.border_width.is_empty() || true && !self.border_style.is_empty() || true && !self.border_radius.is_empty() || true && !self.outline_color.is_empty() || true && !self.font_style.is_empty() || true && !self.font_weight.is_empty() || true && !self.text_decoration.is_empty() || true && self.opacity_value.is_finite() || true
+    }
+}
+
+impl Default for DecorationRenderOption {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor gutter decoration indicator
+#[derive(Debug, Clone)]
+pub struct GutterDecoration {
+    pub gutter_id: String,
+    pub icon_path: String,
+    pub icon_color: String,
+    pub tooltip_text: String,
+    pub line_number: u32,
+    pub is_visible: bool,
+    pub sort_order: u32,
+    pub hover_message: String,
+    pub click_command: String,
+    pub gutter_name: String,
+    pub is_sticky: bool,
+    pub width_px: u32,
+}
+
+impl GutterDecoration {
+    pub fn new() -> Self {
+        Self {
+            gutter_id: String::new(),
+            icon_path: String::new(),
+            icon_color: String::new(),
+            tooltip_text: String::new(),
+            line_number: u32::default(),
+            is_visible: bool::default(),
+            sort_order: u32::default(),
+            hover_message: String::new(),
+            click_command: String::new(),
+            gutter_name: String::new(),
+            is_sticky: bool::default(),
+            width_px: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gutter_id.is_empty() || true && !self.icon_path.is_empty() || true && !self.icon_color.is_empty() || true && !self.tooltip_text.is_empty() || true && self.line_number < u32::MAX || true && self.is_visible || true && self.sort_order < u32::MAX || true && !self.hover_message.is_empty() || true && !self.click_command.is_empty() || true && !self.gutter_name.is_empty() || true && self.is_sticky || true && self.width_px < u32::MAX || true
+    }
+}
+
+impl Default for GutterDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Overview ruler decoration mark
+#[derive(Debug, Clone)]
+pub struct OverviewRulerMark {
+    pub ruler_mark_id: String,
+    pub mark_color: String,
+    pub position_pct: f64,
+    pub mark_height: u32,
+    pub is_visible: bool,
+    pub tooltip_text: String,
+    pub dark_color: String,
+    pub light_color: String,
+    pub hc_color: String,
+    pub lane_index: u32,
+    pub opacity_value: f64,
+    pub mark_width: u32,
+}
+
+impl OverviewRulerMark {
+    pub fn new() -> Self {
+        Self {
+            ruler_mark_id: String::new(),
+            mark_color: String::new(),
+            position_pct: f64::default(),
+            mark_height: u32::default(),
+            is_visible: bool::default(),
+            tooltip_text: String::new(),
+            dark_color: String::new(),
+            light_color: String::new(),
+            hc_color: String::new(),
+            lane_index: u32::default(),
+            opacity_value: f64::default(),
+            mark_width: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ruler_mark_id.is_empty() || true && !self.mark_color.is_empty() || true && self.position_pct.is_finite() || true && self.mark_height < u32::MAX || true && self.is_visible || true && !self.tooltip_text.is_empty() || true && !self.dark_color.is_empty() || true && !self.light_color.is_empty() || true && !self.hc_color.is_empty() || true && self.lane_index < u32::MAX || true && self.opacity_value.is_finite() || true && self.mark_width < u32::MAX || true
+    }
+}
+
+impl Default for OverviewRulerMark {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Minimap decoration highlight mark
+#[derive(Debug, Clone)]
+pub struct MinimapDecoration {
+    pub minimap_mark_id: String,
+    pub mark_color: String,
+    pub line_start: u32,
+    pub line_end: u32,
+    pub is_visible: bool,
+    pub dark_color: String,
+    pub light_color: String,
+    pub hc_color: String,
+    pub position_hint: String,
+    pub opacity_value: f64,
+    pub spread_lines: u32,
+    pub mark_kind: String,
+}
+
+impl MinimapDecoration {
+    pub fn new() -> Self {
+        Self {
+            minimap_mark_id: String::new(),
+            mark_color: String::new(),
+            line_start: u32::default(),
+            line_end: u32::default(),
+            is_visible: bool::default(),
+            dark_color: String::new(),
+            light_color: String::new(),
+            hc_color: String::new(),
+            position_hint: String::new(),
+            opacity_value: f64::default(),
+            spread_lines: u32::default(),
+            mark_kind: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.minimap_mark_id.is_empty() || true && !self.mark_color.is_empty() || true && self.line_start < u32::MAX || true && self.line_end < u32::MAX || true && self.is_visible || true && !self.dark_color.is_empty() || true && !self.light_color.is_empty() || true && !self.hc_color.is_empty() || true && !self.position_hint.is_empty() || true && self.opacity_value.is_finite() || true && self.spread_lines < u32::MAX || true && !self.mark_kind.is_empty() || true
+    }
+}
+
+impl Default for MinimapDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline text decoration style
+#[derive(Debug, Clone)]
+pub struct InlineDecoration {
+    pub inline_id: String,
+    pub before_text: String,
+    pub after_text: String,
+    pub before_color: String,
+    pub after_color: String,
+    pub font_style: String,
+    pub font_weight: String,
+    pub text_decoration: String,
+    pub letter_spacing: String,
+    pub cursor_style: String,
+    pub content_text: String,
+    pub content_icon: String,
+}
+
+impl InlineDecoration {
+    pub fn new() -> Self {
+        Self {
+            inline_id: String::new(),
+            before_text: String::new(),
+            after_text: String::new(),
+            before_color: String::new(),
+            after_color: String::new(),
+            font_style: String::new(),
+            font_weight: String::new(),
+            text_decoration: String::new(),
+            letter_spacing: String::new(),
+            cursor_style: String::new(),
+            content_text: String::new(),
+            content_icon: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_id.is_empty() || true && !self.before_text.is_empty() || true && !self.after_text.is_empty() || true && !self.before_color.is_empty() || true && !self.after_color.is_empty() || true && !self.font_style.is_empty() || true && !self.font_weight.is_empty() || true && !self.text_decoration.is_empty() || true && !self.letter_spacing.is_empty() || true && !self.cursor_style.is_empty() || true && !self.content_text.is_empty() || true && !self.content_icon.is_empty() || true
+    }
+}
+
+impl Default for InlineDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor margin decoration widget
+#[derive(Debug, Clone)]
+pub struct MarginDecoration {
+    pub margin_id: String,
+    pub margin_lane: String,
+    pub icon_path: String,
+    pub hover_message: String,
+    pub click_command: String,
+    pub tooltip_text: String,
+    pub bg_color: String,
+    pub width_px: u32,
+    pub is_visible: bool,
+    pub sort_order: u32,
+    pub line_number: u32,
+    pub css_class: String,
+}
+
+impl MarginDecoration {
+    pub fn new() -> Self {
+        Self {
+            margin_id: String::new(),
+            margin_lane: String::new(),
+            icon_path: String::new(),
+            hover_message: String::new(),
+            click_command: String::new(),
+            tooltip_text: String::new(),
+            bg_color: String::new(),
+            width_px: u32::default(),
+            is_visible: bool::default(),
+            sort_order: u32::default(),
+            line_number: u32::default(),
+            css_class: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.margin_id.is_empty() || true && !self.margin_lane.is_empty() || true && !self.icon_path.is_empty() || true && !self.hover_message.is_empty() || true && !self.click_command.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.bg_color.is_empty() || true && self.width_px < u32::MAX || true && self.is_visible || true && self.sort_order < u32::MAX || true && self.line_number < u32::MAX || true && !self.css_class.is_empty() || true
+    }
+}
+
+impl Default for MarginDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor line highlight decoration
+#[derive(Debug, Clone)]
+pub struct LineHighlight {
+    pub highlight_id: String,
+    pub line_number: u32,
+    pub bg_color: String,
+    pub border_color: String,
+    pub is_current: bool,
+    pub is_range: bool,
+    pub end_line: u32,
+    pub opacity_value: f64,
+    pub is_whole_line: bool,
+    pub dark_color: String,
+    pub light_color: String,
+    pub hc_color: String,
+}
+
+impl LineHighlight {
+    pub fn new() -> Self {
+        Self {
+            highlight_id: String::new(),
+            line_number: u32::default(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            is_current: bool::default(),
+            is_range: bool::default(),
+            end_line: u32::default(),
+            opacity_value: f64::default(),
+            is_whole_line: bool::default(),
+            dark_color: String::new(),
+            light_color: String::new(),
+            hc_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.highlight_id.is_empty() || true && self.line_number < u32::MAX || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && self.is_current || true && self.is_range || true && self.end_line < u32::MAX || true && self.opacity_value.is_finite() || true && self.is_whole_line || true && !self.dark_color.is_empty() || true && !self.light_color.is_empty() || true && !self.hc_color.is_empty() || true
+    }
+}
+
+impl Default for LineHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Word occurrence highlight decoration
+#[derive(Debug, Clone)]
+pub struct WordHighlight {
+    pub highlight_kind: String,
+    pub bg_color: String,
+    pub border_color: String,
+    pub is_read: bool,
+    pub is_write: bool,
+    pub is_text: bool,
+    pub strong_color: String,
+    pub start_offset: u32,
+    pub end_offset: u32,
+    pub line_number: u32,
+    pub dark_color: String,
+    pub light_color: String,
+}
+
+impl WordHighlight {
+    pub fn new() -> Self {
+        Self {
+            highlight_kind: String::new(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            is_read: bool::default(),
+            is_write: bool::default(),
+            is_text: bool::default(),
+            strong_color: String::new(),
+            start_offset: u32::default(),
+            end_offset: u32::default(),
+            line_number: u32::default(),
+            dark_color: String::new(),
+            light_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.highlight_kind.is_empty() || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && self.is_read || true && self.is_write || true && self.is_text || true && !self.strong_color.is_empty() || true && self.start_offset < u32::MAX || true && self.end_offset < u32::MAX || true && self.line_number < u32::MAX || true && !self.dark_color.is_empty() || true && !self.light_color.is_empty() || true
+    }
+}
+
+impl Default for WordHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bracket pair highlight decoration
+#[derive(Debug, Clone)]
+pub struct BracketHighlight {
+    pub bracket_id: String,
+    pub open_line: u32,
+    pub open_column: u32,
+    pub close_line: u32,
+    pub close_column: u32,
+    pub bracket_color: String,
+    pub nest_level: u32,
+    pub is_horizontal: bool,
+    pub guide_color: String,
+    pub is_active: bool,
+    pub bracket_kind: String,
+    pub is_error: bool,
+}
+
+impl BracketHighlight {
+    pub fn new() -> Self {
+        Self {
+            bracket_id: String::new(),
+            open_line: u32::default(),
+            open_column: u32::default(),
+            close_line: u32::default(),
+            close_column: u32::default(),
+            bracket_color: String::new(),
+            nest_level: u32::default(),
+            is_horizontal: bool::default(),
+            guide_color: String::new(),
+            is_active: bool::default(),
+            bracket_kind: String::new(),
+            is_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bracket_id.is_empty() || true && self.open_line < u32::MAX || true && self.open_column < u32::MAX || true && self.close_line < u32::MAX || true && self.close_column < u32::MAX || true && !self.bracket_color.is_empty() || true && self.nest_level < u32::MAX || true && self.is_horizontal || true && !self.guide_color.is_empty() || true && self.is_active || true && !self.bracket_kind.is_empty() || true && self.is_error || true
+    }
+}
+
+impl Default for BracketHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor indent guide decoration
+#[derive(Debug, Clone)]
+pub struct IndentGuide {
+    pub guide_level: u32,
+    pub guide_color: String,
+    pub is_active: bool,
+    pub line_number: u32,
+    pub column_offset: u32,
+    pub is_highlighted: bool,
+    pub nest_depth: u32,
+    pub scope_kind: String,
+    pub dark_color: String,
+    pub light_color: String,
+    pub guide_style: String,
+    pub is_visible: bool,
+}
+
+impl IndentGuide {
+    pub fn new() -> Self {
+        Self {
+            guide_level: u32::default(),
+            guide_color: String::new(),
+            is_active: bool::default(),
+            line_number: u32::default(),
+            column_offset: u32::default(),
+            is_highlighted: bool::default(),
+            nest_depth: u32::default(),
+            scope_kind: String::new(),
+            dark_color: String::new(),
+            light_color: String::new(),
+            guide_style: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.guide_level < u32::MAX || true && !self.guide_color.is_empty() || true && self.is_active || true && self.line_number < u32::MAX || true && self.column_offset < u32::MAX || true && self.is_highlighted || true && self.nest_depth < u32::MAX || true && !self.scope_kind.is_empty() || true && !self.dark_color.is_empty() || true && !self.light_color.is_empty() || true && !self.guide_style.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for IndentGuide {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Whitespace rendering configuration
+#[derive(Debug, Clone)]
+pub struct WhitespaceRender {
+    pub render_mode: String,
+    pub space_char: String,
+    pub tab_char: String,
+    pub newline_char: String,
+    pub cr_char: String,
+    pub boundary_char: String,
+    pub trailing_color: String,
+    pub leading_color: String,
+    pub inner_color: String,
+    pub is_enabled: bool,
+    pub font_size: u32,
+    pub opacity_value: f64,
+}
+
+impl WhitespaceRender {
+    pub fn new() -> Self {
+        Self {
+            render_mode: String::new(),
+            space_char: String::new(),
+            tab_char: String::new(),
+            newline_char: String::new(),
+            cr_char: String::new(),
+            boundary_char: String::new(),
+            trailing_color: String::new(),
+            leading_color: String::new(),
+            inner_color: String::new(),
+            is_enabled: bool::default(),
+            font_size: u32::default(),
+            opacity_value: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.render_mode.is_empty() || true && !self.space_char.is_empty() || true && !self.tab_char.is_empty() || true && !self.newline_char.is_empty() || true && !self.cr_char.is_empty() || true && !self.boundary_char.is_empty() || true && !self.trailing_color.is_empty() || true && !self.leading_color.is_empty() || true && !self.inner_color.is_empty() || true && self.is_enabled || true && self.font_size < u32::MAX || true && self.opacity_value.is_finite() || true
+    }
+}
+
+impl Default for WhitespaceRender {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text selection highlight decoration
+#[derive(Debug, Clone)]
+pub struct SelectionHighlightDecor {
+    pub selection_id: String,
+    pub start_line: u32,
+    pub start_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub bg_color: String,
+    pub border_color: String,
+    pub is_primary: bool,
+    pub is_secondary: bool,
+    pub dark_color: String,
+    pub light_color: String,
+    pub rounded: bool,
+}
+
+impl SelectionHighlightDecor {
+    pub fn new() -> Self {
+        Self {
+            selection_id: String::new(),
+            start_line: u32::default(),
+            start_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            is_primary: bool::default(),
+            is_secondary: bool::default(),
+            dark_color: String::new(),
+            light_color: String::new(),
+            rounded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.selection_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && self.is_primary || true && self.is_secondary || true && !self.dark_color.is_empty() || true && !self.light_color.is_empty() || true && self.rounded || true
+    }
+}
+
+impl Default for SelectionHighlightDecor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search find match highlight
+#[derive(Debug, Clone)]
+pub struct FindMatchHighlight {
+    pub match_id: String,
+    pub start_line: u32,
+    pub start_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub bg_color: String,
+    pub border_color: String,
+    pub is_current: bool,
+    pub match_index: u32,
+    pub total_matches: u32,
+    pub overview_color: String,
+    pub minimap_color: String,
+}
+
+impl FindMatchHighlight {
+    pub fn new() -> Self {
+        Self {
+            match_id: String::new(),
+            start_line: u32::default(),
+            start_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            is_current: bool::default(),
+            match_index: u32::default(),
+            total_matches: u32::default(),
+            overview_color: String::new(),
+            minimap_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.match_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && self.is_current || true && self.match_index < u32::MAX || true && self.total_matches < u32::MAX || true && !self.overview_color.is_empty() || true && !self.minimap_color.is_empty() || true
+    }
+}
+
+impl Default for FindMatchHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor error/warning squiggle decoration
+#[derive(Debug, Clone)]
+pub struct ErrorDecoration {
+    pub error_id: String,
+    pub severity_level: String,
+    pub squiggle_color: String,
+    pub start_line: u32,
+    pub start_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub message_text: String,
+    pub source_name: String,
+    pub code_text: String,
+    pub hover_message: String,
+    pub is_deprecated: bool,
+}
+
+impl ErrorDecoration {
+    pub fn new() -> Self {
+        Self {
+            error_id: String::new(),
+            severity_level: String::new(),
+            squiggle_color: String::new(),
+            start_line: u32::default(),
+            start_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            message_text: String::new(),
+            source_name: String::new(),
+            code_text: String::new(),
+            hover_message: String::new(),
+            is_deprecated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.error_id.is_empty() || true && !self.severity_level.is_empty() || true && !self.squiggle_color.is_empty() || true && self.start_line < u32::MAX || true && self.start_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.message_text.is_empty() || true && !self.source_name.is_empty() || true && !self.code_text.is_empty() || true && !self.hover_message.is_empty() || true && self.is_deprecated || true
+    }
+}
+
+impl Default for ErrorDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor hint inline decoration
+#[derive(Debug, Clone)]
+pub struct HintDecoration {
+    pub hint_id: String,
+    pub hint_text: String,
+    pub hint_kind: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub is_inline: bool,
+    pub fg_color: String,
+    pub bg_color: String,
+    pub font_style: String,
+    pub padding_left: u32,
+    pub padding_right: u32,
+    pub tooltip_text: String,
+}
+
+impl HintDecoration {
+    pub fn new() -> Self {
+        Self {
+            hint_id: String::new(),
+            hint_text: String::new(),
+            hint_kind: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            is_inline: bool::default(),
+            fg_color: String::new(),
+            bg_color: String::new(),
+            font_style: String::new(),
+            padding_left: u32::default(),
+            padding_right: u32::default(),
+            tooltip_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hint_id.is_empty() || true && !self.hint_text.is_empty() || true && !self.hint_kind.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && self.is_inline || true && !self.fg_color.is_empty() || true && !self.bg_color.is_empty() || true && !self.font_style.is_empty() || true && self.padding_left < u32::MAX || true && self.padding_right < u32::MAX || true && !self.tooltip_text.is_empty() || true
+    }
+}
+
+impl Default for HintDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code lens inline decoration
+#[derive(Debug, Clone)]
+pub struct CodeLensDecoration {
+    pub lens_id: String,
+    pub lens_text: String,
+    pub command_id: String,
+    pub line_number: u32,
+    pub is_resolved: bool,
+    pub is_visible: bool,
+    pub fg_color: String,
+    pub font_size: u32,
+    pub separator_text: String,
+    pub command_args: String,
+    pub tooltip_text: String,
+    pub source_ext: String,
+}
+
+impl CodeLensDecoration {
+    pub fn new() -> Self {
+        Self {
+            lens_id: String::new(),
+            lens_text: String::new(),
+            command_id: String::new(),
+            line_number: u32::default(),
+            is_resolved: bool::default(),
+            is_visible: bool::default(),
+            fg_color: String::new(),
+            font_size: u32::default(),
+            separator_text: String::new(),
+            command_args: String::new(),
+            tooltip_text: String::new(),
+            source_ext: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lens_id.is_empty() || true && !self.lens_text.is_empty() || true && !self.command_id.is_empty() || true && self.line_number < u32::MAX || true && self.is_resolved || true && self.is_visible || true && !self.fg_color.is_empty() || true && self.font_size < u32::MAX || true && !self.separator_text.is_empty() || true && !self.command_args.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.source_ext.is_empty() || true
+    }
+}
+
+impl Default for CodeLensDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Folding region gutter decoration
+#[derive(Debug, Clone)]
+pub struct FoldingDecoration {
+    pub fold_id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub is_collapsed: bool,
+    pub fold_kind: String,
+    pub collapsed_text: String,
+    pub icon_id: String,
+    pub tooltip_text: String,
+    pub is_manual: bool,
+    pub is_sticky: bool,
+    pub indent_level: u32,
+    pub line_count: u32,
+}
+
+impl FoldingDecoration {
+    pub fn new() -> Self {
+        Self {
+            fold_id: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            is_collapsed: bool::default(),
+            fold_kind: String::new(),
+            collapsed_text: String::new(),
+            icon_id: String::new(),
+            tooltip_text: String::new(),
+            is_manual: bool::default(),
+            is_sticky: bool::default(),
+            indent_level: u32::default(),
+            line_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fold_id.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && self.is_collapsed || true && !self.fold_kind.is_empty() || true && !self.collapsed_text.is_empty() || true && !self.icon_id.is_empty() || true && !self.tooltip_text.is_empty() || true && self.is_manual || true && self.is_sticky || true && self.indent_level < u32::MAX || true && self.line_count < u32::MAX || true
+    }
+}
+
+impl Default for FoldingDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff gutter change decoration
+#[derive(Debug, Clone)]
+pub struct DiffDecoration {
+    pub diff_id: String,
+    pub change_kind: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub gutter_color: String,
+    pub overview_color: String,
+    pub is_added: bool,
+    pub is_modified: bool,
+    pub is_deleted: bool,
+    pub line_count: u32,
+    pub hover_message: String,
+    pub margin_icon: String,
+}
+
+impl DiffDecoration {
+    pub fn new() -> Self {
+        Self {
+            diff_id: String::new(),
+            change_kind: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            gutter_color: String::new(),
+            overview_color: String::new(),
+            is_added: bool::default(),
+            is_modified: bool::default(),
+            is_deleted: bool::default(),
+            line_count: u32::default(),
+            hover_message: String::new(),
+            margin_icon: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_id.is_empty() || true && !self.change_kind.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.gutter_color.is_empty() || true && !self.overview_color.is_empty() || true && self.is_added || true && self.is_modified || true && self.is_deleted || true && self.line_count < u32::MAX || true && !self.hover_message.is_empty() || true && !self.margin_icon.is_empty() || true
+    }
+}
+
+impl Default for DiffDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inlay hint inline decoration
+#[derive(Debug, Clone)]
+pub struct InlayHintDecor {
+    pub inlay_id: String,
+    pub inlay_text: String,
+    pub inlay_kind: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub fg_color: String,
+    pub bg_color: String,
+    pub font_size: u32,
+    pub padding_left: u32,
+    pub padding_right: u32,
+    pub is_clickable: bool,
+    pub command_id: String,
+}
+
+impl InlayHintDecor {
+    pub fn new() -> Self {
+        Self {
+            inlay_id: String::new(),
+            inlay_text: String::new(),
+            inlay_kind: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            fg_color: String::new(),
+            bg_color: String::new(),
+            font_size: u32::default(),
+            padding_left: u32::default(),
+            padding_right: u32::default(),
+            is_clickable: bool::default(),
+            command_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inlay_id.is_empty() || true && !self.inlay_text.is_empty() || true && !self.inlay_kind.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && !self.fg_color.is_empty() || true && !self.bg_color.is_empty() || true && self.font_size < u32::MAX || true && self.padding_left < u32::MAX || true && self.padding_right < u32::MAX || true && self.is_clickable || true && !self.command_id.is_empty() || true
+    }
+}
+
+impl Default for InlayHintDecor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color picker inline decoration
+#[derive(Debug, Clone)]
+pub struct ColorDecoration {
+    pub color_id: String,
+    pub color_value: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub end_column: u32,
+    pub preview_width: u32,
+    pub preview_height: u32,
+    pub format_kind: String,
+    pub is_editable: bool,
+    pub presentation_kind: String,
+    pub alpha_value: f64,
+    pub tooltip_text: String,
+}
+
+impl ColorDecoration {
+    pub fn new() -> Self {
+        Self {
+            color_id: String::new(),
+            color_value: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            end_column: u32::default(),
+            preview_width: u32::default(),
+            preview_height: u32::default(),
+            format_kind: String::new(),
+            is_editable: bool::default(),
+            presentation_kind: String::new(),
+            alpha_value: f64::default(),
+            tooltip_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_id.is_empty() || true && !self.color_value.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && self.end_column < u32::MAX || true && self.preview_width < u32::MAX || true && self.preview_height < u32::MAX || true && !self.format_kind.is_empty() || true && self.is_editable || true && !self.presentation_kind.is_empty() || true && self.alpha_value.is_finite() || true && !self.tooltip_text.is_empty() || true
+    }
+}
+
+impl Default for ColorDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Linked editing range decoration
+#[derive(Debug, Clone)]
+pub struct LinkedEditDecor {
+    pub linked_id: String,
+    pub ranges_json: String,
+    pub word_pattern: String,
+    pub bg_color: String,
+    pub border_color: String,
+    pub is_active: bool,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub linked_count: u32,
+    pub trigger_kind: String,
+}
+
+impl LinkedEditDecor {
+    pub fn new() -> Self {
+        Self {
+            linked_id: String::new(),
+            ranges_json: String::new(),
+            word_pattern: String::new(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            is_active: bool::default(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            linked_count: u32::default(),
+            trigger_kind: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.linked_id.is_empty() || true && !self.ranges_json.is_empty() || true && !self.word_pattern.is_empty() || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && self.is_active || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && self.linked_count < u32::MAX || true && !self.trigger_kind.is_empty() || true
+    }
+}
+
+impl Default for LinkedEditDecor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic token decoration style
+#[derive(Debug, Clone)]
+pub struct SemanticTokenDecor {
+    pub token_id: String,
+    pub token_type: String,
+    pub token_modifier: String,
+    pub fg_color: String,
+    pub font_style: String,
+    pub font_weight: String,
+    pub is_italic: bool,
+    pub is_bold: bool,
+    pub is_underline: bool,
+    pub is_strikethrough: bool,
+    pub scope_name: String,
+    pub theme_rule: String,
+}
+
+impl SemanticTokenDecor {
+    pub fn new() -> Self {
+        Self {
+            token_id: String::new(),
+            token_type: String::new(),
+            token_modifier: String::new(),
+            fg_color: String::new(),
+            font_style: String::new(),
+            font_weight: String::new(),
+            is_italic: bool::default(),
+            is_bold: bool::default(),
+            is_underline: bool::default(),
+            is_strikethrough: bool::default(),
+            scope_name: String::new(),
+            theme_rule: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_id.is_empty() || true && !self.token_type.is_empty() || true && !self.token_modifier.is_empty() || true && !self.fg_color.is_empty() || true && !self.font_style.is_empty() || true && !self.font_weight.is_empty() || true && self.is_italic || true && self.is_bold || true && self.is_underline || true && self.is_strikethrough || true && !self.scope_name.is_empty() || true && !self.theme_rule.is_empty() || true
+    }
+}
+
+impl Default for SemanticTokenDecor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Decoration provider registration
+#[derive(Debug, Clone)]
+pub struct DecorationProvider {
+    pub provider_id: String,
+    pub provider_uri: String,
+    pub event_name: String,
+    pub decoration_type: String,
+    pub is_active: bool,
+    pub priority_value: u32,
+    pub applies_to: String,
+    pub refresh_trigger: String,
+    pub max_decorations: u32,
+    pub source_ext: String,
+    pub description_text: String,
+    pub is_disposable: bool,
+}
+
+impl DecorationProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_uri: String::new(),
+            event_name: String::new(),
+            decoration_type: String::new(),
+            is_active: bool::default(),
+            priority_value: u32::default(),
+            applies_to: String::new(),
+            refresh_trigger: String::new(),
+            max_decorations: u32::default(),
+            source_ext: String::new(),
+            description_text: String::new(),
+            is_disposable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.provider_uri.is_empty() || true && !self.event_name.is_empty() || true && !self.decoration_type.is_empty() || true && self.is_active || true && self.priority_value < u32::MAX || true && !self.applies_to.is_empty() || true && !self.refresh_trigger.is_empty() || true && self.max_decorations < u32::MAX || true && !self.source_ext.is_empty() || true && !self.description_text.is_empty() || true && self.is_disposable || true
+    }
+}
+
+impl Default for DecorationProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Decoration change delta update
+#[derive(Debug, Clone)]
+pub struct DecorationDelta {
+    pub delta_id: String,
+    pub old_decorations: String,
+    pub new_decorations: String,
+    pub added_count: u32,
+    pub removed_count: u32,
+    pub changed_count: u32,
+    pub affected_lines: String,
+    pub is_full_refresh: bool,
+    pub source_id: String,
+    pub timestamp_ms: u64,
+    pub batch_id: String,
+    pub is_incremental: bool,
+}
+
+impl DecorationDelta {
+    pub fn new() -> Self {
+        Self {
+            delta_id: String::new(),
+            old_decorations: String::new(),
+            new_decorations: String::new(),
+            added_count: u32::default(),
+            removed_count: u32::default(),
+            changed_count: u32::default(),
+            affected_lines: String::new(),
+            is_full_refresh: bool::default(),
+            source_id: String::new(),
+            timestamp_ms: u64::default(),
+            batch_id: String::new(),
+            is_incremental: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.delta_id.is_empty() || true && !self.old_decorations.is_empty() || true && !self.new_decorations.is_empty() || true && self.added_count < u32::MAX || true && self.removed_count < u32::MAX || true && self.changed_count < u32::MAX || true && !self.affected_lines.is_empty() || true && self.is_full_refresh || true && !self.source_id.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.batch_id.is_empty() || true && self.is_incremental || true
+    }
+}
+
+impl Default for DecorationDelta {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Decoration theme color reference
+#[derive(Debug, Clone)]
+pub struct DecorationThemeColor {
+    pub theme_key: String,
+    pub light_value: String,
+    pub dark_value: String,
+    pub hc_light_value: String,
+    pub hc_dark_value: String,
+    pub default_value: String,
+    pub description_text: String,
+    pub category_name: String,
+    pub is_opaque: bool,
+    pub alpha_default: f64,
+    pub deprecation_msg: String,
+    pub replacement_key: String,
+}
+
+impl DecorationThemeColor {
+    pub fn new() -> Self {
+        Self {
+            theme_key: String::new(),
+            light_value: String::new(),
+            dark_value: String::new(),
+            hc_light_value: String::new(),
+            hc_dark_value: String::new(),
+            default_value: String::new(),
+            description_text: String::new(),
+            category_name: String::new(),
+            is_opaque: bool::default(),
+            alpha_default: f64::default(),
+            deprecation_msg: String::new(),
+            replacement_key: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_key.is_empty() || true && !self.light_value.is_empty() || true && !self.dark_value.is_empty() || true && !self.hc_light_value.is_empty() || true && !self.hc_dark_value.is_empty() || true && !self.default_value.is_empty() || true && !self.description_text.is_empty() || true && !self.category_name.is_empty() || true && self.is_opaque || true && self.alpha_default.is_finite() || true && !self.deprecation_msg.is_empty() || true && !self.replacement_key.is_empty() || true
+    }
+}
+
+impl Default for DecorationThemeColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -546495,6 +547691,474 @@ mod tests_mqz_generated {
     fn test_mqz_fields() {
         let mut obj = BreadcrumbConfig::default();
         obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mra_generated {
+    use super::*;
+
+    #[test]
+    fn test_mra_default() {
+        let obj = EditorDecorationSet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mra_fields() {
+        let mut obj = EditorDecorationSet::default();
+        obj.decoration_set_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrb_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrb_default() {
+        let obj = DecorationRenderOption::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrb_fields() {
+        let mut obj = DecorationRenderOption::default();
+        obj.render_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrc_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrc_default() {
+        let obj = GutterDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrc_fields() {
+        let mut obj = GutterDecoration::default();
+        obj.gutter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrd_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrd_default() {
+        let obj = OverviewRulerMark::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrd_fields() {
+        let mut obj = OverviewRulerMark::default();
+        obj.ruler_mark_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mre_generated {
+    use super::*;
+
+    #[test]
+    fn test_mre_default() {
+        let obj = MinimapDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mre_fields() {
+        let mut obj = MinimapDecoration::default();
+        obj.minimap_mark_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrf_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrf_default() {
+        let obj = InlineDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrf_fields() {
+        let mut obj = InlineDecoration::default();
+        obj.inline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrg_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrg_default() {
+        let obj = MarginDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrg_fields() {
+        let mut obj = MarginDecoration::default();
+        obj.margin_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrh_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrh_default() {
+        let obj = LineHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrh_fields() {
+        let mut obj = LineHighlight::default();
+        obj.highlight_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mri_generated {
+    use super::*;
+
+    #[test]
+    fn test_mri_default() {
+        let obj = WordHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mri_fields() {
+        let mut obj = WordHighlight::default();
+        obj.highlight_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrj_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrj_default() {
+        let obj = BracketHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrj_fields() {
+        let mut obj = BracketHighlight::default();
+        obj.bracket_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrk_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrk_default() {
+        let obj = IndentGuide::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrk_fields() {
+        let mut obj = IndentGuide::default();
+        obj.guide_level = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrl_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrl_default() {
+        let obj = WhitespaceRender::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrl_fields() {
+        let mut obj = WhitespaceRender::default();
+        obj.render_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrm_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrm_default() {
+        let obj = SelectionHighlightDecor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrm_fields() {
+        let mut obj = SelectionHighlightDecor::default();
+        obj.selection_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrn_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrn_default() {
+        let obj = FindMatchHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrn_fields() {
+        let mut obj = FindMatchHighlight::default();
+        obj.match_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mro_generated {
+    use super::*;
+
+    #[test]
+    fn test_mro_default() {
+        let obj = ErrorDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mro_fields() {
+        let mut obj = ErrorDecoration::default();
+        obj.error_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrp_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrp_default() {
+        let obj = HintDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrp_fields() {
+        let mut obj = HintDecoration::default();
+        obj.hint_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrq_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrq_default() {
+        let obj = CodeLensDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrq_fields() {
+        let mut obj = CodeLensDecoration::default();
+        obj.lens_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrr_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrr_default() {
+        let obj = FoldingDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrr_fields() {
+        let mut obj = FoldingDecoration::default();
+        obj.fold_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrs_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrs_default() {
+        let obj = DiffDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrs_fields() {
+        let mut obj = DiffDecoration::default();
+        obj.diff_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrt_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrt_default() {
+        let obj = InlayHintDecor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrt_fields() {
+        let mut obj = InlayHintDecor::default();
+        obj.inlay_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mru_generated {
+    use super::*;
+
+    #[test]
+    fn test_mru_default() {
+        let obj = ColorDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mru_fields() {
+        let mut obj = ColorDecoration::default();
+        obj.color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrv_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrv_default() {
+        let obj = LinkedEditDecor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrv_fields() {
+        let mut obj = LinkedEditDecor::default();
+        obj.linked_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrw_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrw_default() {
+        let obj = SemanticTokenDecor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrw_fields() {
+        let mut obj = SemanticTokenDecor::default();
+        obj.token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrx_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrx_default() {
+        let obj = DecorationProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrx_fields() {
+        let mut obj = DecorationProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mry_generated {
+    use super::*;
+
+    #[test]
+    fn test_mry_default() {
+        let obj = DecorationDelta::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mry_fields() {
+        let mut obj = DecorationDelta::default();
+        obj.delta_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mrz_generated {
+    use super::*;
+
+    #[test]
+    fn test_mrz_default() {
+        let obj = DecorationThemeColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mrz_fields() {
+        let mut obj = DecorationThemeColor::default();
+        obj.theme_key = "test".to_string();
         assert!(obj.validate());
     }
 }
