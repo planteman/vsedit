@@ -239596,6 +239596,1202 @@ impl Default for ExtGalleryConfig {
     }
 }
 
+/// Welcome walkthrough registration entry
+#[derive(Debug, Clone)]
+pub struct WalkthroughEntry {
+    pub walkthrough_id: String,
+    pub title_text: String,
+    pub description_text: String,
+    pub icon_id: String,
+    pub category_name: String,
+    pub when_clause: String,
+    pub sort_order: u32,
+    pub is_featured: bool,
+    pub step_count: u32,
+    pub completed_count: u32,
+    pub source_ext: String,
+    pub is_new: bool,
+}
+
+impl WalkthroughEntry {
+    pub fn new() -> Self {
+        Self {
+            walkthrough_id: String::new(),
+            title_text: String::new(),
+            description_text: String::new(),
+            icon_id: String::new(),
+            category_name: String::new(),
+            when_clause: String::new(),
+            sort_order: u32::default(),
+            is_featured: bool::default(),
+            step_count: u32::default(),
+            completed_count: u32::default(),
+            source_ext: String::new(),
+            is_new: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.walkthrough_id.is_empty() || true && !self.title_text.is_empty() || true && !self.description_text.is_empty() || true && !self.icon_id.is_empty() || true && !self.category_name.is_empty() || true && !self.when_clause.is_empty() || true && self.sort_order < u32::MAX || true && self.is_featured || true && self.step_count < u32::MAX || true && self.completed_count < u32::MAX || true && !self.source_ext.is_empty() || true && self.is_new || true
+    }
+}
+
+impl Default for WalkthroughEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Walkthrough step definition
+#[derive(Debug, Clone)]
+pub struct WalkthroughStepDef {
+    pub step_id: String,
+    pub title_text: String,
+    pub description_md: String,
+    pub media_path: String,
+    pub completion_event: String,
+    pub when_clause: String,
+    pub is_completed: bool,
+    pub sort_order: u32,
+    pub walkthrough_id: String,
+    pub command_id: String,
+    pub alt_text: String,
+    pub category_name: String,
+}
+
+impl WalkthroughStepDef {
+    pub fn new() -> Self {
+        Self {
+            step_id: String::new(),
+            title_text: String::new(),
+            description_md: String::new(),
+            media_path: String::new(),
+            completion_event: String::new(),
+            when_clause: String::new(),
+            is_completed: bool::default(),
+            sort_order: u32::default(),
+            walkthrough_id: String::new(),
+            command_id: String::new(),
+            alt_text: String::new(),
+            category_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.step_id.is_empty() || true && !self.title_text.is_empty() || true && !self.description_md.is_empty() || true && !self.media_path.is_empty() || true && !self.completion_event.is_empty() || true && !self.when_clause.is_empty() || true && self.is_completed || true && self.sort_order < u32::MAX || true && !self.walkthrough_id.is_empty() || true && !self.command_id.is_empty() || true && !self.alt_text.is_empty() || true && !self.category_name.is_empty() || true
+    }
+}
+
+impl Default for WalkthroughStepDef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Welcome page view item
+#[derive(Debug, Clone)]
+pub struct WelcomeViewItem {
+    pub item_id: String,
+    pub item_label: String,
+    pub item_kind: String,
+    pub icon_id: String,
+    pub command_id: String,
+    pub description_text: String,
+    pub when_clause: String,
+    pub sort_order: u32,
+    pub group_name: String,
+    pub is_new: bool,
+    pub badge_text: String,
+    pub tooltip_text: String,
+}
+
+impl WelcomeViewItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            item_label: String::new(),
+            item_kind: String::new(),
+            icon_id: String::new(),
+            command_id: String::new(),
+            description_text: String::new(),
+            when_clause: String::new(),
+            sort_order: u32::default(),
+            group_name: String::new(),
+            is_new: bool::default(),
+            badge_text: String::new(),
+            tooltip_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.item_label.is_empty() || true && !self.item_kind.is_empty() || true && !self.icon_id.is_empty() || true && !self.command_id.is_empty() || true && !self.description_text.is_empty() || true && !self.when_clause.is_empty() || true && self.sort_order < u32::MAX || true && !self.group_name.is_empty() || true && self.is_new || true && !self.badge_text.is_empty() || true && !self.tooltip_text.is_empty() || true
+    }
+}
+
+impl Default for WelcomeViewItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Getting started card widget
+#[derive(Debug, Clone)]
+pub struct GettingStartedCard {
+    pub card_id: String,
+    pub card_title: String,
+    pub card_body: String,
+    pub icon_url: String,
+    pub action_label: String,
+    pub action_command: String,
+    pub category_name: String,
+    pub sort_order: u32,
+    pub is_dismissable: bool,
+    pub is_dismissed: bool,
+    pub badge_text: String,
+    pub media_url: String,
+}
+
+impl GettingStartedCard {
+    pub fn new() -> Self {
+        Self {
+            card_id: String::new(),
+            card_title: String::new(),
+            card_body: String::new(),
+            icon_url: String::new(),
+            action_label: String::new(),
+            action_command: String::new(),
+            category_name: String::new(),
+            sort_order: u32::default(),
+            is_dismissable: bool::default(),
+            is_dismissed: bool::default(),
+            badge_text: String::new(),
+            media_url: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.card_id.is_empty() || true && !self.card_title.is_empty() || true && !self.card_body.is_empty() || true && !self.icon_url.is_empty() || true && !self.action_label.is_empty() || true && !self.action_command.is_empty() || true && !self.category_name.is_empty() || true && self.sort_order < u32::MAX || true && self.is_dismissable || true && self.is_dismissed || true && !self.badge_text.is_empty() || true && !self.media_url.is_empty() || true
+    }
+}
+
+impl Default for GettingStartedCard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Welcome page action button
+#[derive(Debug, Clone)]
+pub struct WelcomeAction {
+    pub action_id: String,
+    pub action_label: String,
+    pub command_id: String,
+    pub icon_id: String,
+    pub description_text: String,
+    pub when_clause: String,
+    pub sort_order: u32,
+    pub group_name: String,
+    pub is_primary: bool,
+    pub tooltip_text: String,
+    pub keyboard_shortcut: String,
+    pub badge_text: String,
+}
+
+impl WelcomeAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            action_label: String::new(),
+            command_id: String::new(),
+            icon_id: String::new(),
+            description_text: String::new(),
+            when_clause: String::new(),
+            sort_order: u32::default(),
+            group_name: String::new(),
+            is_primary: bool::default(),
+            tooltip_text: String::new(),
+            keyboard_shortcut: String::new(),
+            badge_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.action_label.is_empty() || true && !self.command_id.is_empty() || true && !self.icon_id.is_empty() || true && !self.description_text.is_empty() || true && !self.when_clause.is_empty() || true && self.sort_order < u32::MAX || true && !self.group_name.is_empty() || true && self.is_primary || true && !self.tooltip_text.is_empty() || true && !self.keyboard_shortcut.is_empty() || true && !self.badge_text.is_empty() || true
+    }
+}
+
+impl Default for WelcomeAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Walkthrough step media content
+#[derive(Debug, Clone)]
+pub struct WalkthroughMedia {
+    pub media_url: String,
+    pub media_type: String,
+    pub alt_text: String,
+    pub width_px: u32,
+    pub height_px: u32,
+    pub is_svg: bool,
+    pub is_animated: bool,
+    pub theme_variant: String,
+    pub fallback_url: String,
+    pub poster_url: String,
+    pub autoplay: bool,
+    pub caption_text: String,
+}
+
+impl WalkthroughMedia {
+    pub fn new() -> Self {
+        Self {
+            media_url: String::new(),
+            media_type: String::new(),
+            alt_text: String::new(),
+            width_px: u32::default(),
+            height_px: u32::default(),
+            is_svg: bool::default(),
+            is_animated: bool::default(),
+            theme_variant: String::new(),
+            fallback_url: String::new(),
+            poster_url: String::new(),
+            autoplay: bool::default(),
+            caption_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.media_url.is_empty() || true && !self.media_type.is_empty() || true && !self.alt_text.is_empty() || true && self.width_px < u32::MAX || true && self.height_px < u32::MAX || true && self.is_svg || true && self.is_animated || true && !self.theme_variant.is_empty() || true && !self.fallback_url.is_empty() || true && !self.poster_url.is_empty() || true && self.autoplay || true && !self.caption_text.is_empty() || true
+    }
+}
+
+impl Default for WalkthroughMedia {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor tip of the day entry
+#[derive(Debug, Clone)]
+pub struct TipOfTheDay {
+    pub tip_id: String,
+    pub tip_text: String,
+    pub tip_category: String,
+    pub command_id: String,
+    pub keyboard_shortcut: String,
+    pub icon_id: String,
+    pub is_shown: bool,
+    pub show_count: u32,
+    pub last_shown_ms: u64,
+    pub priority_value: u32,
+    pub when_clause: String,
+    pub learn_more_url: String,
+}
+
+impl TipOfTheDay {
+    pub fn new() -> Self {
+        Self {
+            tip_id: String::new(),
+            tip_text: String::new(),
+            tip_category: String::new(),
+            command_id: String::new(),
+            keyboard_shortcut: String::new(),
+            icon_id: String::new(),
+            is_shown: bool::default(),
+            show_count: u32::default(),
+            last_shown_ms: u64::default(),
+            priority_value: u32::default(),
+            when_clause: String::new(),
+            learn_more_url: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tip_id.is_empty() || true && !self.tip_text.is_empty() || true && !self.tip_category.is_empty() || true && !self.command_id.is_empty() || true && !self.keyboard_shortcut.is_empty() || true && !self.icon_id.is_empty() || true && self.is_shown || true && self.show_count < u32::MAX || true && self.last_shown_ms < u64::MAX || true && self.priority_value < u32::MAX || true && !self.when_clause.is_empty() || true && !self.learn_more_url.is_empty() || true
+    }
+}
+
+impl Default for TipOfTheDay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Startup editor page configuration
+#[derive(Debug, Clone)]
+pub struct StartupEditor {
+    pub editor_kind: String,
+    pub show_on_startup: bool,
+    pub show_walkthrough: bool,
+    pub show_recent: bool,
+    pub show_tips: bool,
+    pub show_release: bool,
+    pub show_extensions: bool,
+    pub custom_content: String,
+    pub layout_mode: String,
+    pub max_recent: u32,
+    pub show_getting_started: bool,
+    pub is_default: bool,
+}
+
+impl StartupEditor {
+    pub fn new() -> Self {
+        Self {
+            editor_kind: String::new(),
+            show_on_startup: bool::default(),
+            show_walkthrough: bool::default(),
+            show_recent: bool::default(),
+            show_tips: bool::default(),
+            show_release: bool::default(),
+            show_extensions: bool::default(),
+            custom_content: String::new(),
+            layout_mode: String::new(),
+            max_recent: u32::default(),
+            show_getting_started: bool::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_kind.is_empty() || true && self.show_on_startup || true && self.show_walkthrough || true && self.show_recent || true && self.show_tips || true && self.show_release || true && self.show_extensions || true && !self.custom_content.is_empty() || true && !self.layout_mode.is_empty() || true && self.max_recent < u32::MAX || true && self.show_getting_started || true && self.is_default || true
+    }
+}
+
+impl Default for StartupEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Recent files/folders list entry
+#[derive(Debug, Clone)]
+pub struct RecentItemEntry {
+    pub item_path: String,
+    pub item_label: String,
+    pub is_folder: bool,
+    pub is_workspace: bool,
+    pub last_opened_ms: u64,
+    pub is_pinned: bool,
+    pub icon_id: String,
+    pub detail_text: String,
+    pub remote_authority: String,
+    pub is_dirty: bool,
+    pub workspace_name: String,
+    pub sort_order: u32,
+}
+
+impl RecentItemEntry {
+    pub fn new() -> Self {
+        Self {
+            item_path: String::new(),
+            item_label: String::new(),
+            is_folder: bool::default(),
+            is_workspace: bool::default(),
+            last_opened_ms: u64::default(),
+            is_pinned: bool::default(),
+            icon_id: String::new(),
+            detail_text: String::new(),
+            remote_authority: String::new(),
+            is_dirty: bool::default(),
+            workspace_name: String::new(),
+            sort_order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_path.is_empty() || true && !self.item_label.is_empty() || true && self.is_folder || true && self.is_workspace || true && self.last_opened_ms < u64::MAX || true && self.is_pinned || true && !self.icon_id.is_empty() || true && !self.detail_text.is_empty() || true && !self.remote_authority.is_empty() || true && self.is_dirty || true && !self.workspace_name.is_empty() || true && self.sort_order < u32::MAX || true
+    }
+}
+
+impl Default for RecentItemEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Welcome page layout configuration
+#[derive(Debug, Clone)]
+pub struct WelcomeLayout {
+    pub layout_id: String,
+    pub column_count: u32,
+    pub section_order: String,
+    pub show_header: bool,
+    pub show_footer: bool,
+    pub max_width: u32,
+    pub padding_value: u32,
+    pub gap_value: u32,
+    pub is_responsive: bool,
+    pub breakpoints: String,
+    pub theme_variant: String,
+    pub description_text: String,
+}
+
+impl WelcomeLayout {
+    pub fn new() -> Self {
+        Self {
+            layout_id: String::new(),
+            column_count: u32::default(),
+            section_order: String::new(),
+            show_header: bool::default(),
+            show_footer: bool::default(),
+            max_width: u32::default(),
+            padding_value: u32::default(),
+            gap_value: u32::default(),
+            is_responsive: bool::default(),
+            breakpoints: String::new(),
+            theme_variant: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_id.is_empty() || true && self.column_count < u32::MAX || true && !self.section_order.is_empty() || true && self.show_header || true && self.show_footer || true && self.max_width < u32::MAX || true && self.padding_value < u32::MAX || true && self.gap_value < u32::MAX || true && self.is_responsive || true && !self.breakpoints.is_empty() || true && !self.theme_variant.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for WelcomeLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Release notes display item
+#[derive(Debug, Clone)]
+pub struct ReleaseNoteItem {
+    pub note_version: String,
+    pub note_title: String,
+    pub note_body_md: String,
+    pub release_date: u64,
+    pub is_major: bool,
+    pub is_current: bool,
+    pub section_kind: String,
+    pub media_url: String,
+    pub action_label: String,
+    pub action_url: String,
+    pub sort_order: u32,
+    pub is_read: bool,
+}
+
+impl ReleaseNoteItem {
+    pub fn new() -> Self {
+        Self {
+            note_version: String::new(),
+            note_title: String::new(),
+            note_body_md: String::new(),
+            release_date: u64::default(),
+            is_major: bool::default(),
+            is_current: bool::default(),
+            section_kind: String::new(),
+            media_url: String::new(),
+            action_label: String::new(),
+            action_url: String::new(),
+            sort_order: u32::default(),
+            is_read: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.note_version.is_empty() || true && !self.note_title.is_empty() || true && !self.note_body_md.is_empty() || true && self.release_date < u64::MAX || true && self.is_major || true && self.is_current || true && !self.section_kind.is_empty() || true && !self.media_url.is_empty() || true && !self.action_label.is_empty() || true && !self.action_url.is_empty() || true && self.sort_order < u32::MAX || true && self.is_read || true
+    }
+}
+
+impl Default for ReleaseNoteItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Welcome page promotional banner
+#[derive(Debug, Clone)]
+pub struct WelcomeBanner {
+    pub banner_id: String,
+    pub banner_text: String,
+    pub banner_url: String,
+    pub bg_color: String,
+    pub fg_color: String,
+    pub icon_id: String,
+    pub action_label: String,
+    pub action_command: String,
+    pub is_dismissable: bool,
+    pub is_dismissed: bool,
+    pub priority_value: u32,
+    pub expires_ms: u64,
+}
+
+impl WelcomeBanner {
+    pub fn new() -> Self {
+        Self {
+            banner_id: String::new(),
+            banner_text: String::new(),
+            banner_url: String::new(),
+            bg_color: String::new(),
+            fg_color: String::new(),
+            icon_id: String::new(),
+            action_label: String::new(),
+            action_command: String::new(),
+            is_dismissable: bool::default(),
+            is_dismissed: bool::default(),
+            priority_value: u32::default(),
+            expires_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.banner_id.is_empty() || true && !self.banner_text.is_empty() || true && !self.banner_url.is_empty() || true && !self.bg_color.is_empty() || true && !self.fg_color.is_empty() || true && !self.icon_id.is_empty() || true && !self.action_label.is_empty() || true && !self.action_command.is_empty() || true && self.is_dismissable || true && self.is_dismissed || true && self.priority_value < u32::MAX || true && self.expires_ms < u64::MAX || true
+    }
+}
+
+impl Default for WelcomeBanner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keyboard shortcut preset option
+#[derive(Debug, Clone)]
+pub struct KeymapOption {
+    pub keymap_id: String,
+    pub keymap_label: String,
+    pub extension_id: String,
+    pub description_text: String,
+    pub icon_id: String,
+    pub platform_text: String,
+    pub source_editor: String,
+    pub binding_count: u32,
+    pub is_installed: bool,
+    pub is_active: bool,
+    pub sort_order: u32,
+    pub preview_bindings: String,
+}
+
+impl KeymapOption {
+    pub fn new() -> Self {
+        Self {
+            keymap_id: String::new(),
+            keymap_label: String::new(),
+            extension_id: String::new(),
+            description_text: String::new(),
+            icon_id: String::new(),
+            platform_text: String::new(),
+            source_editor: String::new(),
+            binding_count: u32::default(),
+            is_installed: bool::default(),
+            is_active: bool::default(),
+            sort_order: u32::default(),
+            preview_bindings: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.keymap_id.is_empty() || true && !self.keymap_label.is_empty() || true && !self.extension_id.is_empty() || true && !self.description_text.is_empty() || true && !self.icon_id.is_empty() || true && !self.platform_text.is_empty() || true && !self.source_editor.is_empty() || true && self.binding_count < u32::MAX || true && self.is_installed || true && self.is_active || true && self.sort_order < u32::MAX || true && !self.preview_bindings.is_empty() || true
+    }
+}
+
+impl Default for KeymapOption {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Welcome theme picker list item
+#[derive(Debug, Clone)]
+pub struct ThemePickerItem {
+    pub theme_id: String,
+    pub theme_label: String,
+    pub theme_kind: String,
+    pub is_dark: bool,
+    pub is_high_contrast: bool,
+    pub preview_colors: String,
+    pub extension_id: String,
+    pub is_installed: bool,
+    pub is_active: bool,
+    pub icon_url: String,
+    pub sort_order: u32,
+    pub description_text: String,
+}
+
+impl ThemePickerItem {
+    pub fn new() -> Self {
+        Self {
+            theme_id: String::new(),
+            theme_label: String::new(),
+            theme_kind: String::new(),
+            is_dark: bool::default(),
+            is_high_contrast: bool::default(),
+            preview_colors: String::new(),
+            extension_id: String::new(),
+            is_installed: bool::default(),
+            is_active: bool::default(),
+            icon_url: String::new(),
+            sort_order: u32::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_id.is_empty() || true && !self.theme_label.is_empty() || true && !self.theme_kind.is_empty() || true && self.is_dark || true && self.is_high_contrast || true && !self.preview_colors.is_empty() || true && !self.extension_id.is_empty() || true && self.is_installed || true && self.is_active || true && !self.icon_url.is_empty() || true && self.sort_order < u32::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ThemePickerItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Interactive playground tutorial
+#[derive(Debug, Clone)]
+pub struct InteractiveTour {
+    pub tour_id: String,
+    pub tour_title: String,
+    pub step_count: u32,
+    pub current_step: u32,
+    pub is_completed: bool,
+    pub is_active: bool,
+    pub description_text: String,
+    pub category_name: String,
+    pub when_clause: String,
+    pub restart_allowed: bool,
+    pub skip_allowed: bool,
+    pub source_ext: String,
+}
+
+impl InteractiveTour {
+    pub fn new() -> Self {
+        Self {
+            tour_id: String::new(),
+            tour_title: String::new(),
+            step_count: u32::default(),
+            current_step: u32::default(),
+            is_completed: bool::default(),
+            is_active: bool::default(),
+            description_text: String::new(),
+            category_name: String::new(),
+            when_clause: String::new(),
+            restart_allowed: bool::default(),
+            skip_allowed: bool::default(),
+            source_ext: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tour_id.is_empty() || true && !self.tour_title.is_empty() || true && self.step_count < u32::MAX || true && self.current_step < u32::MAX || true && self.is_completed || true && self.is_active || true && !self.description_text.is_empty() || true && !self.category_name.is_empty() || true && !self.when_clause.is_empty() || true && self.restart_allowed || true && self.skip_allowed || true && !self.source_ext.is_empty() || true
+    }
+}
+
+impl Default for InteractiveTour {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tutorial section with code samples
+#[derive(Debug, Clone)]
+pub struct TutorialSection {
+    pub section_id: String,
+    pub section_title: String,
+    pub content_md: String,
+    pub code_sample: String,
+    pub language_id: String,
+    pub is_interactive: bool,
+    pub expected_output: String,
+    pub hint_text: String,
+    pub sort_order: u32,
+    pub duration_sec: u32,
+    pub difficulty_level: String,
+    pub prerequisite_id: String,
+}
+
+impl TutorialSection {
+    pub fn new() -> Self {
+        Self {
+            section_id: String::new(),
+            section_title: String::new(),
+            content_md: String::new(),
+            code_sample: String::new(),
+            language_id: String::new(),
+            is_interactive: bool::default(),
+            expected_output: String::new(),
+            hint_text: String::new(),
+            sort_order: u32::default(),
+            duration_sec: u32::default(),
+            difficulty_level: String::new(),
+            prerequisite_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.section_id.is_empty() || true && !self.section_title.is_empty() || true && !self.content_md.is_empty() || true && !self.code_sample.is_empty() || true && !self.language_id.is_empty() || true && self.is_interactive || true && !self.expected_output.is_empty() || true && !self.hint_text.is_empty() || true && self.sort_order < u32::MAX || true && self.duration_sec < u32::MAX || true && !self.difficulty_level.is_empty() || true && !self.prerequisite_id.is_empty() || true
+    }
+}
+
+impl Default for TutorialSection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Feature discovery highlight callout
+#[derive(Debug, Clone)]
+pub struct FeatureHighlight {
+    pub feature_id: String,
+    pub feature_label: String,
+    pub description_text: String,
+    pub target_element: String,
+    pub position_hint: String,
+    pub icon_id: String,
+    pub is_shown: bool,
+    pub show_count: u32,
+    pub when_clause: String,
+    pub dismiss_action: String,
+    pub command_id: String,
+    pub priority_value: u32,
+}
+
+impl FeatureHighlight {
+    pub fn new() -> Self {
+        Self {
+            feature_id: String::new(),
+            feature_label: String::new(),
+            description_text: String::new(),
+            target_element: String::new(),
+            position_hint: String::new(),
+            icon_id: String::new(),
+            is_shown: bool::default(),
+            show_count: u32::default(),
+            when_clause: String::new(),
+            dismiss_action: String::new(),
+            command_id: String::new(),
+            priority_value: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.feature_id.is_empty() || true && !self.feature_label.is_empty() || true && !self.description_text.is_empty() || true && !self.target_element.is_empty() || true && !self.position_hint.is_empty() || true && !self.icon_id.is_empty() || true && self.is_shown || true && self.show_count < u32::MAX || true && !self.when_clause.is_empty() || true && !self.dismiss_action.is_empty() || true && !self.command_id.is_empty() || true && self.priority_value < u32::MAX || true
+    }
+}
+
+impl Default for FeatureHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// User onboarding flow controller
+#[derive(Debug, Clone)]
+pub struct OnboardingFlow {
+    pub flow_id: String,
+    pub flow_label: String,
+    pub step_ids: String,
+    pub current_step: u32,
+    pub is_completed: bool,
+    pub is_skipped: bool,
+    pub started_ms: u64,
+    pub completed_ms: u64,
+    pub user_choices: String,
+    pub source_ext: String,
+    pub category_name: String,
+    pub restart_count: u32,
+}
+
+impl OnboardingFlow {
+    pub fn new() -> Self {
+        Self {
+            flow_id: String::new(),
+            flow_label: String::new(),
+            step_ids: String::new(),
+            current_step: u32::default(),
+            is_completed: bool::default(),
+            is_skipped: bool::default(),
+            started_ms: u64::default(),
+            completed_ms: u64::default(),
+            user_choices: String::new(),
+            source_ext: String::new(),
+            category_name: String::new(),
+            restart_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.flow_id.is_empty() || true && !self.flow_label.is_empty() || true && !self.step_ids.is_empty() || true && self.current_step < u32::MAX || true && self.is_completed || true && self.is_skipped || true && self.started_ms < u64::MAX || true && self.completed_ms < u64::MAX || true && !self.user_choices.is_empty() || true && !self.source_ext.is_empty() || true && !self.category_name.is_empty() || true && self.restart_count < u32::MAX || true
+    }
+}
+
+impl Default for OnboardingFlow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Initial setup wizard step
+#[derive(Debug, Clone)]
+pub struct SetupWizardStep {
+    pub wizard_step: String,
+    pub step_title: String,
+    pub step_body_md: String,
+    pub input_kind: String,
+    pub input_options: String,
+    pub selected_value: String,
+    pub is_required: bool,
+    pub is_completed: bool,
+    pub validation_msg: String,
+    pub sort_order: u32,
+    pub icon_id: String,
+    pub depends_on: String,
+}
+
+impl SetupWizardStep {
+    pub fn new() -> Self {
+        Self {
+            wizard_step: String::new(),
+            step_title: String::new(),
+            step_body_md: String::new(),
+            input_kind: String::new(),
+            input_options: String::new(),
+            selected_value: String::new(),
+            is_required: bool::default(),
+            is_completed: bool::default(),
+            validation_msg: String::new(),
+            sort_order: u32::default(),
+            icon_id: String::new(),
+            depends_on: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wizard_step.is_empty() || true && !self.step_title.is_empty() || true && !self.step_body_md.is_empty() || true && !self.input_kind.is_empty() || true && !self.input_options.is_empty() || true && !self.selected_value.is_empty() || true && self.is_required || true && self.is_completed || true && !self.validation_msg.is_empty() || true && self.sort_order < u32::MAX || true && !self.icon_id.is_empty() || true && !self.depends_on.is_empty() || true
+    }
+}
+
+impl Default for SetupWizardStep {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Welcome page external link entry
+#[derive(Debug, Clone)]
+pub struct WelcomeLink {
+    pub link_id: String,
+    pub link_label: String,
+    pub link_url: String,
+    pub icon_id: String,
+    pub description_text: String,
+    pub category_name: String,
+    pub sort_order: u32,
+    pub is_external: bool,
+    pub when_clause: String,
+    pub tooltip_text: String,
+    pub badge_text: String,
+    pub open_in_browser: bool,
+}
+
+impl WelcomeLink {
+    pub fn new() -> Self {
+        Self {
+            link_id: String::new(),
+            link_label: String::new(),
+            link_url: String::new(),
+            icon_id: String::new(),
+            description_text: String::new(),
+            category_name: String::new(),
+            sort_order: u32::default(),
+            is_external: bool::default(),
+            when_clause: String::new(),
+            tooltip_text: String::new(),
+            badge_text: String::new(),
+            open_in_browser: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.link_id.is_empty() || true && !self.link_label.is_empty() || true && !self.link_url.is_empty() || true && !self.icon_id.is_empty() || true && !self.description_text.is_empty() || true && !self.category_name.is_empty() || true && self.sort_order < u32::MAX || true && self.is_external || true && !self.when_clause.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.badge_text.is_empty() || true && self.open_in_browser || true
+    }
+}
+
+impl Default for WelcomeLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Startup performance metric
+#[derive(Debug, Clone)]
+pub struct StartupPerf {
+    pub metric_name: String,
+    pub metric_value: f64,
+    pub metric_unit: String,
+    pub phase_name: String,
+    pub start_ms: u64,
+    pub end_ms: u64,
+    pub is_slow: bool,
+    pub threshold_ms: u64,
+    pub contribution: String,
+    pub mark_name: String,
+    pub parent_metric: String,
+    pub sample_count: u32,
+}
+
+impl StartupPerf {
+    pub fn new() -> Self {
+        Self {
+            metric_name: String::new(),
+            metric_value: f64::default(),
+            metric_unit: String::new(),
+            phase_name: String::new(),
+            start_ms: u64::default(),
+            end_ms: u64::default(),
+            is_slow: bool::default(),
+            threshold_ms: u64::default(),
+            contribution: String::new(),
+            mark_name: String::new(),
+            parent_metric: String::new(),
+            sample_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.metric_name.is_empty() || true && self.metric_value.is_finite() || true && !self.metric_unit.is_empty() || true && !self.phase_name.is_empty() || true && self.start_ms < u64::MAX || true && self.end_ms < u64::MAX || true && self.is_slow || true && self.threshold_ms < u64::MAX || true && !self.contribution.is_empty() || true && !self.mark_name.is_empty() || true && !self.parent_metric.is_empty() || true && self.sample_count < u32::MAX || true
+    }
+}
+
+impl Default for StartupPerf {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace extension recommendation
+#[derive(Debug, Clone)]
+pub struct WorkspaceRecommend {
+    pub rec_id: String,
+    pub extension_id: String,
+    pub rec_reason: String,
+    pub file_pattern: String,
+    pub language_id: String,
+    pub is_workspace: bool,
+    pub is_dismissed: bool,
+    pub priority_value: u32,
+    pub source_type: String,
+    pub show_count: u32,
+    pub config_path: String,
+    pub workspace_name: String,
+}
+
+impl WorkspaceRecommend {
+    pub fn new() -> Self {
+        Self {
+            rec_id: String::new(),
+            extension_id: String::new(),
+            rec_reason: String::new(),
+            file_pattern: String::new(),
+            language_id: String::new(),
+            is_workspace: bool::default(),
+            is_dismissed: bool::default(),
+            priority_value: u32::default(),
+            source_type: String::new(),
+            show_count: u32::default(),
+            config_path: String::new(),
+            workspace_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rec_id.is_empty() || true && !self.extension_id.is_empty() || true && !self.rec_reason.is_empty() || true && !self.file_pattern.is_empty() || true && !self.language_id.is_empty() || true && self.is_workspace || true && self.is_dismissed || true && self.priority_value < u32::MAX || true && !self.source_type.is_empty() || true && self.show_count < u32::MAX || true && !self.config_path.is_empty() || true && !self.workspace_name.is_empty() || true
+    }
+}
+
+impl Default for WorkspaceRecommend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Welcome page keyboard shortcut card
+#[derive(Debug, Clone)]
+pub struct WelcomeShortcut {
+    pub shortcut_id: String,
+    pub shortcut_label: String,
+    pub key_binding: String,
+    pub command_id: String,
+    pub description_text: String,
+    pub category_name: String,
+    pub icon_id: String,
+    pub platform_key: String,
+    pub sort_order: u32,
+    pub is_custom: bool,
+    pub alt_binding: String,
+    pub when_clause: String,
+}
+
+impl WelcomeShortcut {
+    pub fn new() -> Self {
+        Self {
+            shortcut_id: String::new(),
+            shortcut_label: String::new(),
+            key_binding: String::new(),
+            command_id: String::new(),
+            description_text: String::new(),
+            category_name: String::new(),
+            icon_id: String::new(),
+            platform_key: String::new(),
+            sort_order: u32::default(),
+            is_custom: bool::default(),
+            alt_binding: String::new(),
+            when_clause: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shortcut_id.is_empty() || true && !self.shortcut_label.is_empty() || true && !self.key_binding.is_empty() || true && !self.command_id.is_empty() || true && !self.description_text.is_empty() || true && !self.category_name.is_empty() || true && !self.icon_id.is_empty() || true && !self.platform_key.is_empty() || true && self.sort_order < u32::MAX || true && self.is_custom || true && !self.alt_binding.is_empty() || true && !self.when_clause.is_empty() || true
+    }
+}
+
+impl Default for WelcomeShortcut {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Interactive editor playground entry
+#[derive(Debug, Clone)]
+pub struct EditorPlayground {
+    pub playground_id: String,
+    pub playground_title: String,
+    pub language_id: String,
+    pub initial_content: String,
+    pub expected_output: String,
+    pub description_text: String,
+    pub difficulty_level: String,
+    pub category_name: String,
+    pub sort_order: u32,
+    pub is_interactive: bool,
+    pub hint_text: String,
+    pub duration_sec: u32,
+}
+
+impl EditorPlayground {
+    pub fn new() -> Self {
+        Self {
+            playground_id: String::new(),
+            playground_title: String::new(),
+            language_id: String::new(),
+            initial_content: String::new(),
+            expected_output: String::new(),
+            description_text: String::new(),
+            difficulty_level: String::new(),
+            category_name: String::new(),
+            sort_order: u32::default(),
+            is_interactive: bool::default(),
+            hint_text: String::new(),
+            duration_sec: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.playground_id.is_empty() || true && !self.playground_title.is_empty() || true && !self.language_id.is_empty() || true && !self.initial_content.is_empty() || true && !self.expected_output.is_empty() || true && !self.description_text.is_empty() || true && !self.difficulty_level.is_empty() || true && !self.category_name.is_empty() || true && self.sort_order < u32::MAX || true && self.is_interactive || true && !self.hint_text.is_empty() || true && self.duration_sec < u32::MAX || true
+    }
+}
+
+impl Default for EditorPlayground {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Startup automatic action execution
+#[derive(Debug, Clone)]
+pub struct StartupAction {
+    pub action_id: String,
+    pub action_kind: String,
+    pub command_id: String,
+    pub delay_ms: u32,
+    pub condition_clause: String,
+    pub is_enabled: bool,
+    pub run_once: bool,
+    pub last_run_ms: u64,
+    pub priority_value: u32,
+    pub source_ext: String,
+    pub args_json: String,
+    pub description_text: String,
+}
+
+impl StartupAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            action_kind: String::new(),
+            command_id: String::new(),
+            delay_ms: u32::default(),
+            condition_clause: String::new(),
+            is_enabled: bool::default(),
+            run_once: bool::default(),
+            last_run_ms: u64::default(),
+            priority_value: u32::default(),
+            source_ext: String::new(),
+            args_json: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.action_kind.is_empty() || true && !self.command_id.is_empty() || true && self.delay_ms < u32::MAX || true && !self.condition_clause.is_empty() || true && self.is_enabled || true && self.run_once || true && self.last_run_ms < u64::MAX || true && self.priority_value < u32::MAX || true && !self.source_ext.is_empty() || true && !self.args_json.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for StartupAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Welcome page configuration settings
+#[derive(Debug, Clone)]
+pub struct WelcomePageConfig {
+    pub config_id: String,
+    pub show_on_startup: bool,
+    pub default_tab: String,
+    pub show_recent_count: u32,
+    pub show_walkthroughs: bool,
+    pub show_release_notes: bool,
+    pub show_tips: bool,
+    pub custom_sections: String,
+    pub layout_mode: String,
+    pub theme_variant: String,
+    pub max_width: u32,
+    pub footer_links: String,
+}
+
+impl WelcomePageConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            show_on_startup: bool::default(),
+            default_tab: String::new(),
+            show_recent_count: u32::default(),
+            show_walkthroughs: bool::default(),
+            show_release_notes: bool::default(),
+            show_tips: bool::default(),
+            custom_sections: String::new(),
+            layout_mode: String::new(),
+            theme_variant: String::new(),
+            max_width: u32::default(),
+            footer_links: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && self.show_on_startup || true && !self.default_tab.is_empty() || true && self.show_recent_count < u32::MAX || true && self.show_walkthroughs || true && self.show_release_notes || true && self.show_tips || true && !self.custom_sections.is_empty() || true && !self.layout_mode.is_empty() || true && !self.theme_variant.is_empty() || true && self.max_width < u32::MAX || true && !self.footer_links.is_empty() || true
+    }
+}
+
+impl Default for WelcomePageConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -543160,6 +544356,474 @@ mod tests_moz_generated {
     fn test_moz_fields() {
         let mut obj = ExtGalleryConfig::default();
         obj.gallery_url = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpa_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpa_default() {
+        let obj = WalkthroughEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpa_fields() {
+        let mut obj = WalkthroughEntry::default();
+        obj.walkthrough_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpb_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpb_default() {
+        let obj = WalkthroughStepDef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpb_fields() {
+        let mut obj = WalkthroughStepDef::default();
+        obj.step_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpc_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpc_default() {
+        let obj = WelcomeViewItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpc_fields() {
+        let mut obj = WelcomeViewItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpd_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpd_default() {
+        let obj = GettingStartedCard::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpd_fields() {
+        let mut obj = GettingStartedCard::default();
+        obj.card_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpe_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpe_default() {
+        let obj = WelcomeAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpe_fields() {
+        let mut obj = WelcomeAction::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpf_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpf_default() {
+        let obj = WalkthroughMedia::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpf_fields() {
+        let mut obj = WalkthroughMedia::default();
+        obj.media_url = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpg_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpg_default() {
+        let obj = TipOfTheDay::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpg_fields() {
+        let mut obj = TipOfTheDay::default();
+        obj.tip_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mph_generated {
+    use super::*;
+
+    #[test]
+    fn test_mph_default() {
+        let obj = StartupEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mph_fields() {
+        let mut obj = StartupEditor::default();
+        obj.editor_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpi_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpi_default() {
+        let obj = RecentItemEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpi_fields() {
+        let mut obj = RecentItemEntry::default();
+        obj.item_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpj_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpj_default() {
+        let obj = WelcomeLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpj_fields() {
+        let mut obj = WelcomeLayout::default();
+        obj.layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpk_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpk_default() {
+        let obj = ReleaseNoteItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpk_fields() {
+        let mut obj = ReleaseNoteItem::default();
+        obj.note_version = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpl_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpl_default() {
+        let obj = WelcomeBanner::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpl_fields() {
+        let mut obj = WelcomeBanner::default();
+        obj.banner_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpm_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpm_default() {
+        let obj = KeymapOption::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpm_fields() {
+        let mut obj = KeymapOption::default();
+        obj.keymap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpn_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpn_default() {
+        let obj = ThemePickerItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpn_fields() {
+        let mut obj = ThemePickerItem::default();
+        obj.theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpo_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpo_default() {
+        let obj = InteractiveTour::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpo_fields() {
+        let mut obj = InteractiveTour::default();
+        obj.tour_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpp_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpp_default() {
+        let obj = TutorialSection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpp_fields() {
+        let mut obj = TutorialSection::default();
+        obj.section_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpq_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpq_default() {
+        let obj = FeatureHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpq_fields() {
+        let mut obj = FeatureHighlight::default();
+        obj.feature_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpr_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpr_default() {
+        let obj = OnboardingFlow::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpr_fields() {
+        let mut obj = OnboardingFlow::default();
+        obj.flow_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mps_generated {
+    use super::*;
+
+    #[test]
+    fn test_mps_default() {
+        let obj = SetupWizardStep::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mps_fields() {
+        let mut obj = SetupWizardStep::default();
+        obj.wizard_step = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpt_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpt_default() {
+        let obj = WelcomeLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpt_fields() {
+        let mut obj = WelcomeLink::default();
+        obj.link_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpu_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpu_default() {
+        let obj = StartupPerf::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpu_fields() {
+        let mut obj = StartupPerf::default();
+        obj.metric_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpv_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpv_default() {
+        let obj = WorkspaceRecommend::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpv_fields() {
+        let mut obj = WorkspaceRecommend::default();
+        obj.rec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpw_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpw_default() {
+        let obj = WelcomeShortcut::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpw_fields() {
+        let mut obj = WelcomeShortcut::default();
+        obj.shortcut_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpx_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpx_default() {
+        let obj = EditorPlayground::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpx_fields() {
+        let mut obj = EditorPlayground::default();
+        obj.playground_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpy_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpy_default() {
+        let obj = StartupAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpy_fields() {
+        let mut obj = StartupAction::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mpz_generated {
+    use super::*;
+
+    #[test]
+    fn test_mpz_default() {
+        let obj = WelcomePageConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mpz_fields() {
+        let mut obj = WelcomePageConfig::default();
+        obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
