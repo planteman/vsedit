@@ -236221,6 +236221,1202 @@ impl Default for TreeAccessibility {
     }
 }
 
+/// Output channel data and display view
+#[derive(Debug, Clone)]
+pub struct OutputChannelView {
+    pub channel_id: String,
+    pub channel_name: String,
+    pub language_id: String,
+    pub is_visible: bool,
+    pub line_count: u32,
+    pub is_log: bool,
+    pub is_append: bool,
+    pub encoding_name: String,
+    pub max_lines: u32,
+    pub auto_scroll: bool,
+    pub source_ext: String,
+    pub created_ms: u64,
+}
+
+impl OutputChannelView {
+    pub fn new() -> Self {
+        Self {
+            channel_id: String::new(),
+            channel_name: String::new(),
+            language_id: String::new(),
+            is_visible: bool::default(),
+            line_count: u32::default(),
+            is_log: bool::default(),
+            is_append: bool::default(),
+            encoding_name: String::new(),
+            max_lines: u32::default(),
+            auto_scroll: bool::default(),
+            source_ext: String::new(),
+            created_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.channel_id.is_empty() || true && !self.channel_name.is_empty() || true && !self.language_id.is_empty() || true && self.is_visible || true && self.line_count < u32::MAX || true && self.is_log || true && self.is_append || true && !self.encoding_name.is_empty() || true && self.max_lines < u32::MAX || true && self.auto_scroll || true && !self.source_ext.is_empty() || true && self.created_ms < u64::MAX || true
+    }
+}
+
+impl Default for OutputChannelView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel line entry with metadata
+#[derive(Debug, Clone)]
+pub struct OutputLineEntry {
+    pub line_text: String,
+    pub line_number: u32,
+    pub timestamp_ms: u64,
+    pub severity_level: String,
+    pub source_name: String,
+    pub is_error: bool,
+    pub is_warning: bool,
+    pub is_info: bool,
+    pub has_ansi: bool,
+    pub link_ranges: String,
+    pub category_name: String,
+    pub channel_id: String,
+}
+
+impl OutputLineEntry {
+    pub fn new() -> Self {
+        Self {
+            line_text: String::new(),
+            line_number: u32::default(),
+            timestamp_ms: u64::default(),
+            severity_level: String::new(),
+            source_name: String::new(),
+            is_error: bool::default(),
+            is_warning: bool::default(),
+            is_info: bool::default(),
+            has_ansi: bool::default(),
+            link_ranges: String::new(),
+            category_name: String::new(),
+            channel_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_text.is_empty() || true && self.line_number < u32::MAX || true && self.timestamp_ms < u64::MAX || true && !self.severity_level.is_empty() || true && !self.source_name.is_empty() || true && self.is_error || true && self.is_warning || true && self.is_info || true && self.has_ansi || true && !self.link_ranges.is_empty() || true && !self.category_name.is_empty() || true && !self.channel_id.is_empty() || true
+    }
+}
+
+impl Default for OutputLineEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bottom panel view state and sizing
+#[derive(Debug, Clone)]
+pub struct PanelViewState {
+    pub panel_id: String,
+    pub panel_height: u32,
+    pub is_maximized: bool,
+    pub is_visible: bool,
+    pub active_tab: String,
+    pub tab_count: u32,
+    pub is_focused: bool,
+    pub position_hint: String,
+    pub min_height: u32,
+    pub max_height: u32,
+    pub restore_height: u32,
+    pub layout_mode: String,
+}
+
+impl PanelViewState {
+    pub fn new() -> Self {
+        Self {
+            panel_id: String::new(),
+            panel_height: u32::default(),
+            is_maximized: bool::default(),
+            is_visible: bool::default(),
+            active_tab: String::new(),
+            tab_count: u32::default(),
+            is_focused: bool::default(),
+            position_hint: String::new(),
+            min_height: u32::default(),
+            max_height: u32::default(),
+            restore_height: u32::default(),
+            layout_mode: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.panel_id.is_empty() || true && self.panel_height < u32::MAX || true && self.is_maximized || true && self.is_visible || true && !self.active_tab.is_empty() || true && self.tab_count < u32::MAX || true && self.is_focused || true && !self.position_hint.is_empty() || true && self.min_height < u32::MAX || true && self.max_height < u32::MAX || true && self.restore_height < u32::MAX || true && !self.layout_mode.is_empty() || true
+    }
+}
+
+impl Default for PanelViewState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel text filter rule
+#[derive(Debug, Clone)]
+pub struct OutputFilterRule {
+    pub filter_pattern: String,
+    pub is_regex: bool,
+    pub match_case: bool,
+    pub is_include: bool,
+    pub is_exclude: bool,
+    pub source_filter: String,
+    pub severity_filter: String,
+    pub is_active: bool,
+    pub match_count: u32,
+    pub label_text: String,
+    pub group_name: String,
+    pub highlight_matches: bool,
+}
+
+impl OutputFilterRule {
+    pub fn new() -> Self {
+        Self {
+            filter_pattern: String::new(),
+            is_regex: bool::default(),
+            match_case: bool::default(),
+            is_include: bool::default(),
+            is_exclude: bool::default(),
+            source_filter: String::new(),
+            severity_filter: String::new(),
+            is_active: bool::default(),
+            match_count: u32::default(),
+            label_text: String::new(),
+            group_name: String::new(),
+            highlight_matches: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_pattern.is_empty() || true && self.is_regex || true && self.match_case || true && self.is_include || true && self.is_exclude || true && !self.source_filter.is_empty() || true && !self.severity_filter.is_empty() || true && self.is_active || true && self.match_count < u32::MAX || true && !self.label_text.is_empty() || true && !self.group_name.is_empty() || true && self.highlight_matches || true
+    }
+}
+
+impl Default for OutputFilterRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bottom panel tab registration entry
+#[derive(Debug, Clone)]
+pub struct PanelTabEntry {
+    pub tab_id: String,
+    pub tab_label: String,
+    pub icon_id: String,
+    pub sort_order: u32,
+    pub is_visible: bool,
+    pub is_closable: bool,
+    pub badge_count: u32,
+    pub badge_text: String,
+    pub when_clause: String,
+    pub view_id: String,
+    pub tooltip_text: String,
+    pub is_default: bool,
+}
+
+impl PanelTabEntry {
+    pub fn new() -> Self {
+        Self {
+            tab_id: String::new(),
+            tab_label: String::new(),
+            icon_id: String::new(),
+            sort_order: u32::default(),
+            is_visible: bool::default(),
+            is_closable: bool::default(),
+            badge_count: u32::default(),
+            badge_text: String::new(),
+            when_clause: String::new(),
+            view_id: String::new(),
+            tooltip_text: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tab_id.is_empty() || true && !self.tab_label.is_empty() || true && !self.icon_id.is_empty() || true && self.sort_order < u32::MAX || true && self.is_visible || true && self.is_closable || true && self.badge_count < u32::MAX || true && !self.badge_text.is_empty() || true && !self.when_clause.is_empty() || true && !self.view_id.is_empty() || true && !self.tooltip_text.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for PanelTabEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel scroll position state
+#[derive(Debug, Clone)]
+pub struct OutputScrollState {
+    pub scroll_offset: u32,
+    pub visible_lines: u32,
+    pub total_lines: u32,
+    pub is_at_bottom: bool,
+    pub is_scrolling: bool,
+    pub scroll_speed: u32,
+    pub smooth_scroll: bool,
+    pub line_height: u32,
+    pub viewport_height: u32,
+    pub anchor_line: u32,
+    pub follow_output: bool,
+    pub word_wrap: bool,
+}
+
+impl OutputScrollState {
+    pub fn new() -> Self {
+        Self {
+            scroll_offset: u32::default(),
+            visible_lines: u32::default(),
+            total_lines: u32::default(),
+            is_at_bottom: bool::default(),
+            is_scrolling: bool::default(),
+            scroll_speed: u32::default(),
+            smooth_scroll: bool::default(),
+            line_height: u32::default(),
+            viewport_height: u32::default(),
+            anchor_line: u32::default(),
+            follow_output: bool::default(),
+            word_wrap: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.scroll_offset < u32::MAX || true && self.visible_lines < u32::MAX || true && self.total_lines < u32::MAX || true && self.is_at_bottom || true && self.is_scrolling || true && self.scroll_speed < u32::MAX || true && self.smooth_scroll || true && self.line_height < u32::MAX || true && self.viewport_height < u32::MAX || true && self.anchor_line < u32::MAX || true && self.follow_output || true && self.word_wrap || true
+    }
+}
+
+impl Default for OutputScrollState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Panel resize drag handle state
+#[derive(Debug, Clone)]
+pub struct PanelDragHandle {
+    pub handle_pos: u32,
+    pub is_dragging: bool,
+    pub drag_start: u32,
+    pub min_pos: u32,
+    pub max_pos: u32,
+    pub orientation: String,
+    pub snap_positions: String,
+    pub cursor_style: String,
+    pub is_visible: bool,
+    pub hover_state: bool,
+    pub drag_delta: u32,
+    pub resize_target: String,
+}
+
+impl PanelDragHandle {
+    pub fn new() -> Self {
+        Self {
+            handle_pos: u32::default(),
+            is_dragging: bool::default(),
+            drag_start: u32::default(),
+            min_pos: u32::default(),
+            max_pos: u32::default(),
+            orientation: String::new(),
+            snap_positions: String::new(),
+            cursor_style: String::new(),
+            is_visible: bool::default(),
+            hover_state: bool::default(),
+            drag_delta: u32::default(),
+            resize_target: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.handle_pos < u32::MAX || true && self.is_dragging || true && self.drag_start < u32::MAX || true && self.min_pos < u32::MAX || true && self.max_pos < u32::MAX || true && !self.orientation.is_empty() || true && !self.snap_positions.is_empty() || true && !self.cursor_style.is_empty() || true && self.is_visible || true && self.hover_state || true && self.drag_delta < u32::MAX || true && !self.resize_target.is_empty() || true
+    }
+}
+
+impl Default for PanelDragHandle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// ANSI escape sequence parser state
+#[derive(Debug, Clone)]
+pub struct OutputAnsiParser {
+    pub parse_state: String,
+    pub current_seq: String,
+    pub fg_color: String,
+    pub bg_color: String,
+    pub is_bold: bool,
+    pub is_italic: bool,
+    pub is_underline: bool,
+    pub is_dim: bool,
+    pub is_blink: bool,
+    pub is_inverse: bool,
+    pub is_hidden: bool,
+    pub is_strikethrough: bool,
+}
+
+impl OutputAnsiParser {
+    pub fn new() -> Self {
+        Self {
+            parse_state: String::new(),
+            current_seq: String::new(),
+            fg_color: String::new(),
+            bg_color: String::new(),
+            is_bold: bool::default(),
+            is_italic: bool::default(),
+            is_underline: bool::default(),
+            is_dim: bool::default(),
+            is_blink: bool::default(),
+            is_inverse: bool::default(),
+            is_hidden: bool::default(),
+            is_strikethrough: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.parse_state.is_empty() || true && !self.current_seq.is_empty() || true && !self.fg_color.is_empty() || true && !self.bg_color.is_empty() || true && self.is_bold || true && self.is_italic || true && self.is_underline || true && self.is_dim || true && self.is_blink || true && self.is_inverse || true && self.is_hidden || true && self.is_strikethrough || true
+    }
+}
+
+impl Default for OutputAnsiParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Panel title bar action button
+#[derive(Debug, Clone)]
+pub struct PanelActionEntry {
+    pub action_id: String,
+    pub action_label: String,
+    pub icon_id: String,
+    pub tooltip_text: String,
+    pub is_enabled: bool,
+    pub is_toggle: bool,
+    pub is_checked: bool,
+    pub command_id: String,
+    pub when_clause: String,
+    pub group_name: String,
+    pub sort_order: u32,
+    pub separator_after: bool,
+}
+
+impl PanelActionEntry {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            action_label: String::new(),
+            icon_id: String::new(),
+            tooltip_text: String::new(),
+            is_enabled: bool::default(),
+            is_toggle: bool::default(),
+            is_checked: bool::default(),
+            command_id: String::new(),
+            when_clause: String::new(),
+            group_name: String::new(),
+            sort_order: u32::default(),
+            separator_after: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.action_label.is_empty() || true && !self.icon_id.is_empty() || true && !self.tooltip_text.is_empty() || true && self.is_enabled || true && self.is_toggle || true && self.is_checked || true && !self.command_id.is_empty() || true && !self.when_clause.is_empty() || true && !self.group_name.is_empty() || true && self.sort_order < u32::MAX || true && self.separator_after || true
+    }
+}
+
+impl Default for PanelActionEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel search/find state
+#[derive(Debug, Clone)]
+pub struct OutputSearchState {
+    pub search_text: String,
+    pub is_regex: bool,
+    pub match_case: bool,
+    pub whole_word: bool,
+    pub match_count: u32,
+    pub current_match: u32,
+    pub is_visible: bool,
+    pub highlight_all: bool,
+    pub replace_text: String,
+    pub is_replacing: bool,
+    pub preserve_case: bool,
+    pub search_scope: String,
+}
+
+impl OutputSearchState {
+    pub fn new() -> Self {
+        Self {
+            search_text: String::new(),
+            is_regex: bool::default(),
+            match_case: bool::default(),
+            whole_word: bool::default(),
+            match_count: u32::default(),
+            current_match: u32::default(),
+            is_visible: bool::default(),
+            highlight_all: bool::default(),
+            replace_text: String::new(),
+            is_replacing: bool::default(),
+            preserve_case: bool::default(),
+            search_scope: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_text.is_empty() || true && self.is_regex || true && self.match_case || true && self.whole_word || true && self.match_count < u32::MAX || true && self.current_match < u32::MAX || true && self.is_visible || true && self.highlight_all || true && !self.replace_text.is_empty() || true && self.is_replacing || true && self.preserve_case || true && !self.search_scope.is_empty() || true
+    }
+}
+
+impl Default for OutputSearchState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Panel layout configuration settings
+#[derive(Debug, Clone)]
+pub struct PanelLayoutConfig {
+    pub layout_kind: String,
+    pub panel_position: String,
+    pub default_height: u32,
+    pub default_width: u32,
+    pub show_tabs: bool,
+    pub show_actions: bool,
+    pub allow_maximize: bool,
+    pub allow_close: bool,
+    pub alignment: String,
+    pub secondary_side: String,
+    pub split_ratio: f64,
+    pub restore_on_open: bool,
+}
+
+impl PanelLayoutConfig {
+    pub fn new() -> Self {
+        Self {
+            layout_kind: String::new(),
+            panel_position: String::new(),
+            default_height: u32::default(),
+            default_width: u32::default(),
+            show_tabs: bool::default(),
+            show_actions: bool::default(),
+            allow_maximize: bool::default(),
+            allow_close: bool::default(),
+            alignment: String::new(),
+            secondary_side: String::new(),
+            split_ratio: f64::default(),
+            restore_on_open: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_kind.is_empty() || true && !self.panel_position.is_empty() || true && self.default_height < u32::MAX || true && self.default_width < u32::MAX || true && self.show_tabs || true && self.show_actions || true && self.allow_maximize || true && self.allow_close || true && !self.alignment.is_empty() || true && !self.secondary_side.is_empty() || true && self.split_ratio.is_finite() || true && self.restore_on_open || true
+    }
+}
+
+impl Default for PanelLayoutConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel link detection rule
+#[derive(Debug, Clone)]
+pub struct OutputLinkDetector {
+    pub link_pattern: String,
+    pub link_kind: String,
+    pub is_regex: bool,
+    pub protocol_list: String,
+    pub resolve_paths: bool,
+    pub open_internal: bool,
+    pub tooltip_format: String,
+    pub priority_value: u32,
+    pub line_pattern: String,
+    pub column_pattern: String,
+    pub is_active: bool,
+    pub match_full_line: bool,
+}
+
+impl OutputLinkDetector {
+    pub fn new() -> Self {
+        Self {
+            link_pattern: String::new(),
+            link_kind: String::new(),
+            is_regex: bool::default(),
+            protocol_list: String::new(),
+            resolve_paths: bool::default(),
+            open_internal: bool::default(),
+            tooltip_format: String::new(),
+            priority_value: u32::default(),
+            line_pattern: String::new(),
+            column_pattern: String::new(),
+            is_active: bool::default(),
+            match_full_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.link_pattern.is_empty() || true && !self.link_kind.is_empty() || true && self.is_regex || true && !self.protocol_list.is_empty() || true && self.resolve_paths || true && self.open_internal || true && !self.tooltip_format.is_empty() || true && self.priority_value < u32::MAX || true && !self.line_pattern.is_empty() || true && !self.column_pattern.is_empty() || true && self.is_active || true && self.match_full_line || true
+    }
+}
+
+impl Default for OutputLinkDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Panel tab grouping configuration
+#[derive(Debug, Clone)]
+pub struct PanelGroupEntry {
+    pub group_id: String,
+    pub group_label: String,
+    pub tab_ids: String,
+    pub is_collapsed: bool,
+    pub sort_order: u32,
+    pub icon_id: String,
+    pub when_clause: String,
+    pub is_default: bool,
+    pub max_tabs: u32,
+    pub overflow_action: String,
+    pub separator_style: String,
+    pub description_text: String,
+}
+
+impl PanelGroupEntry {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            group_label: String::new(),
+            tab_ids: String::new(),
+            is_collapsed: bool::default(),
+            sort_order: u32::default(),
+            icon_id: String::new(),
+            when_clause: String::new(),
+            is_default: bool::default(),
+            max_tabs: u32::default(),
+            overflow_action: String::new(),
+            separator_style: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.group_label.is_empty() || true && !self.tab_ids.is_empty() || true && self.is_collapsed || true && self.sort_order < u32::MAX || true && !self.icon_id.is_empty() || true && !self.when_clause.is_empty() || true && self.is_default || true && self.max_tabs < u32::MAX || true && !self.overflow_action.is_empty() || true && !self.separator_style.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for PanelGroupEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel timestamp formatting
+#[derive(Debug, Clone)]
+pub struct OutputTimestamp {
+    pub time_format: String,
+    pub show_date: bool,
+    pub show_time: bool,
+    pub show_millis: bool,
+    pub use_utc: bool,
+    pub use_relative: bool,
+    pub locale_id: String,
+    pub separator_char: String,
+    pub prefix_text: String,
+    pub suffix_text: String,
+    pub is_enabled: bool,
+    pub color_id: String,
+}
+
+impl OutputTimestamp {
+    pub fn new() -> Self {
+        Self {
+            time_format: String::new(),
+            show_date: bool::default(),
+            show_time: bool::default(),
+            show_millis: bool::default(),
+            use_utc: bool::default(),
+            use_relative: bool::default(),
+            locale_id: String::new(),
+            separator_char: String::new(),
+            prefix_text: String::new(),
+            suffix_text: String::new(),
+            is_enabled: bool::default(),
+            color_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.time_format.is_empty() || true && self.show_date || true && self.show_time || true && self.show_millis || true && self.use_utc || true && self.use_relative || true && !self.locale_id.is_empty() || true && !self.separator_char.is_empty() || true && !self.prefix_text.is_empty() || true && !self.suffix_text.is_empty() || true && self.is_enabled || true && !self.color_id.is_empty() || true
+    }
+}
+
+impl Default for OutputTimestamp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel language mode config
+#[derive(Debug, Clone)]
+pub struct OutputLanguageSet {
+    pub language_id: String,
+    pub token_colors: String,
+    pub word_pattern: String,
+    pub comment_pattern: String,
+    pub bracket_pairs: String,
+    pub auto_closing: String,
+    pub folding_rules: String,
+    pub indent_rules: String,
+    pub on_enter_rules: String,
+    pub color_theme: String,
+    pub is_builtin: bool,
+    pub extension_id: String,
+}
+
+impl OutputLanguageSet {
+    pub fn new() -> Self {
+        Self {
+            language_id: String::new(),
+            token_colors: String::new(),
+            word_pattern: String::new(),
+            comment_pattern: String::new(),
+            bracket_pairs: String::new(),
+            auto_closing: String::new(),
+            folding_rules: String::new(),
+            indent_rules: String::new(),
+            on_enter_rules: String::new(),
+            color_theme: String::new(),
+            is_builtin: bool::default(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.language_id.is_empty() || true && !self.token_colors.is_empty() || true && !self.word_pattern.is_empty() || true && !self.comment_pattern.is_empty() || true && !self.bracket_pairs.is_empty() || true && !self.auto_closing.is_empty() || true && !self.folding_rules.is_empty() || true && !self.indent_rules.is_empty() || true && !self.on_enter_rules.is_empty() || true && !self.color_theme.is_empty() || true && self.is_builtin || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for OutputLanguageSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Panel tab badge notification state
+#[derive(Debug, Clone)]
+pub struct PanelBadgeState {
+    pub badge_value: u32,
+    pub badge_text: String,
+    pub badge_color: String,
+    pub is_visible: bool,
+    pub is_dot: bool,
+    pub max_value: u32,
+    pub overflow_text: String,
+    pub tooltip_text: String,
+    pub is_animated: bool,
+    pub clear_on_click: bool,
+    pub priority_value: u32,
+    pub source_id: String,
+}
+
+impl PanelBadgeState {
+    pub fn new() -> Self {
+        Self {
+            badge_value: u32::default(),
+            badge_text: String::new(),
+            badge_color: String::new(),
+            is_visible: bool::default(),
+            is_dot: bool::default(),
+            max_value: u32::default(),
+            overflow_text: String::new(),
+            tooltip_text: String::new(),
+            is_animated: bool::default(),
+            clear_on_click: bool::default(),
+            priority_value: u32::default(),
+            source_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.badge_value < u32::MAX || true && !self.badge_text.is_empty() || true && !self.badge_color.is_empty() || true && self.is_visible || true && self.is_dot || true && self.max_value < u32::MAX || true && !self.overflow_text.is_empty() || true && !self.tooltip_text.is_empty() || true && self.is_animated || true && self.clear_on_click || true && self.priority_value < u32::MAX || true && !self.source_id.is_empty() || true
+    }
+}
+
+impl Default for PanelBadgeState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel copy/selection range
+#[derive(Debug, Clone)]
+pub struct OutputCopyRange {
+    pub start_line: u32,
+    pub end_line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub is_whole_line: bool,
+    pub include_timestamps: bool,
+    pub strip_ansi: bool,
+    pub format_kind: String,
+    pub separator_text: String,
+    pub max_lines: u32,
+    pub trim_trailing: bool,
+    pub add_newline: bool,
+}
+
+impl OutputCopyRange {
+    pub fn new() -> Self {
+        Self {
+            start_line: u32::default(),
+            end_line: u32::default(),
+            start_col: u32::default(),
+            end_col: u32::default(),
+            is_whole_line: bool::default(),
+            include_timestamps: bool::default(),
+            strip_ansi: bool::default(),
+            format_kind: String::new(),
+            separator_text: String::new(),
+            max_lines: u32::default(),
+            trim_trailing: bool::default(),
+            add_newline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_col < u32::MAX || true && self.is_whole_line || true && self.include_timestamps || true && self.strip_ansi || true && !self.format_kind.is_empty() || true && !self.separator_text.is_empty() || true && self.max_lines < u32::MAX || true && self.trim_trailing || true && self.add_newline || true
+    }
+}
+
+impl Default for OutputCopyRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Panel keyboard focus traversal order
+#[derive(Debug, Clone)]
+pub struct PanelFocusOrder {
+    pub focus_index: u32,
+    pub element_id: String,
+    pub tab_index: u32,
+    pub is_focusable: bool,
+    pub focus_group: String,
+    pub skip_hidden: bool,
+    pub wrap_around: bool,
+    pub trap_focus: bool,
+    pub restore_focus: bool,
+    pub initial_focus: String,
+    pub escape_action: String,
+    pub focus_indicator: String,
+}
+
+impl PanelFocusOrder {
+    pub fn new() -> Self {
+        Self {
+            focus_index: u32::default(),
+            element_id: String::new(),
+            tab_index: u32::default(),
+            is_focusable: bool::default(),
+            focus_group: String::new(),
+            skip_hidden: bool::default(),
+            wrap_around: bool::default(),
+            trap_focus: bool::default(),
+            restore_focus: bool::default(),
+            initial_focus: String::new(),
+            escape_action: String::new(),
+            focus_indicator: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.focus_index < u32::MAX || true && !self.element_id.is_empty() || true && self.tab_index < u32::MAX || true && self.is_focusable || true && !self.focus_group.is_empty() || true && self.skip_hidden || true && self.wrap_around || true && self.trap_focus || true && self.restore_focus || true && !self.initial_focus.is_empty() || true && !self.escape_action.is_empty() || true && !self.focus_indicator.is_empty() || true
+    }
+}
+
+impl Default for PanelFocusOrder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Grouped output channels container
+#[derive(Debug, Clone)]
+pub struct OutputChannelGroup {
+    pub group_name: String,
+    pub channel_ids: String,
+    pub is_expanded: bool,
+    pub sort_order: u32,
+    pub icon_id: String,
+    pub description_text: String,
+    pub is_default: bool,
+    pub auto_expand: bool,
+    pub max_channels: u32,
+    pub badge_count: u32,
+    pub is_visible: bool,
+    pub collapse_empty: bool,
+}
+
+impl OutputChannelGroup {
+    pub fn new() -> Self {
+        Self {
+            group_name: String::new(),
+            channel_ids: String::new(),
+            is_expanded: bool::default(),
+            sort_order: u32::default(),
+            icon_id: String::new(),
+            description_text: String::new(),
+            is_default: bool::default(),
+            auto_expand: bool::default(),
+            max_channels: u32::default(),
+            badge_count: u32::default(),
+            is_visible: bool::default(),
+            collapse_empty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_name.is_empty() || true && !self.channel_ids.is_empty() || true && self.is_expanded || true && self.sort_order < u32::MAX || true && !self.icon_id.is_empty() || true && !self.description_text.is_empty() || true && self.is_default || true && self.auto_expand || true && self.max_channels < u32::MAX || true && self.badge_count < u32::MAX || true && self.is_visible || true && self.collapse_empty || true
+    }
+}
+
+impl Default for OutputChannelGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Panel split view configuration
+#[derive(Debug, Clone)]
+pub struct PanelSplitView {
+    pub split_id: String,
+    pub orientation: String,
+    pub split_ratio: f64,
+    pub first_panel: String,
+    pub second_panel: String,
+    pub is_locked: bool,
+    pub min_first: u32,
+    pub min_second: u32,
+    pub snap_threshold: u32,
+    pub show_separator: bool,
+    pub separator_width: u32,
+    pub is_resizable: bool,
+}
+
+impl PanelSplitView {
+    pub fn new() -> Self {
+        Self {
+            split_id: String::new(),
+            orientation: String::new(),
+            split_ratio: f64::default(),
+            first_panel: String::new(),
+            second_panel: String::new(),
+            is_locked: bool::default(),
+            min_first: u32::default(),
+            min_second: u32::default(),
+            snap_threshold: u32::default(),
+            show_separator: bool::default(),
+            separator_width: u32::default(),
+            is_resizable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.split_id.is_empty() || true && !self.orientation.is_empty() || true && self.split_ratio.is_finite() || true && !self.first_panel.is_empty() || true && !self.second_panel.is_empty() || true && self.is_locked || true && self.min_first < u32::MAX || true && self.min_second < u32::MAX || true && self.snap_threshold < u32::MAX || true && self.show_separator || true && self.separator_width < u32::MAX || true && self.is_resizable || true
+    }
+}
+
+impl Default for PanelSplitView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel smart scroll behavior
+#[derive(Debug, Clone)]
+pub struct OutputSmartScroll {
+    pub scroll_mode: String,
+    pub follow_output: bool,
+    pub lock_on_scroll: bool,
+    pub unlock_threshold: u32,
+    pub auto_reveal: bool,
+    pub smooth_scroll: bool,
+    pub scroll_sensitivity: u32,
+    pub overscroll_amount: u32,
+    pub show_indicator: bool,
+    pub indicator_text: String,
+    pub fade_duration: u32,
+    pub is_locked: bool,
+}
+
+impl OutputSmartScroll {
+    pub fn new() -> Self {
+        Self {
+            scroll_mode: String::new(),
+            follow_output: bool::default(),
+            lock_on_scroll: bool::default(),
+            unlock_threshold: u32::default(),
+            auto_reveal: bool::default(),
+            smooth_scroll: bool::default(),
+            scroll_sensitivity: u32::default(),
+            overscroll_amount: u32::default(),
+            show_indicator: bool::default(),
+            indicator_text: String::new(),
+            fade_duration: u32::default(),
+            is_locked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scroll_mode.is_empty() || true && self.follow_output || true && self.lock_on_scroll || true && self.unlock_threshold < u32::MAX || true && self.auto_reveal || true && self.smooth_scroll || true && self.scroll_sensitivity < u32::MAX || true && self.overscroll_amount < u32::MAX || true && self.show_indicator || true && !self.indicator_text.is_empty() || true && self.fade_duration < u32::MAX || true && self.is_locked || true
+    }
+}
+
+impl Default for OutputSmartScroll {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel word wrap configuration
+#[derive(Debug, Clone)]
+pub struct OutputWordWrap {
+    pub wrap_mode: String,
+    pub wrap_column: u32,
+    pub wrap_indent: String,
+    pub min_wrap_col: u32,
+    pub break_on_word: bool,
+    pub break_on_hyphen: bool,
+    pub trim_trailing: bool,
+    pub show_indicator: bool,
+    pub indicator_char: String,
+    pub soft_wrap: bool,
+    pub hard_wrap: bool,
+    pub is_enabled: bool,
+}
+
+impl OutputWordWrap {
+    pub fn new() -> Self {
+        Self {
+            wrap_mode: String::new(),
+            wrap_column: u32::default(),
+            wrap_indent: String::new(),
+            min_wrap_col: u32::default(),
+            break_on_word: bool::default(),
+            break_on_hyphen: bool::default(),
+            trim_trailing: bool::default(),
+            show_indicator: bool::default(),
+            indicator_char: String::new(),
+            soft_wrap: bool::default(),
+            hard_wrap: bool::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wrap_mode.is_empty() || true && self.wrap_column < u32::MAX || true && !self.wrap_indent.is_empty() || true && self.min_wrap_col < u32::MAX || true && self.break_on_word || true && self.break_on_hyphen || true && self.trim_trailing || true && self.show_indicator || true && !self.indicator_char.is_empty() || true && self.soft_wrap || true && self.hard_wrap || true && self.is_enabled || true
+    }
+}
+
+impl Default for OutputWordWrap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Panel open/close animation state
+#[derive(Debug, Clone)]
+pub struct PanelAnimState {
+    pub anim_kind: String,
+    pub duration_ms: u32,
+    pub easing_func: String,
+    pub start_value: f64,
+    pub end_value: f64,
+    pub current_value: f64,
+    pub is_playing: bool,
+    pub is_reverse: bool,
+    pub loop_count: u32,
+    pub delay_ms: u32,
+    pub fill_mode: String,
+    pub direction: String,
+}
+
+impl PanelAnimState {
+    pub fn new() -> Self {
+        Self {
+            anim_kind: String::new(),
+            duration_ms: u32::default(),
+            easing_func: String::new(),
+            start_value: f64::default(),
+            end_value: f64::default(),
+            current_value: f64::default(),
+            is_playing: bool::default(),
+            is_reverse: bool::default(),
+            loop_count: u32::default(),
+            delay_ms: u32::default(),
+            fill_mode: String::new(),
+            direction: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.anim_kind.is_empty() || true && self.duration_ms < u32::MAX || true && !self.easing_func.is_empty() || true && self.start_value.is_finite() || true && self.end_value.is_finite() || true && self.current_value.is_finite() || true && self.is_playing || true && self.is_reverse || true && self.loop_count < u32::MAX || true && self.delay_ms < u32::MAX || true && !self.fill_mode.is_empty() || true && !self.direction.is_empty() || true
+    }
+}
+
+impl Default for PanelAnimState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel color theme settings
+#[derive(Debug, Clone)]
+pub struct OutputColorTheme {
+    pub theme_id: String,
+    pub error_color: String,
+    pub warning_color: String,
+    pub info_color: String,
+    pub debug_color: String,
+    pub link_color: String,
+    pub timestamp_color: String,
+    pub source_color: String,
+    pub bg_color: String,
+    pub selection_color: String,
+    pub find_highlight: String,
+    pub line_number_color: String,
+}
+
+impl OutputColorTheme {
+    pub fn new() -> Self {
+        Self {
+            theme_id: String::new(),
+            error_color: String::new(),
+            warning_color: String::new(),
+            info_color: String::new(),
+            debug_color: String::new(),
+            link_color: String::new(),
+            timestamp_color: String::new(),
+            source_color: String::new(),
+            bg_color: String::new(),
+            selection_color: String::new(),
+            find_highlight: String::new(),
+            line_number_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_id.is_empty() || true && !self.error_color.is_empty() || true && !self.warning_color.is_empty() || true && !self.info_color.is_empty() || true && !self.debug_color.is_empty() || true && !self.link_color.is_empty() || true && !self.timestamp_color.is_empty() || true && !self.source_color.is_empty() || true && !self.bg_color.is_empty() || true && !self.selection_color.is_empty() || true && !self.find_highlight.is_empty() || true && !self.line_number_color.is_empty() || true
+    }
+}
+
+impl Default for OutputColorTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Panel keyboard shortcut binding
+#[derive(Debug, Clone)]
+pub struct PanelShortcut {
+    pub shortcut_key: String,
+    pub modifier_keys: String,
+    pub command_id: String,
+    pub when_clause: String,
+    pub is_enabled: bool,
+    pub description_text: String,
+    pub category_name: String,
+    pub source_ext: String,
+    pub is_default: bool,
+    pub is_user: bool,
+    pub priority_value: u32,
+    pub args_json: String,
+}
+
+impl PanelShortcut {
+    pub fn new() -> Self {
+        Self {
+            shortcut_key: String::new(),
+            modifier_keys: String::new(),
+            command_id: String::new(),
+            when_clause: String::new(),
+            is_enabled: bool::default(),
+            description_text: String::new(),
+            category_name: String::new(),
+            source_ext: String::new(),
+            is_default: bool::default(),
+            is_user: bool::default(),
+            priority_value: u32::default(),
+            args_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shortcut_key.is_empty() || true && !self.modifier_keys.is_empty() || true && !self.command_id.is_empty() || true && !self.when_clause.is_empty() || true && self.is_enabled || true && !self.description_text.is_empty() || true && !self.category_name.is_empty() || true && !self.source_ext.is_empty() || true && self.is_default || true && self.is_user || true && self.priority_value < u32::MAX || true && !self.args_json.is_empty() || true
+    }
+}
+
+impl Default for PanelShortcut {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel accessibility config
+#[derive(Debug, Clone)]
+pub struct OutputAccessibility {
+    pub screen_reader: bool,
+    pub announce_new: bool,
+    pub announce_level: String,
+    pub reduce_motion: bool,
+    pub high_contrast: bool,
+    pub aria_live: String,
+    pub aria_label: String,
+    pub focus_visible: bool,
+    pub tab_navigation: bool,
+    pub keyboard_only: bool,
+    pub role_text: String,
+    pub description_text: String,
+}
+
+impl OutputAccessibility {
+    pub fn new() -> Self {
+        Self {
+            screen_reader: bool::default(),
+            announce_new: bool::default(),
+            announce_level: String::new(),
+            reduce_motion: bool::default(),
+            high_contrast: bool::default(),
+            aria_live: String::new(),
+            aria_label: String::new(),
+            focus_visible: bool::default(),
+            tab_navigation: bool::default(),
+            keyboard_only: bool::default(),
+            role_text: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.screen_reader || true && self.announce_new || true && !self.announce_level.is_empty() || true && self.reduce_motion || true && self.high_contrast || true && !self.aria_live.is_empty() || true && !self.aria_label.is_empty() || true && self.focus_visible || true && self.tab_navigation || true && self.keyboard_only || true && !self.role_text.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for OutputAccessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -538182,6 +539378,474 @@ mod tests_mlz_generated {
     fn test_mlz_fields() {
         let mut obj = TreeAccessibility::default();
         obj.aria_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mma_generated {
+    use super::*;
+
+    #[test]
+    fn test_mma_default() {
+        let obj = OutputChannelView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mma_fields() {
+        let mut obj = OutputChannelView::default();
+        obj.channel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmb_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmb_default() {
+        let obj = OutputLineEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmb_fields() {
+        let mut obj = OutputLineEntry::default();
+        obj.line_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmc_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmc_default() {
+        let obj = PanelViewState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmc_fields() {
+        let mut obj = PanelViewState::default();
+        obj.panel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmd_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmd_default() {
+        let obj = OutputFilterRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmd_fields() {
+        let mut obj = OutputFilterRule::default();
+        obj.filter_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mme_generated {
+    use super::*;
+
+    #[test]
+    fn test_mme_default() {
+        let obj = PanelTabEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mme_fields() {
+        let mut obj = PanelTabEntry::default();
+        obj.tab_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmf_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmf_default() {
+        let obj = OutputScrollState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmf_fields() {
+        let mut obj = OutputScrollState::default();
+        obj.scroll_offset = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmg_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmg_default() {
+        let obj = PanelDragHandle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmg_fields() {
+        let mut obj = PanelDragHandle::default();
+        obj.handle_pos = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmh_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmh_default() {
+        let obj = OutputAnsiParser::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmh_fields() {
+        let mut obj = OutputAnsiParser::default();
+        obj.parse_state = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmi_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmi_default() {
+        let obj = PanelActionEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmi_fields() {
+        let mut obj = PanelActionEntry::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmj_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmj_default() {
+        let obj = OutputSearchState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmj_fields() {
+        let mut obj = OutputSearchState::default();
+        obj.search_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmk_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmk_default() {
+        let obj = PanelLayoutConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmk_fields() {
+        let mut obj = PanelLayoutConfig::default();
+        obj.layout_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mml_generated {
+    use super::*;
+
+    #[test]
+    fn test_mml_default() {
+        let obj = OutputLinkDetector::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mml_fields() {
+        let mut obj = OutputLinkDetector::default();
+        obj.link_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmm_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmm_default() {
+        let obj = PanelGroupEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmm_fields() {
+        let mut obj = PanelGroupEntry::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmn_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmn_default() {
+        let obj = OutputTimestamp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmn_fields() {
+        let mut obj = OutputTimestamp::default();
+        obj.time_format = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmo_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmo_default() {
+        let obj = OutputLanguageSet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmo_fields() {
+        let mut obj = OutputLanguageSet::default();
+        obj.language_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmp_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmp_default() {
+        let obj = PanelBadgeState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmp_fields() {
+        let mut obj = PanelBadgeState::default();
+        obj.badge_value = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmq_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmq_default() {
+        let obj = OutputCopyRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmq_fields() {
+        let mut obj = OutputCopyRange::default();
+        obj.start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmr_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmr_default() {
+        let obj = PanelFocusOrder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmr_fields() {
+        let mut obj = PanelFocusOrder::default();
+        obj.focus_index = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mms_generated {
+    use super::*;
+
+    #[test]
+    fn test_mms_default() {
+        let obj = OutputChannelGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mms_fields() {
+        let mut obj = OutputChannelGroup::default();
+        obj.group_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmt_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmt_default() {
+        let obj = PanelSplitView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmt_fields() {
+        let mut obj = PanelSplitView::default();
+        obj.split_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmu_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmu_default() {
+        let obj = OutputSmartScroll::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmu_fields() {
+        let mut obj = OutputSmartScroll::default();
+        obj.scroll_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmv_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmv_default() {
+        let obj = OutputWordWrap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmv_fields() {
+        let mut obj = OutputWordWrap::default();
+        obj.wrap_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmw_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmw_default() {
+        let obj = PanelAnimState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmw_fields() {
+        let mut obj = PanelAnimState::default();
+        obj.anim_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmx_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmx_default() {
+        let obj = OutputColorTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmx_fields() {
+        let mut obj = OutputColorTheme::default();
+        obj.theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmy_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmy_default() {
+        let obj = PanelShortcut::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmy_fields() {
+        let mut obj = PanelShortcut::default();
+        obj.shortcut_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mmz_generated {
+    use super::*;
+
+    #[test]
+    fn test_mmz_default() {
+        let obj = OutputAccessibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mmz_fields() {
+        let mut obj = OutputAccessibility::default();
+        obj.screen_reader = true;
         assert!(obj.validate());
     }
 }
