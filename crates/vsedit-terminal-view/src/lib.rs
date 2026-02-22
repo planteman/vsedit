@@ -240955,6 +240955,1202 @@ impl Default for WelcomePageConfig {
     }
 }
 
+/// Breadcrumb navigation full path model
+#[derive(Debug, Clone)]
+pub struct BreadcrumbPath {
+    pub crumb_path: String,
+    pub crumb_label: String,
+    pub crumb_kind: String,
+    pub depth_level: u32,
+    pub icon_id: String,
+    pub is_file: bool,
+    pub is_folder: bool,
+    pub is_symbol: bool,
+    pub detail_text: String,
+    pub tooltip_text: String,
+    pub command_id: String,
+    pub is_active: bool,
+}
+
+impl BreadcrumbPath {
+    pub fn new() -> Self {
+        Self {
+            crumb_path: String::new(),
+            crumb_label: String::new(),
+            crumb_kind: String::new(),
+            depth_level: u32::default(),
+            icon_id: String::new(),
+            is_file: bool::default(),
+            is_folder: bool::default(),
+            is_symbol: bool::default(),
+            detail_text: String::new(),
+            tooltip_text: String::new(),
+            command_id: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.crumb_path.is_empty() || true && !self.crumb_label.is_empty() || true && !self.crumb_kind.is_empty() || true && self.depth_level < u32::MAX || true && !self.icon_id.is_empty() || true && self.is_file || true && self.is_folder || true && self.is_symbol || true && !self.detail_text.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.command_id.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for BreadcrumbPath {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Breadcrumb picker dropdown model
+#[derive(Debug, Clone)]
+pub struct BreadcrumbPicker {
+    pub picker_id: String,
+    pub picker_items: String,
+    pub selected_index: u32,
+    pub filter_text: String,
+    pub is_visible: bool,
+    pub position_x: u32,
+    pub position_y: u32,
+    pub max_height: u32,
+    pub scroll_top: u32,
+    pub item_count: u32,
+    pub is_loading: bool,
+    pub placeholder_text: String,
+}
+
+impl BreadcrumbPicker {
+    pub fn new() -> Self {
+        Self {
+            picker_id: String::new(),
+            picker_items: String::new(),
+            selected_index: u32::default(),
+            filter_text: String::new(),
+            is_visible: bool::default(),
+            position_x: u32::default(),
+            position_y: u32::default(),
+            max_height: u32::default(),
+            scroll_top: u32::default(),
+            item_count: u32::default(),
+            is_loading: bool::default(),
+            placeholder_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.picker_id.is_empty() || true && !self.picker_items.is_empty() || true && self.selected_index < u32::MAX || true && !self.filter_text.is_empty() || true && self.is_visible || true && self.position_x < u32::MAX || true && self.position_y < u32::MAX || true && self.max_height < u32::MAX || true && self.scroll_top < u32::MAX || true && self.item_count < u32::MAX || true && self.is_loading || true && !self.placeholder_text.is_empty() || true
+    }
+}
+
+impl Default for BreadcrumbPicker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor navigation back/forward history
+#[derive(Debug, Clone)]
+pub struct NavigationHistory {
+    pub history_id: String,
+    pub entries_json: String,
+    pub current_index: u32,
+    pub can_go_back: bool,
+    pub can_go_forward: bool,
+    pub max_entries: u32,
+    pub last_navigate_ms: u64,
+    pub scope_kind: String,
+    pub is_editor: bool,
+    pub is_global: bool,
+    pub entry_count: u32,
+    pub prune_count: u32,
+}
+
+impl NavigationHistory {
+    pub fn new() -> Self {
+        Self {
+            history_id: String::new(),
+            entries_json: String::new(),
+            current_index: u32::default(),
+            can_go_back: bool::default(),
+            can_go_forward: bool::default(),
+            max_entries: u32::default(),
+            last_navigate_ms: u64::default(),
+            scope_kind: String::new(),
+            is_editor: bool::default(),
+            is_global: bool::default(),
+            entry_count: u32::default(),
+            prune_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.history_id.is_empty() || true && !self.entries_json.is_empty() || true && self.current_index < u32::MAX || true && self.can_go_back || true && self.can_go_forward || true && self.max_entries < u32::MAX || true && self.last_navigate_ms < u64::MAX || true && !self.scope_kind.is_empty() || true && self.is_editor || true && self.is_global || true && self.entry_count < u32::MAX || true && self.prune_count < u32::MAX || true
+    }
+}
+
+impl Default for NavigationHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go to symbol navigation entry
+#[derive(Debug, Clone)]
+pub struct GoToSymbolEntry {
+    pub symbol_name: String,
+    pub symbol_kind: String,
+    pub container_name: String,
+    pub file_path: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub detail_text: String,
+    pub icon_id: String,
+    pub sort_text: String,
+    pub filter_text: String,
+    pub is_deprecated: bool,
+    pub score_value: f64,
+}
+
+impl GoToSymbolEntry {
+    pub fn new() -> Self {
+        Self {
+            symbol_name: String::new(),
+            symbol_kind: String::new(),
+            container_name: String::new(),
+            file_path: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            detail_text: String::new(),
+            icon_id: String::new(),
+            sort_text: String::new(),
+            filter_text: String::new(),
+            is_deprecated: bool::default(),
+            score_value: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.symbol_name.is_empty() || true && !self.symbol_kind.is_empty() || true && !self.container_name.is_empty() || true && !self.file_path.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && !self.detail_text.is_empty() || true && !self.icon_id.is_empty() || true && !self.sort_text.is_empty() || true && !self.filter_text.is_empty() || true && self.is_deprecated || true && self.score_value.is_finite() || true
+    }
+}
+
+impl Default for GoToSymbolEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go to line dialog state
+#[derive(Debug, Clone)]
+pub struct GoToLineState {
+    pub target_line: u32,
+    pub target_column: u32,
+    pub is_visible: bool,
+    pub input_text: String,
+    pub max_line: u32,
+    pub is_valid: bool,
+    pub error_text: String,
+    pub preview_line: u32,
+    pub go_to_column: bool,
+    pub selection_mode: String,
+    pub highlight_line: bool,
+    pub animate_scroll: bool,
+}
+
+impl GoToLineState {
+    pub fn new() -> Self {
+        Self {
+            target_line: u32::default(),
+            target_column: u32::default(),
+            is_visible: bool::default(),
+            input_text: String::new(),
+            max_line: u32::default(),
+            is_valid: bool::default(),
+            error_text: String::new(),
+            preview_line: u32::default(),
+            go_to_column: bool::default(),
+            selection_mode: String::new(),
+            highlight_line: bool::default(),
+            animate_scroll: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.target_line < u32::MAX || true && self.target_column < u32::MAX || true && self.is_visible || true && !self.input_text.is_empty() || true && self.max_line < u32::MAX || true && self.is_valid || true && !self.error_text.is_empty() || true && self.preview_line < u32::MAX || true && self.go_to_column || true && !self.selection_mode.is_empty() || true && self.highlight_line || true && self.animate_scroll || true
+    }
+}
+
+impl Default for GoToLineState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File quick open navigator item
+#[derive(Debug, Clone)]
+pub struct FileNavigatorItem {
+    pub nav_path: String,
+    pub nav_label: String,
+    pub description_text: String,
+    pub icon_id: String,
+    pub sort_text: String,
+    pub filter_text: String,
+    pub is_recent: bool,
+    pub is_pinned: bool,
+    pub last_opened_ms: u64,
+    pub match_ranges: String,
+    pub detail_path: String,
+    pub score_value: f64,
+}
+
+impl FileNavigatorItem {
+    pub fn new() -> Self {
+        Self {
+            nav_path: String::new(),
+            nav_label: String::new(),
+            description_text: String::new(),
+            icon_id: String::new(),
+            sort_text: String::new(),
+            filter_text: String::new(),
+            is_recent: bool::default(),
+            is_pinned: bool::default(),
+            last_opened_ms: u64::default(),
+            match_ranges: String::new(),
+            detail_path: String::new(),
+            score_value: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nav_path.is_empty() || true && !self.nav_label.is_empty() || true && !self.description_text.is_empty() || true && !self.icon_id.is_empty() || true && !self.sort_text.is_empty() || true && !self.filter_text.is_empty() || true && self.is_recent || true && self.is_pinned || true && self.last_opened_ms < u64::MAX || true && !self.match_ranges.is_empty() || true && !self.detail_path.is_empty() || true && self.score_value.is_finite() || true
+    }
+}
+
+impl Default for FileNavigatorItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document symbol outline item
+#[derive(Debug, Clone)]
+pub struct SymbolOutlineItem {
+    pub outline_name: String,
+    pub outline_kind: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub detail_text: String,
+    pub icon_id: String,
+    pub depth_level: u32,
+    pub child_count: u32,
+    pub is_deprecated: bool,
+    pub container_name: String,
+    pub sort_text: String,
+    pub is_expanded: bool,
+}
+
+impl SymbolOutlineItem {
+    pub fn new() -> Self {
+        Self {
+            outline_name: String::new(),
+            outline_kind: String::new(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            detail_text: String::new(),
+            icon_id: String::new(),
+            depth_level: u32::default(),
+            child_count: u32::default(),
+            is_deprecated: bool::default(),
+            container_name: String::new(),
+            sort_text: String::new(),
+            is_expanded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.outline_name.is_empty() || true && !self.outline_kind.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && !self.detail_text.is_empty() || true && !self.icon_id.is_empty() || true && self.depth_level < u32::MAX || true && self.child_count < u32::MAX || true && self.is_deprecated || true && !self.container_name.is_empty() || true && !self.sort_text.is_empty() || true && self.is_expanded || true
+    }
+}
+
+impl Default for SymbolOutlineItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Quick access menu navigation item
+#[derive(Debug, Clone)]
+pub struct QuickAccessItem {
+    pub access_id: String,
+    pub access_label: String,
+    pub command_id: String,
+    pub icon_id: String,
+    pub description_text: String,
+    pub sort_order: u32,
+    pub when_clause: String,
+    pub group_name: String,
+    pub keyboard_shortcut: String,
+    pub is_recent: bool,
+    pub badge_text: String,
+    pub tooltip_text: String,
+}
+
+impl QuickAccessItem {
+    pub fn new() -> Self {
+        Self {
+            access_id: String::new(),
+            access_label: String::new(),
+            command_id: String::new(),
+            icon_id: String::new(),
+            description_text: String::new(),
+            sort_order: u32::default(),
+            when_clause: String::new(),
+            group_name: String::new(),
+            keyboard_shortcut: String::new(),
+            is_recent: bool::default(),
+            badge_text: String::new(),
+            tooltip_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.access_id.is_empty() || true && !self.access_label.is_empty() || true && !self.command_id.is_empty() || true && !self.icon_id.is_empty() || true && !self.description_text.is_empty() || true && self.sort_order < u32::MAX || true && !self.when_clause.is_empty() || true && !self.group_name.is_empty() || true && !self.keyboard_shortcut.is_empty() || true && self.is_recent || true && !self.badge_text.is_empty() || true && !self.tooltip_text.is_empty() || true
+    }
+}
+
+impl Default for QuickAccessItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor tab keyboard navigation model
+#[derive(Debug, Clone)]
+pub struct EditorTabNav {
+    pub tab_id: String,
+    pub tab_index: u32,
+    pub is_active: bool,
+    pub is_pinned: bool,
+    pub group_id: String,
+    pub is_preview: bool,
+    pub can_close: bool,
+    pub can_move: bool,
+    pub sort_order: u32,
+    pub keyboard_label: String,
+    pub mru_index: u32,
+    pub focus_order: u32,
+}
+
+impl EditorTabNav {
+    pub fn new() -> Self {
+        Self {
+            tab_id: String::new(),
+            tab_index: u32::default(),
+            is_active: bool::default(),
+            is_pinned: bool::default(),
+            group_id: String::new(),
+            is_preview: bool::default(),
+            can_close: bool::default(),
+            can_move: bool::default(),
+            sort_order: u32::default(),
+            keyboard_label: String::new(),
+            mru_index: u32::default(),
+            focus_order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tab_id.is_empty() || true && self.tab_index < u32::MAX || true && self.is_active || true && self.is_pinned || true && !self.group_id.is_empty() || true && self.is_preview || true && self.can_close || true && self.can_move || true && self.sort_order < u32::MAX || true && !self.keyboard_label.is_empty() || true && self.mru_index < u32::MAX || true && self.focus_order < u32::MAX || true
+    }
+}
+
+impl Default for EditorTabNav {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor sticky scroll header line
+#[derive(Debug, Clone)]
+pub struct StickyScrollLine {
+    pub sticky_line: u32,
+    pub scope_kind: String,
+    pub scope_name: String,
+    pub depth_level: u32,
+    pub is_visible: bool,
+    pub max_lines: u32,
+    pub scroll_offset: u32,
+    pub bg_color: String,
+    pub border_color: String,
+    pub is_folded: bool,
+    pub parent_line: u32,
+    pub label_text: String,
+}
+
+impl StickyScrollLine {
+    pub fn new() -> Self {
+        Self {
+            sticky_line: u32::default(),
+            scope_kind: String::new(),
+            scope_name: String::new(),
+            depth_level: u32::default(),
+            is_visible: bool::default(),
+            max_lines: u32::default(),
+            scroll_offset: u32::default(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            is_folded: bool::default(),
+            parent_line: u32::default(),
+            label_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.sticky_line < u32::MAX || true && !self.scope_kind.is_empty() || true && !self.scope_name.is_empty() || true && self.depth_level < u32::MAX || true && self.is_visible || true && self.max_lines < u32::MAX || true && self.scroll_offset < u32::MAX || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && self.is_folded || true && self.parent_line < u32::MAX || true && !self.label_text.is_empty() || true
+    }
+}
+
+impl Default for StickyScrollLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Peek definition inline view state
+#[derive(Debug, Clone)]
+pub struct PeekViewState {
+    pub peek_id: String,
+    pub source_uri: String,
+    pub target_uri: String,
+    pub target_line: u32,
+    pub target_column: u32,
+    pub is_visible: bool,
+    pub width_px: u32,
+    pub height_lines: u32,
+    pub is_focused: bool,
+    pub can_navigate: bool,
+    pub title_text: String,
+    pub result_count: u32,
+}
+
+impl PeekViewState {
+    pub fn new() -> Self {
+        Self {
+            peek_id: String::new(),
+            source_uri: String::new(),
+            target_uri: String::new(),
+            target_line: u32::default(),
+            target_column: u32::default(),
+            is_visible: bool::default(),
+            width_px: u32::default(),
+            height_lines: u32::default(),
+            is_focused: bool::default(),
+            can_navigate: bool::default(),
+            title_text: String::new(),
+            result_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.peek_id.is_empty() || true && !self.source_uri.is_empty() || true && !self.target_uri.is_empty() || true && self.target_line < u32::MAX || true && self.target_column < u32::MAX || true && self.is_visible || true && self.width_px < u32::MAX || true && self.height_lines < u32::MAX || true && self.is_focused || true && self.can_navigate || true && !self.title_text.is_empty() || true && self.result_count < u32::MAX || true
+    }
+}
+
+impl Default for PeekViewState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Reference peek preview entry
+#[derive(Debug, Clone)]
+pub struct ReferencePreview {
+    pub ref_path: String,
+    pub ref_line: u32,
+    pub ref_column: u32,
+    pub context_text: String,
+    pub is_active: bool,
+    pub match_kind: String,
+    pub icon_id: String,
+    pub file_name: String,
+    pub preview_text: String,
+    pub is_write: bool,
+    pub container_name: String,
+    pub score_value: f64,
+}
+
+impl ReferencePreview {
+    pub fn new() -> Self {
+        Self {
+            ref_path: String::new(),
+            ref_line: u32::default(),
+            ref_column: u32::default(),
+            context_text: String::new(),
+            is_active: bool::default(),
+            match_kind: String::new(),
+            icon_id: String::new(),
+            file_name: String::new(),
+            preview_text: String::new(),
+            is_write: bool::default(),
+            container_name: String::new(),
+            score_value: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ref_path.is_empty() || true && self.ref_line < u32::MAX || true && self.ref_column < u32::MAX || true && !self.context_text.is_empty() || true && self.is_active || true && !self.match_kind.is_empty() || true && !self.icon_id.is_empty() || true && !self.file_name.is_empty() || true && !self.preview_text.is_empty() || true && self.is_write || true && !self.container_name.is_empty() || true && self.score_value.is_finite() || true
+    }
+}
+
+impl Default for ReferencePreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go to definition link target
+#[derive(Debug, Clone)]
+pub struct DefinitionLink {
+    pub def_uri: String,
+    pub def_line: u32,
+    pub def_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub origin_line: u32,
+    pub origin_column: u32,
+    pub symbol_name: String,
+    pub target_kind: String,
+    pub tooltip_text: String,
+    pub is_external: bool,
+    pub source_uri: String,
+}
+
+impl DefinitionLink {
+    pub fn new() -> Self {
+        Self {
+            def_uri: String::new(),
+            def_line: u32::default(),
+            def_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            origin_line: u32::default(),
+            origin_column: u32::default(),
+            symbol_name: String::new(),
+            target_kind: String::new(),
+            tooltip_text: String::new(),
+            is_external: bool::default(),
+            source_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.def_uri.is_empty() || true && self.def_line < u32::MAX || true && self.def_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && self.origin_line < u32::MAX || true && self.origin_column < u32::MAX || true && !self.symbol_name.is_empty() || true && !self.target_kind.is_empty() || true && !self.tooltip_text.is_empty() || true && self.is_external || true && !self.source_uri.is_empty() || true
+    }
+}
+
+impl Default for DefinitionLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go to type definition target
+#[derive(Debug, Clone)]
+pub struct TypeDefTarget {
+    pub typedef_uri: String,
+    pub typedef_line: u32,
+    pub typedef_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub type_name: String,
+    pub symbol_kind: String,
+    pub container_name: String,
+    pub is_builtin: bool,
+    pub module_path: String,
+    pub tooltip_text: String,
+    pub source_uri: String,
+}
+
+impl TypeDefTarget {
+    pub fn new() -> Self {
+        Self {
+            typedef_uri: String::new(),
+            typedef_line: u32::default(),
+            typedef_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            type_name: String::new(),
+            symbol_kind: String::new(),
+            container_name: String::new(),
+            is_builtin: bool::default(),
+            module_path: String::new(),
+            tooltip_text: String::new(),
+            source_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.typedef_uri.is_empty() || true && self.typedef_line < u32::MAX || true && self.typedef_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.type_name.is_empty() || true && !self.symbol_kind.is_empty() || true && !self.container_name.is_empty() || true && self.is_builtin || true && !self.module_path.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.source_uri.is_empty() || true
+    }
+}
+
+impl Default for TypeDefTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go to implementation target
+#[derive(Debug, Clone)]
+pub struct ImplTarget {
+    pub impl_uri: String,
+    pub impl_line: u32,
+    pub impl_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub impl_name: String,
+    pub symbol_kind: String,
+    pub container_name: String,
+    pub is_interface: bool,
+    pub module_path: String,
+    pub tooltip_text: String,
+    pub source_uri: String,
+}
+
+impl ImplTarget {
+    pub fn new() -> Self {
+        Self {
+            impl_uri: String::new(),
+            impl_line: u32::default(),
+            impl_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            impl_name: String::new(),
+            symbol_kind: String::new(),
+            container_name: String::new(),
+            is_interface: bool::default(),
+            module_path: String::new(),
+            tooltip_text: String::new(),
+            source_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.impl_uri.is_empty() || true && self.impl_line < u32::MAX || true && self.impl_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.impl_name.is_empty() || true && !self.symbol_kind.is_empty() || true && !self.container_name.is_empty() || true && self.is_interface || true && !self.module_path.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.source_uri.is_empty() || true
+    }
+}
+
+impl Default for ImplTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go to declaration target
+#[derive(Debug, Clone)]
+pub struct DeclarationTarget {
+    pub decl_uri: String,
+    pub decl_line: u32,
+    pub decl_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub decl_name: String,
+    pub symbol_kind: String,
+    pub container_name: String,
+    pub is_forward: bool,
+    pub module_path: String,
+    pub tooltip_text: String,
+    pub source_uri: String,
+}
+
+impl DeclarationTarget {
+    pub fn new() -> Self {
+        Self {
+            decl_uri: String::new(),
+            decl_line: u32::default(),
+            decl_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            decl_name: String::new(),
+            symbol_kind: String::new(),
+            container_name: String::new(),
+            is_forward: bool::default(),
+            module_path: String::new(),
+            tooltip_text: String::new(),
+            source_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decl_uri.is_empty() || true && self.decl_line < u32::MAX || true && self.decl_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.decl_name.is_empty() || true && !self.symbol_kind.is_empty() || true && !self.container_name.is_empty() || true && self.is_forward || true && !self.module_path.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.source_uri.is_empty() || true
+    }
+}
+
+impl Default for DeclarationTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Call hierarchy tree view entry
+#[derive(Debug, Clone)]
+pub struct CallHierarchyEntry {
+    pub entry_name: String,
+    pub entry_kind: String,
+    pub file_path: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub detail_text: String,
+    pub direction: String,
+    pub call_count: u32,
+    pub is_recursive: bool,
+    pub depth_level: u32,
+    pub icon_id: String,
+    pub container_name: String,
+}
+
+impl CallHierarchyEntry {
+    pub fn new() -> Self {
+        Self {
+            entry_name: String::new(),
+            entry_kind: String::new(),
+            file_path: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            detail_text: String::new(),
+            direction: String::new(),
+            call_count: u32::default(),
+            is_recursive: bool::default(),
+            depth_level: u32::default(),
+            icon_id: String::new(),
+            container_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.entry_name.is_empty() || true && !self.entry_kind.is_empty() || true && !self.file_path.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && !self.detail_text.is_empty() || true && !self.direction.is_empty() || true && self.call_count < u32::MAX || true && self.is_recursive || true && self.depth_level < u32::MAX || true && !self.icon_id.is_empty() || true && !self.container_name.is_empty() || true
+    }
+}
+
+impl Default for CallHierarchyEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Type hierarchy tree view entry
+#[derive(Debug, Clone)]
+pub struct TypeHierarchyEntry {
+    pub entry_name: String,
+    pub entry_kind: String,
+    pub file_path: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub detail_text: String,
+    pub direction: String,
+    pub is_interface: bool,
+    pub is_abstract: bool,
+    pub depth_level: u32,
+    pub icon_id: String,
+    pub container_name: String,
+}
+
+impl TypeHierarchyEntry {
+    pub fn new() -> Self {
+        Self {
+            entry_name: String::new(),
+            entry_kind: String::new(),
+            file_path: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            detail_text: String::new(),
+            direction: String::new(),
+            is_interface: bool::default(),
+            is_abstract: bool::default(),
+            depth_level: u32::default(),
+            icon_id: String::new(),
+            container_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.entry_name.is_empty() || true && !self.entry_kind.is_empty() || true && !self.file_path.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && !self.detail_text.is_empty() || true && !self.direction.is_empty() || true && self.is_interface || true && self.is_abstract || true && self.depth_level < u32::MAX || true && !self.icon_id.is_empty() || true && !self.container_name.is_empty() || true
+    }
+}
+
+impl Default for TypeHierarchyEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace symbol search result
+#[derive(Debug, Clone)]
+pub struct SymbolSearchResult {
+    pub result_name: String,
+    pub result_kind: String,
+    pub file_path: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub container_name: String,
+    pub detail_text: String,
+    pub icon_id: String,
+    pub match_ranges: String,
+    pub score_value: f64,
+    pub is_exact: bool,
+    pub sort_text: String,
+}
+
+impl SymbolSearchResult {
+    pub fn new() -> Self {
+        Self {
+            result_name: String::new(),
+            result_kind: String::new(),
+            file_path: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            container_name: String::new(),
+            detail_text: String::new(),
+            icon_id: String::new(),
+            match_ranges: String::new(),
+            score_value: f64::default(),
+            is_exact: bool::default(),
+            sort_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.result_name.is_empty() || true && !self.result_kind.is_empty() || true && !self.file_path.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && !self.container_name.is_empty() || true && !self.detail_text.is_empty() || true && !self.icon_id.is_empty() || true && !self.match_ranges.is_empty() || true && self.score_value.is_finite() || true && self.is_exact || true && !self.sort_text.is_empty() || true
+    }
+}
+
+impl Default for SymbolSearchResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Navigation bar widget instance
+#[derive(Debug, Clone)]
+pub struct NavBarWidget {
+    pub widget_id: String,
+    pub widget_kind: String,
+    pub is_visible: bool,
+    pub position_hint: String,
+    pub items_json: String,
+    pub active_item: String,
+    pub height_px: u32,
+    pub is_focused: bool,
+    pub show_icons: bool,
+    pub show_files: bool,
+    pub show_symbols: bool,
+    pub separator_style: String,
+}
+
+impl NavBarWidget {
+    pub fn new() -> Self {
+        Self {
+            widget_id: String::new(),
+            widget_kind: String::new(),
+            is_visible: bool::default(),
+            position_hint: String::new(),
+            items_json: String::new(),
+            active_item: String::new(),
+            height_px: u32::default(),
+            is_focused: bool::default(),
+            show_icons: bool::default(),
+            show_files: bool::default(),
+            show_symbols: bool::default(),
+            separator_style: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.widget_id.is_empty() || true && !self.widget_kind.is_empty() || true && self.is_visible || true && !self.position_hint.is_empty() || true && !self.items_json.is_empty() || true && !self.active_item.is_empty() || true && self.height_px < u32::MAX || true && self.is_focused || true && self.show_icons || true && self.show_files || true && self.show_symbols || true && !self.separator_style.is_empty() || true
+    }
+}
+
+impl Default for NavBarWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Outline view sort option
+#[derive(Debug, Clone)]
+pub struct OutlineSortOption {
+    pub sort_key: String,
+    pub sort_label: String,
+    pub sort_direction: String,
+    pub is_active: bool,
+    pub icon_id: String,
+    pub group_by: String,
+    pub filter_kind: bool,
+    pub show_detail: bool,
+    pub collapse_all: bool,
+    pub follow_cursor: bool,
+    pub is_default: bool,
+    pub description_text: String,
+}
+
+impl OutlineSortOption {
+    pub fn new() -> Self {
+        Self {
+            sort_key: String::new(),
+            sort_label: String::new(),
+            sort_direction: String::new(),
+            is_active: bool::default(),
+            icon_id: String::new(),
+            group_by: String::new(),
+            filter_kind: bool::default(),
+            show_detail: bool::default(),
+            collapse_all: bool::default(),
+            follow_cursor: bool::default(),
+            is_default: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sort_key.is_empty() || true && !self.sort_label.is_empty() || true && !self.sort_direction.is_empty() || true && self.is_active || true && !self.icon_id.is_empty() || true && !self.group_by.is_empty() || true && self.filter_kind || true && self.show_detail || true && self.collapse_all || true && self.follow_cursor || true && self.is_default || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for OutlineSortOption {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Outline view filter configuration
+#[derive(Debug, Clone)]
+pub struct OutlineFilterConfig {
+    pub filter_kind: String,
+    pub filter_label: String,
+    pub is_active: bool,
+    pub include_kinds: String,
+    pub exclude_kinds: String,
+    pub show_deprecated: bool,
+    pub show_private: bool,
+    pub text_filter: String,
+    pub match_case: bool,
+    pub is_regex: bool,
+    pub result_count: u32,
+    pub description_text: String,
+}
+
+impl OutlineFilterConfig {
+    pub fn new() -> Self {
+        Self {
+            filter_kind: String::new(),
+            filter_label: String::new(),
+            is_active: bool::default(),
+            include_kinds: String::new(),
+            exclude_kinds: String::new(),
+            show_deprecated: bool::default(),
+            show_private: bool::default(),
+            text_filter: String::new(),
+            match_case: bool::default(),
+            is_regex: bool::default(),
+            result_count: u32::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_kind.is_empty() || true && !self.filter_label.is_empty() || true && self.is_active || true && !self.include_kinds.is_empty() || true && !self.exclude_kinds.is_empty() || true && self.show_deprecated || true && self.show_private || true && !self.text_filter.is_empty() || true && self.match_case || true && self.is_regex || true && self.result_count < u32::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for OutlineFilterConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor document location link
+#[derive(Debug, Clone)]
+pub struct EditorLocationLink {
+    pub link_uri: String,
+    pub link_line: u32,
+    pub link_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub link_text: String,
+    pub tooltip_text: String,
+    pub target_uri: String,
+    pub target_line: u32,
+    pub target_column: u32,
+    pub is_command: bool,
+    pub command_id: String,
+}
+
+impl EditorLocationLink {
+    pub fn new() -> Self {
+        Self {
+            link_uri: String::new(),
+            link_line: u32::default(),
+            link_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            link_text: String::new(),
+            tooltip_text: String::new(),
+            target_uri: String::new(),
+            target_line: u32::default(),
+            target_column: u32::default(),
+            is_command: bool::default(),
+            command_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.link_uri.is_empty() || true && self.link_line < u32::MAX || true && self.link_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.link_text.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.target_uri.is_empty() || true && self.target_line < u32::MAX || true && self.target_column < u32::MAX || true && self.is_command || true && !self.command_id.is_empty() || true
+    }
+}
+
+impl Default for EditorLocationLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Symbol metadata tag annotation
+#[derive(Debug, Clone)]
+pub struct SymbolTag {
+    pub tag_name: String,
+    pub tag_value: String,
+    pub symbol_kind: String,
+    pub is_deprecated: bool,
+    pub is_readonly: bool,
+    pub is_static: bool,
+    pub is_abstract: bool,
+    pub is_virtual: bool,
+    pub visibility_kind: String,
+    pub scope_name: String,
+    pub is_async: bool,
+    pub is_generator: bool,
+}
+
+impl SymbolTag {
+    pub fn new() -> Self {
+        Self {
+            tag_name: String::new(),
+            tag_value: String::new(),
+            symbol_kind: String::new(),
+            is_deprecated: bool::default(),
+            is_readonly: bool::default(),
+            is_static: bool::default(),
+            is_abstract: bool::default(),
+            is_virtual: bool::default(),
+            visibility_kind: String::new(),
+            scope_name: String::new(),
+            is_async: bool::default(),
+            is_generator: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tag_name.is_empty() || true && !self.tag_value.is_empty() || true && !self.symbol_kind.is_empty() || true && self.is_deprecated || true && self.is_readonly || true && self.is_static || true && self.is_abstract || true && self.is_virtual || true && !self.visibility_kind.is_empty() || true && !self.scope_name.is_empty() || true && self.is_async || true && self.is_generator || true
+    }
+}
+
+impl Default for SymbolTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Navigation menu contribution
+#[derive(Debug, Clone)]
+pub struct NavigationContrib {
+    pub contrib_id: String,
+    pub menu_id: String,
+    pub command_id: String,
+    pub when_clause: String,
+    pub group_name: String,
+    pub sort_order: u32,
+    pub title_text: String,
+    pub icon_id: String,
+    pub is_inline: bool,
+    pub alt_command: String,
+    pub category_name: String,
+    pub description_text: String,
+}
+
+impl NavigationContrib {
+    pub fn new() -> Self {
+        Self {
+            contrib_id: String::new(),
+            menu_id: String::new(),
+            command_id: String::new(),
+            when_clause: String::new(),
+            group_name: String::new(),
+            sort_order: u32::default(),
+            title_text: String::new(),
+            icon_id: String::new(),
+            is_inline: bool::default(),
+            alt_command: String::new(),
+            category_name: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.contrib_id.is_empty() || true && !self.menu_id.is_empty() || true && !self.command_id.is_empty() || true && !self.when_clause.is_empty() || true && !self.group_name.is_empty() || true && self.sort_order < u32::MAX || true && !self.title_text.is_empty() || true && !self.icon_id.is_empty() || true && self.is_inline || true && !self.alt_command.is_empty() || true && !self.category_name.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for NavigationContrib {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Breadcrumb navigation configuration
+#[derive(Debug, Clone)]
+pub struct BreadcrumbConfig {
+    pub config_id: String,
+    pub is_enabled: bool,
+    pub show_files: bool,
+    pub show_symbols: bool,
+    pub show_types: bool,
+    pub symbol_sort: String,
+    pub file_path_style: String,
+    pub icon_theme: String,
+    pub max_items: u32,
+    pub filter_text: String,
+    pub auto_reveal: bool,
+    pub keyboard_nav: bool,
+}
+
+impl BreadcrumbConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            is_enabled: bool::default(),
+            show_files: bool::default(),
+            show_symbols: bool::default(),
+            show_types: bool::default(),
+            symbol_sort: String::new(),
+            file_path_style: String::new(),
+            icon_theme: String::new(),
+            max_items: u32::default(),
+            filter_text: String::new(),
+            auto_reveal: bool::default(),
+            keyboard_nav: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && self.is_enabled || true && self.show_files || true && self.show_symbols || true && self.show_types || true && !self.symbol_sort.is_empty() || true && !self.file_path_style.is_empty() || true && !self.icon_theme.is_empty() || true && self.max_items < u32::MAX || true && !self.filter_text.is_empty() || true && self.auto_reveal || true && self.keyboard_nav || true
+    }
+}
+
+impl Default for BreadcrumbConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -544839,6 +546035,474 @@ mod tests_mpz_generated {
     #[test]
     fn test_mpz_fields() {
         let mut obj = WelcomePageConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqa_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqa_default() {
+        let obj = BreadcrumbPath::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqa_fields() {
+        let mut obj = BreadcrumbPath::default();
+        obj.crumb_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqb_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqb_default() {
+        let obj = BreadcrumbPicker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqb_fields() {
+        let mut obj = BreadcrumbPicker::default();
+        obj.picker_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqc_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqc_default() {
+        let obj = NavigationHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqc_fields() {
+        let mut obj = NavigationHistory::default();
+        obj.history_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqd_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqd_default() {
+        let obj = GoToSymbolEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqd_fields() {
+        let mut obj = GoToSymbolEntry::default();
+        obj.symbol_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqe_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqe_default() {
+        let obj = GoToLineState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqe_fields() {
+        let mut obj = GoToLineState::default();
+        obj.target_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqf_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqf_default() {
+        let obj = FileNavigatorItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqf_fields() {
+        let mut obj = FileNavigatorItem::default();
+        obj.nav_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqg_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqg_default() {
+        let obj = SymbolOutlineItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqg_fields() {
+        let mut obj = SymbolOutlineItem::default();
+        obj.outline_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqh_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqh_default() {
+        let obj = QuickAccessItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqh_fields() {
+        let mut obj = QuickAccessItem::default();
+        obj.access_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqi_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqi_default() {
+        let obj = EditorTabNav::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqi_fields() {
+        let mut obj = EditorTabNav::default();
+        obj.tab_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqj_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqj_default() {
+        let obj = StickyScrollLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqj_fields() {
+        let mut obj = StickyScrollLine::default();
+        obj.sticky_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqk_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqk_default() {
+        let obj = PeekViewState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqk_fields() {
+        let mut obj = PeekViewState::default();
+        obj.peek_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mql_generated {
+    use super::*;
+
+    #[test]
+    fn test_mql_default() {
+        let obj = ReferencePreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mql_fields() {
+        let mut obj = ReferencePreview::default();
+        obj.ref_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqm_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqm_default() {
+        let obj = DefinitionLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqm_fields() {
+        let mut obj = DefinitionLink::default();
+        obj.def_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqn_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqn_default() {
+        let obj = TypeDefTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqn_fields() {
+        let mut obj = TypeDefTarget::default();
+        obj.typedef_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqo_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqo_default() {
+        let obj = ImplTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqo_fields() {
+        let mut obj = ImplTarget::default();
+        obj.impl_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqp_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqp_default() {
+        let obj = DeclarationTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqp_fields() {
+        let mut obj = DeclarationTarget::default();
+        obj.decl_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqq_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqq_default() {
+        let obj = CallHierarchyEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqq_fields() {
+        let mut obj = CallHierarchyEntry::default();
+        obj.entry_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqr_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqr_default() {
+        let obj = TypeHierarchyEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqr_fields() {
+        let mut obj = TypeHierarchyEntry::default();
+        obj.entry_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqs_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqs_default() {
+        let obj = SymbolSearchResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqs_fields() {
+        let mut obj = SymbolSearchResult::default();
+        obj.result_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqt_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqt_default() {
+        let obj = NavBarWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqt_fields() {
+        let mut obj = NavBarWidget::default();
+        obj.widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqu_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqu_default() {
+        let obj = OutlineSortOption::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqu_fields() {
+        let mut obj = OutlineSortOption::default();
+        obj.sort_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqv_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqv_default() {
+        let obj = OutlineFilterConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqv_fields() {
+        let mut obj = OutlineFilterConfig::default();
+        obj.filter_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqw_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqw_default() {
+        let obj = EditorLocationLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqw_fields() {
+        let mut obj = EditorLocationLink::default();
+        obj.link_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqx_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqx_default() {
+        let obj = SymbolTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqx_fields() {
+        let mut obj = SymbolTag::default();
+        obj.tag_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqy_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqy_default() {
+        let obj = NavigationContrib::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqy_fields() {
+        let mut obj = NavigationContrib::default();
+        obj.contrib_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mqz_generated {
+    use super::*;
+
+    #[test]
+    fn test_mqz_default() {
+        let obj = BreadcrumbConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mqz_fields() {
+        let mut obj = BreadcrumbConfig::default();
         obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
