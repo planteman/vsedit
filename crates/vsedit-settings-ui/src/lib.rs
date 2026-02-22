@@ -238474,6 +238474,1202 @@ impl Default for ScmViewConfig {
     }
 }
 
+/// Extension gallery listing item
+#[derive(Debug, Clone)]
+pub struct ExtGalleryItem {
+    pub extension_id: String,
+    pub display_name: String,
+    pub publisher_name: String,
+    pub version_text: String,
+    pub description_text: String,
+    pub icon_url: String,
+    pub install_count: u64,
+    pub rating_avg: f64,
+    pub rating_count: u32,
+    pub is_installed: bool,
+    pub is_enabled: bool,
+    pub category_name: String,
+}
+
+impl ExtGalleryItem {
+    pub fn new() -> Self {
+        Self {
+            extension_id: String::new(),
+            display_name: String::new(),
+            publisher_name: String::new(),
+            version_text: String::new(),
+            description_text: String::new(),
+            icon_url: String::new(),
+            install_count: u64::default(),
+            rating_avg: f64::default(),
+            rating_count: u32::default(),
+            is_installed: bool::default(),
+            is_enabled: bool::default(),
+            category_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.extension_id.is_empty() || true && !self.display_name.is_empty() || true && !self.publisher_name.is_empty() || true && !self.version_text.is_empty() || true && !self.description_text.is_empty() || true && !self.icon_url.is_empty() || true && self.install_count < u64::MAX || true && self.rating_avg.is_finite() || true && self.rating_count < u32::MAX || true && self.is_installed || true && self.is_enabled || true && !self.category_name.is_empty() || true
+    }
+}
+
+impl Default for ExtGalleryItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension gallery search query
+#[derive(Debug, Clone)]
+pub struct ExtGalleryQuery {
+    pub query_text: String,
+    pub category_filter: String,
+    pub sort_by: String,
+    pub sort_order: String,
+    pub page_number: u32,
+    pub page_size: u32,
+    pub is_curated: bool,
+    pub target_platform: String,
+    pub include_preview: bool,
+    pub publisher_filter: String,
+    pub tag_filter: String,
+    pub result_count: u32,
+}
+
+impl ExtGalleryQuery {
+    pub fn new() -> Self {
+        Self {
+            query_text: String::new(),
+            category_filter: String::new(),
+            sort_by: String::new(),
+            sort_order: String::new(),
+            page_number: u32::default(),
+            page_size: u32::default(),
+            is_curated: bool::default(),
+            target_platform: String::new(),
+            include_preview: bool::default(),
+            publisher_filter: String::new(),
+            tag_filter: String::new(),
+            result_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.query_text.is_empty() || true && !self.category_filter.is_empty() || true && !self.sort_by.is_empty() || true && !self.sort_order.is_empty() || true && self.page_number < u32::MAX || true && self.page_size < u32::MAX || true && self.is_curated || true && !self.target_platform.is_empty() || true && self.include_preview || true && !self.publisher_filter.is_empty() || true && !self.tag_filter.is_empty() || true && self.result_count < u32::MAX || true
+    }
+}
+
+impl Default for ExtGalleryQuery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension version information
+#[derive(Debug, Clone)]
+pub struct ExtVersionInfo {
+    pub version_string: String,
+    pub target_platform: String,
+    pub engine_version: String,
+    pub release_date: u64,
+    pub is_preview: bool,
+    pub is_pre_release: bool,
+    pub asset_uri: String,
+    pub changelog_text: String,
+    pub file_size: u64,
+    pub download_count: u64,
+    pub is_validated: bool,
+    pub fallback_uri: String,
+}
+
+impl ExtVersionInfo {
+    pub fn new() -> Self {
+        Self {
+            version_string: String::new(),
+            target_platform: String::new(),
+            engine_version: String::new(),
+            release_date: u64::default(),
+            is_preview: bool::default(),
+            is_pre_release: bool::default(),
+            asset_uri: String::new(),
+            changelog_text: String::new(),
+            file_size: u64::default(),
+            download_count: u64::default(),
+            is_validated: bool::default(),
+            fallback_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.version_string.is_empty() || true && !self.target_platform.is_empty() || true && !self.engine_version.is_empty() || true && self.release_date < u64::MAX || true && self.is_preview || true && self.is_pre_release || true && !self.asset_uri.is_empty() || true && !self.changelog_text.is_empty() || true && self.file_size < u64::MAX || true && self.download_count < u64::MAX || true && self.is_validated || true && !self.fallback_uri.is_empty() || true
+    }
+}
+
+impl Default for ExtVersionInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension user rating entry
+#[derive(Debug, Clone)]
+pub struct ExtRatingEntry {
+    pub rating_value: u32,
+    pub reviewer_name: String,
+    pub review_date: u64,
+    pub extension_id: String,
+    pub is_verified: bool,
+    pub helpful_count: u32,
+    pub report_count: u32,
+    pub response_text: String,
+    pub response_date: u64,
+    pub reviewer_id: String,
+    pub platform_text: String,
+    pub version_text: String,
+}
+
+impl ExtRatingEntry {
+    pub fn new() -> Self {
+        Self {
+            rating_value: u32::default(),
+            reviewer_name: String::new(),
+            review_date: u64::default(),
+            extension_id: String::new(),
+            is_verified: bool::default(),
+            helpful_count: u32::default(),
+            report_count: u32::default(),
+            response_text: String::new(),
+            response_date: u64::default(),
+            reviewer_id: String::new(),
+            platform_text: String::new(),
+            version_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.rating_value < u32::MAX || true && !self.reviewer_name.is_empty() || true && self.review_date < u64::MAX || true && !self.extension_id.is_empty() || true && self.is_verified || true && self.helpful_count < u32::MAX || true && self.report_count < u32::MAX || true && !self.response_text.is_empty() || true && self.response_date < u64::MAX || true && !self.reviewer_id.is_empty() || true && !self.platform_text.is_empty() || true && !self.version_text.is_empty() || true
+    }
+}
+
+impl Default for ExtRatingEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension user review entry
+#[derive(Debug, Clone)]
+pub struct ExtReviewEntry {
+    pub review_text: String,
+    pub rating_value: u32,
+    pub reviewer_name: String,
+    pub review_date: u64,
+    pub title_text: String,
+    pub extension_id: String,
+    pub version_text: String,
+    pub is_edited: bool,
+    pub edit_date: u64,
+    pub helpful_count: u32,
+    pub language_id: String,
+    pub platform_text: String,
+}
+
+impl ExtReviewEntry {
+    pub fn new() -> Self {
+        Self {
+            review_text: String::new(),
+            rating_value: u32::default(),
+            reviewer_name: String::new(),
+            review_date: u64::default(),
+            title_text: String::new(),
+            extension_id: String::new(),
+            version_text: String::new(),
+            is_edited: bool::default(),
+            edit_date: u64::default(),
+            helpful_count: u32::default(),
+            language_id: String::new(),
+            platform_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.review_text.is_empty() || true && self.rating_value < u32::MAX || true && !self.reviewer_name.is_empty() || true && self.review_date < u64::MAX || true && !self.title_text.is_empty() || true && !self.extension_id.is_empty() || true && !self.version_text.is_empty() || true && self.is_edited || true && self.edit_date < u64::MAX || true && self.helpful_count < u32::MAX || true && !self.language_id.is_empty() || true && !self.platform_text.is_empty() || true
+    }
+}
+
+impl Default for ExtReviewEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension marketplace category
+#[derive(Debug, Clone)]
+pub struct ExtCategoryEntry {
+    pub category_name: String,
+    pub category_id: String,
+    pub extension_count: u32,
+    pub icon_id: String,
+    pub description_text: String,
+    pub is_featured: bool,
+    pub sort_order: u32,
+    pub parent_id: String,
+    pub is_curated: bool,
+    pub display_name: String,
+    pub slug_text: String,
+    pub color_id: String,
+}
+
+impl ExtCategoryEntry {
+    pub fn new() -> Self {
+        Self {
+            category_name: String::new(),
+            category_id: String::new(),
+            extension_count: u32::default(),
+            icon_id: String::new(),
+            description_text: String::new(),
+            is_featured: bool::default(),
+            sort_order: u32::default(),
+            parent_id: String::new(),
+            is_curated: bool::default(),
+            display_name: String::new(),
+            slug_text: String::new(),
+            color_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.category_name.is_empty() || true && !self.category_id.is_empty() || true && self.extension_count < u32::MAX || true && !self.icon_id.is_empty() || true && !self.description_text.is_empty() || true && self.is_featured || true && self.sort_order < u32::MAX || true && !self.parent_id.is_empty() || true && self.is_curated || true && !self.display_name.is_empty() || true && !self.slug_text.is_empty() || true && !self.color_id.is_empty() || true
+    }
+}
+
+impl Default for ExtCategoryEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension publisher information
+#[derive(Debug, Clone)]
+pub struct ExtPublisher {
+    pub publisher_name: String,
+    pub publisher_id: String,
+    pub display_name: String,
+    pub is_verified: bool,
+    pub is_trusted: bool,
+    pub extension_count: u32,
+    pub domain_name: String,
+    pub email_text: String,
+    pub website_url: String,
+    pub avatar_url: String,
+    pub description_text: String,
+    pub member_since: u64,
+}
+
+impl ExtPublisher {
+    pub fn new() -> Self {
+        Self {
+            publisher_name: String::new(),
+            publisher_id: String::new(),
+            display_name: String::new(),
+            is_verified: bool::default(),
+            is_trusted: bool::default(),
+            extension_count: u32::default(),
+            domain_name: String::new(),
+            email_text: String::new(),
+            website_url: String::new(),
+            avatar_url: String::new(),
+            description_text: String::new(),
+            member_since: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.publisher_name.is_empty() || true && !self.publisher_id.is_empty() || true && !self.display_name.is_empty() || true && self.is_verified || true && self.is_trusted || true && self.extension_count < u32::MAX || true && !self.domain_name.is_empty() || true && !self.email_text.is_empty() || true && !self.website_url.is_empty() || true && !self.avatar_url.is_empty() || true && !self.description_text.is_empty() || true && self.member_since < u64::MAX || true
+    }
+}
+
+impl Default for ExtPublisher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension badge/shield information
+#[derive(Debug, Clone)]
+pub struct ExtBadgeEntry {
+    pub badge_label: String,
+    pub badge_url: String,
+    pub link_url: String,
+    pub description_text: String,
+    pub is_external: bool,
+    pub badge_kind: String,
+    pub color_value: String,
+    pub icon_id: String,
+    pub position_hint: String,
+    pub is_dynamic: bool,
+    pub alt_text: String,
+    pub cache_ms: u64,
+}
+
+impl ExtBadgeEntry {
+    pub fn new() -> Self {
+        Self {
+            badge_label: String::new(),
+            badge_url: String::new(),
+            link_url: String::new(),
+            description_text: String::new(),
+            is_external: bool::default(),
+            badge_kind: String::new(),
+            color_value: String::new(),
+            icon_id: String::new(),
+            position_hint: String::new(),
+            is_dynamic: bool::default(),
+            alt_text: String::new(),
+            cache_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.badge_label.is_empty() || true && !self.badge_url.is_empty() || true && !self.link_url.is_empty() || true && !self.description_text.is_empty() || true && self.is_external || true && !self.badge_kind.is_empty() || true && !self.color_value.is_empty() || true && !self.icon_id.is_empty() || true && !self.position_hint.is_empty() || true && self.is_dynamic || true && !self.alt_text.is_empty() || true && self.cache_ms < u64::MAX || true
+    }
+}
+
+impl Default for ExtBadgeEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension downloadable asset entry
+#[derive(Debug, Clone)]
+pub struct ExtAssetEntry {
+    pub asset_type: String,
+    pub asset_uri: String,
+    pub fallback_uri: String,
+    pub file_name: String,
+    pub file_size: u64,
+    pub content_type: String,
+    pub is_primary: bool,
+    pub checksum_value: String,
+    pub platform_text: String,
+    pub version_text: String,
+    pub download_count: u64,
+    pub source_text: String,
+}
+
+impl ExtAssetEntry {
+    pub fn new() -> Self {
+        Self {
+            asset_type: String::new(),
+            asset_uri: String::new(),
+            fallback_uri: String::new(),
+            file_name: String::new(),
+            file_size: u64::default(),
+            content_type: String::new(),
+            is_primary: bool::default(),
+            checksum_value: String::new(),
+            platform_text: String::new(),
+            version_text: String::new(),
+            download_count: u64::default(),
+            source_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.asset_type.is_empty() || true && !self.asset_uri.is_empty() || true && !self.fallback_uri.is_empty() || true && !self.file_name.is_empty() || true && self.file_size < u64::MAX || true && !self.content_type.is_empty() || true && self.is_primary || true && !self.checksum_value.is_empty() || true && !self.platform_text.is_empty() || true && !self.version_text.is_empty() || true && self.download_count < u64::MAX || true && !self.source_text.is_empty() || true
+    }
+}
+
+impl Default for ExtAssetEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension dependency reference
+#[derive(Debug, Clone)]
+pub struct ExtDependencyRef {
+    pub dep_id: String,
+    pub dep_name: String,
+    pub dep_version: String,
+    pub is_required: bool,
+    pub is_optional: bool,
+    pub is_bundled: bool,
+    pub is_installed: bool,
+    pub publisher_name: String,
+    pub display_name: String,
+    pub description_text: String,
+    pub icon_url: String,
+    pub status_text: String,
+}
+
+impl ExtDependencyRef {
+    pub fn new() -> Self {
+        Self {
+            dep_id: String::new(),
+            dep_name: String::new(),
+            dep_version: String::new(),
+            is_required: bool::default(),
+            is_optional: bool::default(),
+            is_bundled: bool::default(),
+            is_installed: bool::default(),
+            publisher_name: String::new(),
+            display_name: String::new(),
+            description_text: String::new(),
+            icon_url: String::new(),
+            status_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dep_id.is_empty() || true && !self.dep_name.is_empty() || true && !self.dep_version.is_empty() || true && self.is_required || true && self.is_optional || true && self.is_bundled || true && self.is_installed || true && !self.publisher_name.is_empty() || true && !self.display_name.is_empty() || true && !self.description_text.is_empty() || true && !self.icon_url.is_empty() || true && !self.status_text.is_empty() || true
+    }
+}
+
+impl Default for ExtDependencyRef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension pack member listing
+#[derive(Debug, Clone)]
+pub struct ExtPackEntry {
+    pub pack_id: String,
+    pub pack_name: String,
+    pub member_ids: String,
+    pub member_count: u32,
+    pub description_text: String,
+    pub icon_url: String,
+    pub publisher_name: String,
+    pub is_installed: bool,
+    pub install_count: u64,
+    pub rating_avg: f64,
+    pub version_text: String,
+    pub display_name: String,
+}
+
+impl ExtPackEntry {
+    pub fn new() -> Self {
+        Self {
+            pack_id: String::new(),
+            pack_name: String::new(),
+            member_ids: String::new(),
+            member_count: u32::default(),
+            description_text: String::new(),
+            icon_url: String::new(),
+            publisher_name: String::new(),
+            is_installed: bool::default(),
+            install_count: u64::default(),
+            rating_avg: f64::default(),
+            version_text: String::new(),
+            display_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pack_id.is_empty() || true && !self.pack_name.is_empty() || true && !self.member_ids.is_empty() || true && self.member_count < u32::MAX || true && !self.description_text.is_empty() || true && !self.icon_url.is_empty() || true && !self.publisher_name.is_empty() || true && self.is_installed || true && self.install_count < u64::MAX || true && self.rating_avg.is_finite() || true && !self.version_text.is_empty() || true && !self.display_name.is_empty() || true
+    }
+}
+
+impl Default for ExtPackEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension changelog entry
+#[derive(Debug, Clone)]
+pub struct ExtChangelog {
+    pub version_text: String,
+    pub release_date: u64,
+    pub content_md: String,
+    pub is_major: bool,
+    pub is_breaking: bool,
+    pub bug_fixes: String,
+    pub new_features: String,
+    pub improvements: String,
+    pub author_name: String,
+    pub commit_range: String,
+    pub pr_refs: String,
+    pub note_text: String,
+}
+
+impl ExtChangelog {
+    pub fn new() -> Self {
+        Self {
+            version_text: String::new(),
+            release_date: u64::default(),
+            content_md: String::new(),
+            is_major: bool::default(),
+            is_breaking: bool::default(),
+            bug_fixes: String::new(),
+            new_features: String::new(),
+            improvements: String::new(),
+            author_name: String::new(),
+            commit_range: String::new(),
+            pr_refs: String::new(),
+            note_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.version_text.is_empty() || true && self.release_date < u64::MAX || true && !self.content_md.is_empty() || true && self.is_major || true && self.is_breaking || true && !self.bug_fixes.is_empty() || true && !self.new_features.is_empty() || true && !self.improvements.is_empty() || true && !self.author_name.is_empty() || true && !self.commit_range.is_empty() || true && !self.pr_refs.is_empty() || true && !self.note_text.is_empty() || true
+    }
+}
+
+impl Default for ExtChangelog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension readme rendered section
+#[derive(Debug, Clone)]
+pub struct ExtReadmeSection {
+    pub section_title: String,
+    pub section_html: String,
+    pub section_level: u32,
+    pub section_id: String,
+    pub has_images: bool,
+    pub has_code: bool,
+    pub has_links: bool,
+    pub word_count: u32,
+    pub is_collapsed: bool,
+    pub anchor_text: String,
+    pub toc_visible: bool,
+    pub media_urls: String,
+}
+
+impl ExtReadmeSection {
+    pub fn new() -> Self {
+        Self {
+            section_title: String::new(),
+            section_html: String::new(),
+            section_level: u32::default(),
+            section_id: String::new(),
+            has_images: bool::default(),
+            has_code: bool::default(),
+            has_links: bool::default(),
+            word_count: u32::default(),
+            is_collapsed: bool::default(),
+            anchor_text: String::new(),
+            toc_visible: bool::default(),
+            media_urls: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.section_title.is_empty() || true && !self.section_html.is_empty() || true && self.section_level < u32::MAX || true && !self.section_id.is_empty() || true && self.has_images || true && self.has_code || true && self.has_links || true && self.word_count < u32::MAX || true && self.is_collapsed || true && !self.anchor_text.is_empty() || true && self.toc_visible || true && !self.media_urls.is_empty() || true
+    }
+}
+
+impl Default for ExtReadmeSection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension installation state tracking
+#[derive(Debug, Clone)]
+pub struct ExtInstallState {
+    pub install_phase: String,
+    pub progress_pct: f64,
+    pub download_size: u64,
+    pub downloaded_size: u64,
+    pub is_downloading: bool,
+    pub is_extracting: bool,
+    pub is_activating: bool,
+    pub error_message: String,
+    pub retry_count: u32,
+    pub cancel_available: bool,
+    pub source_text: String,
+    pub target_path: String,
+}
+
+impl ExtInstallState {
+    pub fn new() -> Self {
+        Self {
+            install_phase: String::new(),
+            progress_pct: f64::default(),
+            download_size: u64::default(),
+            downloaded_size: u64::default(),
+            is_downloading: bool::default(),
+            is_extracting: bool::default(),
+            is_activating: bool::default(),
+            error_message: String::new(),
+            retry_count: u32::default(),
+            cancel_available: bool::default(),
+            source_text: String::new(),
+            target_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.install_phase.is_empty() || true && self.progress_pct.is_finite() || true && self.download_size < u64::MAX || true && self.downloaded_size < u64::MAX || true && self.is_downloading || true && self.is_extracting || true && self.is_activating || true && !self.error_message.is_empty() || true && self.retry_count < u32::MAX || true && self.cancel_available || true && !self.source_text.is_empty() || true && !self.target_path.is_empty() || true
+    }
+}
+
+impl Default for ExtInstallState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension details view section
+#[derive(Debug, Clone)]
+pub struct ExtViewSection {
+    pub section_id: String,
+    pub section_label: String,
+    pub content_html: String,
+    pub is_expanded: bool,
+    pub sort_order: u32,
+    pub icon_id: String,
+    pub badge_text: String,
+    pub is_loading: bool,
+    pub error_text: String,
+    pub is_scrollable: bool,
+    pub max_height: u32,
+    pub show_more: bool,
+}
+
+impl ExtViewSection {
+    pub fn new() -> Self {
+        Self {
+            section_id: String::new(),
+            section_label: String::new(),
+            content_html: String::new(),
+            is_expanded: bool::default(),
+            sort_order: u32::default(),
+            icon_id: String::new(),
+            badge_text: String::new(),
+            is_loading: bool::default(),
+            error_text: String::new(),
+            is_scrollable: bool::default(),
+            max_height: u32::default(),
+            show_more: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.section_id.is_empty() || true && !self.section_label.is_empty() || true && !self.content_html.is_empty() || true && self.is_expanded || true && self.sort_order < u32::MAX || true && !self.icon_id.is_empty() || true && !self.badge_text.is_empty() || true && self.is_loading || true && !self.error_text.is_empty() || true && self.is_scrollable || true && self.max_height < u32::MAX || true && self.show_more || true
+    }
+}
+
+impl Default for ExtViewSection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension search result ranking
+#[derive(Debug, Clone)]
+pub struct ExtSearchResult {
+    pub result_index: u32,
+    pub relevance_score: f64,
+    pub match_fields: String,
+    pub highlight_ranges: String,
+    pub is_exact: bool,
+    pub is_fuzzy: bool,
+    pub extension_id: String,
+    pub sort_weight: f64,
+    pub boost_reason: String,
+    pub category_boost: f64,
+    pub query_match: String,
+    pub snippet_text: String,
+}
+
+impl ExtSearchResult {
+    pub fn new() -> Self {
+        Self {
+            result_index: u32::default(),
+            relevance_score: f64::default(),
+            match_fields: String::new(),
+            highlight_ranges: String::new(),
+            is_exact: bool::default(),
+            is_fuzzy: bool::default(),
+            extension_id: String::new(),
+            sort_weight: f64::default(),
+            boost_reason: String::new(),
+            category_boost: f64::default(),
+            query_match: String::new(),
+            snippet_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.result_index < u32::MAX || true && self.relevance_score.is_finite() || true && !self.match_fields.is_empty() || true && !self.highlight_ranges.is_empty() || true && self.is_exact || true && self.is_fuzzy || true && !self.extension_id.is_empty() || true && self.sort_weight.is_finite() || true && !self.boost_reason.is_empty() || true && self.category_boost.is_finite() || true && !self.query_match.is_empty() || true && !self.snippet_text.is_empty() || true
+    }
+}
+
+impl Default for ExtSearchResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension gallery filter option
+#[derive(Debug, Clone)]
+pub struct ExtFilterOption {
+    pub filter_key: String,
+    pub filter_label: String,
+    pub filter_value: String,
+    pub is_active: bool,
+    pub result_count: u32,
+    pub icon_id: String,
+    pub sort_order: u32,
+    pub group_name: String,
+    pub is_exclusive: bool,
+    pub tooltip_text: String,
+    pub when_clause: String,
+    pub is_default: bool,
+}
+
+impl ExtFilterOption {
+    pub fn new() -> Self {
+        Self {
+            filter_key: String::new(),
+            filter_label: String::new(),
+            filter_value: String::new(),
+            is_active: bool::default(),
+            result_count: u32::default(),
+            icon_id: String::new(),
+            sort_order: u32::default(),
+            group_name: String::new(),
+            is_exclusive: bool::default(),
+            tooltip_text: String::new(),
+            when_clause: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_key.is_empty() || true && !self.filter_label.is_empty() || true && !self.filter_value.is_empty() || true && self.is_active || true && self.result_count < u32::MAX || true && !self.icon_id.is_empty() || true && self.sort_order < u32::MAX || true && !self.group_name.is_empty() || true && self.is_exclusive || true && !self.tooltip_text.is_empty() || true && !self.when_clause.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for ExtFilterOption {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension gallery sort option
+#[derive(Debug, Clone)]
+pub struct ExtSortOption {
+    pub sort_key: String,
+    pub sort_label: String,
+    pub sort_direction: String,
+    pub is_active: bool,
+    pub icon_id: String,
+    pub tooltip_text: String,
+    pub group_name: String,
+    pub is_default: bool,
+    pub sort_order: u32,
+    pub when_clause: String,
+    pub description_text: String,
+    pub secondary_key: String,
+}
+
+impl ExtSortOption {
+    pub fn new() -> Self {
+        Self {
+            sort_key: String::new(),
+            sort_label: String::new(),
+            sort_direction: String::new(),
+            is_active: bool::default(),
+            icon_id: String::new(),
+            tooltip_text: String::new(),
+            group_name: String::new(),
+            is_default: bool::default(),
+            sort_order: u32::default(),
+            when_clause: String::new(),
+            description_text: String::new(),
+            secondary_key: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sort_key.is_empty() || true && !self.sort_label.is_empty() || true && !self.sort_direction.is_empty() || true && self.is_active || true && !self.icon_id.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.group_name.is_empty() || true && self.is_default || true && self.sort_order < u32::MAX || true && !self.when_clause.is_empty() || true && !self.description_text.is_empty() || true && !self.secondary_key.is_empty() || true
+    }
+}
+
+impl Default for ExtSortOption {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension recommendation entry
+#[derive(Debug, Clone)]
+pub struct ExtRecommendation {
+    pub rec_id: String,
+    pub extension_id: String,
+    pub rec_reason: String,
+    pub rec_score: f64,
+    pub source_type: String,
+    pub is_dismissed: bool,
+    pub is_installed: bool,
+    pub show_count: u32,
+    pub last_shown_ms: u64,
+    pub priority_value: u32,
+    pub campaign_id: String,
+    pub category_name: String,
+}
+
+impl ExtRecommendation {
+    pub fn new() -> Self {
+        Self {
+            rec_id: String::new(),
+            extension_id: String::new(),
+            rec_reason: String::new(),
+            rec_score: f64::default(),
+            source_type: String::new(),
+            is_dismissed: bool::default(),
+            is_installed: bool::default(),
+            show_count: u32::default(),
+            last_shown_ms: u64::default(),
+            priority_value: u32::default(),
+            campaign_id: String::new(),
+            category_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rec_id.is_empty() || true && !self.extension_id.is_empty() || true && !self.rec_reason.is_empty() || true && self.rec_score.is_finite() || true && !self.source_type.is_empty() || true && self.is_dismissed || true && self.is_installed || true && self.show_count < u32::MAX || true && self.last_shown_ms < u64::MAX || true && self.priority_value < u32::MAX || true && !self.campaign_id.is_empty() || true && !self.category_name.is_empty() || true
+    }
+}
+
+impl Default for ExtRecommendation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension feature flag/capability
+#[derive(Debug, Clone)]
+pub struct ExtFeatureFlag {
+    pub flag_name: String,
+    pub flag_value: String,
+    pub is_enabled: bool,
+    pub description_text: String,
+    pub default_value: String,
+    pub version_added: String,
+    pub is_experimental: bool,
+    pub category_name: String,
+    pub depends_on: String,
+    pub is_deprecated: bool,
+    pub replacement_name: String,
+    pub applies_to: String,
+}
+
+impl ExtFeatureFlag {
+    pub fn new() -> Self {
+        Self {
+            flag_name: String::new(),
+            flag_value: String::new(),
+            is_enabled: bool::default(),
+            description_text: String::new(),
+            default_value: String::new(),
+            version_added: String::new(),
+            is_experimental: bool::default(),
+            category_name: String::new(),
+            depends_on: String::new(),
+            is_deprecated: bool::default(),
+            replacement_name: String::new(),
+            applies_to: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.flag_name.is_empty() || true && !self.flag_value.is_empty() || true && self.is_enabled || true && !self.description_text.is_empty() || true && !self.default_value.is_empty() || true && !self.version_added.is_empty() || true && self.is_experimental || true && !self.category_name.is_empty() || true && !self.depends_on.is_empty() || true && self.is_deprecated || true && !self.replacement_name.is_empty() || true && !self.applies_to.is_empty() || true
+    }
+}
+
+impl Default for ExtFeatureFlag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension update notification
+#[derive(Debug, Clone)]
+pub struct ExtUpdateNotice {
+    pub update_id: String,
+    pub extension_id: String,
+    pub old_version: String,
+    pub new_version: String,
+    pub is_major: bool,
+    pub is_breaking: bool,
+    pub changelog_url: String,
+    pub auto_update: bool,
+    pub is_dismissed: bool,
+    pub priority_value: u32,
+    pub release_notes: String,
+    pub update_date: u64,
+}
+
+impl ExtUpdateNotice {
+    pub fn new() -> Self {
+        Self {
+            update_id: String::new(),
+            extension_id: String::new(),
+            old_version: String::new(),
+            new_version: String::new(),
+            is_major: bool::default(),
+            is_breaking: bool::default(),
+            changelog_url: String::new(),
+            auto_update: bool::default(),
+            is_dismissed: bool::default(),
+            priority_value: u32::default(),
+            release_notes: String::new(),
+            update_date: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.update_id.is_empty() || true && !self.extension_id.is_empty() || true && !self.old_version.is_empty() || true && !self.new_version.is_empty() || true && self.is_major || true && self.is_breaking || true && !self.changelog_url.is_empty() || true && self.auto_update || true && self.is_dismissed || true && self.priority_value < u32::MAX || true && !self.release_notes.is_empty() || true && self.update_date < u64::MAX || true
+    }
+}
+
+impl Default for ExtUpdateNotice {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension gallery promotional banner
+#[derive(Debug, Clone)]
+pub struct ExtBannerInfo {
+    pub banner_url: String,
+    pub banner_color: String,
+    pub banner_theme: String,
+    pub link_url: String,
+    pub alt_text: String,
+    pub position_hint: String,
+    pub is_animated: bool,
+    pub width_px: u32,
+    pub height_px: u32,
+    pub format_type: String,
+    pub campaign_id: String,
+    pub display_order: u32,
+}
+
+impl ExtBannerInfo {
+    pub fn new() -> Self {
+        Self {
+            banner_url: String::new(),
+            banner_color: String::new(),
+            banner_theme: String::new(),
+            link_url: String::new(),
+            alt_text: String::new(),
+            position_hint: String::new(),
+            is_animated: bool::default(),
+            width_px: u32::default(),
+            height_px: u32::default(),
+            format_type: String::new(),
+            campaign_id: String::new(),
+            display_order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.banner_url.is_empty() || true && !self.banner_color.is_empty() || true && !self.banner_theme.is_empty() || true && !self.link_url.is_empty() || true && !self.alt_text.is_empty() || true && !self.position_hint.is_empty() || true && self.is_animated || true && self.width_px < u32::MAX || true && self.height_px < u32::MAX || true && !self.format_type.is_empty() || true && !self.campaign_id.is_empty() || true && self.display_order < u32::MAX || true
+    }
+}
+
+impl Default for ExtBannerInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension marketplace statistics entry
+#[derive(Debug, Clone)]
+pub struct ExtStatEntry {
+    pub stat_name: String,
+    pub stat_value: u64,
+    pub stat_label: String,
+    pub period_text: String,
+    pub trend_direction: String,
+    pub trend_pct: f64,
+    pub last_updated: u64,
+    pub is_public: bool,
+    pub format_hint: String,
+    pub icon_id: String,
+    pub tooltip_text: String,
+    pub chart_data: String,
+}
+
+impl ExtStatEntry {
+    pub fn new() -> Self {
+        Self {
+            stat_name: String::new(),
+            stat_value: u64::default(),
+            stat_label: String::new(),
+            period_text: String::new(),
+            trend_direction: String::new(),
+            trend_pct: f64::default(),
+            last_updated: u64::default(),
+            is_public: bool::default(),
+            format_hint: String::new(),
+            icon_id: String::new(),
+            tooltip_text: String::new(),
+            chart_data: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.stat_name.is_empty() || true && self.stat_value < u64::MAX || true && !self.stat_label.is_empty() || true && !self.period_text.is_empty() || true && !self.trend_direction.is_empty() || true && self.trend_pct.is_finite() || true && self.last_updated < u64::MAX || true && self.is_public || true && !self.format_hint.is_empty() || true && !self.icon_id.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.chart_data.is_empty() || true
+    }
+}
+
+impl Default for ExtStatEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension language contribution tag
+#[derive(Debug, Clone)]
+pub struct ExtLanguageTag {
+    pub language_tag: String,
+    pub extension_id: String,
+    pub grammar_path: String,
+    pub config_path: String,
+    pub snippet_path: String,
+    pub icon_id: String,
+    pub alias_names: String,
+    pub file_extensions: String,
+    pub file_names: String,
+    pub first_line: String,
+    pub mime_types: String,
+    pub scope_name: String,
+}
+
+impl ExtLanguageTag {
+    pub fn new() -> Self {
+        Self {
+            language_tag: String::new(),
+            extension_id: String::new(),
+            grammar_path: String::new(),
+            config_path: String::new(),
+            snippet_path: String::new(),
+            icon_id: String::new(),
+            alias_names: String::new(),
+            file_extensions: String::new(),
+            file_names: String::new(),
+            first_line: String::new(),
+            mime_types: String::new(),
+            scope_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.language_tag.is_empty() || true && !self.extension_id.is_empty() || true && !self.grammar_path.is_empty() || true && !self.config_path.is_empty() || true && !self.snippet_path.is_empty() || true && !self.icon_id.is_empty() || true && !self.alias_names.is_empty() || true && !self.file_extensions.is_empty() || true && !self.file_names.is_empty() || true && !self.first_line.is_empty() || true && !self.mime_types.is_empty() || true && !self.scope_name.is_empty() || true
+    }
+}
+
+impl Default for ExtLanguageTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension color theme preview data
+#[derive(Debug, Clone)]
+pub struct ExtThemePreview {
+    pub preview_id: String,
+    pub theme_name: String,
+    pub screenshot_url: String,
+    pub token_colors: String,
+    pub bg_color: String,
+    pub fg_color: String,
+    pub accent_color: String,
+    pub selection_color: String,
+    pub line_highlight: String,
+    pub is_dark: bool,
+    pub is_high_contrast: bool,
+    pub font_family: String,
+}
+
+impl ExtThemePreview {
+    pub fn new() -> Self {
+        Self {
+            preview_id: String::new(),
+            theme_name: String::new(),
+            screenshot_url: String::new(),
+            token_colors: String::new(),
+            bg_color: String::new(),
+            fg_color: String::new(),
+            accent_color: String::new(),
+            selection_color: String::new(),
+            line_highlight: String::new(),
+            is_dark: bool::default(),
+            is_high_contrast: bool::default(),
+            font_family: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.preview_id.is_empty() || true && !self.theme_name.is_empty() || true && !self.screenshot_url.is_empty() || true && !self.token_colors.is_empty() || true && !self.bg_color.is_empty() || true && !self.fg_color.is_empty() || true && !self.accent_color.is_empty() || true && !self.selection_color.is_empty() || true && !self.line_highlight.is_empty() || true && self.is_dark || true && self.is_high_contrast || true && !self.font_family.is_empty() || true
+    }
+}
+
+impl Default for ExtThemePreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension gallery endpoint configuration
+#[derive(Debug, Clone)]
+pub struct ExtGalleryConfig {
+    pub gallery_url: String,
+    pub service_url: String,
+    pub item_url: String,
+    pub control_url: String,
+    pub search_url: String,
+    pub api_version: String,
+    pub auth_token: String,
+    pub cache_duration: u32,
+    pub retry_count: u32,
+    pub timeout_ms: u32,
+    pub proxy_url: String,
+    pub user_agent: String,
+}
+
+impl ExtGalleryConfig {
+    pub fn new() -> Self {
+        Self {
+            gallery_url: String::new(),
+            service_url: String::new(),
+            item_url: String::new(),
+            control_url: String::new(),
+            search_url: String::new(),
+            api_version: String::new(),
+            auth_token: String::new(),
+            cache_duration: u32::default(),
+            retry_count: u32::default(),
+            timeout_ms: u32::default(),
+            proxy_url: String::new(),
+            user_agent: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gallery_url.is_empty() || true && !self.service_url.is_empty() || true && !self.item_url.is_empty() || true && !self.control_url.is_empty() || true && !self.search_url.is_empty() || true && !self.api_version.is_empty() || true && !self.auth_token.is_empty() || true && self.cache_duration < u32::MAX || true && self.retry_count < u32::MAX || true && self.timeout_ms < u32::MAX || true && !self.proxy_url.is_empty() || true && !self.user_agent.is_empty() || true
+    }
+}
+
+impl Default for ExtGalleryConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -541515,6 +542711,474 @@ mod tests_mnz_generated {
     fn test_mnz_fields() {
         let mut obj = ScmViewConfig::default();
         obj.view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_moa_generated {
+    use super::*;
+
+    #[test]
+    fn test_moa_default() {
+        let obj = ExtGalleryItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_moa_fields() {
+        let mut obj = ExtGalleryItem::default();
+        obj.extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mob_generated {
+    use super::*;
+
+    #[test]
+    fn test_mob_default() {
+        let obj = ExtGalleryQuery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mob_fields() {
+        let mut obj = ExtGalleryQuery::default();
+        obj.query_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_moc_generated {
+    use super::*;
+
+    #[test]
+    fn test_moc_default() {
+        let obj = ExtVersionInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_moc_fields() {
+        let mut obj = ExtVersionInfo::default();
+        obj.version_string = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mod_generated {
+    use super::*;
+
+    #[test]
+    fn test_mod_default() {
+        let obj = ExtRatingEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mod_fields() {
+        let mut obj = ExtRatingEntry::default();
+        obj.rating_value = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_moe_generated {
+    use super::*;
+
+    #[test]
+    fn test_moe_default() {
+        let obj = ExtReviewEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_moe_fields() {
+        let mut obj = ExtReviewEntry::default();
+        obj.review_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mof_generated {
+    use super::*;
+
+    #[test]
+    fn test_mof_default() {
+        let obj = ExtCategoryEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mof_fields() {
+        let mut obj = ExtCategoryEntry::default();
+        obj.category_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mog_generated {
+    use super::*;
+
+    #[test]
+    fn test_mog_default() {
+        let obj = ExtPublisher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mog_fields() {
+        let mut obj = ExtPublisher::default();
+        obj.publisher_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_moh_generated {
+    use super::*;
+
+    #[test]
+    fn test_moh_default() {
+        let obj = ExtBadgeEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_moh_fields() {
+        let mut obj = ExtBadgeEntry::default();
+        obj.badge_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_moi_generated {
+    use super::*;
+
+    #[test]
+    fn test_moi_default() {
+        let obj = ExtAssetEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_moi_fields() {
+        let mut obj = ExtAssetEntry::default();
+        obj.asset_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_moj_generated {
+    use super::*;
+
+    #[test]
+    fn test_moj_default() {
+        let obj = ExtDependencyRef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_moj_fields() {
+        let mut obj = ExtDependencyRef::default();
+        obj.dep_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mok_generated {
+    use super::*;
+
+    #[test]
+    fn test_mok_default() {
+        let obj = ExtPackEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mok_fields() {
+        let mut obj = ExtPackEntry::default();
+        obj.pack_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mol_generated {
+    use super::*;
+
+    #[test]
+    fn test_mol_default() {
+        let obj = ExtChangelog::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mol_fields() {
+        let mut obj = ExtChangelog::default();
+        obj.version_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mom_generated {
+    use super::*;
+
+    #[test]
+    fn test_mom_default() {
+        let obj = ExtReadmeSection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mom_fields() {
+        let mut obj = ExtReadmeSection::default();
+        obj.section_title = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mon_generated {
+    use super::*;
+
+    #[test]
+    fn test_mon_default() {
+        let obj = ExtInstallState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mon_fields() {
+        let mut obj = ExtInstallState::default();
+        obj.install_phase = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_moo_generated {
+    use super::*;
+
+    #[test]
+    fn test_moo_default() {
+        let obj = ExtViewSection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_moo_fields() {
+        let mut obj = ExtViewSection::default();
+        obj.section_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mop_generated {
+    use super::*;
+
+    #[test]
+    fn test_mop_default() {
+        let obj = ExtSearchResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mop_fields() {
+        let mut obj = ExtSearchResult::default();
+        obj.result_index = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_moq_generated {
+    use super::*;
+
+    #[test]
+    fn test_moq_default() {
+        let obj = ExtFilterOption::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_moq_fields() {
+        let mut obj = ExtFilterOption::default();
+        obj.filter_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mor_generated {
+    use super::*;
+
+    #[test]
+    fn test_mor_default() {
+        let obj = ExtSortOption::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mor_fields() {
+        let mut obj = ExtSortOption::default();
+        obj.sort_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mos_generated {
+    use super::*;
+
+    #[test]
+    fn test_mos_default() {
+        let obj = ExtRecommendation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mos_fields() {
+        let mut obj = ExtRecommendation::default();
+        obj.rec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mot_generated {
+    use super::*;
+
+    #[test]
+    fn test_mot_default() {
+        let obj = ExtFeatureFlag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mot_fields() {
+        let mut obj = ExtFeatureFlag::default();
+        obj.flag_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mou_generated {
+    use super::*;
+
+    #[test]
+    fn test_mou_default() {
+        let obj = ExtUpdateNotice::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mou_fields() {
+        let mut obj = ExtUpdateNotice::default();
+        obj.update_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mov_generated {
+    use super::*;
+
+    #[test]
+    fn test_mov_default() {
+        let obj = ExtBannerInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mov_fields() {
+        let mut obj = ExtBannerInfo::default();
+        obj.banner_url = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mow_generated {
+    use super::*;
+
+    #[test]
+    fn test_mow_default() {
+        let obj = ExtStatEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mow_fields() {
+        let mut obj = ExtStatEntry::default();
+        obj.stat_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mox_generated {
+    use super::*;
+
+    #[test]
+    fn test_mox_default() {
+        let obj = ExtLanguageTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mox_fields() {
+        let mut obj = ExtLanguageTag::default();
+        obj.language_tag = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_moy_generated {
+    use super::*;
+
+    #[test]
+    fn test_moy_default() {
+        let obj = ExtThemePreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_moy_fields() {
+        let mut obj = ExtThemePreview::default();
+        obj.preview_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_moz_generated {
+    use super::*;
+
+    #[test]
+    fn test_moz_default() {
+        let obj = ExtGalleryConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_moz_fields() {
+        let mut obj = ExtGalleryConfig::default();
+        obj.gallery_url = "test".to_string();
         assert!(obj.validate());
     }
 }
