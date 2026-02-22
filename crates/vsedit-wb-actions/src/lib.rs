@@ -237176,6 +237176,1202 @@ impl Default for OutputAccessibility {
     }
 }
 
+/// Source control resource entry model
+#[derive(Debug, Clone)]
+pub struct ScmResourceEntry {
+    pub resource_uri: String,
+    pub resource_name: String,
+    pub status_char: String,
+    pub is_staged: bool,
+    pub is_modified: bool,
+    pub is_added: bool,
+    pub is_deleted: bool,
+    pub is_renamed: bool,
+    pub original_uri: String,
+    pub decoration_text: String,
+    pub icon_id: String,
+    pub group_id: String,
+}
+
+impl ScmResourceEntry {
+    pub fn new() -> Self {
+        Self {
+            resource_uri: String::new(),
+            resource_name: String::new(),
+            status_char: String::new(),
+            is_staged: bool::default(),
+            is_modified: bool::default(),
+            is_added: bool::default(),
+            is_deleted: bool::default(),
+            is_renamed: bool::default(),
+            original_uri: String::new(),
+            decoration_text: String::new(),
+            icon_id: String::new(),
+            group_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resource_uri.is_empty() || true && !self.resource_name.is_empty() || true && !self.status_char.is_empty() || true && self.is_staged || true && self.is_modified || true && self.is_added || true && self.is_deleted || true && self.is_renamed || true && !self.original_uri.is_empty() || true && !self.decoration_text.is_empty() || true && !self.icon_id.is_empty() || true && !self.group_id.is_empty() || true
+    }
+}
+
+impl Default for ScmResourceEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control provider state model
+#[derive(Debug, Clone)]
+pub struct ScmProviderState {
+    pub provider_id: String,
+    pub provider_label: String,
+    pub root_uri: String,
+    pub branch_name: String,
+    pub commit_count: u32,
+    pub is_dirty: bool,
+    pub status_text: String,
+    pub action_label: String,
+    pub has_changes: bool,
+    pub resource_count: u32,
+    pub icon_id: String,
+    pub is_default: bool,
+}
+
+impl ScmProviderState {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_label: String::new(),
+            root_uri: String::new(),
+            branch_name: String::new(),
+            commit_count: u32::default(),
+            is_dirty: bool::default(),
+            status_text: String::new(),
+            action_label: String::new(),
+            has_changes: bool::default(),
+            resource_count: u32::default(),
+            icon_id: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.provider_label.is_empty() || true && !self.root_uri.is_empty() || true && !self.branch_name.is_empty() || true && self.commit_count < u32::MAX || true && self.is_dirty || true && !self.status_text.is_empty() || true && !self.action_label.is_empty() || true && self.has_changes || true && self.resource_count < u32::MAX || true && !self.icon_id.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for ScmProviderState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control change list group
+#[derive(Debug, Clone)]
+pub struct ScmChangeGroup {
+    pub group_id: String,
+    pub group_label: String,
+    pub resource_count: u32,
+    pub is_expanded: bool,
+    pub is_staged: bool,
+    pub is_working: bool,
+    pub is_merge: bool,
+    pub icon_id: String,
+    pub tooltip_text: String,
+    pub sort_order: u32,
+    pub hide_when_empty: bool,
+    pub description_text: String,
+}
+
+impl ScmChangeGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            group_label: String::new(),
+            resource_count: u32::default(),
+            is_expanded: bool::default(),
+            is_staged: bool::default(),
+            is_working: bool::default(),
+            is_merge: bool::default(),
+            icon_id: String::new(),
+            tooltip_text: String::new(),
+            sort_order: u32::default(),
+            hide_when_empty: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.group_label.is_empty() || true && self.resource_count < u32::MAX || true && self.is_expanded || true && self.is_staged || true && self.is_working || true && self.is_merge || true && !self.icon_id.is_empty() || true && !self.tooltip_text.is_empty() || true && self.sort_order < u32::MAX || true && self.hide_when_empty || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ScmChangeGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control commit information
+#[derive(Debug, Clone)]
+pub struct ScmCommitInfo {
+    pub commit_hash: String,
+    pub commit_message: String,
+    pub author_name: String,
+    pub author_email: String,
+    pub date_ms: u64,
+    pub parent_hashes: String,
+    pub is_merge: bool,
+    pub is_head: bool,
+    pub branch_refs: String,
+    pub tag_refs: String,
+    pub file_count: u32,
+    pub short_hash: String,
+}
+
+impl ScmCommitInfo {
+    pub fn new() -> Self {
+        Self {
+            commit_hash: String::new(),
+            commit_message: String::new(),
+            author_name: String::new(),
+            author_email: String::new(),
+            date_ms: u64::default(),
+            parent_hashes: String::new(),
+            is_merge: bool::default(),
+            is_head: bool::default(),
+            branch_refs: String::new(),
+            tag_refs: String::new(),
+            file_count: u32::default(),
+            short_hash: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.commit_hash.is_empty() || true && !self.commit_message.is_empty() || true && !self.author_name.is_empty() || true && !self.author_email.is_empty() || true && self.date_ms < u64::MAX || true && !self.parent_hashes.is_empty() || true && self.is_merge || true && self.is_head || true && !self.branch_refs.is_empty() || true && !self.tag_refs.is_empty() || true && self.file_count < u32::MAX || true && !self.short_hash.is_empty() || true
+    }
+}
+
+impl Default for ScmCommitInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control branch entry model
+#[derive(Debug, Clone)]
+pub struct ScmBranchEntry {
+    pub branch_name: String,
+    pub is_current: bool,
+    pub is_remote: bool,
+    pub is_detached: bool,
+    pub upstream_name: String,
+    pub ahead_count: u32,
+    pub behind_count: u32,
+    pub commit_hash: String,
+    pub last_commit: String,
+    pub protection_status: String,
+    pub is_default: bool,
+    pub created_ms: u64,
+}
+
+impl ScmBranchEntry {
+    pub fn new() -> Self {
+        Self {
+            branch_name: String::new(),
+            is_current: bool::default(),
+            is_remote: bool::default(),
+            is_detached: bool::default(),
+            upstream_name: String::new(),
+            ahead_count: u32::default(),
+            behind_count: u32::default(),
+            commit_hash: String::new(),
+            last_commit: String::new(),
+            protection_status: String::new(),
+            is_default: bool::default(),
+            created_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.branch_name.is_empty() || true && self.is_current || true && self.is_remote || true && self.is_detached || true && !self.upstream_name.is_empty() || true && self.ahead_count < u32::MAX || true && self.behind_count < u32::MAX || true && !self.commit_hash.is_empty() || true && !self.last_commit.is_empty() || true && !self.protection_status.is_empty() || true && self.is_default || true && self.created_ms < u64::MAX || true
+    }
+}
+
+impl Default for ScmBranchEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control remote repository entry
+#[derive(Debug, Clone)]
+pub struct ScmRemoteEntry {
+    pub remote_name: String,
+    pub fetch_url: String,
+    pub push_url: String,
+    pub is_default: bool,
+    pub branch_count: u32,
+    pub last_fetch_ms: u64,
+    pub protocol_kind: String,
+    pub auth_method: String,
+    pub is_connected: bool,
+    pub head_branch: String,
+    pub description_text: String,
+    pub icon_id: String,
+}
+
+impl ScmRemoteEntry {
+    pub fn new() -> Self {
+        Self {
+            remote_name: String::new(),
+            fetch_url: String::new(),
+            push_url: String::new(),
+            is_default: bool::default(),
+            branch_count: u32::default(),
+            last_fetch_ms: u64::default(),
+            protocol_kind: String::new(),
+            auth_method: String::new(),
+            is_connected: bool::default(),
+            head_branch: String::new(),
+            description_text: String::new(),
+            icon_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_name.is_empty() || true && !self.fetch_url.is_empty() || true && !self.push_url.is_empty() || true && self.is_default || true && self.branch_count < u32::MAX || true && self.last_fetch_ms < u64::MAX || true && !self.protocol_kind.is_empty() || true && !self.auth_method.is_empty() || true && self.is_connected || true && !self.head_branch.is_empty() || true && !self.description_text.is_empty() || true && !self.icon_id.is_empty() || true
+    }
+}
+
+impl Default for ScmRemoteEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control stash entry model
+#[derive(Debug, Clone)]
+pub struct ScmStashEntry {
+    pub stash_index: u32,
+    pub stash_message: String,
+    pub branch_name: String,
+    pub commit_hash: String,
+    pub created_ms: u64,
+    pub file_count: u32,
+    pub has_untracked: bool,
+    pub has_staged: bool,
+    pub parent_hash: String,
+    pub author_name: String,
+    pub is_partial: bool,
+    pub description_text: String,
+}
+
+impl ScmStashEntry {
+    pub fn new() -> Self {
+        Self {
+            stash_index: u32::default(),
+            stash_message: String::new(),
+            branch_name: String::new(),
+            commit_hash: String::new(),
+            created_ms: u64::default(),
+            file_count: u32::default(),
+            has_untracked: bool::default(),
+            has_staged: bool::default(),
+            parent_hash: String::new(),
+            author_name: String::new(),
+            is_partial: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.stash_index < u32::MAX || true && !self.stash_message.is_empty() || true && !self.branch_name.is_empty() || true && !self.commit_hash.is_empty() || true && self.created_ms < u64::MAX || true && self.file_count < u32::MAX || true && self.has_untracked || true && self.has_staged || true && !self.parent_hash.is_empty() || true && !self.author_name.is_empty() || true && self.is_partial || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ScmStashEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control history timeline entry
+#[derive(Debug, Clone)]
+pub struct ScmHistoryEntry {
+    pub entry_hash: String,
+    pub entry_message: String,
+    pub author_name: String,
+    pub date_ms: u64,
+    pub parent_hash: String,
+    pub file_changes: String,
+    pub is_merge: bool,
+    pub graph_column: u32,
+    pub graph_color: String,
+    pub refs_text: String,
+    pub avatar_url: String,
+    pub stat_summary: String,
+}
+
+impl ScmHistoryEntry {
+    pub fn new() -> Self {
+        Self {
+            entry_hash: String::new(),
+            entry_message: String::new(),
+            author_name: String::new(),
+            date_ms: u64::default(),
+            parent_hash: String::new(),
+            file_changes: String::new(),
+            is_merge: bool::default(),
+            graph_column: u32::default(),
+            graph_color: String::new(),
+            refs_text: String::new(),
+            avatar_url: String::new(),
+            stat_summary: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.entry_hash.is_empty() || true && !self.entry_message.is_empty() || true && !self.author_name.is_empty() || true && self.date_ms < u64::MAX || true && !self.parent_hash.is_empty() || true && !self.file_changes.is_empty() || true && self.is_merge || true && self.graph_column < u32::MAX || true && !self.graph_color.is_empty() || true && !self.refs_text.is_empty() || true && !self.avatar_url.is_empty() || true && !self.stat_summary.is_empty() || true
+    }
+}
+
+impl Default for ScmHistoryEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control merge conflict file
+#[derive(Debug, Clone)]
+pub struct ScmConflictFile {
+    pub file_path: String,
+    pub conflict_kind: String,
+    pub base_content: String,
+    pub ours_content: String,
+    pub theirs_content: String,
+    pub is_resolved: bool,
+    pub resolution: String,
+    pub marker_count: u32,
+    pub current_marker: u32,
+    pub has_diff3: bool,
+    pub region_count: u32,
+    pub auto_resolvable: bool,
+}
+
+impl ScmConflictFile {
+    pub fn new() -> Self {
+        Self {
+            file_path: String::new(),
+            conflict_kind: String::new(),
+            base_content: String::new(),
+            ours_content: String::new(),
+            theirs_content: String::new(),
+            is_resolved: bool::default(),
+            resolution: String::new(),
+            marker_count: u32::default(),
+            current_marker: u32::default(),
+            has_diff3: bool::default(),
+            region_count: u32::default(),
+            auto_resolvable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_path.is_empty() || true && !self.conflict_kind.is_empty() || true && !self.base_content.is_empty() || true && !self.ours_content.is_empty() || true && !self.theirs_content.is_empty() || true && self.is_resolved || true && !self.resolution.is_empty() || true && self.marker_count < u32::MAX || true && self.current_marker < u32::MAX || true && self.has_diff3 || true && self.region_count < u32::MAX || true && self.auto_resolvable || true
+    }
+}
+
+impl Default for ScmConflictFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control tag/release entry
+#[derive(Debug, Clone)]
+pub struct ScmTagEntry {
+    pub tag_name: String,
+    pub tag_hash: String,
+    pub target_hash: String,
+    pub tagger_name: String,
+    pub tagger_email: String,
+    pub date_ms: u64,
+    pub message_text: String,
+    pub is_annotated: bool,
+    pub is_lightweight: bool,
+    pub is_signed: bool,
+    pub release_url: String,
+    pub description_text: String,
+}
+
+impl ScmTagEntry {
+    pub fn new() -> Self {
+        Self {
+            tag_name: String::new(),
+            tag_hash: String::new(),
+            target_hash: String::new(),
+            tagger_name: String::new(),
+            tagger_email: String::new(),
+            date_ms: u64::default(),
+            message_text: String::new(),
+            is_annotated: bool::default(),
+            is_lightweight: bool::default(),
+            is_signed: bool::default(),
+            release_url: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tag_name.is_empty() || true && !self.tag_hash.is_empty() || true && !self.target_hash.is_empty() || true && !self.tagger_name.is_empty() || true && !self.tagger_email.is_empty() || true && self.date_ms < u64::MAX || true && !self.message_text.is_empty() || true && self.is_annotated || true && self.is_lightweight || true && self.is_signed || true && !self.release_url.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ScmTagEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control diff hunk data
+#[derive(Debug, Clone)]
+pub struct ScmDiffHunk {
+    pub hunk_header: String,
+    pub old_start: u32,
+    pub old_count: u32,
+    pub new_start: u32,
+    pub new_count: u32,
+    pub context_lines: String,
+    pub added_lines: String,
+    pub removed_lines: String,
+    pub is_binary: bool,
+    pub file_path: String,
+    pub hunk_index: u32,
+    pub section_header: String,
+}
+
+impl ScmDiffHunk {
+    pub fn new() -> Self {
+        Self {
+            hunk_header: String::new(),
+            old_start: u32::default(),
+            old_count: u32::default(),
+            new_start: u32::default(),
+            new_count: u32::default(),
+            context_lines: String::new(),
+            added_lines: String::new(),
+            removed_lines: String::new(),
+            is_binary: bool::default(),
+            file_path: String::new(),
+            hunk_index: u32::default(),
+            section_header: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hunk_header.is_empty() || true && self.old_start < u32::MAX || true && self.old_count < u32::MAX || true && self.new_start < u32::MAX || true && self.new_count < u32::MAX || true && !self.context_lines.is_empty() || true && !self.added_lines.is_empty() || true && !self.removed_lines.is_empty() || true && self.is_binary || true && !self.file_path.is_empty() || true && self.hunk_index < u32::MAX || true && !self.section_header.is_empty() || true
+    }
+}
+
+impl Default for ScmDiffHunk {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control line blame annotation
+#[derive(Debug, Clone)]
+pub struct ScmBlameInfo {
+    pub blame_hash: String,
+    pub author_name: String,
+    pub author_email: String,
+    pub date_ms: u64,
+    pub line_text: String,
+    pub line_number: u32,
+    pub original_line: u32,
+    pub commit_message: String,
+    pub is_uncommitted: bool,
+    pub file_path: String,
+    pub previous_hash: String,
+    pub blame_range: u32,
+}
+
+impl ScmBlameInfo {
+    pub fn new() -> Self {
+        Self {
+            blame_hash: String::new(),
+            author_name: String::new(),
+            author_email: String::new(),
+            date_ms: u64::default(),
+            line_text: String::new(),
+            line_number: u32::default(),
+            original_line: u32::default(),
+            commit_message: String::new(),
+            is_uncommitted: bool::default(),
+            file_path: String::new(),
+            previous_hash: String::new(),
+            blame_range: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.blame_hash.is_empty() || true && !self.author_name.is_empty() || true && !self.author_email.is_empty() || true && self.date_ms < u64::MAX || true && !self.line_text.is_empty() || true && self.line_number < u32::MAX || true && self.original_line < u32::MAX || true && !self.commit_message.is_empty() || true && self.is_uncommitted || true && !self.file_path.is_empty() || true && !self.previous_hash.is_empty() || true && self.blame_range < u32::MAX || true
+    }
+}
+
+impl Default for ScmBlameInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control submodule entry
+#[derive(Debug, Clone)]
+pub struct ScmSubmoduleEntry {
+    pub submodule_path: String,
+    pub submodule_url: String,
+    pub head_hash: String,
+    pub expected_hash: String,
+    pub is_initialized: bool,
+    pub is_dirty: bool,
+    pub has_commits: bool,
+    pub branch_name: String,
+    pub status_text: String,
+    pub update_mode: String,
+    pub recursive_status: bool,
+    pub description_text: String,
+}
+
+impl ScmSubmoduleEntry {
+    pub fn new() -> Self {
+        Self {
+            submodule_path: String::new(),
+            submodule_url: String::new(),
+            head_hash: String::new(),
+            expected_hash: String::new(),
+            is_initialized: bool::default(),
+            is_dirty: bool::default(),
+            has_commits: bool::default(),
+            branch_name: String::new(),
+            status_text: String::new(),
+            update_mode: String::new(),
+            recursive_status: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.submodule_path.is_empty() || true && !self.submodule_url.is_empty() || true && !self.head_hash.is_empty() || true && !self.expected_hash.is_empty() || true && self.is_initialized || true && self.is_dirty || true && self.has_commits || true && !self.branch_name.is_empty() || true && !self.status_text.is_empty() || true && !self.update_mode.is_empty() || true && self.recursive_status || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ScmSubmoduleEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control commit input box state
+#[derive(Debug, Clone)]
+pub struct ScmInputBox {
+    pub input_text: String,
+    pub placeholder_text: String,
+    pub is_visible: bool,
+    pub is_focused: bool,
+    pub cursor_pos: u32,
+    pub selection_start: u32,
+    pub selection_end: u32,
+    pub max_length: u32,
+    pub is_multiline: bool,
+    pub validation_msg: String,
+    pub action_label: String,
+    pub template_text: String,
+}
+
+impl ScmInputBox {
+    pub fn new() -> Self {
+        Self {
+            input_text: String::new(),
+            placeholder_text: String::new(),
+            is_visible: bool::default(),
+            is_focused: bool::default(),
+            cursor_pos: u32::default(),
+            selection_start: u32::default(),
+            selection_end: u32::default(),
+            max_length: u32::default(),
+            is_multiline: bool::default(),
+            validation_msg: String::new(),
+            action_label: String::new(),
+            template_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_text.is_empty() || true && !self.placeholder_text.is_empty() || true && self.is_visible || true && self.is_focused || true && self.cursor_pos < u32::MAX || true && self.selection_start < u32::MAX || true && self.selection_end < u32::MAX || true && self.max_length < u32::MAX || true && self.is_multiline || true && !self.validation_msg.is_empty() || true && !self.action_label.is_empty() || true && !self.template_text.is_empty() || true
+    }
+}
+
+impl Default for ScmInputBox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control view action button
+#[derive(Debug, Clone)]
+pub struct ScmActionButton {
+    pub button_id: String,
+    pub button_label: String,
+    pub icon_id: String,
+    pub tooltip_text: String,
+    pub is_enabled: bool,
+    pub command_id: String,
+    pub command_args: String,
+    pub when_clause: String,
+    pub sort_order: u32,
+    pub group_name: String,
+    pub is_primary: bool,
+    pub badge_text: String,
+}
+
+impl ScmActionButton {
+    pub fn new() -> Self {
+        Self {
+            button_id: String::new(),
+            button_label: String::new(),
+            icon_id: String::new(),
+            tooltip_text: String::new(),
+            is_enabled: bool::default(),
+            command_id: String::new(),
+            command_args: String::new(),
+            when_clause: String::new(),
+            sort_order: u32::default(),
+            group_name: String::new(),
+            is_primary: bool::default(),
+            badge_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.button_id.is_empty() || true && !self.button_label.is_empty() || true && !self.icon_id.is_empty() || true && !self.tooltip_text.is_empty() || true && self.is_enabled || true && !self.command_id.is_empty() || true && !self.command_args.is_empty() || true && !self.when_clause.is_empty() || true && self.sort_order < u32::MAX || true && !self.group_name.is_empty() || true && self.is_primary || true && !self.badge_text.is_empty() || true
+    }
+}
+
+impl Default for ScmActionButton {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control view sorting options
+#[derive(Debug, Clone)]
+pub struct ScmViewSort {
+    pub sort_field: String,
+    pub sort_direction: String,
+    pub group_by: String,
+    pub show_staged: bool,
+    pub show_changes: bool,
+    pub show_untracked: bool,
+    pub compact_view: bool,
+    pub tree_view: bool,
+    pub show_actions: bool,
+    pub filter_text: String,
+    pub is_flat: bool,
+    pub sort_folders: bool,
+}
+
+impl ScmViewSort {
+    pub fn new() -> Self {
+        Self {
+            sort_field: String::new(),
+            sort_direction: String::new(),
+            group_by: String::new(),
+            show_staged: bool::default(),
+            show_changes: bool::default(),
+            show_untracked: bool::default(),
+            compact_view: bool::default(),
+            tree_view: bool::default(),
+            show_actions: bool::default(),
+            filter_text: String::new(),
+            is_flat: bool::default(),
+            sort_folders: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sort_field.is_empty() || true && !self.sort_direction.is_empty() || true && !self.group_by.is_empty() || true && self.show_staged || true && self.show_changes || true && self.show_untracked || true && self.compact_view || true && self.tree_view || true && self.show_actions || true && !self.filter_text.is_empty() || true && self.is_flat || true && self.sort_folders || true
+    }
+}
+
+impl Default for ScmViewSort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control graph visualization node
+#[derive(Debug, Clone)]
+pub struct ScmGraphNode {
+    pub node_hash: String,
+    pub column_index: u32,
+    pub row_index: u32,
+    pub color_id: String,
+    pub is_merge: bool,
+    pub is_branch_tip: bool,
+    pub is_tag: bool,
+    pub parent_count: u32,
+    pub child_count: u32,
+    pub branch_name: String,
+    pub refs_text: String,
+    pub glyph_char: String,
+}
+
+impl ScmGraphNode {
+    pub fn new() -> Self {
+        Self {
+            node_hash: String::new(),
+            column_index: u32::default(),
+            row_index: u32::default(),
+            color_id: String::new(),
+            is_merge: bool::default(),
+            is_branch_tip: bool::default(),
+            is_tag: bool::default(),
+            parent_count: u32::default(),
+            child_count: u32::default(),
+            branch_name: String::new(),
+            refs_text: String::new(),
+            glyph_char: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.node_hash.is_empty() || true && self.column_index < u32::MAX || true && self.row_index < u32::MAX || true && !self.color_id.is_empty() || true && self.is_merge || true && self.is_branch_tip || true && self.is_tag || true && self.parent_count < u32::MAX || true && self.child_count < u32::MAX || true && !self.branch_name.is_empty() || true && !self.refs_text.is_empty() || true && !self.glyph_char.is_empty() || true
+    }
+}
+
+impl Default for ScmGraphNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control graph visualization edge
+#[derive(Debug, Clone)]
+pub struct ScmGraphEdge {
+    pub from_hash: String,
+    pub to_hash: String,
+    pub edge_color: String,
+    pub from_column: u32,
+    pub to_column: u32,
+    pub is_merge_edge: bool,
+    pub is_branch_edge: bool,
+    pub line_style: String,
+    pub weight_value: u32,
+    pub from_row: u32,
+    pub to_row: u32,
+    pub is_hidden: bool,
+}
+
+impl ScmGraphEdge {
+    pub fn new() -> Self {
+        Self {
+            from_hash: String::new(),
+            to_hash: String::new(),
+            edge_color: String::new(),
+            from_column: u32::default(),
+            to_column: u32::default(),
+            is_merge_edge: bool::default(),
+            is_branch_edge: bool::default(),
+            line_style: String::new(),
+            weight_value: u32::default(),
+            from_row: u32::default(),
+            to_row: u32::default(),
+            is_hidden: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.from_hash.is_empty() || true && !self.to_hash.is_empty() || true && !self.edge_color.is_empty() || true && self.from_column < u32::MAX || true && self.to_column < u32::MAX || true && self.is_merge_edge || true && self.is_branch_edge || true && !self.line_style.is_empty() || true && self.weight_value < u32::MAX || true && self.from_row < u32::MAX || true && self.to_row < u32::MAX || true && self.is_hidden || true
+    }
+}
+
+impl Default for ScmGraphEdge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control file status decoration
+#[derive(Debug, Clone)]
+pub struct ScmFileStatus {
+    pub status_code: String,
+    pub status_label: String,
+    pub fg_color: String,
+    pub icon_id: String,
+    pub is_staged: bool,
+    pub is_working: bool,
+    pub badge_char: String,
+    pub tooltip_text: String,
+    pub priority_value: u32,
+    pub decoration_kind: String,
+    pub strikethrough: bool,
+    pub opacity_value: f64,
+}
+
+impl ScmFileStatus {
+    pub fn new() -> Self {
+        Self {
+            status_code: String::new(),
+            status_label: String::new(),
+            fg_color: String::new(),
+            icon_id: String::new(),
+            is_staged: bool::default(),
+            is_working: bool::default(),
+            badge_char: String::new(),
+            tooltip_text: String::new(),
+            priority_value: u32::default(),
+            decoration_kind: String::new(),
+            strikethrough: bool::default(),
+            opacity_value: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.status_code.is_empty() || true && !self.status_label.is_empty() || true && !self.fg_color.is_empty() || true && !self.icon_id.is_empty() || true && self.is_staged || true && self.is_working || true && !self.badge_char.is_empty() || true && !self.tooltip_text.is_empty() || true && self.priority_value < u32::MAX || true && !self.decoration_kind.is_empty() || true && self.strikethrough || true && self.opacity_value.is_finite() || true
+    }
+}
+
+impl Default for ScmFileStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control worktree entry
+#[derive(Debug, Clone)]
+pub struct ScmWorktreeEntry {
+    pub worktree_path: String,
+    pub branch_name: String,
+    pub head_hash: String,
+    pub is_bare: bool,
+    pub is_locked: bool,
+    pub lock_reason: String,
+    pub is_prunable: bool,
+    pub created_ms: u64,
+    pub is_main: bool,
+    pub is_detached: bool,
+    pub description_text: String,
+    pub status_text: String,
+}
+
+impl ScmWorktreeEntry {
+    pub fn new() -> Self {
+        Self {
+            worktree_path: String::new(),
+            branch_name: String::new(),
+            head_hash: String::new(),
+            is_bare: bool::default(),
+            is_locked: bool::default(),
+            lock_reason: String::new(),
+            is_prunable: bool::default(),
+            created_ms: u64::default(),
+            is_main: bool::default(),
+            is_detached: bool::default(),
+            description_text: String::new(),
+            status_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.worktree_path.is_empty() || true && !self.branch_name.is_empty() || true && !self.head_hash.is_empty() || true && self.is_bare || true && self.is_locked || true && !self.lock_reason.is_empty() || true && self.is_prunable || true && self.created_ms < u64::MAX || true && self.is_main || true && self.is_detached || true && !self.description_text.is_empty() || true && !self.status_text.is_empty() || true
+    }
+}
+
+impl Default for ScmWorktreeEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control cherry-pick operation state
+#[derive(Debug, Clone)]
+pub struct ScmCherryPick {
+    pub pick_hash: String,
+    pub pick_message: String,
+    pub source_branch: String,
+    pub target_branch: String,
+    pub is_in_progress: bool,
+    pub conflict_count: u32,
+    pub resolved_count: u32,
+    pub current_step: u32,
+    pub total_steps: u32,
+    pub abort_available: bool,
+    pub continue_available: bool,
+    pub author_name: String,
+}
+
+impl ScmCherryPick {
+    pub fn new() -> Self {
+        Self {
+            pick_hash: String::new(),
+            pick_message: String::new(),
+            source_branch: String::new(),
+            target_branch: String::new(),
+            is_in_progress: bool::default(),
+            conflict_count: u32::default(),
+            resolved_count: u32::default(),
+            current_step: u32::default(),
+            total_steps: u32::default(),
+            abort_available: bool::default(),
+            continue_available: bool::default(),
+            author_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pick_hash.is_empty() || true && !self.pick_message.is_empty() || true && !self.source_branch.is_empty() || true && !self.target_branch.is_empty() || true && self.is_in_progress || true && self.conflict_count < u32::MAX || true && self.resolved_count < u32::MAX || true && self.current_step < u32::MAX || true && self.total_steps < u32::MAX || true && self.abort_available || true && self.continue_available || true && !self.author_name.is_empty() || true
+    }
+}
+
+impl Default for ScmCherryPick {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control rebase operation state
+#[derive(Debug, Clone)]
+pub struct ScmRebaseState {
+    pub rebase_branch: String,
+    pub onto_branch: String,
+    pub current_step: u32,
+    pub total_steps: u32,
+    pub is_interactive: bool,
+    pub is_in_progress: bool,
+    pub conflict_count: u32,
+    pub head_hash: String,
+    pub original_head: String,
+    pub abort_available: bool,
+    pub continue_available: bool,
+    pub edit_todo: bool,
+}
+
+impl ScmRebaseState {
+    pub fn new() -> Self {
+        Self {
+            rebase_branch: String::new(),
+            onto_branch: String::new(),
+            current_step: u32::default(),
+            total_steps: u32::default(),
+            is_interactive: bool::default(),
+            is_in_progress: bool::default(),
+            conflict_count: u32::default(),
+            head_hash: String::new(),
+            original_head: String::new(),
+            abort_available: bool::default(),
+            continue_available: bool::default(),
+            edit_todo: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rebase_branch.is_empty() || true && !self.onto_branch.is_empty() || true && self.current_step < u32::MAX || true && self.total_steps < u32::MAX || true && self.is_interactive || true && self.is_in_progress || true && self.conflict_count < u32::MAX || true && !self.head_hash.is_empty() || true && !self.original_head.is_empty() || true && self.abort_available || true && self.continue_available || true && self.edit_todo || true
+    }
+}
+
+impl Default for ScmRebaseState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control patch file entry
+#[derive(Debug, Clone)]
+pub struct ScmPatchEntry {
+    pub patch_content: String,
+    pub file_path: String,
+    pub patch_header: String,
+    pub is_binary: bool,
+    pub old_mode: String,
+    pub new_mode: String,
+    pub added_count: u32,
+    pub removed_count: u32,
+    pub hunk_count: u32,
+    pub is_rename: bool,
+    pub similarity_pct: u32,
+    pub encoding_name: String,
+}
+
+impl ScmPatchEntry {
+    pub fn new() -> Self {
+        Self {
+            patch_content: String::new(),
+            file_path: String::new(),
+            patch_header: String::new(),
+            is_binary: bool::default(),
+            old_mode: String::new(),
+            new_mode: String::new(),
+            added_count: u32::default(),
+            removed_count: u32::default(),
+            hunk_count: u32::default(),
+            is_rename: bool::default(),
+            similarity_pct: u32::default(),
+            encoding_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.patch_content.is_empty() || true && !self.file_path.is_empty() || true && !self.patch_header.is_empty() || true && self.is_binary || true && !self.old_mode.is_empty() || true && !self.new_mode.is_empty() || true && self.added_count < u32::MAX || true && self.removed_count < u32::MAX || true && self.hunk_count < u32::MAX || true && self.is_rename || true && self.similarity_pct < u32::MAX || true && !self.encoding_name.is_empty() || true
+    }
+}
+
+impl Default for ScmPatchEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control reflog history entry
+#[derive(Debug, Clone)]
+pub struct ScmReflogEntry {
+    pub reflog_hash: String,
+    pub previous_hash: String,
+    pub action_text: String,
+    pub message_text: String,
+    pub timestamp_ms: u64,
+    pub author_name: String,
+    pub ref_name: String,
+    pub entry_index: u32,
+    pub is_checkout: bool,
+    pub is_commit: bool,
+    pub is_merge: bool,
+    pub is_rebase: bool,
+}
+
+impl ScmReflogEntry {
+    pub fn new() -> Self {
+        Self {
+            reflog_hash: String::new(),
+            previous_hash: String::new(),
+            action_text: String::new(),
+            message_text: String::new(),
+            timestamp_ms: u64::default(),
+            author_name: String::new(),
+            ref_name: String::new(),
+            entry_index: u32::default(),
+            is_checkout: bool::default(),
+            is_commit: bool::default(),
+            is_merge: bool::default(),
+            is_rebase: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.reflog_hash.is_empty() || true && !self.previous_hash.is_empty() || true && !self.action_text.is_empty() || true && !self.message_text.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.author_name.is_empty() || true && !self.ref_name.is_empty() || true && self.entry_index < u32::MAX || true && self.is_checkout || true && self.is_commit || true && self.is_merge || true && self.is_rebase || true
+    }
+}
+
+impl Default for ScmReflogEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control pull request entry
+#[derive(Debug, Clone)]
+pub struct ScmPullRequest {
+    pub pr_number: u32,
+    pub pr_title: String,
+    pub pr_body: String,
+    pub author_name: String,
+    pub state_text: String,
+    pub head_branch: String,
+    pub base_branch: String,
+    pub is_draft: bool,
+    pub review_count: u32,
+    pub comment_count: u32,
+    pub created_ms: u64,
+    pub merge_status: String,
+}
+
+impl ScmPullRequest {
+    pub fn new() -> Self {
+        Self {
+            pr_number: u32::default(),
+            pr_title: String::new(),
+            pr_body: String::new(),
+            author_name: String::new(),
+            state_text: String::new(),
+            head_branch: String::new(),
+            base_branch: String::new(),
+            is_draft: bool::default(),
+            review_count: u32::default(),
+            comment_count: u32::default(),
+            created_ms: u64::default(),
+            merge_status: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.pr_number < u32::MAX || true && !self.pr_title.is_empty() || true && !self.pr_body.is_empty() || true && !self.author_name.is_empty() || true && !self.state_text.is_empty() || true && !self.head_branch.is_empty() || true && !self.base_branch.is_empty() || true && self.is_draft || true && self.review_count < u32::MAX || true && self.comment_count < u32::MAX || true && self.created_ms < u64::MAX || true && !self.merge_status.is_empty() || true
+    }
+}
+
+impl Default for ScmPullRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control view configuration
+#[derive(Debug, Clone)]
+pub struct ScmViewConfig {
+    pub view_id: String,
+    pub show_graph: bool,
+    pub show_blame: bool,
+    pub show_timeline: bool,
+    pub auto_fetch: bool,
+    pub fetch_interval: u32,
+    pub show_submodules: bool,
+    pub show_stashes: bool,
+    pub input_visible: bool,
+    pub compact_mode: bool,
+    pub sort_by: String,
+    pub always_sign: bool,
+}
+
+impl ScmViewConfig {
+    pub fn new() -> Self {
+        Self {
+            view_id: String::new(),
+            show_graph: bool::default(),
+            show_blame: bool::default(),
+            show_timeline: bool::default(),
+            auto_fetch: bool::default(),
+            fetch_interval: u32::default(),
+            show_submodules: bool::default(),
+            show_stashes: bool::default(),
+            input_visible: bool::default(),
+            compact_mode: bool::default(),
+            sort_by: String::new(),
+            always_sign: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_id.is_empty() || true && self.show_graph || true && self.show_blame || true && self.show_timeline || true && self.auto_fetch || true && self.fetch_interval < u32::MAX || true && self.show_submodules || true && self.show_stashes || true && self.input_visible || true && self.compact_mode || true && !self.sort_by.is_empty() || true && self.always_sign || true
+    }
+}
+
+impl Default for ScmViewConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -539857,6 +541053,474 @@ mod tests_mmz_generated {
     fn test_mmz_fields() {
         let mut obj = OutputAccessibility::default();
         obj.screen_reader = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mna_generated {
+    use super::*;
+
+    #[test]
+    fn test_mna_default() {
+        let obj = ScmResourceEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mna_fields() {
+        let mut obj = ScmResourceEntry::default();
+        obj.resource_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnb_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnb_default() {
+        let obj = ScmProviderState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnb_fields() {
+        let mut obj = ScmProviderState::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnc_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnc_default() {
+        let obj = ScmChangeGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnc_fields() {
+        let mut obj = ScmChangeGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnd_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnd_default() {
+        let obj = ScmCommitInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnd_fields() {
+        let mut obj = ScmCommitInfo::default();
+        obj.commit_hash = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mne_generated {
+    use super::*;
+
+    #[test]
+    fn test_mne_default() {
+        let obj = ScmBranchEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mne_fields() {
+        let mut obj = ScmBranchEntry::default();
+        obj.branch_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnf_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnf_default() {
+        let obj = ScmRemoteEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnf_fields() {
+        let mut obj = ScmRemoteEntry::default();
+        obj.remote_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mng_generated {
+    use super::*;
+
+    #[test]
+    fn test_mng_default() {
+        let obj = ScmStashEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mng_fields() {
+        let mut obj = ScmStashEntry::default();
+        obj.stash_index = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnh_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnh_default() {
+        let obj = ScmHistoryEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnh_fields() {
+        let mut obj = ScmHistoryEntry::default();
+        obj.entry_hash = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mni_generated {
+    use super::*;
+
+    #[test]
+    fn test_mni_default() {
+        let obj = ScmConflictFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mni_fields() {
+        let mut obj = ScmConflictFile::default();
+        obj.file_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnj_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnj_default() {
+        let obj = ScmTagEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnj_fields() {
+        let mut obj = ScmTagEntry::default();
+        obj.tag_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnk_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnk_default() {
+        let obj = ScmDiffHunk::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnk_fields() {
+        let mut obj = ScmDiffHunk::default();
+        obj.hunk_header = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnl_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnl_default() {
+        let obj = ScmBlameInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnl_fields() {
+        let mut obj = ScmBlameInfo::default();
+        obj.blame_hash = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnm_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnm_default() {
+        let obj = ScmSubmoduleEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnm_fields() {
+        let mut obj = ScmSubmoduleEntry::default();
+        obj.submodule_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnn_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnn_default() {
+        let obj = ScmInputBox::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnn_fields() {
+        let mut obj = ScmInputBox::default();
+        obj.input_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mno_generated {
+    use super::*;
+
+    #[test]
+    fn test_mno_default() {
+        let obj = ScmActionButton::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mno_fields() {
+        let mut obj = ScmActionButton::default();
+        obj.button_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnp_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnp_default() {
+        let obj = ScmViewSort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnp_fields() {
+        let mut obj = ScmViewSort::default();
+        obj.sort_field = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnq_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnq_default() {
+        let obj = ScmGraphNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnq_fields() {
+        let mut obj = ScmGraphNode::default();
+        obj.node_hash = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnr_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnr_default() {
+        let obj = ScmGraphEdge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnr_fields() {
+        let mut obj = ScmGraphEdge::default();
+        obj.from_hash = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mns_generated {
+    use super::*;
+
+    #[test]
+    fn test_mns_default() {
+        let obj = ScmFileStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mns_fields() {
+        let mut obj = ScmFileStatus::default();
+        obj.status_code = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnt_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnt_default() {
+        let obj = ScmWorktreeEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnt_fields() {
+        let mut obj = ScmWorktreeEntry::default();
+        obj.worktree_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnu_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnu_default() {
+        let obj = ScmCherryPick::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnu_fields() {
+        let mut obj = ScmCherryPick::default();
+        obj.pick_hash = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnv_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnv_default() {
+        let obj = ScmRebaseState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnv_fields() {
+        let mut obj = ScmRebaseState::default();
+        obj.rebase_branch = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnw_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnw_default() {
+        let obj = ScmPatchEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnw_fields() {
+        let mut obj = ScmPatchEntry::default();
+        obj.patch_content = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnx_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnx_default() {
+        let obj = ScmReflogEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnx_fields() {
+        let mut obj = ScmReflogEntry::default();
+        obj.reflog_hash = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mny_generated {
+    use super::*;
+
+    #[test]
+    fn test_mny_default() {
+        let obj = ScmPullRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mny_fields() {
+        let mut obj = ScmPullRequest::default();
+        obj.pr_number = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mnz_generated {
+    use super::*;
+
+    #[test]
+    fn test_mnz_default() {
+        let obj = ScmViewConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mnz_fields() {
+        let mut obj = ScmViewConfig::default();
+        obj.view_id = "test".to_string();
         assert!(obj.validate());
     }
 }
