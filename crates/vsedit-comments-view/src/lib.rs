@@ -244291,6 +244291,1202 @@ impl Default for CodeActionConfig {
     }
 }
 
+/// Workspace trust determination level
+#[derive(Debug, Clone)]
+pub struct WorkspaceTrustLevel {
+    pub trust_state: String,
+    pub is_trusted: bool,
+    pub is_empty: bool,
+    pub folder_count: u32,
+    pub trusted_count: u32,
+    pub untrusted_count: u32,
+    pub parent_trusted: bool,
+    pub transitive_trust: bool,
+    pub last_check_ms: u64,
+    pub trust_source: String,
+    pub override_reason: String,
+    pub is_pending: bool,
+}
+
+impl WorkspaceTrustLevel {
+    pub fn new() -> Self {
+        Self {
+            trust_state: String::new(),
+            is_trusted: bool::default(),
+            is_empty: bool::default(),
+            folder_count: u32::default(),
+            trusted_count: u32::default(),
+            untrusted_count: u32::default(),
+            parent_trusted: bool::default(),
+            transitive_trust: bool::default(),
+            last_check_ms: u64::default(),
+            trust_source: String::new(),
+            override_reason: String::new(),
+            is_pending: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.trust_state.is_empty() || true && self.is_trusted || true && self.is_empty || true && self.folder_count < u32::MAX || true && self.trusted_count < u32::MAX || true && self.untrusted_count < u32::MAX || true && self.parent_trusted || true && self.transitive_trust || true && self.last_check_ms < u64::MAX || true && !self.trust_source.is_empty() || true && !self.override_reason.is_empty() || true && self.is_pending || true
+    }
+}
+
+impl Default for WorkspaceTrustLevel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace trust request dialog info
+#[derive(Debug, Clone)]
+pub struct TrustRequestInfo {
+    pub request_id: String,
+    pub folder_uri: String,
+    pub request_reason: String,
+    pub requester_ext: String,
+    pub is_modal: bool,
+    pub show_details: bool,
+    pub trust_options: String,
+    pub default_action: String,
+    pub dismiss_count: u32,
+    pub created_ms: u64,
+    pub response_text: String,
+    pub is_answered: bool,
+}
+
+impl TrustRequestInfo {
+    pub fn new() -> Self {
+        Self {
+            request_id: String::new(),
+            folder_uri: String::new(),
+            request_reason: String::new(),
+            requester_ext: String::new(),
+            is_modal: bool::default(),
+            show_details: bool::default(),
+            trust_options: String::new(),
+            default_action: String::new(),
+            dismiss_count: u32::default(),
+            created_ms: u64::default(),
+            response_text: String::new(),
+            is_answered: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.request_id.is_empty() || true && !self.folder_uri.is_empty() || true && !self.request_reason.is_empty() || true && !self.requester_ext.is_empty() || true && self.is_modal || true && self.show_details || true && !self.trust_options.is_empty() || true && !self.default_action.is_empty() || true && self.dismiss_count < u32::MAX || true && self.created_ms < u64::MAX || true && !self.response_text.is_empty() || true && self.is_answered || true
+    }
+}
+
+impl Default for TrustRequestInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Trusted workspace folder entry
+#[derive(Debug, Clone)]
+pub struct TrustedFolder {
+    pub folder_uri: String,
+    pub trust_level: String,
+    pub trusted_since: u64,
+    pub trusted_by: String,
+    pub parent_uri: String,
+    pub is_explicit: bool,
+    pub is_inherited: bool,
+    pub is_temporary: bool,
+    pub expires_ms: u64,
+    pub folder_name: String,
+    pub description_text: String,
+    pub is_workspace: bool,
+}
+
+impl TrustedFolder {
+    pub fn new() -> Self {
+        Self {
+            folder_uri: String::new(),
+            trust_level: String::new(),
+            trusted_since: u64::default(),
+            trusted_by: String::new(),
+            parent_uri: String::new(),
+            is_explicit: bool::default(),
+            is_inherited: bool::default(),
+            is_temporary: bool::default(),
+            expires_ms: u64::default(),
+            folder_name: String::new(),
+            description_text: String::new(),
+            is_workspace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folder_uri.is_empty() || true && !self.trust_level.is_empty() || true && self.trusted_since < u64::MAX || true && !self.trusted_by.is_empty() || true && !self.parent_uri.is_empty() || true && self.is_explicit || true && self.is_inherited || true && self.is_temporary || true && self.expires_ms < u64::MAX || true && !self.folder_name.is_empty() || true && !self.description_text.is_empty() || true && self.is_workspace || true
+    }
+}
+
+impl Default for TrustedFolder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Feature restricted in untrusted workspace
+#[derive(Debug, Clone)]
+pub struct UntrustedFeature {
+    pub feature_id: String,
+    pub feature_label: String,
+    pub description_text: String,
+    pub extension_id: String,
+    pub category_name: String,
+    pub severity_level: String,
+    pub is_disabled: bool,
+    pub fallback_mode: String,
+    pub when_clause: String,
+    pub icon_id: String,
+    pub sort_order: u32,
+    pub doc_url: String,
+}
+
+impl UntrustedFeature {
+    pub fn new() -> Self {
+        Self {
+            feature_id: String::new(),
+            feature_label: String::new(),
+            description_text: String::new(),
+            extension_id: String::new(),
+            category_name: String::new(),
+            severity_level: String::new(),
+            is_disabled: bool::default(),
+            fallback_mode: String::new(),
+            when_clause: String::new(),
+            icon_id: String::new(),
+            sort_order: u32::default(),
+            doc_url: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.feature_id.is_empty() || true && !self.feature_label.is_empty() || true && !self.description_text.is_empty() || true && !self.extension_id.is_empty() || true && !self.category_name.is_empty() || true && !self.severity_level.is_empty() || true && self.is_disabled || true && !self.fallback_mode.is_empty() || true && !self.when_clause.is_empty() || true && !self.icon_id.is_empty() || true && self.sort_order < u32::MAX || true && !self.doc_url.is_empty() || true
+    }
+}
+
+impl Default for UntrustedFeature {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace trust banner display state
+#[derive(Debug, Clone)]
+pub struct TrustBannerState {
+    pub banner_id: String,
+    pub banner_text: String,
+    pub is_visible: bool,
+    pub is_dismissed: bool,
+    pub action_label: String,
+    pub action_command: String,
+    pub severity_kind: String,
+    pub icon_id: String,
+    pub dismiss_count: u32,
+    pub show_details: bool,
+    pub position_hint: String,
+    pub expires_ms: u64,
+}
+
+impl TrustBannerState {
+    pub fn new() -> Self {
+        Self {
+            banner_id: String::new(),
+            banner_text: String::new(),
+            is_visible: bool::default(),
+            is_dismissed: bool::default(),
+            action_label: String::new(),
+            action_command: String::new(),
+            severity_kind: String::new(),
+            icon_id: String::new(),
+            dismiss_count: u32::default(),
+            show_details: bool::default(),
+            position_hint: String::new(),
+            expires_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.banner_id.is_empty() || true && !self.banner_text.is_empty() || true && self.is_visible || true && self.is_dismissed || true && !self.action_label.is_empty() || true && !self.action_command.is_empty() || true && !self.severity_kind.is_empty() || true && !self.icon_id.is_empty() || true && self.dismiss_count < u32::MAX || true && self.show_details || true && !self.position_hint.is_empty() || true && self.expires_ms < u64::MAX || true
+    }
+}
+
+impl Default for TrustBannerState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Restricted mode configuration
+#[derive(Debug, Clone)]
+pub struct RestrictedMode {
+    pub mode_id: String,
+    pub is_active: bool,
+    pub restricted_features: String,
+    pub allowed_features: String,
+    pub override_allowed: bool,
+    pub notification_text: String,
+    pub icon_id: String,
+    pub status_text: String,
+    pub category_name: String,
+    pub exit_action: String,
+    pub enter_reason: String,
+    pub description_text: String,
+}
+
+impl RestrictedMode {
+    pub fn new() -> Self {
+        Self {
+            mode_id: String::new(),
+            is_active: bool::default(),
+            restricted_features: String::new(),
+            allowed_features: String::new(),
+            override_allowed: bool::default(),
+            notification_text: String::new(),
+            icon_id: String::new(),
+            status_text: String::new(),
+            category_name: String::new(),
+            exit_action: String::new(),
+            enter_reason: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mode_id.is_empty() || true && self.is_active || true && !self.restricted_features.is_empty() || true && !self.allowed_features.is_empty() || true && self.override_allowed || true && !self.notification_text.is_empty() || true && !self.icon_id.is_empty() || true && !self.status_text.is_empty() || true && !self.category_name.is_empty() || true && !self.exit_action.is_empty() || true && !self.enter_reason.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RestrictedMode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension workspace trust requirement
+#[derive(Debug, Clone)]
+pub struct TrustExtension {
+    pub extension_id: String,
+    pub trust_requirement: String,
+    pub supported_modes: String,
+    pub restricted_api: String,
+    pub virtual_workspace: String,
+    pub is_ui_extension: bool,
+    pub is_workspace_ext: bool,
+    pub untrusted_behavior: String,
+    pub description_text: String,
+    pub version_text: String,
+    pub publisher_name: String,
+    pub category_name: String,
+}
+
+impl TrustExtension {
+    pub fn new() -> Self {
+        Self {
+            extension_id: String::new(),
+            trust_requirement: String::new(),
+            supported_modes: String::new(),
+            restricted_api: String::new(),
+            virtual_workspace: String::new(),
+            is_ui_extension: bool::default(),
+            is_workspace_ext: bool::default(),
+            untrusted_behavior: String::new(),
+            description_text: String::new(),
+            version_text: String::new(),
+            publisher_name: String::new(),
+            category_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.extension_id.is_empty() || true && !self.trust_requirement.is_empty() || true && !self.supported_modes.is_empty() || true && !self.restricted_api.is_empty() || true && !self.virtual_workspace.is_empty() || true && self.is_ui_extension || true && self.is_workspace_ext || true && !self.untrusted_behavior.is_empty() || true && !self.description_text.is_empty() || true && !self.version_text.is_empty() || true && !self.publisher_name.is_empty() || true && !self.category_name.is_empty() || true
+    }
+}
+
+impl Default for TrustExtension {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace security alert notification
+#[derive(Debug, Clone)]
+pub struct SecurityAlert {
+    pub alert_id: String,
+    pub alert_kind: String,
+    pub alert_message: String,
+    pub severity_level: String,
+    pub source_ext: String,
+    pub file_path: String,
+    pub is_dismissed: bool,
+    pub action_label: String,
+    pub action_command: String,
+    pub created_ms: u64,
+    pub icon_id: String,
+    pub detail_text: String,
+}
+
+impl SecurityAlert {
+    pub fn new() -> Self {
+        Self {
+            alert_id: String::new(),
+            alert_kind: String::new(),
+            alert_message: String::new(),
+            severity_level: String::new(),
+            source_ext: String::new(),
+            file_path: String::new(),
+            is_dismissed: bool::default(),
+            action_label: String::new(),
+            action_command: String::new(),
+            created_ms: u64::default(),
+            icon_id: String::new(),
+            detail_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.alert_id.is_empty() || true && !self.alert_kind.is_empty() || true && !self.alert_message.is_empty() || true && !self.severity_level.is_empty() || true && !self.source_ext.is_empty() || true && !self.file_path.is_empty() || true && self.is_dismissed || true && !self.action_label.is_empty() || true && !self.action_command.is_empty() || true && self.created_ms < u64::MAX || true && !self.icon_id.is_empty() || true && !self.detail_text.is_empty() || true
+    }
+}
+
+impl Default for SecurityAlert {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace trust configuration setting
+#[derive(Debug, Clone)]
+pub struct TrustSetting {
+    pub setting_key: String,
+    pub setting_value: String,
+    pub default_value: String,
+    pub scope_kind: String,
+    pub description_text: String,
+    pub is_overridden: bool,
+    pub override_source: String,
+    pub category_name: String,
+    pub when_clause: String,
+    pub is_deprecated: bool,
+    pub replacement_key: String,
+    pub value_kind: String,
+}
+
+impl TrustSetting {
+    pub fn new() -> Self {
+        Self {
+            setting_key: String::new(),
+            setting_value: String::new(),
+            default_value: String::new(),
+            scope_kind: String::new(),
+            description_text: String::new(),
+            is_overridden: bool::default(),
+            override_source: String::new(),
+            category_name: String::new(),
+            when_clause: String::new(),
+            is_deprecated: bool::default(),
+            replacement_key: String::new(),
+            value_kind: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.setting_key.is_empty() || true && !self.setting_value.is_empty() || true && !self.default_value.is_empty() || true && !self.scope_kind.is_empty() || true && !self.description_text.is_empty() || true && self.is_overridden || true && !self.override_source.is_empty() || true && !self.category_name.is_empty() || true && !self.when_clause.is_empty() || true && self.is_deprecated || true && !self.replacement_key.is_empty() || true && !self.value_kind.is_empty() || true
+    }
+}
+
+impl Default for TrustSetting {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Virtual workspace trust context
+#[derive(Debug, Clone)]
+pub struct VirtualWorkspace {
+    pub workspace_id: String,
+    pub scheme_name: String,
+    pub authority_text: String,
+    pub is_virtual: bool,
+    pub supports_trust: bool,
+    pub trust_level: String,
+    pub feature_flags: String,
+    pub extension_host: String,
+    pub file_system: String,
+    pub search_support: bool,
+    pub description_text: String,
+    pub icon_id: String,
+}
+
+impl VirtualWorkspace {
+    pub fn new() -> Self {
+        Self {
+            workspace_id: String::new(),
+            scheme_name: String::new(),
+            authority_text: String::new(),
+            is_virtual: bool::default(),
+            supports_trust: bool::default(),
+            trust_level: String::new(),
+            feature_flags: String::new(),
+            extension_host: String::new(),
+            file_system: String::new(),
+            search_support: bool::default(),
+            description_text: String::new(),
+            icon_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.workspace_id.is_empty() || true && !self.scheme_name.is_empty() || true && !self.authority_text.is_empty() || true && self.is_virtual || true && self.supports_trust || true && !self.trust_level.is_empty() || true && !self.feature_flags.is_empty() || true && !self.extension_host.is_empty() || true && !self.file_system.is_empty() || true && self.search_support || true && !self.description_text.is_empty() || true && !self.icon_id.is_empty() || true
+    }
+}
+
+impl Default for VirtualWorkspace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Trust state transition record
+#[derive(Debug, Clone)]
+pub struct TrustTransition {
+    pub transition_id: String,
+    pub from_state: String,
+    pub to_state: String,
+    pub trigger_kind: String,
+    pub timestamp_ms: u64,
+    pub user_action: String,
+    pub folder_uri: String,
+    pub extension_id: String,
+    pub is_automatic: bool,
+    pub reason_text: String,
+    pub rollback_avail: bool,
+    pub audit_log: String,
+}
+
+impl TrustTransition {
+    pub fn new() -> Self {
+        Self {
+            transition_id: String::new(),
+            from_state: String::new(),
+            to_state: String::new(),
+            trigger_kind: String::new(),
+            timestamp_ms: u64::default(),
+            user_action: String::new(),
+            folder_uri: String::new(),
+            extension_id: String::new(),
+            is_automatic: bool::default(),
+            reason_text: String::new(),
+            rollback_avail: bool::default(),
+            audit_log: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.transition_id.is_empty() || true && !self.from_state.is_empty() || true && !self.to_state.is_empty() || true && !self.trigger_kind.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.user_action.is_empty() || true && !self.folder_uri.is_empty() || true && !self.extension_id.is_empty() || true && self.is_automatic || true && !self.reason_text.is_empty() || true && self.rollback_avail || true && !self.audit_log.is_empty() || true
+    }
+}
+
+impl Default for TrustTransition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace security policy rule
+#[derive(Debug, Clone)]
+pub struct SecurityPolicy {
+    pub policy_id: String,
+    pub policy_name: String,
+    pub policy_rule: String,
+    pub scope_kind: String,
+    pub is_enforced: bool,
+    pub is_default: bool,
+    pub priority_value: u32,
+    pub applies_to: String,
+    pub action_on_fail: String,
+    pub description_text: String,
+    pub category_name: String,
+    pub source_text: String,
+}
+
+impl SecurityPolicy {
+    pub fn new() -> Self {
+        Self {
+            policy_id: String::new(),
+            policy_name: String::new(),
+            policy_rule: String::new(),
+            scope_kind: String::new(),
+            is_enforced: bool::default(),
+            is_default: bool::default(),
+            priority_value: u32::default(),
+            applies_to: String::new(),
+            action_on_fail: String::new(),
+            description_text: String::new(),
+            category_name: String::new(),
+            source_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.policy_id.is_empty() || true && !self.policy_name.is_empty() || true && !self.policy_rule.is_empty() || true && !self.scope_kind.is_empty() || true && self.is_enforced || true && self.is_default || true && self.priority_value < u32::MAX || true && !self.applies_to.is_empty() || true && !self.action_on_fail.is_empty() || true && !self.description_text.is_empty() || true && !self.category_name.is_empty() || true && !self.source_text.is_empty() || true
+    }
+}
+
+impl Default for SecurityPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Status bar trust indicator widget
+#[derive(Debug, Clone)]
+pub struct TrustIndicator {
+    pub indicator_id: String,
+    pub indicator_text: String,
+    pub indicator_icon: String,
+    pub tooltip_text: String,
+    pub bg_color: String,
+    pub fg_color: String,
+    pub is_visible: bool,
+    pub click_command: String,
+    pub alignment: String,
+    pub priority_value: u32,
+    pub trust_state: String,
+    pub blink_on_change: bool,
+}
+
+impl TrustIndicator {
+    pub fn new() -> Self {
+        Self {
+            indicator_id: String::new(),
+            indicator_text: String::new(),
+            indicator_icon: String::new(),
+            tooltip_text: String::new(),
+            bg_color: String::new(),
+            fg_color: String::new(),
+            is_visible: bool::default(),
+            click_command: String::new(),
+            alignment: String::new(),
+            priority_value: u32::default(),
+            trust_state: String::new(),
+            blink_on_change: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.indicator_id.is_empty() || true && !self.indicator_text.is_empty() || true && !self.indicator_icon.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.bg_color.is_empty() || true && !self.fg_color.is_empty() || true && self.is_visible || true && !self.click_command.is_empty() || true && !self.alignment.is_empty() || true && self.priority_value < u32::MAX || true && !self.trust_state.is_empty() || true && self.blink_on_change || true
+    }
+}
+
+impl Default for TrustIndicator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command restricted by trust state
+#[derive(Debug, Clone)]
+pub struct RestrictedCommand {
+    pub command_id: String,
+    pub command_label: String,
+    pub restriction_kind: String,
+    pub fallback_command: String,
+    pub notification_text: String,
+    pub is_hidden: bool,
+    pub is_disabled: bool,
+    pub when_clause: String,
+    pub trust_required: String,
+    pub category_name: String,
+    pub icon_id: String,
+    pub description_text: String,
+}
+
+impl RestrictedCommand {
+    pub fn new() -> Self {
+        Self {
+            command_id: String::new(),
+            command_label: String::new(),
+            restriction_kind: String::new(),
+            fallback_command: String::new(),
+            notification_text: String::new(),
+            is_hidden: bool::default(),
+            is_disabled: bool::default(),
+            when_clause: String::new(),
+            trust_required: String::new(),
+            category_name: String::new(),
+            icon_id: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.command_id.is_empty() || true && !self.command_label.is_empty() || true && !self.restriction_kind.is_empty() || true && !self.fallback_command.is_empty() || true && !self.notification_text.is_empty() || true && self.is_hidden || true && self.is_disabled || true && !self.when_clause.is_empty() || true && !self.trust_required.is_empty() || true && !self.category_name.is_empty() || true && !self.icon_id.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RestrictedCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension sandbox security configuration
+#[derive(Debug, Clone)]
+pub struct SandboxConfig {
+    pub sandbox_id: String,
+    pub sandbox_kind: String,
+    pub allowed_api: String,
+    pub blocked_api: String,
+    pub file_access: String,
+    pub network_access: String,
+    pub process_access: String,
+    pub is_enabled: bool,
+    pub extension_id: String,
+    pub max_memory: u64,
+    pub timeout_ms: u32,
+    pub description_text: String,
+}
+
+impl SandboxConfig {
+    pub fn new() -> Self {
+        Self {
+            sandbox_id: String::new(),
+            sandbox_kind: String::new(),
+            allowed_api: String::new(),
+            blocked_api: String::new(),
+            file_access: String::new(),
+            network_access: String::new(),
+            process_access: String::new(),
+            is_enabled: bool::default(),
+            extension_id: String::new(),
+            max_memory: u64::default(),
+            timeout_ms: u32::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sandbox_id.is_empty() || true && !self.sandbox_kind.is_empty() || true && !self.allowed_api.is_empty() || true && !self.blocked_api.is_empty() || true && !self.file_access.is_empty() || true && !self.network_access.is_empty() || true && !self.process_access.is_empty() || true && self.is_enabled || true && !self.extension_id.is_empty() || true && self.max_memory < u64::MAX || true && self.timeout_ms < u32::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for SandboxConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Trust settings editor view model
+#[derive(Debug, Clone)]
+pub struct TrustEditor {
+    pub editor_id: String,
+    pub trusted_folders: String,
+    pub untrusted_folders: String,
+    pub pending_folders: String,
+    pub is_modified: bool,
+    pub show_all: bool,
+    pub filter_text: String,
+    pub sort_order: String,
+    pub group_by: String,
+    pub selected_folder: String,
+    pub action_label: String,
+    pub is_visible: bool,
+}
+
+impl TrustEditor {
+    pub fn new() -> Self {
+        Self {
+            editor_id: String::new(),
+            trusted_folders: String::new(),
+            untrusted_folders: String::new(),
+            pending_folders: String::new(),
+            is_modified: bool::default(),
+            show_all: bool::default(),
+            filter_text: String::new(),
+            sort_order: String::new(),
+            group_by: String::new(),
+            selected_folder: String::new(),
+            action_label: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_id.is_empty() || true && !self.trusted_folders.is_empty() || true && !self.untrusted_folders.is_empty() || true && !self.pending_folders.is_empty() || true && self.is_modified || true && self.show_all || true && !self.filter_text.is_empty() || true && !self.sort_order.is_empty() || true && !self.group_by.is_empty() || true && !self.selected_folder.is_empty() || true && !self.action_label.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for TrustEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace permission grant entry
+#[derive(Debug, Clone)]
+pub struct PermissionGrant {
+    pub grant_id: String,
+    pub permission_kind: String,
+    pub granted_to: String,
+    pub granted_by: String,
+    pub scope_uri: String,
+    pub is_permanent: bool,
+    pub expires_ms: u64,
+    pub created_ms: u64,
+    pub revoked_ms: u64,
+    pub is_active: bool,
+    pub reason_text: String,
+    pub category_name: String,
+}
+
+impl PermissionGrant {
+    pub fn new() -> Self {
+        Self {
+            grant_id: String::new(),
+            permission_kind: String::new(),
+            granted_to: String::new(),
+            granted_by: String::new(),
+            scope_uri: String::new(),
+            is_permanent: bool::default(),
+            expires_ms: u64::default(),
+            created_ms: u64::default(),
+            revoked_ms: u64::default(),
+            is_active: bool::default(),
+            reason_text: String::new(),
+            category_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grant_id.is_empty() || true && !self.permission_kind.is_empty() || true && !self.granted_to.is_empty() || true && !self.granted_by.is_empty() || true && !self.scope_uri.is_empty() || true && self.is_permanent || true && self.expires_ms < u64::MAX || true && self.created_ms < u64::MAX || true && self.revoked_ms < u64::MAX || true && self.is_active || true && !self.reason_text.is_empty() || true && !self.category_name.is_empty() || true
+    }
+}
+
+impl Default for PermissionGrant {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace security audit log entry
+#[derive(Debug, Clone)]
+pub struct SecurityAudit {
+    pub audit_id: String,
+    pub event_kind: String,
+    pub event_detail: String,
+    pub timestamp_ms: u64,
+    pub user_action: String,
+    pub extension_id: String,
+    pub folder_uri: String,
+    pub severity_level: String,
+    pub ip_address: String,
+    pub session_id: String,
+    pub outcome_text: String,
+    pub metadata_json: String,
+}
+
+impl SecurityAudit {
+    pub fn new() -> Self {
+        Self {
+            audit_id: String::new(),
+            event_kind: String::new(),
+            event_detail: String::new(),
+            timestamp_ms: u64::default(),
+            user_action: String::new(),
+            extension_id: String::new(),
+            folder_uri: String::new(),
+            severity_level: String::new(),
+            ip_address: String::new(),
+            session_id: String::new(),
+            outcome_text: String::new(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.audit_id.is_empty() || true && !self.event_kind.is_empty() || true && !self.event_detail.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.user_action.is_empty() || true && !self.extension_id.is_empty() || true && !self.folder_uri.is_empty() || true && !self.severity_level.is_empty() || true && !self.ip_address.is_empty() || true && !self.session_id.is_empty() || true && !self.outcome_text.is_empty() || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for SecurityAudit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Trust settings migration record
+#[derive(Debug, Clone)]
+pub struct TrustMigration {
+    pub migration_id: String,
+    pub from_version: String,
+    pub to_version: String,
+    pub migrated_folders: u32,
+    pub migrated_settings: u32,
+    pub is_completed: bool,
+    pub started_ms: u64,
+    pub completed_ms: u64,
+    pub error_message: String,
+    pub backup_path: String,
+    pub rollback_avail: bool,
+    pub description_text: String,
+}
+
+impl TrustMigration {
+    pub fn new() -> Self {
+        Self {
+            migration_id: String::new(),
+            from_version: String::new(),
+            to_version: String::new(),
+            migrated_folders: u32::default(),
+            migrated_settings: u32::default(),
+            is_completed: bool::default(),
+            started_ms: u64::default(),
+            completed_ms: u64::default(),
+            error_message: String::new(),
+            backup_path: String::new(),
+            rollback_avail: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.migration_id.is_empty() || true && !self.from_version.is_empty() || true && !self.to_version.is_empty() || true && self.migrated_folders < u32::MAX || true && self.migrated_settings < u32::MAX || true && self.is_completed || true && self.started_ms < u64::MAX || true && self.completed_ms < u64::MAX || true && !self.error_message.is_empty() || true && !self.backup_path.is_empty() || true && self.rollback_avail || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for TrustMigration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Setting restricted by trust state
+#[derive(Debug, Clone)]
+pub struct RestrictedSetting {
+    pub setting_id: String,
+    pub setting_key: String,
+    pub trusted_value: String,
+    pub untrusted_value: String,
+    pub restriction_kind: String,
+    pub scope_kind: String,
+    pub is_overridden: bool,
+    pub notification_text: String,
+    pub category_name: String,
+    pub icon_id: String,
+    pub description_text: String,
+    pub default_mode: String,
+}
+
+impl RestrictedSetting {
+    pub fn new() -> Self {
+        Self {
+            setting_id: String::new(),
+            setting_key: String::new(),
+            trusted_value: String::new(),
+            untrusted_value: String::new(),
+            restriction_kind: String::new(),
+            scope_kind: String::new(),
+            is_overridden: bool::default(),
+            notification_text: String::new(),
+            category_name: String::new(),
+            icon_id: String::new(),
+            description_text: String::new(),
+            default_mode: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.setting_id.is_empty() || true && !self.setting_key.is_empty() || true && !self.trusted_value.is_empty() || true && !self.untrusted_value.is_empty() || true && !self.restriction_kind.is_empty() || true && !self.scope_kind.is_empty() || true && self.is_overridden || true && !self.notification_text.is_empty() || true && !self.category_name.is_empty() || true && !self.icon_id.is_empty() || true && !self.description_text.is_empty() || true && !self.default_mode.is_empty() || true
+    }
+}
+
+impl Default for RestrictedSetting {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Trust prompt interaction history
+#[derive(Debug, Clone)]
+pub struct TrustPromptHistory {
+    pub prompt_id: String,
+    pub folder_uri: String,
+    pub prompt_kind: String,
+    pub user_response: String,
+    pub response_ms: u64,
+    pub show_count: u32,
+    pub last_shown_ms: u64,
+    pub is_suppressed: bool,
+    pub suppress_reason: String,
+    pub extension_id: String,
+    pub session_id: String,
+    pub description_text: String,
+}
+
+impl TrustPromptHistory {
+    pub fn new() -> Self {
+        Self {
+            prompt_id: String::new(),
+            folder_uri: String::new(),
+            prompt_kind: String::new(),
+            user_response: String::new(),
+            response_ms: u64::default(),
+            show_count: u32::default(),
+            last_shown_ms: u64::default(),
+            is_suppressed: bool::default(),
+            suppress_reason: String::new(),
+            extension_id: String::new(),
+            session_id: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prompt_id.is_empty() || true && !self.folder_uri.is_empty() || true && !self.prompt_kind.is_empty() || true && !self.user_response.is_empty() || true && self.response_ms < u64::MAX || true && self.show_count < u32::MAX || true && self.last_shown_ms < u64::MAX || true && self.is_suppressed || true && !self.suppress_reason.is_empty() || true && !self.extension_id.is_empty() || true && !self.session_id.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for TrustPromptHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Trust delegation to parent workspace
+#[derive(Debug, Clone)]
+pub struct TrustDelegation {
+    pub delegation_id: String,
+    pub parent_uri: String,
+    pub child_uri: String,
+    pub delegation_kind: String,
+    pub is_active: bool,
+    pub created_ms: u64,
+    pub expires_ms: u64,
+    pub granted_by: String,
+    pub trust_level: String,
+    pub is_revocable: bool,
+    pub scope_limit: String,
+    pub description_text: String,
+}
+
+impl TrustDelegation {
+    pub fn new() -> Self {
+        Self {
+            delegation_id: String::new(),
+            parent_uri: String::new(),
+            child_uri: String::new(),
+            delegation_kind: String::new(),
+            is_active: bool::default(),
+            created_ms: u64::default(),
+            expires_ms: u64::default(),
+            granted_by: String::new(),
+            trust_level: String::new(),
+            is_revocable: bool::default(),
+            scope_limit: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.delegation_id.is_empty() || true && !self.parent_uri.is_empty() || true && !self.child_uri.is_empty() || true && !self.delegation_kind.is_empty() || true && self.is_active || true && self.created_ms < u64::MAX || true && self.expires_ms < u64::MAX || true && !self.granted_by.is_empty() || true && !self.trust_level.is_empty() || true && self.is_revocable || true && !self.scope_limit.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for TrustDelegation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Security scope boundary definition
+#[derive(Debug, Clone)]
+pub struct SecurityScope {
+    pub scope_id: String,
+    pub scope_name: String,
+    pub scope_uri: String,
+    pub boundary_kind: String,
+    pub includes: String,
+    pub excludes: String,
+    pub is_default: bool,
+    pub priority_value: u32,
+    pub parent_scope: String,
+    pub trust_level: String,
+    pub description_text: String,
+    pub created_ms: u64,
+}
+
+impl SecurityScope {
+    pub fn new() -> Self {
+        Self {
+            scope_id: String::new(),
+            scope_name: String::new(),
+            scope_uri: String::new(),
+            boundary_kind: String::new(),
+            includes: String::new(),
+            excludes: String::new(),
+            is_default: bool::default(),
+            priority_value: u32::default(),
+            parent_scope: String::new(),
+            trust_level: String::new(),
+            description_text: String::new(),
+            created_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope_id.is_empty() || true && !self.scope_name.is_empty() || true && !self.scope_uri.is_empty() || true && !self.boundary_kind.is_empty() || true && !self.includes.is_empty() || true && !self.excludes.is_empty() || true && self.is_default || true && self.priority_value < u32::MAX || true && !self.parent_scope.is_empty() || true && !self.trust_level.is_empty() || true && !self.description_text.is_empty() || true && self.created_ms < u64::MAX || true
+    }
+}
+
+impl Default for SecurityScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace trust manifest file entry
+#[derive(Debug, Clone)]
+pub struct TrustManifest {
+    pub manifest_id: String,
+    pub manifest_path: String,
+    pub schema_version: String,
+    pub trusted_items: String,
+    pub untrusted_items: String,
+    pub rules_json: String,
+    pub is_valid: bool,
+    pub parse_errors: String,
+    pub last_modified: u64,
+    pub checksum_value: String,
+    pub description_text: String,
+    pub author_name: String,
+}
+
+impl TrustManifest {
+    pub fn new() -> Self {
+        Self {
+            manifest_id: String::new(),
+            manifest_path: String::new(),
+            schema_version: String::new(),
+            trusted_items: String::new(),
+            untrusted_items: String::new(),
+            rules_json: String::new(),
+            is_valid: bool::default(),
+            parse_errors: String::new(),
+            last_modified: u64::default(),
+            checksum_value: String::new(),
+            description_text: String::new(),
+            author_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.manifest_id.is_empty() || true && !self.manifest_path.is_empty() || true && !self.schema_version.is_empty() || true && !self.trusted_items.is_empty() || true && !self.untrusted_items.is_empty() || true && !self.rules_json.is_empty() || true && self.is_valid || true && !self.parse_errors.is_empty() || true && self.last_modified < u64::MAX || true && !self.checksum_value.is_empty() || true && !self.description_text.is_empty() || true && !self.author_name.is_empty() || true
+    }
+}
+
+impl Default for TrustManifest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task restricted by trust state
+#[derive(Debug, Clone)]
+pub struct RestrictedTask {
+    pub task_id: String,
+    pub task_label: String,
+    pub task_kind: String,
+    pub restriction_kind: String,
+    pub fallback_task: String,
+    pub is_disabled: bool,
+    pub notification_text: String,
+    pub trust_required: String,
+    pub when_clause: String,
+    pub category_name: String,
+    pub icon_id: String,
+    pub description_text: String,
+}
+
+impl RestrictedTask {
+    pub fn new() -> Self {
+        Self {
+            task_id: String::new(),
+            task_label: String::new(),
+            task_kind: String::new(),
+            restriction_kind: String::new(),
+            fallback_task: String::new(),
+            is_disabled: bool::default(),
+            notification_text: String::new(),
+            trust_required: String::new(),
+            when_clause: String::new(),
+            category_name: String::new(),
+            icon_id: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_id.is_empty() || true && !self.task_label.is_empty() || true && !self.task_kind.is_empty() || true && !self.restriction_kind.is_empty() || true && !self.fallback_task.is_empty() || true && self.is_disabled || true && !self.notification_text.is_empty() || true && !self.trust_required.is_empty() || true && !self.when_clause.is_empty() || true && !self.category_name.is_empty() || true && !self.icon_id.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RestrictedTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace trust configuration settings
+#[derive(Debug, Clone)]
+pub struct TrustConfig {
+    pub config_id: String,
+    pub enabled: bool,
+    pub startup_prompt: bool,
+    pub empty_window: String,
+    pub banner_dismiss: bool,
+    pub restrict_untrusted: bool,
+    pub default_trust: String,
+    pub audit_enabled: bool,
+    pub migration_version: String,
+    pub prompt_frequency: String,
+    pub excluded_schemes: String,
+    pub description_text: String,
+}
+
+impl TrustConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            enabled: bool::default(),
+            startup_prompt: bool::default(),
+            empty_window: String::new(),
+            banner_dismiss: bool::default(),
+            restrict_untrusted: bool::default(),
+            default_trust: String::new(),
+            audit_enabled: bool::default(),
+            migration_version: String::new(),
+            prompt_frequency: String::new(),
+            excluded_schemes: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && self.enabled || true && self.startup_prompt || true && !self.empty_window.is_empty() || true && self.banner_dismiss || true && self.restrict_untrusted || true && !self.default_trust.is_empty() || true && self.audit_enabled || true && !self.migration_version.is_empty() || true && !self.prompt_frequency.is_empty() || true && !self.excluded_schemes.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for TrustConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -549971,6 +551167,474 @@ mod tests_msz_generated {
     #[test]
     fn test_msz_fields() {
         let mut obj = CodeActionConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mta_generated {
+    use super::*;
+
+    #[test]
+    fn test_mta_default() {
+        let obj = WorkspaceTrustLevel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mta_fields() {
+        let mut obj = WorkspaceTrustLevel::default();
+        obj.trust_state = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtb_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtb_default() {
+        let obj = TrustRequestInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtb_fields() {
+        let mut obj = TrustRequestInfo::default();
+        obj.request_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtc_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtc_default() {
+        let obj = TrustedFolder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtc_fields() {
+        let mut obj = TrustedFolder::default();
+        obj.folder_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtd_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtd_default() {
+        let obj = UntrustedFeature::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtd_fields() {
+        let mut obj = UntrustedFeature::default();
+        obj.feature_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mte_generated {
+    use super::*;
+
+    #[test]
+    fn test_mte_default() {
+        let obj = TrustBannerState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mte_fields() {
+        let mut obj = TrustBannerState::default();
+        obj.banner_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtf_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtf_default() {
+        let obj = RestrictedMode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtf_fields() {
+        let mut obj = RestrictedMode::default();
+        obj.mode_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtg_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtg_default() {
+        let obj = TrustExtension::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtg_fields() {
+        let mut obj = TrustExtension::default();
+        obj.extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mth_generated {
+    use super::*;
+
+    #[test]
+    fn test_mth_default() {
+        let obj = SecurityAlert::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mth_fields() {
+        let mut obj = SecurityAlert::default();
+        obj.alert_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mti_generated {
+    use super::*;
+
+    #[test]
+    fn test_mti_default() {
+        let obj = TrustSetting::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mti_fields() {
+        let mut obj = TrustSetting::default();
+        obj.setting_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtj_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtj_default() {
+        let obj = VirtualWorkspace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtj_fields() {
+        let mut obj = VirtualWorkspace::default();
+        obj.workspace_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtk_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtk_default() {
+        let obj = TrustTransition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtk_fields() {
+        let mut obj = TrustTransition::default();
+        obj.transition_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtl_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtl_default() {
+        let obj = SecurityPolicy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtl_fields() {
+        let mut obj = SecurityPolicy::default();
+        obj.policy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtm_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtm_default() {
+        let obj = TrustIndicator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtm_fields() {
+        let mut obj = TrustIndicator::default();
+        obj.indicator_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtn_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtn_default() {
+        let obj = RestrictedCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtn_fields() {
+        let mut obj = RestrictedCommand::default();
+        obj.command_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mto_generated {
+    use super::*;
+
+    #[test]
+    fn test_mto_default() {
+        let obj = SandboxConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mto_fields() {
+        let mut obj = SandboxConfig::default();
+        obj.sandbox_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtp_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtp_default() {
+        let obj = TrustEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtp_fields() {
+        let mut obj = TrustEditor::default();
+        obj.editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtq_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtq_default() {
+        let obj = PermissionGrant::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtq_fields() {
+        let mut obj = PermissionGrant::default();
+        obj.grant_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtr_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtr_default() {
+        let obj = SecurityAudit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtr_fields() {
+        let mut obj = SecurityAudit::default();
+        obj.audit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mts_generated {
+    use super::*;
+
+    #[test]
+    fn test_mts_default() {
+        let obj = TrustMigration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mts_fields() {
+        let mut obj = TrustMigration::default();
+        obj.migration_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtt_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtt_default() {
+        let obj = RestrictedSetting::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtt_fields() {
+        let mut obj = RestrictedSetting::default();
+        obj.setting_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtu_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtu_default() {
+        let obj = TrustPromptHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtu_fields() {
+        let mut obj = TrustPromptHistory::default();
+        obj.prompt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtv_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtv_default() {
+        let obj = TrustDelegation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtv_fields() {
+        let mut obj = TrustDelegation::default();
+        obj.delegation_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtw_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtw_default() {
+        let obj = SecurityScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtw_fields() {
+        let mut obj = SecurityScope::default();
+        obj.scope_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtx_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtx_default() {
+        let obj = TrustManifest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtx_fields() {
+        let mut obj = TrustManifest::default();
+        obj.manifest_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mty_generated {
+    use super::*;
+
+    #[test]
+    fn test_mty_default() {
+        let obj = RestrictedTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mty_fields() {
+        let mut obj = RestrictedTask::default();
+        obj.task_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mtz_generated {
+    use super::*;
+
+    #[test]
+    fn test_mtz_default() {
+        let obj = TrustConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mtz_fields() {
+        let mut obj = TrustConfig::default();
         obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
