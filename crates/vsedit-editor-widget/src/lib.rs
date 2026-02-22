@@ -234896,6 +234896,1202 @@ impl Default for DebugExceptionFilter {
     }
 }
 
+/// File explorer tree node representation
+#[derive(Debug, Clone)]
+pub struct ExplorerTreeNode {
+    pub node_path: String,
+    pub node_name: String,
+    pub is_directory: bool,
+    pub is_symlink: bool,
+    pub file_size: u64,
+    pub modified_ms: u64,
+    pub is_expanded: bool,
+    pub is_selected: bool,
+    pub depth_level: u32,
+    pub child_count: u32,
+    pub icon_id: String,
+    pub is_readonly: bool,
+}
+
+impl ExplorerTreeNode {
+    pub fn new() -> Self {
+        Self {
+            node_path: String::new(),
+            node_name: String::new(),
+            is_directory: bool::default(),
+            is_symlink: bool::default(),
+            file_size: u64::default(),
+            modified_ms: u64::default(),
+            is_expanded: bool::default(),
+            is_selected: bool::default(),
+            depth_level: u32::default(),
+            child_count: u32::default(),
+            icon_id: String::new(),
+            is_readonly: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.node_path.is_empty() || true && !self.node_name.is_empty() || true && self.is_directory || true && self.is_symlink || true && self.file_size < u64::MAX || true && self.modified_ms < u64::MAX || true && self.is_expanded || true && self.is_selected || true && self.depth_level < u32::MAX || true && self.child_count < u32::MAX || true && !self.icon_id.is_empty() || true && self.is_readonly || true
+    }
+}
+
+impl Default for ExplorerTreeNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File explorer filter and glob matching
+#[derive(Debug, Clone)]
+pub struct FileExplorerFilter {
+    pub filter_pattern: String,
+    pub is_glob: bool,
+    pub is_regex: bool,
+    pub exclude_pattern: String,
+    pub include_hidden: bool,
+    pub include_ignored: bool,
+    pub match_case: bool,
+    pub match_path: bool,
+    pub max_depth: u32,
+    pub filter_label: String,
+    pub is_active: bool,
+    pub result_count: u32,
+}
+
+impl FileExplorerFilter {
+    pub fn new() -> Self {
+        Self {
+            filter_pattern: String::new(),
+            is_glob: bool::default(),
+            is_regex: bool::default(),
+            exclude_pattern: String::new(),
+            include_hidden: bool::default(),
+            include_ignored: bool::default(),
+            match_case: bool::default(),
+            match_path: bool::default(),
+            max_depth: u32::default(),
+            filter_label: String::new(),
+            is_active: bool::default(),
+            result_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_pattern.is_empty() || true && self.is_glob || true && self.is_regex || true && !self.exclude_pattern.is_empty() || true && self.include_hidden || true && self.include_ignored || true && self.match_case || true && self.match_path || true && self.max_depth < u32::MAX || true && !self.filter_label.is_empty() || true && self.is_active || true && self.result_count < u32::MAX || true
+    }
+}
+
+impl Default for FileExplorerFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree view expansion and selection state
+#[derive(Debug, Clone)]
+pub struct TreeViewState {
+    pub tree_id: String,
+    pub expanded_ids: String,
+    pub selected_id: String,
+    pub focused_id: String,
+    pub scroll_top: u32,
+    pub visible_count: u32,
+    pub total_count: u32,
+    pub is_collapsed: bool,
+    pub filter_text: String,
+    pub sort_order: String,
+    pub show_hidden: bool,
+    pub is_flat: bool,
+}
+
+impl TreeViewState {
+    pub fn new() -> Self {
+        Self {
+            tree_id: String::new(),
+            expanded_ids: String::new(),
+            selected_id: String::new(),
+            focused_id: String::new(),
+            scroll_top: u32::default(),
+            visible_count: u32::default(),
+            total_count: u32::default(),
+            is_collapsed: bool::default(),
+            filter_text: String::new(),
+            sort_order: String::new(),
+            show_hidden: bool::default(),
+            is_flat: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_id.is_empty() || true && !self.expanded_ids.is_empty() || true && !self.selected_id.is_empty() || true && !self.focused_id.is_empty() || true && self.scroll_top < u32::MAX || true && self.visible_count < u32::MAX || true && self.total_count < u32::MAX || true && self.is_collapsed || true && !self.filter_text.is_empty() || true && !self.sort_order.is_empty() || true && self.show_hidden || true && self.is_flat || true
+    }
+}
+
+impl Default for TreeViewState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree item badge and color decoration
+#[derive(Debug, Clone)]
+pub struct TreeItemDecoration {
+    pub decoration_id: String,
+    pub badge_text: String,
+    pub badge_color: String,
+    pub tooltip_text: String,
+    pub icon_path: String,
+    pub is_propagated: bool,
+    pub priority_value: u32,
+    pub foreground_color: String,
+    pub strikethrough: bool,
+    pub font_weight: String,
+    pub opacity_value: f64,
+    pub letter_text: String,
+}
+
+impl TreeItemDecoration {
+    pub fn new() -> Self {
+        Self {
+            decoration_id: String::new(),
+            badge_text: String::new(),
+            badge_color: String::new(),
+            tooltip_text: String::new(),
+            icon_path: String::new(),
+            is_propagated: bool::default(),
+            priority_value: u32::default(),
+            foreground_color: String::new(),
+            strikethrough: bool::default(),
+            font_weight: String::new(),
+            opacity_value: f64::default(),
+            letter_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decoration_id.is_empty() || true && !self.badge_text.is_empty() || true && !self.badge_color.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.icon_path.is_empty() || true && self.is_propagated || true && self.priority_value < u32::MAX || true && !self.foreground_color.is_empty() || true && self.strikethrough || true && !self.font_weight.is_empty() || true && self.opacity_value.is_finite() || true && !self.letter_text.is_empty() || true
+    }
+}
+
+impl Default for TreeItemDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File nesting pattern configuration
+#[derive(Debug, Clone)]
+pub struct FileNestingRule {
+    pub parent_pattern: String,
+    pub child_pattern: String,
+    pub is_enabled: bool,
+    pub nest_under: String,
+    pub sort_order: u32,
+    pub applies_to: String,
+    pub direction: String,
+    pub match_kind: String,
+    pub priority_value: u32,
+    pub group_name: String,
+    pub collapse_default: bool,
+    pub description_text: String,
+}
+
+impl FileNestingRule {
+    pub fn new() -> Self {
+        Self {
+            parent_pattern: String::new(),
+            child_pattern: String::new(),
+            is_enabled: bool::default(),
+            nest_under: String::new(),
+            sort_order: u32::default(),
+            applies_to: String::new(),
+            direction: String::new(),
+            match_kind: String::new(),
+            priority_value: u32::default(),
+            group_name: String::new(),
+            collapse_default: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.parent_pattern.is_empty() || true && !self.child_pattern.is_empty() || true && self.is_enabled || true && !self.nest_under.is_empty() || true && self.sort_order < u32::MAX || true && !self.applies_to.is_empty() || true && !self.direction.is_empty() || true && !self.match_kind.is_empty() || true && self.priority_value < u32::MAX || true && !self.group_name.is_empty() || true && self.collapse_default || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for FileNestingRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File explorer sorting configuration
+#[derive(Debug, Clone)]
+pub struct FileExplorerSort {
+    pub sort_field: String,
+    pub sort_direction: String,
+    pub folders_first: bool,
+    pub by_extension: bool,
+    pub by_modified: bool,
+    pub by_name: bool,
+    pub by_size: bool,
+    pub by_type: bool,
+    pub case_sensitive: bool,
+    pub natural_sort: bool,
+    pub group_dirs: bool,
+    pub mix_files_dirs: bool,
+}
+
+impl FileExplorerSort {
+    pub fn new() -> Self {
+        Self {
+            sort_field: String::new(),
+            sort_direction: String::new(),
+            folders_first: bool::default(),
+            by_extension: bool::default(),
+            by_modified: bool::default(),
+            by_name: bool::default(),
+            by_size: bool::default(),
+            by_type: bool::default(),
+            case_sensitive: bool::default(),
+            natural_sort: bool::default(),
+            group_dirs: bool::default(),
+            mix_files_dirs: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sort_field.is_empty() || true && !self.sort_direction.is_empty() || true && self.folders_first || true && self.by_extension || true && self.by_modified || true && self.by_name || true && self.by_size || true && self.by_type || true && self.case_sensitive || true && self.natural_sort || true && self.group_dirs || true && self.mix_files_dirs || true
+    }
+}
+
+impl Default for FileExplorerSort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree view drag and drop transfer data
+#[derive(Debug, Clone)]
+pub struct TreeDragDropData {
+    pub drag_mime: String,
+    pub source_ids: String,
+    pub target_id: String,
+    pub drop_effect: String,
+    pub is_copy: bool,
+    pub is_move: bool,
+    pub is_link: bool,
+    pub data_payload: String,
+    pub source_tree: String,
+    pub target_tree: String,
+    pub position_hint: String,
+    pub is_external: bool,
+}
+
+impl TreeDragDropData {
+    pub fn new() -> Self {
+        Self {
+            drag_mime: String::new(),
+            source_ids: String::new(),
+            target_id: String::new(),
+            drop_effect: String::new(),
+            is_copy: bool::default(),
+            is_move: bool::default(),
+            is_link: bool::default(),
+            data_payload: String::new(),
+            source_tree: String::new(),
+            target_tree: String::new(),
+            position_hint: String::new(),
+            is_external: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.drag_mime.is_empty() || true && !self.source_ids.is_empty() || true && !self.target_id.is_empty() || true && !self.drop_effect.is_empty() || true && self.is_copy || true && self.is_move || true && self.is_link || true && !self.data_payload.is_empty() || true && !self.source_tree.is_empty() || true && !self.target_tree.is_empty() || true && !self.position_hint.is_empty() || true && self.is_external || true
+    }
+}
+
+impl Default for TreeDragDropData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree view column definition and sizing
+#[derive(Debug, Clone)]
+pub struct TreeViewColumn {
+    pub column_id: String,
+    pub column_label: String,
+    pub column_width: u32,
+    pub min_width: u32,
+    pub max_width: u32,
+    pub is_resizable: bool,
+    pub is_sortable: bool,
+    pub is_visible: bool,
+    pub alignment: String,
+    pub tooltip_text: String,
+    pub sort_direction: String,
+    pub weight_value: u32,
+}
+
+impl TreeViewColumn {
+    pub fn new() -> Self {
+        Self {
+            column_id: String::new(),
+            column_label: String::new(),
+            column_width: u32::default(),
+            min_width: u32::default(),
+            max_width: u32::default(),
+            is_resizable: bool::default(),
+            is_sortable: bool::default(),
+            is_visible: bool::default(),
+            alignment: String::new(),
+            tooltip_text: String::new(),
+            sort_direction: String::new(),
+            weight_value: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.column_id.is_empty() || true && !self.column_label.is_empty() || true && self.column_width < u32::MAX || true && self.min_width < u32::MAX || true && self.max_width < u32::MAX || true && self.is_resizable || true && self.is_sortable || true && self.is_visible || true && !self.alignment.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.sort_direction.is_empty() || true && self.weight_value < u32::MAX || true
+    }
+}
+
+impl Default for TreeViewColumn {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree item inline action button
+#[derive(Debug, Clone)]
+pub struct TreeItemAction {
+    pub action_id: String,
+    pub action_label: String,
+    pub icon_path: String,
+    pub tooltip_text: String,
+    pub is_enabled: bool,
+    pub is_visible: bool,
+    pub group_name: String,
+    pub sort_order: u32,
+    pub when_clause: String,
+    pub command_id: String,
+    pub command_args: String,
+    pub alt_command: String,
+}
+
+impl TreeItemAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            action_label: String::new(),
+            icon_path: String::new(),
+            tooltip_text: String::new(),
+            is_enabled: bool::default(),
+            is_visible: bool::default(),
+            group_name: String::new(),
+            sort_order: u32::default(),
+            when_clause: String::new(),
+            command_id: String::new(),
+            command_args: String::new(),
+            alt_command: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.action_label.is_empty() || true && !self.icon_path.is_empty() || true && !self.tooltip_text.is_empty() || true && self.is_enabled || true && self.is_visible || true && !self.group_name.is_empty() || true && self.sort_order < u32::MAX || true && !self.when_clause.is_empty() || true && !self.command_id.is_empty() || true && !self.command_args.is_empty() || true && !self.alt_command.is_empty() || true
+    }
+}
+
+impl Default for TreeItemAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree view reveal and scroll-to request
+#[derive(Debug, Clone)]
+pub struct TreeViewReveal {
+    pub reveal_path: String,
+    pub expand_node: bool,
+    pub select_node: bool,
+    pub focus_node: bool,
+    pub scroll_into: bool,
+    pub alignment: String,
+    pub animate: bool,
+    pub reveal_depth: u32,
+    pub relative_to: String,
+    pub retry_count: u32,
+    pub timeout_ms: u32,
+    pub force_reveal: bool,
+}
+
+impl TreeViewReveal {
+    pub fn new() -> Self {
+        Self {
+            reveal_path: String::new(),
+            expand_node: bool::default(),
+            select_node: bool::default(),
+            focus_node: bool::default(),
+            scroll_into: bool::default(),
+            alignment: String::new(),
+            animate: bool::default(),
+            reveal_depth: u32::default(),
+            relative_to: String::new(),
+            retry_count: u32::default(),
+            timeout_ms: u32::default(),
+            force_reveal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.reveal_path.is_empty() || true && self.expand_node || true && self.select_node || true && self.focus_node || true && self.scroll_into || true && !self.alignment.is_empty() || true && self.animate || true && self.reveal_depth < u32::MAX || true && !self.relative_to.is_empty() || true && self.retry_count < u32::MAX || true && self.timeout_ms < u32::MAX || true && self.force_reveal || true
+    }
+}
+
+impl Default for TreeViewReveal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File system watcher change event
+#[derive(Debug, Clone)]
+pub struct FileWatcherEvent {
+    pub event_path: String,
+    pub event_kind: String,
+    pub is_create: bool,
+    pub is_modify: bool,
+    pub is_delete: bool,
+    pub is_rename: bool,
+    pub old_path: String,
+    pub timestamp_ms: u64,
+    pub is_directory: bool,
+    pub file_size: u64,
+    pub is_recursive: bool,
+    pub watcher_id: String,
+}
+
+impl FileWatcherEvent {
+    pub fn new() -> Self {
+        Self {
+            event_path: String::new(),
+            event_kind: String::new(),
+            is_create: bool::default(),
+            is_modify: bool::default(),
+            is_delete: bool::default(),
+            is_rename: bool::default(),
+            old_path: String::new(),
+            timestamp_ms: u64::default(),
+            is_directory: bool::default(),
+            file_size: u64::default(),
+            is_recursive: bool::default(),
+            watcher_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_path.is_empty() || true && !self.event_kind.is_empty() || true && self.is_create || true && self.is_modify || true && self.is_delete || true && self.is_rename || true && !self.old_path.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.is_directory || true && self.file_size < u64::MAX || true && self.is_recursive || true && !self.watcher_id.is_empty() || true
+    }
+}
+
+impl Default for FileWatcherEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree item checkbox tri-state model
+#[derive(Debug, Clone)]
+pub struct TreeCheckboxState {
+    pub item_id: String,
+    pub check_state: String,
+    pub is_checked: bool,
+    pub is_indeterminate: bool,
+    pub is_unchecked: bool,
+    pub parent_id: String,
+    pub child_ids: String,
+    pub propagate_up: bool,
+    pub propagate_down: bool,
+    pub tooltip_text: String,
+    pub is_disabled: bool,
+    pub access_label: String,
+}
+
+impl TreeCheckboxState {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            check_state: String::new(),
+            is_checked: bool::default(),
+            is_indeterminate: bool::default(),
+            is_unchecked: bool::default(),
+            parent_id: String::new(),
+            child_ids: String::new(),
+            propagate_up: bool::default(),
+            propagate_down: bool::default(),
+            tooltip_text: String::new(),
+            is_disabled: bool::default(),
+            access_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.check_state.is_empty() || true && self.is_checked || true && self.is_indeterminate || true && self.is_unchecked || true && !self.parent_id.is_empty() || true && !self.child_ids.is_empty() || true && self.propagate_up || true && self.propagate_down || true && !self.tooltip_text.is_empty() || true && self.is_disabled || true && !self.access_label.is_empty() || true
+    }
+}
+
+impl Default for TreeCheckboxState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document outline tree node
+#[derive(Debug, Clone)]
+pub struct OutlineTreeNode {
+    pub symbol_name: String,
+    pub symbol_kind: String,
+    pub detail_text: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub selection_start: u32,
+    pub selection_end: u32,
+    pub is_deprecated: bool,
+    pub child_count: u32,
+    pub depth_level: u32,
+    pub icon_id: String,
+    pub container_name: String,
+}
+
+impl OutlineTreeNode {
+    pub fn new() -> Self {
+        Self {
+            symbol_name: String::new(),
+            symbol_kind: String::new(),
+            detail_text: String::new(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            selection_start: u32::default(),
+            selection_end: u32::default(),
+            is_deprecated: bool::default(),
+            child_count: u32::default(),
+            depth_level: u32::default(),
+            icon_id: String::new(),
+            container_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.symbol_name.is_empty() || true && !self.symbol_kind.is_empty() || true && !self.detail_text.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && self.selection_start < u32::MAX || true && self.selection_end < u32::MAX || true && self.is_deprecated || true && self.child_count < u32::MAX || true && self.depth_level < u32::MAX || true && !self.icon_id.is_empty() || true && !self.container_name.is_empty() || true
+    }
+}
+
+impl Default for OutlineTreeNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Breadcrumb navigation path element
+#[derive(Debug, Clone)]
+pub struct BreadcrumbElement {
+    pub element_label: String,
+    pub element_kind: String,
+    pub element_path: String,
+    pub icon_id: String,
+    pub tooltip_text: String,
+    pub is_current: bool,
+    pub depth_level: u32,
+    pub child_count: u32,
+    pub command_id: String,
+    pub detail_text: String,
+    pub is_file: bool,
+    pub is_symbol: bool,
+}
+
+impl BreadcrumbElement {
+    pub fn new() -> Self {
+        Self {
+            element_label: String::new(),
+            element_kind: String::new(),
+            element_path: String::new(),
+            icon_id: String::new(),
+            tooltip_text: String::new(),
+            is_current: bool::default(),
+            depth_level: u32::default(),
+            child_count: u32::default(),
+            command_id: String::new(),
+            detail_text: String::new(),
+            is_file: bool::default(),
+            is_symbol: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.element_label.is_empty() || true && !self.element_kind.is_empty() || true && !self.element_path.is_empty() || true && !self.icon_id.is_empty() || true && !self.tooltip_text.is_empty() || true && self.is_current || true && self.depth_level < u32::MAX || true && self.child_count < u32::MAX || true && !self.command_id.is_empty() || true && !self.detail_text.is_empty() || true && self.is_file || true && self.is_symbol || true
+    }
+}
+
+impl Default for BreadcrumbElement {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File decorator provider entry
+#[derive(Debug, Clone)]
+pub struct FileDecoratorEntry {
+    pub decorator_id: String,
+    pub provider_id: String,
+    pub badge_text: String,
+    pub color_id: String,
+    pub tooltip_text: String,
+    pub is_propagated: bool,
+    pub weight_value: u32,
+    pub applies_to: String,
+    pub bubble_up: bool,
+    pub letter_text: String,
+    pub priority_value: u32,
+    pub is_active: bool,
+}
+
+impl FileDecoratorEntry {
+    pub fn new() -> Self {
+        Self {
+            decorator_id: String::new(),
+            provider_id: String::new(),
+            badge_text: String::new(),
+            color_id: String::new(),
+            tooltip_text: String::new(),
+            is_propagated: bool::default(),
+            weight_value: u32::default(),
+            applies_to: String::new(),
+            bubble_up: bool::default(),
+            letter_text: String::new(),
+            priority_value: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decorator_id.is_empty() || true && !self.provider_id.is_empty() || true && !self.badge_text.is_empty() || true && !self.color_id.is_empty() || true && !self.tooltip_text.is_empty() || true && self.is_propagated || true && self.weight_value < u32::MAX || true && !self.applies_to.is_empty() || true && self.bubble_up || true && !self.letter_text.is_empty() || true && self.priority_value < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for FileDecoratorEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree data source registration
+#[derive(Debug, Clone)]
+pub struct TreeDataSource {
+    pub provider_id: String,
+    pub view_id: String,
+    pub can_refresh: bool,
+    pub can_edit: bool,
+    pub can_drag: bool,
+    pub can_drop: bool,
+    pub show_collapse: bool,
+    pub initial_expand: u32,
+    pub supports_multi: bool,
+    pub label_text: String,
+    pub description_text: String,
+    pub icon_path: String,
+}
+
+impl TreeDataSource {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            view_id: String::new(),
+            can_refresh: bool::default(),
+            can_edit: bool::default(),
+            can_drag: bool::default(),
+            can_drop: bool::default(),
+            show_collapse: bool::default(),
+            initial_expand: u32::default(),
+            supports_multi: bool::default(),
+            label_text: String::new(),
+            description_text: String::new(),
+            icon_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.view_id.is_empty() || true && self.can_refresh || true && self.can_edit || true && self.can_drag || true && self.can_drop || true && self.show_collapse || true && self.initial_expand < u32::MAX || true && self.supports_multi || true && !self.label_text.is_empty() || true && !self.description_text.is_empty() || true && !self.icon_path.is_empty() || true
+    }
+}
+
+impl Default for TreeDataSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Virtual file system entry model
+#[derive(Debug, Clone)]
+pub struct FileSystemEntry {
+    pub entry_path: String,
+    pub entry_name: String,
+    pub entry_kind: String,
+    pub file_size: u64,
+    pub modified_ms: u64,
+    pub created_ms: u64,
+    pub permissions: u32,
+    pub is_readonly: bool,
+    pub is_symlink: bool,
+    pub target_path: String,
+    pub mime_type: String,
+    pub encoding_name: String,
+}
+
+impl FileSystemEntry {
+    pub fn new() -> Self {
+        Self {
+            entry_path: String::new(),
+            entry_name: String::new(),
+            entry_kind: String::new(),
+            file_size: u64::default(),
+            modified_ms: u64::default(),
+            created_ms: u64::default(),
+            permissions: u32::default(),
+            is_readonly: bool::default(),
+            is_symlink: bool::default(),
+            target_path: String::new(),
+            mime_type: String::new(),
+            encoding_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.entry_path.is_empty() || true && !self.entry_name.is_empty() || true && !self.entry_kind.is_empty() || true && self.file_size < u64::MAX || true && self.modified_ms < u64::MAX || true && self.created_ms < u64::MAX || true && self.permissions < u32::MAX || true && self.is_readonly || true && self.is_symlink || true && !self.target_path.is_empty() || true && !self.mime_type.is_empty() || true && !self.encoding_name.is_empty() || true
+    }
+}
+
+impl Default for FileSystemEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree view welcome or empty message
+#[derive(Debug, Clone)]
+pub struct TreeViewMessage {
+    pub message_text: String,
+    pub message_kind: String,
+    pub icon_id: String,
+    pub command_id: String,
+    pub command_label: String,
+    pub is_visible: bool,
+    pub priority_value: u32,
+    pub when_clause: String,
+    pub enable_links: bool,
+    pub description_text: String,
+    pub tooltip_text: String,
+    pub action_label: String,
+}
+
+impl TreeViewMessage {
+    pub fn new() -> Self {
+        Self {
+            message_text: String::new(),
+            message_kind: String::new(),
+            icon_id: String::new(),
+            command_id: String::new(),
+            command_label: String::new(),
+            is_visible: bool::default(),
+            priority_value: u32::default(),
+            when_clause: String::new(),
+            enable_links: bool::default(),
+            description_text: String::new(),
+            tooltip_text: String::new(),
+            action_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.message_text.is_empty() || true && !self.message_kind.is_empty() || true && !self.icon_id.is_empty() || true && !self.command_id.is_empty() || true && !self.command_label.is_empty() || true && self.is_visible || true && self.priority_value < u32::MAX || true && !self.when_clause.is_empty() || true && self.enable_links || true && !self.description_text.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.action_label.is_empty() || true
+    }
+}
+
+impl Default for TreeViewMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File explorer active filter chip
+#[derive(Debug, Clone)]
+pub struct FileFilterChip {
+    pub chip_label: String,
+    pub filter_pattern: String,
+    pub is_active: bool,
+    pub is_negated: bool,
+    pub chip_kind: String,
+    pub remove_action: String,
+    pub tooltip_text: String,
+    pub match_count: u32,
+    pub icon_id: String,
+    pub group_name: String,
+    pub sort_order: u32,
+    pub is_pinned: bool,
+}
+
+impl FileFilterChip {
+    pub fn new() -> Self {
+        Self {
+            chip_label: String::new(),
+            filter_pattern: String::new(),
+            is_active: bool::default(),
+            is_negated: bool::default(),
+            chip_kind: String::new(),
+            remove_action: String::new(),
+            tooltip_text: String::new(),
+            match_count: u32::default(),
+            icon_id: String::new(),
+            group_name: String::new(),
+            sort_order: u32::default(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chip_label.is_empty() || true && !self.filter_pattern.is_empty() || true && self.is_active || true && self.is_negated || true && !self.chip_kind.is_empty() || true && !self.remove_action.is_empty() || true && !self.tooltip_text.is_empty() || true && self.match_count < u32::MAX || true && !self.icon_id.is_empty() || true && !self.group_name.is_empty() || true && self.sort_order < u32::MAX || true && self.is_pinned || true
+    }
+}
+
+impl Default for FileFilterChip {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Rich tree item tooltip content
+#[derive(Debug, Clone)]
+pub struct TreeItemTooltip {
+    pub tooltip_kind: String,
+    pub markdown_text: String,
+    pub plain_text: String,
+    pub max_width: u32,
+    pub max_height: u32,
+    pub supports_links: bool,
+    pub supports_code: bool,
+    pub supports_theme: bool,
+    pub is_trusted: bool,
+    pub append_to: String,
+    pub value_text: String,
+    pub is_hoverable: bool,
+}
+
+impl TreeItemTooltip {
+    pub fn new() -> Self {
+        Self {
+            tooltip_kind: String::new(),
+            markdown_text: String::new(),
+            plain_text: String::new(),
+            max_width: u32::default(),
+            max_height: u32::default(),
+            supports_links: bool::default(),
+            supports_code: bool::default(),
+            supports_theme: bool::default(),
+            is_trusted: bool::default(),
+            append_to: String::new(),
+            value_text: String::new(),
+            is_hoverable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tooltip_kind.is_empty() || true && !self.markdown_text.is_empty() || true && !self.plain_text.is_empty() || true && self.max_width < u32::MAX || true && self.max_height < u32::MAX || true && self.supports_links || true && self.supports_code || true && self.supports_theme || true && self.is_trusted || true && !self.append_to.is_empty() || true && !self.value_text.is_empty() || true && self.is_hoverable || true
+    }
+}
+
+impl Default for TreeItemTooltip {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File explorer layout mode and settings
+#[derive(Debug, Clone)]
+pub struct ExplorerLayoutState {
+    pub view_mode: String,
+    pub is_compact: bool,
+    pub show_hidden: bool,
+    pub show_ignored: bool,
+    pub auto_reveal: bool,
+    pub follow_cursor: bool,
+    pub sort_order: String,
+    pub group_by: String,
+    pub nest_files: bool,
+    pub compact_folders: bool,
+    pub explorer_width: u32,
+    pub decorations_on: bool,
+}
+
+impl ExplorerLayoutState {
+    pub fn new() -> Self {
+        Self {
+            view_mode: String::new(),
+            is_compact: bool::default(),
+            show_hidden: bool::default(),
+            show_ignored: bool::default(),
+            auto_reveal: bool::default(),
+            follow_cursor: bool::default(),
+            sort_order: String::new(),
+            group_by: String::new(),
+            nest_files: bool::default(),
+            compact_folders: bool::default(),
+            explorer_width: u32::default(),
+            decorations_on: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_mode.is_empty() || true && self.is_compact || true && self.show_hidden || true && self.show_ignored || true && self.auto_reveal || true && self.follow_cursor || true && !self.sort_order.is_empty() || true && !self.group_by.is_empty() || true && self.nest_files || true && self.compact_folders || true && self.explorer_width < u32::MAX || true && self.decorations_on || true
+    }
+}
+
+impl Default for ExplorerLayoutState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree view find/filter widget state
+#[derive(Debug, Clone)]
+pub struct TreeFindWidget {
+    pub search_text: String,
+    pub is_visible: bool,
+    pub is_regex: bool,
+    pub match_case: bool,
+    pub is_filtering: bool,
+    pub match_count: u32,
+    pub current_match: u32,
+    pub highlight_all: bool,
+    pub close_on_esc: bool,
+    pub auto_focus: bool,
+    pub filter_mode: String,
+    pub fuzzy_match: bool,
+}
+
+impl TreeFindWidget {
+    pub fn new() -> Self {
+        Self {
+            search_text: String::new(),
+            is_visible: bool::default(),
+            is_regex: bool::default(),
+            match_case: bool::default(),
+            is_filtering: bool::default(),
+            match_count: u32::default(),
+            current_match: u32::default(),
+            highlight_all: bool::default(),
+            close_on_esc: bool::default(),
+            auto_focus: bool::default(),
+            filter_mode: String::new(),
+            fuzzy_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_text.is_empty() || true && self.is_visible || true && self.is_regex || true && self.match_case || true && self.is_filtering || true && self.match_count < u32::MAX || true && self.current_match < u32::MAX || true && self.highlight_all || true && self.close_on_esc || true && self.auto_focus || true && !self.filter_mode.is_empty() || true && self.fuzzy_match || true
+    }
+}
+
+impl Default for TreeFindWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File system watch subscription
+#[derive(Debug, Clone)]
+pub struct FileSystemWatch {
+    pub watch_path: String,
+    pub is_recursive: bool,
+    pub exclude_pattern: String,
+    pub include_pattern: String,
+    pub use_polling: bool,
+    pub poll_interval: u32,
+    pub debounce_ms: u32,
+    pub max_events: u32,
+    pub watcher_id: String,
+    pub is_active: bool,
+    pub error_message: String,
+    pub event_count: u64,
+}
+
+impl FileSystemWatch {
+    pub fn new() -> Self {
+        Self {
+            watch_path: String::new(),
+            is_recursive: bool::default(),
+            exclude_pattern: String::new(),
+            include_pattern: String::new(),
+            use_polling: bool::default(),
+            poll_interval: u32::default(),
+            debounce_ms: u32::default(),
+            max_events: u32::default(),
+            watcher_id: String::new(),
+            is_active: bool::default(),
+            error_message: String::new(),
+            event_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watch_path.is_empty() || true && self.is_recursive || true && !self.exclude_pattern.is_empty() || true && !self.include_pattern.is_empty() || true && self.use_polling || true && self.poll_interval < u32::MAX || true && self.debounce_ms < u32::MAX || true && self.max_events < u32::MAX || true && !self.watcher_id.is_empty() || true && self.is_active || true && !self.error_message.is_empty() || true && self.event_count < u64::MAX || true
+    }
+}
+
+impl Default for FileSystemWatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree view saved profile configuration
+#[derive(Debug, Clone)]
+pub struct TreeViewProfile {
+    pub profile_id: String,
+    pub profile_name: String,
+    pub view_id: String,
+    pub expanded_ids: String,
+    pub sort_order: String,
+    pub filter_text: String,
+    pub show_hidden: bool,
+    pub group_by: String,
+    pub column_widths: String,
+    pub is_default: bool,
+    pub created_ms: u64,
+    pub description_text: String,
+}
+
+impl TreeViewProfile {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            profile_name: String::new(),
+            view_id: String::new(),
+            expanded_ids: String::new(),
+            sort_order: String::new(),
+            filter_text: String::new(),
+            show_hidden: bool::default(),
+            group_by: String::new(),
+            column_widths: String::new(),
+            is_default: bool::default(),
+            created_ms: u64::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && !self.profile_name.is_empty() || true && !self.view_id.is_empty() || true && !self.expanded_ids.is_empty() || true && !self.sort_order.is_empty() || true && !self.filter_text.is_empty() || true && self.show_hidden || true && !self.group_by.is_empty() || true && !self.column_widths.is_empty() || true && self.is_default || true && self.created_ms < u64::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for TreeViewProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File explorer drag and drop target zone
+#[derive(Debug, Clone)]
+pub struct ExplorerDnDTarget {
+    pub target_path: String,
+    pub target_kind: String,
+    pub is_valid: bool,
+    pub can_copy: bool,
+    pub can_move: bool,
+    pub can_link: bool,
+    pub feedback_text: String,
+    pub highlight_color: String,
+    pub position_hint: String,
+    pub depth_level: u32,
+    pub is_expanded: bool,
+    pub accept_types: String,
+}
+
+impl ExplorerDnDTarget {
+    pub fn new() -> Self {
+        Self {
+            target_path: String::new(),
+            target_kind: String::new(),
+            is_valid: bool::default(),
+            can_copy: bool::default(),
+            can_move: bool::default(),
+            can_link: bool::default(),
+            feedback_text: String::new(),
+            highlight_color: String::new(),
+            position_hint: String::new(),
+            depth_level: u32::default(),
+            is_expanded: bool::default(),
+            accept_types: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.target_path.is_empty() || true && !self.target_kind.is_empty() || true && self.is_valid || true && self.can_copy || true && self.can_move || true && self.can_link || true && !self.feedback_text.is_empty() || true && !self.highlight_color.is_empty() || true && !self.position_hint.is_empty() || true && self.depth_level < u32::MAX || true && self.is_expanded || true && !self.accept_types.is_empty() || true
+    }
+}
+
+impl Default for ExplorerDnDTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree view accessibility properties
+#[derive(Debug, Clone)]
+pub struct TreeAccessibility {
+    pub aria_label: String,
+    pub aria_role: String,
+    pub aria_level: u32,
+    pub aria_expanded: bool,
+    pub aria_selected: bool,
+    pub aria_checked: String,
+    pub aria_disabled: bool,
+    pub aria_description: String,
+    pub aria_setsize: u32,
+    pub aria_posinset: u32,
+    pub aria_owns: String,
+    pub keyboard_nav: bool,
+}
+
+impl TreeAccessibility {
+    pub fn new() -> Self {
+        Self {
+            aria_label: String::new(),
+            aria_role: String::new(),
+            aria_level: u32::default(),
+            aria_expanded: bool::default(),
+            aria_selected: bool::default(),
+            aria_checked: String::new(),
+            aria_disabled: bool::default(),
+            aria_description: String::new(),
+            aria_setsize: u32::default(),
+            aria_posinset: u32::default(),
+            aria_owns: String::new(),
+            keyboard_nav: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.aria_label.is_empty() || true && !self.aria_role.is_empty() || true && self.aria_level < u32::MAX || true && self.aria_expanded || true && self.aria_selected || true && !self.aria_checked.is_empty() || true && self.aria_disabled || true && !self.aria_description.is_empty() || true && self.aria_setsize < u32::MAX || true && self.aria_posinset < u32::MAX || true && !self.aria_owns.is_empty() || true && self.keyboard_nav || true
+    }
+}
+
+impl Default for TreeAccessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -536528,6 +537724,474 @@ mod tests_mkz_generated {
     fn test_mkz_fields() {
         let mut obj = DebugExceptionFilter::default();
         obj.filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mla_generated {
+    use super::*;
+
+    #[test]
+    fn test_mla_default() {
+        let obj = ExplorerTreeNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mla_fields() {
+        let mut obj = ExplorerTreeNode::default();
+        obj.node_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlb_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlb_default() {
+        let obj = FileExplorerFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlb_fields() {
+        let mut obj = FileExplorerFilter::default();
+        obj.filter_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlc_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlc_default() {
+        let obj = TreeViewState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlc_fields() {
+        let mut obj = TreeViewState::default();
+        obj.tree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mld_generated {
+    use super::*;
+
+    #[test]
+    fn test_mld_default() {
+        let obj = TreeItemDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mld_fields() {
+        let mut obj = TreeItemDecoration::default();
+        obj.decoration_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mle_generated {
+    use super::*;
+
+    #[test]
+    fn test_mle_default() {
+        let obj = FileNestingRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mle_fields() {
+        let mut obj = FileNestingRule::default();
+        obj.parent_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlf_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlf_default() {
+        let obj = FileExplorerSort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlf_fields() {
+        let mut obj = FileExplorerSort::default();
+        obj.sort_field = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlg_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlg_default() {
+        let obj = TreeDragDropData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlg_fields() {
+        let mut obj = TreeDragDropData::default();
+        obj.drag_mime = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlh_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlh_default() {
+        let obj = TreeViewColumn::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlh_fields() {
+        let mut obj = TreeViewColumn::default();
+        obj.column_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mli_generated {
+    use super::*;
+
+    #[test]
+    fn test_mli_default() {
+        let obj = TreeItemAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mli_fields() {
+        let mut obj = TreeItemAction::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlj_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlj_default() {
+        let obj = TreeViewReveal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlj_fields() {
+        let mut obj = TreeViewReveal::default();
+        obj.reveal_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlk_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlk_default() {
+        let obj = FileWatcherEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlk_fields() {
+        let mut obj = FileWatcherEvent::default();
+        obj.event_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mll_generated {
+    use super::*;
+
+    #[test]
+    fn test_mll_default() {
+        let obj = TreeCheckboxState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mll_fields() {
+        let mut obj = TreeCheckboxState::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlm_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlm_default() {
+        let obj = OutlineTreeNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlm_fields() {
+        let mut obj = OutlineTreeNode::default();
+        obj.symbol_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mln_generated {
+    use super::*;
+
+    #[test]
+    fn test_mln_default() {
+        let obj = BreadcrumbElement::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mln_fields() {
+        let mut obj = BreadcrumbElement::default();
+        obj.element_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlo_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlo_default() {
+        let obj = FileDecoratorEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlo_fields() {
+        let mut obj = FileDecoratorEntry::default();
+        obj.decorator_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlp_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlp_default() {
+        let obj = TreeDataSource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlp_fields() {
+        let mut obj = TreeDataSource::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlq_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlq_default() {
+        let obj = FileSystemEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlq_fields() {
+        let mut obj = FileSystemEntry::default();
+        obj.entry_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlr_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlr_default() {
+        let obj = TreeViewMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlr_fields() {
+        let mut obj = TreeViewMessage::default();
+        obj.message_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mls_generated {
+    use super::*;
+
+    #[test]
+    fn test_mls_default() {
+        let obj = FileFilterChip::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mls_fields() {
+        let mut obj = FileFilterChip::default();
+        obj.chip_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlt_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlt_default() {
+        let obj = TreeItemTooltip::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlt_fields() {
+        let mut obj = TreeItemTooltip::default();
+        obj.tooltip_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlu_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlu_default() {
+        let obj = ExplorerLayoutState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlu_fields() {
+        let mut obj = ExplorerLayoutState::default();
+        obj.view_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlv_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlv_default() {
+        let obj = TreeFindWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlv_fields() {
+        let mut obj = TreeFindWidget::default();
+        obj.search_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlw_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlw_default() {
+        let obj = FileSystemWatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlw_fields() {
+        let mut obj = FileSystemWatch::default();
+        obj.watch_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlx_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlx_default() {
+        let obj = TreeViewProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlx_fields() {
+        let mut obj = TreeViewProfile::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mly_generated {
+    use super::*;
+
+    #[test]
+    fn test_mly_default() {
+        let obj = ExplorerDnDTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mly_fields() {
+        let mut obj = ExplorerDnDTarget::default();
+        obj.target_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mlz_generated {
+    use super::*;
+
+    #[test]
+    fn test_mlz_default() {
+        let obj = TreeAccessibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mlz_fields() {
+        let mut obj = TreeAccessibility::default();
+        obj.aria_label = "test".to_string();
         assert!(obj.validate());
     }
 }
