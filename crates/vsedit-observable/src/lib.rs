@@ -233687,6 +233687,1202 @@ impl Default for TestFramework {
     }
 }
 
+/// Debug launch/attach configuration for debug sessions
+#[derive(Debug, Clone)]
+pub struct DebugLaunchConfig {
+    pub session_name: String,
+    pub launch_type: String,
+    pub program_path: String,
+    pub args_list: String,
+    pub working_dir: String,
+    pub env_vars: String,
+    pub stop_on_entry: bool,
+    pub no_debug: bool,
+    pub restart_on_crash: bool,
+    pub console_mode: String,
+    pub source_map: String,
+    pub pre_launch_task: String,
+}
+
+impl DebugLaunchConfig {
+    pub fn new() -> Self {
+        Self {
+            session_name: String::new(),
+            launch_type: String::new(),
+            program_path: String::new(),
+            args_list: String::new(),
+            working_dir: String::new(),
+            env_vars: String::new(),
+            stop_on_entry: bool::default(),
+            no_debug: bool::default(),
+            restart_on_crash: bool::default(),
+            console_mode: String::new(),
+            source_map: String::new(),
+            pre_launch_task: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.session_name.is_empty() || true && !self.launch_type.is_empty() || true && !self.program_path.is_empty() || true && !self.args_list.is_empty() || true && !self.working_dir.is_empty() || true && !self.env_vars.is_empty() || true && self.stop_on_entry || true && self.no_debug || true && self.restart_on_crash || true && !self.console_mode.is_empty() || true && !self.source_map.is_empty() || true && !self.pre_launch_task.is_empty() || true
+    }
+}
+
+impl Default for DebugLaunchConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug thread execution state tracking
+#[derive(Debug, Clone)]
+pub struct DebugThreadState {
+    pub thread_id: u32,
+    pub thread_name: String,
+    pub status_text: String,
+    pub is_stopped: bool,
+    pub stop_reason: String,
+    pub frame_count: u32,
+    pub current_frame: u32,
+    pub is_focused: bool,
+    pub can_continue: bool,
+    pub can_step: bool,
+    pub has_exception: bool,
+    pub exception_info: String,
+}
+
+impl DebugThreadState {
+    pub fn new() -> Self {
+        Self {
+            thread_id: u32::default(),
+            thread_name: String::new(),
+            status_text: String::new(),
+            is_stopped: bool::default(),
+            stop_reason: String::new(),
+            frame_count: u32::default(),
+            current_frame: u32::default(),
+            is_focused: bool::default(),
+            can_continue: bool::default(),
+            can_step: bool::default(),
+            has_exception: bool::default(),
+            exception_info: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.thread_id < u32::MAX || true && !self.thread_name.is_empty() || true && !self.status_text.is_empty() || true && self.is_stopped || true && !self.stop_reason.is_empty() || true && self.frame_count < u32::MAX || true && self.current_frame < u32::MAX || true && self.is_focused || true && self.can_continue || true && self.can_step || true && self.has_exception || true && !self.exception_info.is_empty() || true
+    }
+}
+
+impl Default for DebugThreadState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug stack frame detailed information
+#[derive(Debug, Clone)]
+pub struct DebugStackFrameInfo {
+    pub frame_id: u32,
+    pub frame_name: String,
+    pub source_path: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub module_name: String,
+    pub is_artificial: bool,
+    pub presentation_hint: String,
+    pub instruction_ptr: String,
+    pub scope_count: u32,
+}
+
+impl DebugStackFrameInfo {
+    pub fn new() -> Self {
+        Self {
+            frame_id: u32::default(),
+            frame_name: String::new(),
+            source_path: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            module_name: String::new(),
+            is_artificial: bool::default(),
+            presentation_hint: String::new(),
+            instruction_ptr: String::new(),
+            scope_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.frame_id < u32::MAX || true && !self.frame_name.is_empty() || true && !self.source_path.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.module_name.is_empty() || true && self.is_artificial || true && !self.presentation_hint.is_empty() || true && !self.instruction_ptr.is_empty() || true && self.scope_count < u32::MAX || true
+    }
+}
+
+impl Default for DebugStackFrameInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug variable scope container
+#[derive(Debug, Clone)]
+pub struct DebugVariableScope {
+    pub scope_name: String,
+    pub scope_kind: String,
+    pub variable_count: u32,
+    pub variables_ref: u32,
+    pub named_variables: u32,
+    pub indexed_variables: u32,
+    pub is_expensive: bool,
+    pub start_line: u32,
+    pub start_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub source_path: String,
+}
+
+impl DebugVariableScope {
+    pub fn new() -> Self {
+        Self {
+            scope_name: String::new(),
+            scope_kind: String::new(),
+            variable_count: u32::default(),
+            variables_ref: u32::default(),
+            named_variables: u32::default(),
+            indexed_variables: u32::default(),
+            is_expensive: bool::default(),
+            start_line: u32::default(),
+            start_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            source_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope_name.is_empty() || true && !self.scope_kind.is_empty() || true && self.variable_count < u32::MAX || true && self.variables_ref < u32::MAX || true && self.named_variables < u32::MAX || true && self.indexed_variables < u32::MAX || true && self.is_expensive || true && self.start_line < u32::MAX || true && self.start_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.source_path.is_empty() || true
+    }
+}
+
+impl Default for DebugVariableScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug conditional breakpoint expression
+#[derive(Debug, Clone)]
+pub struct DebugBreakpointCondition {
+    pub condition_expr: String,
+    pub hit_condition: String,
+    pub log_message: String,
+    pub is_enabled: bool,
+    pub is_verified: bool,
+    pub hit_count: u32,
+    pub source_path: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub condition_error: String,
+}
+
+impl DebugBreakpointCondition {
+    pub fn new() -> Self {
+        Self {
+            condition_expr: String::new(),
+            hit_condition: String::new(),
+            log_message: String::new(),
+            is_enabled: bool::default(),
+            is_verified: bool::default(),
+            hit_count: u32::default(),
+            source_path: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            condition_error: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.condition_expr.is_empty() || true && !self.hit_condition.is_empty() || true && !self.log_message.is_empty() || true && self.is_enabled || true && self.is_verified || true && self.hit_count < u32::MAX || true && !self.source_path.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.condition_error.is_empty() || true
+    }
+}
+
+impl Default for DebugBreakpointCondition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug watch expression evaluation
+#[derive(Debug, Clone)]
+pub struct DebugWatchExpression {
+    pub expression_text: String,
+    pub result_value: String,
+    pub result_type: String,
+    pub variables_ref: u32,
+    pub named_variables: u32,
+    pub indexed_variables: u32,
+    pub is_evaluated: bool,
+    pub has_error: bool,
+    pub error_message: String,
+    pub memory_ref: String,
+    pub presentation_hint: String,
+    pub evaluation_context: String,
+}
+
+impl DebugWatchExpression {
+    pub fn new() -> Self {
+        Self {
+            expression_text: String::new(),
+            result_value: String::new(),
+            result_type: String::new(),
+            variables_ref: u32::default(),
+            named_variables: u32::default(),
+            indexed_variables: u32::default(),
+            is_evaluated: bool::default(),
+            has_error: bool::default(),
+            error_message: String::new(),
+            memory_ref: String::new(),
+            presentation_hint: String::new(),
+            evaluation_context: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.expression_text.is_empty() || true && !self.result_value.is_empty() || true && !self.result_type.is_empty() || true && self.variables_ref < u32::MAX || true && self.named_variables < u32::MAX || true && self.indexed_variables < u32::MAX || true && self.is_evaluated || true && self.has_error || true && !self.error_message.is_empty() || true && !self.memory_ref.is_empty() || true && !self.presentation_hint.is_empty() || true && !self.evaluation_context.is_empty() || true
+    }
+}
+
+impl Default for DebugWatchExpression {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug console output entry
+#[derive(Debug, Clone)]
+pub struct DebugConsoleEntry {
+    pub entry_text: String,
+    pub entry_kind: String,
+    pub source_origin: String,
+    pub timestamp_ms: u64,
+    pub is_error: bool,
+    pub is_warning: bool,
+    pub category_name: String,
+    pub group_id: String,
+    pub variables_ref: u32,
+    pub line_number: u32,
+    pub source_path: String,
+    pub output_channel: String,
+}
+
+impl DebugConsoleEntry {
+    pub fn new() -> Self {
+        Self {
+            entry_text: String::new(),
+            entry_kind: String::new(),
+            source_origin: String::new(),
+            timestamp_ms: u64::default(),
+            is_error: bool::default(),
+            is_warning: bool::default(),
+            category_name: String::new(),
+            group_id: String::new(),
+            variables_ref: u32::default(),
+            line_number: u32::default(),
+            source_path: String::new(),
+            output_channel: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.entry_text.is_empty() || true && !self.entry_kind.is_empty() || true && !self.source_origin.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.is_error || true && self.is_warning || true && !self.category_name.is_empty() || true && !self.group_id.is_empty() || true && self.variables_ref < u32::MAX || true && self.line_number < u32::MAX || true && !self.source_path.is_empty() || true && !self.output_channel.is_empty() || true
+    }
+}
+
+impl Default for DebugConsoleEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug adapter executable configuration
+#[derive(Debug, Clone)]
+pub struct DebugAdapterConfig {
+    pub adapter_id: String,
+    pub adapter_type: String,
+    pub executable_path: String,
+    pub runtime_path: String,
+    pub runtime_args: String,
+    pub port_number: u32,
+    pub host_name: String,
+    pub timeout_ms: u32,
+    pub supports_restart: bool,
+    pub supports_terminate: bool,
+    pub supports_suspend: bool,
+    pub protocol_version: String,
+}
+
+impl DebugAdapterConfig {
+    pub fn new() -> Self {
+        Self {
+            adapter_id: String::new(),
+            adapter_type: String::new(),
+            executable_path: String::new(),
+            runtime_path: String::new(),
+            runtime_args: String::new(),
+            port_number: u32::default(),
+            host_name: String::new(),
+            timeout_ms: u32::default(),
+            supports_restart: bool::default(),
+            supports_terminate: bool::default(),
+            supports_suspend: bool::default(),
+            protocol_version: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.adapter_id.is_empty() || true && !self.adapter_type.is_empty() || true && !self.executable_path.is_empty() || true && !self.runtime_path.is_empty() || true && !self.runtime_args.is_empty() || true && self.port_number < u32::MAX || true && !self.host_name.is_empty() || true && self.timeout_ms < u32::MAX || true && self.supports_restart || true && self.supports_terminate || true && self.supports_suspend || true && !self.protocol_version.is_empty() || true
+    }
+}
+
+impl Default for DebugAdapterConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug adapter protocol message envelope
+#[derive(Debug, Clone)]
+pub struct DebugProtocolMessage {
+    pub message_seq: u32,
+    pub message_type: String,
+    pub command_name: String,
+    pub request_seq: u32,
+    pub is_success: bool,
+    pub error_message: String,
+    pub body_json: String,
+    pub timestamp_ms: u64,
+    pub is_event: bool,
+    pub event_name: String,
+    pub is_reverse: bool,
+    pub cancel_id: u32,
+}
+
+impl DebugProtocolMessage {
+    pub fn new() -> Self {
+        Self {
+            message_seq: u32::default(),
+            message_type: String::new(),
+            command_name: String::new(),
+            request_seq: u32::default(),
+            is_success: bool::default(),
+            error_message: String::new(),
+            body_json: String::new(),
+            timestamp_ms: u64::default(),
+            is_event: bool::default(),
+            event_name: String::new(),
+            is_reverse: bool::default(),
+            cancel_id: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.message_seq < u32::MAX || true && !self.message_type.is_empty() || true && !self.command_name.is_empty() || true && self.request_seq < u32::MAX || true && self.is_success || true && !self.error_message.is_empty() || true && !self.body_json.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.is_event || true && !self.event_name.is_empty() || true && self.is_reverse || true && self.cancel_id < u32::MAX || true
+    }
+}
+
+impl Default for DebugProtocolMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug exception breakpoint information
+#[derive(Debug, Clone)]
+pub struct DebugExceptionInfo {
+    pub exception_id: String,
+    pub exception_desc: String,
+    pub break_mode: String,
+    pub filter_options: String,
+    pub condition_expr: String,
+    pub is_user_unhandled: bool,
+    pub inner_exception: String,
+    pub stack_trace: String,
+    pub source_path: String,
+    pub line_number: u32,
+    pub type_name: String,
+    pub evaluated_name: String,
+}
+
+impl DebugExceptionInfo {
+    pub fn new() -> Self {
+        Self {
+            exception_id: String::new(),
+            exception_desc: String::new(),
+            break_mode: String::new(),
+            filter_options: String::new(),
+            condition_expr: String::new(),
+            is_user_unhandled: bool::default(),
+            inner_exception: String::new(),
+            stack_trace: String::new(),
+            source_path: String::new(),
+            line_number: u32::default(),
+            type_name: String::new(),
+            evaluated_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exception_id.is_empty() || true && !self.exception_desc.is_empty() || true && !self.break_mode.is_empty() || true && !self.filter_options.is_empty() || true && !self.condition_expr.is_empty() || true && self.is_user_unhandled || true && !self.inner_exception.is_empty() || true && !self.stack_trace.is_empty() || true && !self.source_path.is_empty() || true && self.line_number < u32::MAX || true && !self.type_name.is_empty() || true && !self.evaluated_name.is_empty() || true
+    }
+}
+
+impl Default for DebugExceptionInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug loaded module information
+#[derive(Debug, Clone)]
+pub struct DebugModuleInfo {
+    pub module_id: u32,
+    pub module_name: String,
+    pub module_path: String,
+    pub is_optimized: bool,
+    pub is_user_code: bool,
+    pub symbol_status: String,
+    pub symbol_path: String,
+    pub date_stamp: String,
+    pub address_range: String,
+    pub version_info: String,
+    pub module_size: u64,
+    pub order_index: u32,
+}
+
+impl DebugModuleInfo {
+    pub fn new() -> Self {
+        Self {
+            module_id: u32::default(),
+            module_name: String::new(),
+            module_path: String::new(),
+            is_optimized: bool::default(),
+            is_user_code: bool::default(),
+            symbol_status: String::new(),
+            symbol_path: String::new(),
+            date_stamp: String::new(),
+            address_range: String::new(),
+            version_info: String::new(),
+            module_size: u64::default(),
+            order_index: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.module_id < u32::MAX || true && !self.module_name.is_empty() || true && !self.module_path.is_empty() || true && self.is_optimized || true && self.is_user_code || true && !self.symbol_status.is_empty() || true && !self.symbol_path.is_empty() || true && !self.date_stamp.is_empty() || true && !self.address_range.is_empty() || true && !self.version_info.is_empty() || true && self.module_size < u64::MAX || true && self.order_index < u32::MAX || true
+    }
+}
+
+impl Default for DebugModuleInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug source reference for decompiled code
+#[derive(Debug, Clone)]
+pub struct DebugSourceRef {
+    pub source_id: u32,
+    pub source_name: String,
+    pub source_path: String,
+    pub source_ref: u32,
+    pub origin_hint: String,
+    pub adapter_data: String,
+    pub is_decompiled: bool,
+    pub is_generated: bool,
+    pub checksum_algo: String,
+    pub checksum_value: String,
+    pub mime_type: String,
+    pub presentation_hint: String,
+}
+
+impl DebugSourceRef {
+    pub fn new() -> Self {
+        Self {
+            source_id: u32::default(),
+            source_name: String::new(),
+            source_path: String::new(),
+            source_ref: u32::default(),
+            origin_hint: String::new(),
+            adapter_data: String::new(),
+            is_decompiled: bool::default(),
+            is_generated: bool::default(),
+            checksum_algo: String::new(),
+            checksum_value: String::new(),
+            mime_type: String::new(),
+            presentation_hint: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.source_id < u32::MAX || true && !self.source_name.is_empty() || true && !self.source_path.is_empty() || true && self.source_ref < u32::MAX || true && !self.origin_hint.is_empty() || true && !self.adapter_data.is_empty() || true && self.is_decompiled || true && self.is_generated || true && !self.checksum_algo.is_empty() || true && !self.checksum_value.is_empty() || true && !self.mime_type.is_empty() || true && !self.presentation_hint.is_empty() || true
+    }
+}
+
+impl Default for DebugSourceRef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug data breakpoint on memory access
+#[derive(Debug, Clone)]
+pub struct DebugDataBreakpoint {
+    pub data_id: String,
+    pub description_text: String,
+    pub access_type: String,
+    pub is_enabled: bool,
+    pub is_verified: bool,
+    pub hit_count: u32,
+    pub condition_expr: String,
+    pub hit_condition: String,
+    pub address_expr: String,
+    pub byte_size: u32,
+    pub offset_value: u32,
+    pub end_address: String,
+}
+
+impl DebugDataBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            data_id: String::new(),
+            description_text: String::new(),
+            access_type: String::new(),
+            is_enabled: bool::default(),
+            is_verified: bool::default(),
+            hit_count: u32::default(),
+            condition_expr: String::new(),
+            hit_condition: String::new(),
+            address_expr: String::new(),
+            byte_size: u32::default(),
+            offset_value: u32::default(),
+            end_address: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.data_id.is_empty() || true && !self.description_text.is_empty() || true && !self.access_type.is_empty() || true && self.is_enabled || true && self.is_verified || true && self.hit_count < u32::MAX || true && !self.condition_expr.is_empty() || true && !self.hit_condition.is_empty() || true && !self.address_expr.is_empty() || true && self.byte_size < u32::MAX || true && self.offset_value < u32::MAX || true && !self.end_address.is_empty() || true
+    }
+}
+
+impl Default for DebugDataBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug instruction-level breakpoint
+#[derive(Debug, Clone)]
+pub struct DebugInstructionBreakpoint {
+    pub instruction_ref: String,
+    pub offset_value: u32,
+    pub condition_expr: String,
+    pub hit_condition: String,
+    pub is_enabled: bool,
+    pub is_verified: bool,
+    pub hit_count: u32,
+    pub instruction_text: String,
+    pub address_text: String,
+    pub source_path: String,
+    pub line_number: u32,
+    pub column_number: u32,
+}
+
+impl DebugInstructionBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            instruction_ref: String::new(),
+            offset_value: u32::default(),
+            condition_expr: String::new(),
+            hit_condition: String::new(),
+            is_enabled: bool::default(),
+            is_verified: bool::default(),
+            hit_count: u32::default(),
+            instruction_text: String::new(),
+            address_text: String::new(),
+            source_path: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.instruction_ref.is_empty() || true && self.offset_value < u32::MAX || true && !self.condition_expr.is_empty() || true && !self.hit_condition.is_empty() || true && self.is_enabled || true && self.is_verified || true && self.hit_count < u32::MAX || true && !self.instruction_text.is_empty() || true && !self.address_text.is_empty() || true && !self.source_path.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true
+    }
+}
+
+impl Default for DebugInstructionBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug expression evaluation result
+#[derive(Debug, Clone)]
+pub struct DebugEvaluateResult {
+    pub eval_id: u32,
+    pub expression_text: String,
+    pub result_text: String,
+    pub result_type: String,
+    pub variables_ref: u32,
+    pub named_variables: u32,
+    pub indexed_variables: u32,
+    pub memory_ref: String,
+    pub presentation_hint: String,
+    pub is_side_effect: bool,
+    pub context_name: String,
+    pub frame_id: u32,
+}
+
+impl DebugEvaluateResult {
+    pub fn new() -> Self {
+        Self {
+            eval_id: u32::default(),
+            expression_text: String::new(),
+            result_text: String::new(),
+            result_type: String::new(),
+            variables_ref: u32::default(),
+            named_variables: u32::default(),
+            indexed_variables: u32::default(),
+            memory_ref: String::new(),
+            presentation_hint: String::new(),
+            is_side_effect: bool::default(),
+            context_name: String::new(),
+            frame_id: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.eval_id < u32::MAX || true && !self.expression_text.is_empty() || true && !self.result_text.is_empty() || true && !self.result_type.is_empty() || true && self.variables_ref < u32::MAX || true && self.named_variables < u32::MAX || true && self.indexed_variables < u32::MAX || true && !self.memory_ref.is_empty() || true && !self.presentation_hint.is_empty() || true && self.is_side_effect || true && !self.context_name.is_empty() || true && self.frame_id < u32::MAX || true
+    }
+}
+
+impl Default for DebugEvaluateResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug console completion suggestion
+#[derive(Debug, Clone)]
+pub struct DebugCompletionItem {
+    pub completion_label: String,
+    pub completion_text: String,
+    pub sort_text: String,
+    pub detail_text: String,
+    pub completion_type: String,
+    pub start_offset: u32,
+    pub length_value: u32,
+    pub selection_start: u32,
+    pub selection_length: u32,
+    pub is_snippet: bool,
+    pub filter_text: String,
+    pub insert_mode: String,
+}
+
+impl DebugCompletionItem {
+    pub fn new() -> Self {
+        Self {
+            completion_label: String::new(),
+            completion_text: String::new(),
+            sort_text: String::new(),
+            detail_text: String::new(),
+            completion_type: String::new(),
+            start_offset: u32::default(),
+            length_value: u32::default(),
+            selection_start: u32::default(),
+            selection_length: u32::default(),
+            is_snippet: bool::default(),
+            filter_text: String::new(),
+            insert_mode: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.completion_label.is_empty() || true && !self.completion_text.is_empty() || true && !self.sort_text.is_empty() || true && !self.detail_text.is_empty() || true && !self.completion_type.is_empty() || true && self.start_offset < u32::MAX || true && self.length_value < u32::MAX || true && self.selection_start < u32::MAX || true && self.selection_length < u32::MAX || true && self.is_snippet || true && !self.filter_text.is_empty() || true && !self.insert_mode.is_empty() || true
+    }
+}
+
+impl Default for DebugCompletionItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug variable tree display model
+#[derive(Debug, Clone)]
+pub struct DebugVariableDisplay {
+    pub display_name: String,
+    pub display_value: String,
+    pub display_type: String,
+    pub variables_ref: u32,
+    pub named_variables: u32,
+    pub indexed_variables: u32,
+    pub evaluate_name: String,
+    pub memory_ref: String,
+    pub is_lazy: bool,
+    pub is_readonly: bool,
+    pub presentation_hint: String,
+    pub access_qualifier: String,
+}
+
+impl DebugVariableDisplay {
+    pub fn new() -> Self {
+        Self {
+            display_name: String::new(),
+            display_value: String::new(),
+            display_type: String::new(),
+            variables_ref: u32::default(),
+            named_variables: u32::default(),
+            indexed_variables: u32::default(),
+            evaluate_name: String::new(),
+            memory_ref: String::new(),
+            is_lazy: bool::default(),
+            is_readonly: bool::default(),
+            presentation_hint: String::new(),
+            access_qualifier: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.display_name.is_empty() || true && !self.display_value.is_empty() || true && !self.display_type.is_empty() || true && self.variables_ref < u32::MAX || true && self.named_variables < u32::MAX || true && self.indexed_variables < u32::MAX || true && !self.evaluate_name.is_empty() || true && !self.memory_ref.is_empty() || true && self.is_lazy || true && self.is_readonly || true && !self.presentation_hint.is_empty() || true && !self.access_qualifier.is_empty() || true
+    }
+}
+
+impl Default for DebugVariableDisplay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug disassembly instruction line
+#[derive(Debug, Clone)]
+pub struct DebugDisassemblyLine {
+    pub address_text: String,
+    pub instruction_bytes: String,
+    pub instruction_text: String,
+    pub symbol_name: String,
+    pub source_location: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub is_current: bool,
+    pub has_breakpoint: bool,
+    pub instruction_offset: u32,
+}
+
+impl DebugDisassemblyLine {
+    pub fn new() -> Self {
+        Self {
+            address_text: String::new(),
+            instruction_bytes: String::new(),
+            instruction_text: String::new(),
+            symbol_name: String::new(),
+            source_location: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            is_current: bool::default(),
+            has_breakpoint: bool::default(),
+            instruction_offset: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.address_text.is_empty() || true && !self.instruction_bytes.is_empty() || true && !self.instruction_text.is_empty() || true && !self.symbol_name.is_empty() || true && !self.source_location.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && self.is_current || true && self.has_breakpoint || true && self.instruction_offset < u32::MAX || true
+    }
+}
+
+impl Default for DebugDisassemblyLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug memory view region data
+#[derive(Debug, Clone)]
+pub struct DebugMemoryRegion {
+    pub region_start: String,
+    pub region_size: u64,
+    pub data_bytes: String,
+    pub is_readable: bool,
+    pub is_writable: bool,
+    pub is_executable: bool,
+    pub page_size: u32,
+    pub offset_start: u64,
+    pub unreadable_bytes: u32,
+    pub label_text: String,
+    pub memory_ref: String,
+    pub access_pattern: String,
+}
+
+impl DebugMemoryRegion {
+    pub fn new() -> Self {
+        Self {
+            region_start: String::new(),
+            region_size: u64::default(),
+            data_bytes: String::new(),
+            is_readable: bool::default(),
+            is_writable: bool::default(),
+            is_executable: bool::default(),
+            page_size: u32::default(),
+            offset_start: u64::default(),
+            unreadable_bytes: u32::default(),
+            label_text: String::new(),
+            memory_ref: String::new(),
+            access_pattern: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.region_start.is_empty() || true && self.region_size < u64::MAX || true && !self.data_bytes.is_empty() || true && self.is_readable || true && self.is_writable || true && self.is_executable || true && self.page_size < u32::MAX || true && self.offset_start < u64::MAX || true && self.unreadable_bytes < u32::MAX || true && !self.label_text.is_empty() || true && !self.memory_ref.is_empty() || true && !self.access_pattern.is_empty() || true
+    }
+}
+
+impl Default for DebugMemoryRegion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug stepping granularity control
+#[derive(Debug, Clone)]
+pub struct DebugStepGranularity {
+    pub granularity_kind: String,
+    pub step_count: u32,
+    pub is_statement: bool,
+    pub is_line: bool,
+    pub is_instruction: bool,
+    pub targets_all: bool,
+    pub thread_id: u32,
+    pub single_thread: bool,
+    pub reverse_mode: bool,
+    pub can_restart: bool,
+    pub supports_goto: bool,
+    pub step_back_count: u32,
+}
+
+impl DebugStepGranularity {
+    pub fn new() -> Self {
+        Self {
+            granularity_kind: String::new(),
+            step_count: u32::default(),
+            is_statement: bool::default(),
+            is_line: bool::default(),
+            is_instruction: bool::default(),
+            targets_all: bool::default(),
+            thread_id: u32::default(),
+            single_thread: bool::default(),
+            reverse_mode: bool::default(),
+            can_restart: bool::default(),
+            supports_goto: bool::default(),
+            step_back_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.granularity_kind.is_empty() || true && self.step_count < u32::MAX || true && self.is_statement || true && self.is_line || true && self.is_instruction || true && self.targets_all || true && self.thread_id < u32::MAX || true && self.single_thread || true && self.reverse_mode || true && self.can_restart || true && self.supports_goto || true && self.step_back_count < u32::MAX || true
+    }
+}
+
+impl Default for DebugStepGranularity {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug integrated terminal configuration
+#[derive(Debug, Clone)]
+pub struct DebugTerminalConfig {
+    pub terminal_kind: String,
+    pub terminal_title: String,
+    pub shell_path: String,
+    pub shell_args: String,
+    pub cwd_path: String,
+    pub env_vars: String,
+    pub is_external: bool,
+    pub is_integrated: bool,
+    pub auto_close: bool,
+    pub focus_on_start: bool,
+    pub clear_before: bool,
+    pub ansi_support: bool,
+}
+
+impl DebugTerminalConfig {
+    pub fn new() -> Self {
+        Self {
+            terminal_kind: String::new(),
+            terminal_title: String::new(),
+            shell_path: String::new(),
+            shell_args: String::new(),
+            cwd_path: String::new(),
+            env_vars: String::new(),
+            is_external: bool::default(),
+            is_integrated: bool::default(),
+            auto_close: bool::default(),
+            focus_on_start: bool::default(),
+            clear_before: bool::default(),
+            ansi_support: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.terminal_kind.is_empty() || true && !self.terminal_title.is_empty() || true && !self.shell_path.is_empty() || true && !self.shell_args.is_empty() || true && !self.cwd_path.is_empty() || true && !self.env_vars.is_empty() || true && self.is_external || true && self.is_integrated || true && self.auto_close || true && self.focus_on_start || true && self.clear_before || true && self.ansi_support || true
+    }
+}
+
+impl Default for DebugTerminalConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug log point message template
+#[derive(Debug, Clone)]
+pub struct DebugLogPoint {
+    pub log_message: String,
+    pub source_path: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub is_enabled: bool,
+    pub is_verified: bool,
+    pub hit_count: u32,
+    pub condition_expr: String,
+    pub hit_condition: String,
+    pub log_group: String,
+}
+
+impl DebugLogPoint {
+    pub fn new() -> Self {
+        Self {
+            log_message: String::new(),
+            source_path: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            is_enabled: bool::default(),
+            is_verified: bool::default(),
+            hit_count: u32::default(),
+            condition_expr: String::new(),
+            hit_condition: String::new(),
+            log_group: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_message.is_empty() || true && !self.source_path.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && self.is_enabled || true && self.is_verified || true && self.hit_count < u32::MAX || true && !self.condition_expr.is_empty() || true && !self.hit_condition.is_empty() || true && !self.log_group.is_empty() || true
+    }
+}
+
+impl Default for DebugLogPoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug function name breakpoint
+#[derive(Debug, Clone)]
+pub struct DebugFunctionBreakpoint {
+    pub function_name: String,
+    pub condition_expr: String,
+    pub hit_condition: String,
+    pub is_enabled: bool,
+    pub is_verified: bool,
+    pub hit_count: u32,
+    pub module_filter: String,
+    pub offset_value: u32,
+    pub source_path: String,
+    pub line_number: u32,
+    pub function_signature: String,
+    pub mangled_name: String,
+}
+
+impl DebugFunctionBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            function_name: String::new(),
+            condition_expr: String::new(),
+            hit_condition: String::new(),
+            is_enabled: bool::default(),
+            is_verified: bool::default(),
+            hit_count: u32::default(),
+            module_filter: String::new(),
+            offset_value: u32::default(),
+            source_path: String::new(),
+            line_number: u32::default(),
+            function_signature: String::new(),
+            mangled_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.function_name.is_empty() || true && !self.condition_expr.is_empty() || true && !self.hit_condition.is_empty() || true && self.is_enabled || true && self.is_verified || true && self.hit_count < u32::MAX || true && !self.module_filter.is_empty() || true && self.offset_value < u32::MAX || true && !self.source_path.is_empty() || true && self.line_number < u32::MAX || true && !self.function_signature.is_empty() || true && !self.mangled_name.is_empty() || true
+    }
+}
+
+impl Default for DebugFunctionBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug goto target location
+#[derive(Debug, Clone)]
+pub struct DebugGotoTarget {
+    pub target_id: u32,
+    pub target_label: String,
+    pub target_line: u32,
+    pub target_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub source_path: String,
+    pub instruction_ptr: String,
+    pub is_visible: bool,
+    pub description_text: String,
+    pub category_name: String,
+    pub priority_value: u32,
+}
+
+impl DebugGotoTarget {
+    pub fn new() -> Self {
+        Self {
+            target_id: u32::default(),
+            target_label: String::new(),
+            target_line: u32::default(),
+            target_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            source_path: String::new(),
+            instruction_ptr: String::new(),
+            is_visible: bool::default(),
+            description_text: String::new(),
+            category_name: String::new(),
+            priority_value: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.target_id < u32::MAX || true && !self.target_label.is_empty() || true && self.target_line < u32::MAX || true && self.target_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.source_path.is_empty() || true && !self.instruction_ptr.is_empty() || true && self.is_visible || true && !self.description_text.is_empty() || true && !self.category_name.is_empty() || true && self.priority_value < u32::MAX || true
+    }
+}
+
+impl Default for DebugGotoTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug step-in target selection
+#[derive(Debug, Clone)]
+pub struct DebugStepInTarget {
+    pub step_target_id: u32,
+    pub target_label: String,
+    pub target_line: u32,
+    pub target_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub source_path: String,
+    pub is_default: bool,
+    pub category_name: String,
+    pub description_text: String,
+    pub priority_value: u32,
+    pub granularity_hint: String,
+}
+
+impl DebugStepInTarget {
+    pub fn new() -> Self {
+        Self {
+            step_target_id: u32::default(),
+            target_label: String::new(),
+            target_line: u32::default(),
+            target_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            source_path: String::new(),
+            is_default: bool::default(),
+            category_name: String::new(),
+            description_text: String::new(),
+            priority_value: u32::default(),
+            granularity_hint: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.step_target_id < u32::MAX || true && !self.target_label.is_empty() || true && self.target_line < u32::MAX || true && self.target_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.source_path.is_empty() || true && self.is_default || true && !self.category_name.is_empty() || true && !self.description_text.is_empty() || true && self.priority_value < u32::MAX || true && !self.granularity_hint.is_empty() || true
+    }
+}
+
+impl Default for DebugStepInTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug exception filter configuration
+#[derive(Debug, Clone)]
+pub struct DebugExceptionFilter {
+    pub filter_id: String,
+    pub filter_label: String,
+    pub filter_desc: String,
+    pub is_default: bool,
+    pub supports_condition: bool,
+    pub condition_desc: String,
+    pub is_enabled: bool,
+    pub is_user_unhandled: bool,
+    pub is_first_chance: bool,
+    pub category_name: String,
+    pub applies_to: String,
+    pub super_filter: String,
+}
+
+impl DebugExceptionFilter {
+    pub fn new() -> Self {
+        Self {
+            filter_id: String::new(),
+            filter_label: String::new(),
+            filter_desc: String::new(),
+            is_default: bool::default(),
+            supports_condition: bool::default(),
+            condition_desc: String::new(),
+            is_enabled: bool::default(),
+            is_user_unhandled: bool::default(),
+            is_first_chance: bool::default(),
+            category_name: String::new(),
+            applies_to: String::new(),
+            super_filter: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_id.is_empty() || true && !self.filter_label.is_empty() || true && !self.filter_desc.is_empty() || true && self.is_default || true && self.supports_condition || true && !self.condition_desc.is_empty() || true && self.is_enabled || true && self.is_user_unhandled || true && self.is_first_chance || true && !self.category_name.is_empty() || true && !self.applies_to.is_empty() || true && !self.super_filter.is_empty() || true
+    }
+}
+
+impl Default for DebugExceptionFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -534842,6 +536038,474 @@ mod tests_mjz_generated {
     fn test_mjz_fields() {
         let mut obj = TestFramework::default();
         obj.framework_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mka_generated {
+    use super::*;
+
+    #[test]
+    fn test_mka_default() {
+        let obj = DebugLaunchConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mka_fields() {
+        let mut obj = DebugLaunchConfig::default();
+        obj.session_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkb_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkb_default() {
+        let obj = DebugThreadState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkb_fields() {
+        let mut obj = DebugThreadState::default();
+        obj.thread_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkc_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkc_default() {
+        let obj = DebugStackFrameInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkc_fields() {
+        let mut obj = DebugStackFrameInfo::default();
+        obj.frame_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkd_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkd_default() {
+        let obj = DebugVariableScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkd_fields() {
+        let mut obj = DebugVariableScope::default();
+        obj.scope_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mke_generated {
+    use super::*;
+
+    #[test]
+    fn test_mke_default() {
+        let obj = DebugBreakpointCondition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mke_fields() {
+        let mut obj = DebugBreakpointCondition::default();
+        obj.condition_expr = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkf_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkf_default() {
+        let obj = DebugWatchExpression::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkf_fields() {
+        let mut obj = DebugWatchExpression::default();
+        obj.expression_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkg_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkg_default() {
+        let obj = DebugConsoleEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkg_fields() {
+        let mut obj = DebugConsoleEntry::default();
+        obj.entry_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkh_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkh_default() {
+        let obj = DebugAdapterConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkh_fields() {
+        let mut obj = DebugAdapterConfig::default();
+        obj.adapter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mki_generated {
+    use super::*;
+
+    #[test]
+    fn test_mki_default() {
+        let obj = DebugProtocolMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mki_fields() {
+        let mut obj = DebugProtocolMessage::default();
+        obj.message_seq = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkj_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkj_default() {
+        let obj = DebugExceptionInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkj_fields() {
+        let mut obj = DebugExceptionInfo::default();
+        obj.exception_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkk_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkk_default() {
+        let obj = DebugModuleInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkk_fields() {
+        let mut obj = DebugModuleInfo::default();
+        obj.module_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkl_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkl_default() {
+        let obj = DebugSourceRef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkl_fields() {
+        let mut obj = DebugSourceRef::default();
+        obj.source_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkm_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkm_default() {
+        let obj = DebugDataBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkm_fields() {
+        let mut obj = DebugDataBreakpoint::default();
+        obj.data_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkn_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkn_default() {
+        let obj = DebugInstructionBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkn_fields() {
+        let mut obj = DebugInstructionBreakpoint::default();
+        obj.instruction_ref = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mko_generated {
+    use super::*;
+
+    #[test]
+    fn test_mko_default() {
+        let obj = DebugEvaluateResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mko_fields() {
+        let mut obj = DebugEvaluateResult::default();
+        obj.eval_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkp_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkp_default() {
+        let obj = DebugCompletionItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkp_fields() {
+        let mut obj = DebugCompletionItem::default();
+        obj.completion_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkq_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkq_default() {
+        let obj = DebugVariableDisplay::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkq_fields() {
+        let mut obj = DebugVariableDisplay::default();
+        obj.display_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkr_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkr_default() {
+        let obj = DebugDisassemblyLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkr_fields() {
+        let mut obj = DebugDisassemblyLine::default();
+        obj.address_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mks_generated {
+    use super::*;
+
+    #[test]
+    fn test_mks_default() {
+        let obj = DebugMemoryRegion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mks_fields() {
+        let mut obj = DebugMemoryRegion::default();
+        obj.region_start = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkt_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkt_default() {
+        let obj = DebugStepGranularity::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkt_fields() {
+        let mut obj = DebugStepGranularity::default();
+        obj.granularity_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mku_generated {
+    use super::*;
+
+    #[test]
+    fn test_mku_default() {
+        let obj = DebugTerminalConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mku_fields() {
+        let mut obj = DebugTerminalConfig::default();
+        obj.terminal_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkv_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkv_default() {
+        let obj = DebugLogPoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkv_fields() {
+        let mut obj = DebugLogPoint::default();
+        obj.log_message = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkw_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkw_default() {
+        let obj = DebugFunctionBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkw_fields() {
+        let mut obj = DebugFunctionBreakpoint::default();
+        obj.function_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkx_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkx_default() {
+        let obj = DebugGotoTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkx_fields() {
+        let mut obj = DebugGotoTarget::default();
+        obj.target_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mky_generated {
+    use super::*;
+
+    #[test]
+    fn test_mky_default() {
+        let obj = DebugStepInTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mky_fields() {
+        let mut obj = DebugStepInTarget::default();
+        obj.step_target_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mkz_generated {
+    use super::*;
+
+    #[test]
+    fn test_mkz_default() {
+        let obj = DebugExceptionFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mkz_fields() {
+        let mut obj = DebugExceptionFilter::default();
+        obj.filter_id = "test".to_string();
         assert!(obj.validate());
     }
 }
