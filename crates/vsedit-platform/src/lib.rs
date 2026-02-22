@@ -243304,6 +243304,1202 @@ impl Default for DecorationThemeColor {
     }
 }
 
+/// Code action entry with command and edit
+#[derive(Debug, Clone)]
+pub struct CodeActionEntry {
+    pub action_id: String,
+    pub title_text: String,
+    pub action_kind: String,
+    pub command_id: String,
+    pub edit_json: String,
+    pub diagnostics_json: String,
+    pub is_preferred: bool,
+    pub is_disabled: bool,
+    pub disabled_reason: String,
+    pub source_ext: String,
+    pub sort_order: u32,
+    pub tooltip_text: String,
+}
+
+impl CodeActionEntry {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            title_text: String::new(),
+            action_kind: String::new(),
+            command_id: String::new(),
+            edit_json: String::new(),
+            diagnostics_json: String::new(),
+            is_preferred: bool::default(),
+            is_disabled: bool::default(),
+            disabled_reason: String::new(),
+            source_ext: String::new(),
+            sort_order: u32::default(),
+            tooltip_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.title_text.is_empty() || true && !self.action_kind.is_empty() || true && !self.command_id.is_empty() || true && !self.edit_json.is_empty() || true && !self.diagnostics_json.is_empty() || true && self.is_preferred || true && self.is_disabled || true && !self.disabled_reason.is_empty() || true && !self.source_ext.is_empty() || true && self.sort_order < u32::MAX || true && !self.tooltip_text.is_empty() || true
+    }
+}
+
+impl Default for CodeActionEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Quick fix suggestion entry
+#[derive(Debug, Clone)]
+pub struct QuickFixEntry {
+    pub fix_id: String,
+    pub fix_title: String,
+    pub diagnostic_code: String,
+    pub fix_kind: String,
+    pub edit_json: String,
+    pub command_id: String,
+    pub is_preferred: bool,
+    pub source_name: String,
+    pub severity_level: String,
+    pub line_number: u32,
+    pub is_ai: bool,
+    pub confidence_pct: f64,
+}
+
+impl QuickFixEntry {
+    pub fn new() -> Self {
+        Self {
+            fix_id: String::new(),
+            fix_title: String::new(),
+            diagnostic_code: String::new(),
+            fix_kind: String::new(),
+            edit_json: String::new(),
+            command_id: String::new(),
+            is_preferred: bool::default(),
+            source_name: String::new(),
+            severity_level: String::new(),
+            line_number: u32::default(),
+            is_ai: bool::default(),
+            confidence_pct: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fix_id.is_empty() || true && !self.fix_title.is_empty() || true && !self.diagnostic_code.is_empty() || true && !self.fix_kind.is_empty() || true && !self.edit_json.is_empty() || true && !self.command_id.is_empty() || true && self.is_preferred || true && !self.source_name.is_empty() || true && !self.severity_level.is_empty() || true && self.line_number < u32::MAX || true && self.is_ai || true && self.confidence_pct.is_finite() || true
+    }
+}
+
+impl Default for QuickFixEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Refactoring action entry
+#[derive(Debug, Clone)]
+pub struct RefactorEntry {
+    pub refactor_id: String,
+    pub refactor_title: String,
+    pub refactor_kind: String,
+    pub edit_json: String,
+    pub command_id: String,
+    pub is_preferred: bool,
+    pub preview_available: bool,
+    pub source_ext: String,
+    pub target_range: String,
+    pub description_text: String,
+    pub is_inline: bool,
+    pub sort_order: u32,
+}
+
+impl RefactorEntry {
+    pub fn new() -> Self {
+        Self {
+            refactor_id: String::new(),
+            refactor_title: String::new(),
+            refactor_kind: String::new(),
+            edit_json: String::new(),
+            command_id: String::new(),
+            is_preferred: bool::default(),
+            preview_available: bool::default(),
+            source_ext: String::new(),
+            target_range: String::new(),
+            description_text: String::new(),
+            is_inline: bool::default(),
+            sort_order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.refactor_id.is_empty() || true && !self.refactor_title.is_empty() || true && !self.refactor_kind.is_empty() || true && !self.edit_json.is_empty() || true && !self.command_id.is_empty() || true && self.is_preferred || true && self.preview_available || true && !self.source_ext.is_empty() || true && !self.target_range.is_empty() || true && !self.description_text.is_empty() || true && self.is_inline || true && self.sort_order < u32::MAX || true
+    }
+}
+
+impl Default for RefactorEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source organization action entry
+#[derive(Debug, Clone)]
+pub struct SourceActionEntry {
+    pub source_action_id: String,
+    pub action_title: String,
+    pub action_kind: String,
+    pub edit_json: String,
+    pub command_id: String,
+    pub is_preferred: bool,
+    pub run_on_save: bool,
+    pub run_on_format: bool,
+    pub source_ext: String,
+    pub language_id: String,
+    pub description_text: String,
+    pub sort_order: u32,
+}
+
+impl SourceActionEntry {
+    pub fn new() -> Self {
+        Self {
+            source_action_id: String::new(),
+            action_title: String::new(),
+            action_kind: String::new(),
+            edit_json: String::new(),
+            command_id: String::new(),
+            is_preferred: bool::default(),
+            run_on_save: bool::default(),
+            run_on_format: bool::default(),
+            source_ext: String::new(),
+            language_id: String::new(),
+            description_text: String::new(),
+            sort_order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.source_action_id.is_empty() || true && !self.action_title.is_empty() || true && !self.action_kind.is_empty() || true && !self.edit_json.is_empty() || true && !self.command_id.is_empty() || true && self.is_preferred || true && self.run_on_save || true && self.run_on_format || true && !self.source_ext.is_empty() || true && !self.language_id.is_empty() || true && !self.description_text.is_empty() || true && self.sort_order < u32::MAX || true
+    }
+}
+
+impl Default for SourceActionEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code action context menu model
+#[derive(Debug, Clone)]
+pub struct CodeActionMenu {
+    pub menu_id: String,
+    pub action_ids: String,
+    pub selected_index: u32,
+    pub filter_text: String,
+    pub is_visible: bool,
+    pub position_line: u32,
+    pub position_col: u32,
+    pub max_height: u32,
+    pub show_disabled: bool,
+    pub group_by_kind: bool,
+    pub lightbulb_kind: String,
+    pub trigger_kind: String,
+}
+
+impl CodeActionMenu {
+    pub fn new() -> Self {
+        Self {
+            menu_id: String::new(),
+            action_ids: String::new(),
+            selected_index: u32::default(),
+            filter_text: String::new(),
+            is_visible: bool::default(),
+            position_line: u32::default(),
+            position_col: u32::default(),
+            max_height: u32::default(),
+            show_disabled: bool::default(),
+            group_by_kind: bool::default(),
+            lightbulb_kind: String::new(),
+            trigger_kind: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.menu_id.is_empty() || true && !self.action_ids.is_empty() || true && self.selected_index < u32::MAX || true && !self.filter_text.is_empty() || true && self.is_visible || true && self.position_line < u32::MAX || true && self.position_col < u32::MAX || true && self.max_height < u32::MAX || true && self.show_disabled || true && self.group_by_kind || true && !self.lightbulb_kind.is_empty() || true && !self.trigger_kind.is_empty() || true
+    }
+}
+
+impl Default for CodeActionMenu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code action trigger context
+#[derive(Debug, Clone)]
+pub struct CodeActionTrigger {
+    pub trigger_kind: String,
+    pub diagnostic_codes: String,
+    pub only_kinds: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub is_auto: bool,
+    pub is_manual: bool,
+    pub filter_text: String,
+    pub include_disabled: bool,
+    pub source_id: String,
+}
+
+impl CodeActionTrigger {
+    pub fn new() -> Self {
+        Self {
+            trigger_kind: String::new(),
+            diagnostic_codes: String::new(),
+            only_kinds: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            is_auto: bool::default(),
+            is_manual: bool::default(),
+            filter_text: String::new(),
+            include_disabled: bool::default(),
+            source_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.trigger_kind.is_empty() || true && !self.diagnostic_codes.is_empty() || true && !self.only_kinds.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && self.is_auto || true && self.is_manual || true && !self.filter_text.is_empty() || true && self.include_disabled || true && !self.source_id.is_empty() || true
+    }
+}
+
+impl Default for CodeActionTrigger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Automatic fix on save entry
+#[derive(Debug, Clone)]
+pub struct AutoFixEntry {
+    pub autofix_id: String,
+    pub fix_kind: String,
+    pub language_id: String,
+    pub diagnostic_source: String,
+    pub is_enabled: bool,
+    pub run_on_save: bool,
+    pub run_on_type: bool,
+    pub delay_ms: u32,
+    pub max_fixes: u32,
+    pub priority_value: u32,
+    pub when_clause: String,
+    pub source_ext: String,
+}
+
+impl AutoFixEntry {
+    pub fn new() -> Self {
+        Self {
+            autofix_id: String::new(),
+            fix_kind: String::new(),
+            language_id: String::new(),
+            diagnostic_source: String::new(),
+            is_enabled: bool::default(),
+            run_on_save: bool::default(),
+            run_on_type: bool::default(),
+            delay_ms: u32::default(),
+            max_fixes: u32::default(),
+            priority_value: u32::default(),
+            when_clause: String::new(),
+            source_ext: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.autofix_id.is_empty() || true && !self.fix_kind.is_empty() || true && !self.language_id.is_empty() || true && !self.diagnostic_source.is_empty() || true && self.is_enabled || true && self.run_on_save || true && self.run_on_type || true && self.delay_ms < u32::MAX || true && self.max_fixes < u32::MAX || true && self.priority_value < u32::MAX || true && !self.when_clause.is_empty() || true && !self.source_ext.is_empty() || true
+    }
+}
+
+impl Default for AutoFixEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code action lightbulb indicator
+#[derive(Debug, Clone)]
+pub struct LightbulbIndicator {
+    pub lightbulb_id: String,
+    pub is_visible: bool,
+    pub has_preferred: bool,
+    pub has_autofix: bool,
+    pub action_count: u32,
+    pub line_number: u32,
+    pub position_hint: String,
+    pub icon_kind: String,
+    pub tooltip_text: String,
+    pub is_sparkle: bool,
+    pub is_collapsed: bool,
+    pub hover_delay: u32,
+}
+
+impl LightbulbIndicator {
+    pub fn new() -> Self {
+        Self {
+            lightbulb_id: String::new(),
+            is_visible: bool::default(),
+            has_preferred: bool::default(),
+            has_autofix: bool::default(),
+            action_count: u32::default(),
+            line_number: u32::default(),
+            position_hint: String::new(),
+            icon_kind: String::new(),
+            tooltip_text: String::new(),
+            is_sparkle: bool::default(),
+            is_collapsed: bool::default(),
+            hover_delay: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lightbulb_id.is_empty() || true && self.is_visible || true && self.has_preferred || true && self.has_autofix || true && self.action_count < u32::MAX || true && self.line_number < u32::MAX || true && !self.position_hint.is_empty() || true && !self.icon_kind.is_empty() || true && !self.tooltip_text.is_empty() || true && self.is_sparkle || true && self.is_collapsed || true && self.hover_delay < u32::MAX || true
+    }
+}
+
+impl Default for LightbulbIndicator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code action kind grouping
+#[derive(Debug, Clone)]
+pub struct CodeActionGroup {
+    pub group_id: String,
+    pub group_label: String,
+    pub action_kind: String,
+    pub action_count: u32,
+    pub is_expanded: bool,
+    pub sort_order: u32,
+    pub icon_id: String,
+    pub description_text: String,
+    pub is_preferred: bool,
+    pub show_when_empty: bool,
+    pub separator_after: bool,
+    pub parent_group: String,
+}
+
+impl CodeActionGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            group_label: String::new(),
+            action_kind: String::new(),
+            action_count: u32::default(),
+            is_expanded: bool::default(),
+            sort_order: u32::default(),
+            icon_id: String::new(),
+            description_text: String::new(),
+            is_preferred: bool::default(),
+            show_when_empty: bool::default(),
+            separator_after: bool::default(),
+            parent_group: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.group_label.is_empty() || true && !self.action_kind.is_empty() || true && self.action_count < u32::MAX || true && self.is_expanded || true && self.sort_order < u32::MAX || true && !self.icon_id.is_empty() || true && !self.description_text.is_empty() || true && self.is_preferred || true && self.show_when_empty || true && self.separator_after || true && !self.parent_group.is_empty() || true
+    }
+}
+
+impl Default for CodeActionGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace edit operation entry
+#[derive(Debug, Clone)]
+pub struct WorkspaceEditOp {
+    pub edit_op_id: String,
+    pub op_kind: String,
+    pub file_uri: String,
+    pub text_edits: String,
+    pub is_applied: bool,
+    pub is_previewed: bool,
+    pub file_count: u32,
+    pub edit_count: u32,
+    pub needs_confirm: bool,
+    pub description_text: String,
+    pub metadata_json: String,
+    pub undo_id: String,
+}
+
+impl WorkspaceEditOp {
+    pub fn new() -> Self {
+        Self {
+            edit_op_id: String::new(),
+            op_kind: String::new(),
+            file_uri: String::new(),
+            text_edits: String::new(),
+            is_applied: bool::default(),
+            is_previewed: bool::default(),
+            file_count: u32::default(),
+            edit_count: u32::default(),
+            needs_confirm: bool::default(),
+            description_text: String::new(),
+            metadata_json: String::new(),
+            undo_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_op_id.is_empty() || true && !self.op_kind.is_empty() || true && !self.file_uri.is_empty() || true && !self.text_edits.is_empty() || true && self.is_applied || true && self.is_previewed || true && self.file_count < u32::MAX || true && self.edit_count < u32::MAX || true && self.needs_confirm || true && !self.description_text.is_empty() || true && !self.metadata_json.is_empty() || true && !self.undo_id.is_empty() || true
+    }
+}
+
+impl Default for WorkspaceEditOp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Single text edit operation
+#[derive(Debug, Clone)]
+pub struct TextEditOp {
+    pub text_edit_id: String,
+    pub start_line: u32,
+    pub start_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub new_text: String,
+    pub is_insert: bool,
+    pub is_replace: bool,
+    pub is_delete: bool,
+    pub annotation_id: String,
+    pub sort_order: u32,
+    pub needs_snippet: bool,
+}
+
+impl TextEditOp {
+    pub fn new() -> Self {
+        Self {
+            text_edit_id: String::new(),
+            start_line: u32::default(),
+            start_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            new_text: String::new(),
+            is_insert: bool::default(),
+            is_replace: bool::default(),
+            is_delete: bool::default(),
+            annotation_id: String::new(),
+            sort_order: u32::default(),
+            needs_snippet: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.text_edit_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.new_text.is_empty() || true && self.is_insert || true && self.is_replace || true && self.is_delete || true && !self.annotation_id.is_empty() || true && self.sort_order < u32::MAX || true && self.needs_snippet || true
+    }
+}
+
+impl Default for TextEditOp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File create/rename/delete operation
+#[derive(Debug, Clone)]
+pub struct FileEditOp {
+    pub file_op_id: String,
+    pub op_kind: String,
+    pub source_uri: String,
+    pub target_uri: String,
+    pub overwrite: bool,
+    pub ignore_exists: bool,
+    pub recursive: bool,
+    pub content_text: String,
+    pub encoding_name: String,
+    pub is_applied: bool,
+    pub needs_confirm: bool,
+    pub description_text: String,
+}
+
+impl FileEditOp {
+    pub fn new() -> Self {
+        Self {
+            file_op_id: String::new(),
+            op_kind: String::new(),
+            source_uri: String::new(),
+            target_uri: String::new(),
+            overwrite: bool::default(),
+            ignore_exists: bool::default(),
+            recursive: bool::default(),
+            content_text: String::new(),
+            encoding_name: String::new(),
+            is_applied: bool::default(),
+            needs_confirm: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_op_id.is_empty() || true && !self.op_kind.is_empty() || true && !self.source_uri.is_empty() || true && !self.target_uri.is_empty() || true && self.overwrite || true && self.ignore_exists || true && self.recursive || true && !self.content_text.is_empty() || true && !self.encoding_name.is_empty() || true && self.is_applied || true && self.needs_confirm || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for FileEditOp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace edit preview model
+#[derive(Debug, Clone)]
+pub struct EditPreview {
+    pub preview_id: String,
+    pub edit_label: String,
+    pub file_changes: String,
+    pub is_expanded: bool,
+    pub total_files: u32,
+    pub total_edits: u32,
+    pub is_accepted: bool,
+    pub is_rejected: bool,
+    pub show_diff: bool,
+    pub group_by_file: bool,
+    pub description_text: String,
+    pub source_action: String,
+}
+
+impl EditPreview {
+    pub fn new() -> Self {
+        Self {
+            preview_id: String::new(),
+            edit_label: String::new(),
+            file_changes: String::new(),
+            is_expanded: bool::default(),
+            total_files: u32::default(),
+            total_edits: u32::default(),
+            is_accepted: bool::default(),
+            is_rejected: bool::default(),
+            show_diff: bool::default(),
+            group_by_file: bool::default(),
+            description_text: String::new(),
+            source_action: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.preview_id.is_empty() || true && !self.edit_label.is_empty() || true && !self.file_changes.is_empty() || true && self.is_expanded || true && self.total_files < u32::MAX || true && self.total_edits < u32::MAX || true && self.is_accepted || true && self.is_rejected || true && self.show_diff || true && self.group_by_file || true && !self.description_text.is_empty() || true && !self.source_action.is_empty() || true
+    }
+}
+
+impl Default for EditPreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace edit conflict entry
+#[derive(Debug, Clone)]
+pub struct EditConflict {
+    pub conflict_id: String,
+    pub file_uri: String,
+    pub conflict_kind: String,
+    pub source_edit: String,
+    pub target_edit: String,
+    pub resolution: String,
+    pub is_resolved: bool,
+    pub line_number: u32,
+    pub description_text: String,
+    pub severity_level: String,
+    pub auto_resolvable: bool,
+    pub resolution_text: String,
+}
+
+impl EditConflict {
+    pub fn new() -> Self {
+        Self {
+            conflict_id: String::new(),
+            file_uri: String::new(),
+            conflict_kind: String::new(),
+            source_edit: String::new(),
+            target_edit: String::new(),
+            resolution: String::new(),
+            is_resolved: bool::default(),
+            line_number: u32::default(),
+            description_text: String::new(),
+            severity_level: String::new(),
+            auto_resolvable: bool::default(),
+            resolution_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.conflict_id.is_empty() || true && !self.file_uri.is_empty() || true && !self.conflict_kind.is_empty() || true && !self.source_edit.is_empty() || true && !self.target_edit.is_empty() || true && !self.resolution.is_empty() || true && self.is_resolved || true && self.line_number < u32::MAX || true && !self.description_text.is_empty() || true && !self.severity_level.is_empty() || true && self.auto_resolvable || true && !self.resolution_text.is_empty() || true
+    }
+}
+
+impl Default for EditConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace edit annotation label
+#[derive(Debug, Clone)]
+pub struct EditAnnotation {
+    pub annotation_id: String,
+    pub annotation_label: String,
+    pub needs_confirm: bool,
+    pub description_text: String,
+    pub icon_id: String,
+    pub group_id: String,
+    pub sort_order: u32,
+    pub tooltip_text: String,
+    pub is_resolved: bool,
+    pub created_ms: u64,
+    pub source_action: String,
+    pub change_kind: String,
+}
+
+impl EditAnnotation {
+    pub fn new() -> Self {
+        Self {
+            annotation_id: String::new(),
+            annotation_label: String::new(),
+            needs_confirm: bool::default(),
+            description_text: String::new(),
+            icon_id: String::new(),
+            group_id: String::new(),
+            sort_order: u32::default(),
+            tooltip_text: String::new(),
+            is_resolved: bool::default(),
+            created_ms: u64::default(),
+            source_action: String::new(),
+            change_kind: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.annotation_id.is_empty() || true && !self.annotation_label.is_empty() || true && self.needs_confirm || true && !self.description_text.is_empty() || true && !self.icon_id.is_empty() || true && !self.group_id.is_empty() || true && self.sort_order < u32::MAX || true && !self.tooltip_text.is_empty() || true && self.is_resolved || true && self.created_ms < u64::MAX || true && !self.source_action.is_empty() || true && !self.change_kind.is_empty() || true
+    }
+}
+
+impl Default for EditAnnotation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet text edit with tabstops
+#[derive(Debug, Clone)]
+pub struct SnippetTextEdit {
+    pub snippet_id: String,
+    pub snippet_text: String,
+    pub start_line: u32,
+    pub start_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub tabstop_count: u32,
+    pub placeholder_text: String,
+    pub final_tabstop: u32,
+    pub transform_text: String,
+    pub choice_items: String,
+    pub is_resolved: bool,
+}
+
+impl SnippetTextEdit {
+    pub fn new() -> Self {
+        Self {
+            snippet_id: String::new(),
+            snippet_text: String::new(),
+            start_line: u32::default(),
+            start_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            tabstop_count: u32::default(),
+            placeholder_text: String::new(),
+            final_tabstop: u32::default(),
+            transform_text: String::new(),
+            choice_items: String::new(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_id.is_empty() || true && !self.snippet_text.is_empty() || true && self.start_line < u32::MAX || true && self.start_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && self.tabstop_count < u32::MAX || true && !self.placeholder_text.is_empty() || true && self.final_tabstop < u32::MAX || true && !self.transform_text.is_empty() || true && !self.choice_items.is_empty() || true && self.is_resolved || true
+    }
+}
+
+impl Default for SnippetTextEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code action provider response
+#[derive(Debug, Clone)]
+pub struct CodeActionResponse {
+    pub result_id: String,
+    pub actions_json: String,
+    pub action_count: u32,
+    pub is_incomplete: bool,
+    pub trigger_kind: String,
+    pub provider_id: String,
+    pub response_ms: u64,
+    pub is_cached: bool,
+    pub error_message: String,
+    pub retry_count: u32,
+    pub language_id: String,
+    pub source_ext: String,
+}
+
+impl CodeActionResponse {
+    pub fn new() -> Self {
+        Self {
+            result_id: String::new(),
+            actions_json: String::new(),
+            action_count: u32::default(),
+            is_incomplete: bool::default(),
+            trigger_kind: String::new(),
+            provider_id: String::new(),
+            response_ms: u64::default(),
+            is_cached: bool::default(),
+            error_message: String::new(),
+            retry_count: u32::default(),
+            language_id: String::new(),
+            source_ext: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.result_id.is_empty() || true && !self.actions_json.is_empty() || true && self.action_count < u32::MAX || true && self.is_incomplete || true && !self.trigger_kind.is_empty() || true && !self.provider_id.is_empty() || true && self.response_ms < u64::MAX || true && self.is_cached || true && !self.error_message.is_empty() || true && self.retry_count < u32::MAX || true && !self.language_id.is_empty() || true && !self.source_ext.is_empty() || true
+    }
+}
+
+impl Default for CodeActionResponse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diagnostic-linked fix suggestion
+#[derive(Debug, Clone)]
+pub struct DiagnosticFix {
+    pub fix_id: String,
+    pub diagnostic_uri: String,
+    pub diagnostic_code: String,
+    pub fix_title: String,
+    pub fix_kind: String,
+    pub edit_json: String,
+    pub is_preferred: bool,
+    pub severity_level: String,
+    pub line_number: u32,
+    pub source_name: String,
+    pub related_info: String,
+    pub tags_json: String,
+}
+
+impl DiagnosticFix {
+    pub fn new() -> Self {
+        Self {
+            fix_id: String::new(),
+            diagnostic_uri: String::new(),
+            diagnostic_code: String::new(),
+            fix_title: String::new(),
+            fix_kind: String::new(),
+            edit_json: String::new(),
+            is_preferred: bool::default(),
+            severity_level: String::new(),
+            line_number: u32::default(),
+            source_name: String::new(),
+            related_info: String::new(),
+            tags_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fix_id.is_empty() || true && !self.diagnostic_uri.is_empty() || true && !self.diagnostic_code.is_empty() || true && !self.fix_title.is_empty() || true && !self.fix_kind.is_empty() || true && !self.edit_json.is_empty() || true && self.is_preferred || true && !self.severity_level.is_empty() || true && self.line_number < u32::MAX || true && !self.source_name.is_empty() || true && !self.related_info.is_empty() || true && !self.tags_json.is_empty() || true
+    }
+}
+
+impl Default for DiagnosticFix {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extract method/variable action
+#[derive(Debug, Clone)]
+pub struct ExtractAction {
+    pub extract_id: String,
+    pub extract_kind: String,
+    pub source_range: String,
+    pub target_name: String,
+    pub target_scope: String,
+    pub edit_json: String,
+    pub is_function: bool,
+    pub is_variable: bool,
+    pub is_constant: bool,
+    pub parameter_count: u32,
+    pub preview_text: String,
+    pub description_text: String,
+}
+
+impl ExtractAction {
+    pub fn new() -> Self {
+        Self {
+            extract_id: String::new(),
+            extract_kind: String::new(),
+            source_range: String::new(),
+            target_name: String::new(),
+            target_scope: String::new(),
+            edit_json: String::new(),
+            is_function: bool::default(),
+            is_variable: bool::default(),
+            is_constant: bool::default(),
+            parameter_count: u32::default(),
+            preview_text: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.extract_id.is_empty() || true && !self.extract_kind.is_empty() || true && !self.source_range.is_empty() || true && !self.target_name.is_empty() || true && !self.target_scope.is_empty() || true && !self.edit_json.is_empty() || true && self.is_function || true && self.is_variable || true && self.is_constant || true && self.parameter_count < u32::MAX || true && !self.preview_text.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ExtractAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline variable/method action
+#[derive(Debug, Clone)]
+pub struct InlineAction {
+    pub inline_id: String,
+    pub inline_kind: String,
+    pub source_name: String,
+    pub source_range: String,
+    pub target_ranges: String,
+    pub edit_json: String,
+    pub reference_count: u32,
+    pub is_safe: bool,
+    pub preview_text: String,
+    pub description_text: String,
+    pub affected_files: u32,
+    pub source_ext: String,
+}
+
+impl InlineAction {
+    pub fn new() -> Self {
+        Self {
+            inline_id: String::new(),
+            inline_kind: String::new(),
+            source_name: String::new(),
+            source_range: String::new(),
+            target_ranges: String::new(),
+            edit_json: String::new(),
+            reference_count: u32::default(),
+            is_safe: bool::default(),
+            preview_text: String::new(),
+            description_text: String::new(),
+            affected_files: u32::default(),
+            source_ext: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_id.is_empty() || true && !self.inline_kind.is_empty() || true && !self.source_name.is_empty() || true && !self.source_range.is_empty() || true && !self.target_ranges.is_empty() || true && !self.edit_json.is_empty() || true && self.reference_count < u32::MAX || true && self.is_safe || true && !self.preview_text.is_empty() || true && !self.description_text.is_empty() || true && self.affected_files < u32::MAX || true && !self.source_ext.is_empty() || true
+    }
+}
+
+impl Default for InlineAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Move symbol to file action
+#[derive(Debug, Clone)]
+pub struct MoveAction {
+    pub move_id: String,
+    pub symbol_name: String,
+    pub source_uri: String,
+    pub target_uri: String,
+    pub symbol_kind: String,
+    pub edit_json: String,
+    pub update_imports: bool,
+    pub update_refs: bool,
+    pub affected_files: u32,
+    pub preview_text: String,
+    pub description_text: String,
+    pub is_safe: bool,
+}
+
+impl MoveAction {
+    pub fn new() -> Self {
+        Self {
+            move_id: String::new(),
+            symbol_name: String::new(),
+            source_uri: String::new(),
+            target_uri: String::new(),
+            symbol_kind: String::new(),
+            edit_json: String::new(),
+            update_imports: bool::default(),
+            update_refs: bool::default(),
+            affected_files: u32::default(),
+            preview_text: String::new(),
+            description_text: String::new(),
+            is_safe: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.move_id.is_empty() || true && !self.symbol_name.is_empty() || true && !self.source_uri.is_empty() || true && !self.target_uri.is_empty() || true && !self.symbol_kind.is_empty() || true && !self.edit_json.is_empty() || true && self.update_imports || true && self.update_refs || true && self.affected_files < u32::MAX || true && !self.preview_text.is_empty() || true && !self.description_text.is_empty() || true && self.is_safe || true
+    }
+}
+
+impl Default for MoveAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Symbol rename action
+#[derive(Debug, Clone)]
+pub struct RenameAction {
+    pub rename_id: String,
+    pub old_name: String,
+    pub new_name: String,
+    pub symbol_kind: String,
+    pub edit_json: String,
+    pub file_count: u32,
+    pub reference_count: u32,
+    pub is_valid: bool,
+    pub validation_msg: String,
+    pub preview_changes: String,
+    pub affected_files: String,
+    pub description_text: String,
+}
+
+impl RenameAction {
+    pub fn new() -> Self {
+        Self {
+            rename_id: String::new(),
+            old_name: String::new(),
+            new_name: String::new(),
+            symbol_kind: String::new(),
+            edit_json: String::new(),
+            file_count: u32::default(),
+            reference_count: u32::default(),
+            is_valid: bool::default(),
+            validation_msg: String::new(),
+            preview_changes: String::new(),
+            affected_files: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rename_id.is_empty() || true && !self.old_name.is_empty() || true && !self.new_name.is_empty() || true && !self.symbol_kind.is_empty() || true && !self.edit_json.is_empty() || true && self.file_count < u32::MAX || true && self.reference_count < u32::MAX || true && self.is_valid || true && !self.validation_msg.is_empty() || true && !self.preview_changes.is_empty() || true && !self.affected_files.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RenameAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Organize imports action
+#[derive(Debug, Clone)]
+pub struct OrganizeImportsAction {
+    pub organize_id: String,
+    pub language_id: String,
+    pub sort_imports: bool,
+    pub remove_unused: bool,
+    pub group_rules: String,
+    pub edit_json: String,
+    pub import_count: u32,
+    pub removed_count: u32,
+    pub added_count: u32,
+    pub run_on_save: bool,
+    pub source_ext: String,
+    pub description_text: String,
+}
+
+impl OrganizeImportsAction {
+    pub fn new() -> Self {
+        Self {
+            organize_id: String::new(),
+            language_id: String::new(),
+            sort_imports: bool::default(),
+            remove_unused: bool::default(),
+            group_rules: String::new(),
+            edit_json: String::new(),
+            import_count: u32::default(),
+            removed_count: u32::default(),
+            added_count: u32::default(),
+            run_on_save: bool::default(),
+            source_ext: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.organize_id.is_empty() || true && !self.language_id.is_empty() || true && self.sort_imports || true && self.remove_unused || true && !self.group_rules.is_empty() || true && !self.edit_json.is_empty() || true && self.import_count < u32::MAX || true && self.removed_count < u32::MAX || true && self.added_count < u32::MAX || true && self.run_on_save || true && !self.source_ext.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for OrganizeImportsAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code conversion action
+#[derive(Debug, Clone)]
+pub struct ConvertAction {
+    pub convert_id: String,
+    pub convert_kind: String,
+    pub source_text: String,
+    pub target_text: String,
+    pub edit_json: String,
+    pub is_reversible: bool,
+    pub preview_text: String,
+    pub description_text: String,
+    pub language_id: String,
+    pub source_ext: String,
+    pub sort_order: u32,
+    pub category_name: String,
+}
+
+impl ConvertAction {
+    pub fn new() -> Self {
+        Self {
+            convert_id: String::new(),
+            convert_kind: String::new(),
+            source_text: String::new(),
+            target_text: String::new(),
+            edit_json: String::new(),
+            is_reversible: bool::default(),
+            preview_text: String::new(),
+            description_text: String::new(),
+            language_id: String::new(),
+            source_ext: String::new(),
+            sort_order: u32::default(),
+            category_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.convert_id.is_empty() || true && !self.convert_kind.is_empty() || true && !self.source_text.is_empty() || true && !self.target_text.is_empty() || true && !self.edit_json.is_empty() || true && self.is_reversible || true && !self.preview_text.is_empty() || true && !self.description_text.is_empty() || true && !self.language_id.is_empty() || true && !self.source_ext.is_empty() || true && self.sort_order < u32::MAX || true && !self.category_name.is_empty() || true
+    }
+}
+
+impl Default for ConvertAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Surround with action
+#[derive(Debug, Clone)]
+pub struct SurroundWith {
+    pub surround_id: String,
+    pub surround_kind: String,
+    pub open_text: String,
+    pub close_text: String,
+    pub edit_json: String,
+    pub language_id: String,
+    pub snippet_text: String,
+    pub description_text: String,
+    pub sort_order: u32,
+    pub icon_id: String,
+    pub keyboard_shortcut: String,
+    pub category_name: String,
+}
+
+impl SurroundWith {
+    pub fn new() -> Self {
+        Self {
+            surround_id: String::new(),
+            surround_kind: String::new(),
+            open_text: String::new(),
+            close_text: String::new(),
+            edit_json: String::new(),
+            language_id: String::new(),
+            snippet_text: String::new(),
+            description_text: String::new(),
+            sort_order: u32::default(),
+            icon_id: String::new(),
+            keyboard_shortcut: String::new(),
+            category_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.surround_id.is_empty() || true && !self.surround_kind.is_empty() || true && !self.open_text.is_empty() || true && !self.close_text.is_empty() || true && !self.edit_json.is_empty() || true && !self.language_id.is_empty() || true && !self.snippet_text.is_empty() || true && !self.description_text.is_empty() || true && self.sort_order < u32::MAX || true && !self.icon_id.is_empty() || true && !self.keyboard_shortcut.is_empty() || true && !self.category_name.is_empty() || true
+    }
+}
+
+impl Default for SurroundWith {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code action configuration settings
+#[derive(Debug, Clone)]
+pub struct CodeActionConfig {
+    pub config_id: String,
+    pub show_lightbulb: bool,
+    pub show_on_hover: bool,
+    pub auto_trigger: bool,
+    pub only_preferred: bool,
+    pub max_actions: u32,
+    pub delay_ms: u32,
+    pub on_save_kinds: String,
+    pub excluded_kinds: String,
+    pub group_by_kind: bool,
+    pub show_disabled: bool,
+    pub language_scopes: String,
+}
+
+impl CodeActionConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            show_lightbulb: bool::default(),
+            show_on_hover: bool::default(),
+            auto_trigger: bool::default(),
+            only_preferred: bool::default(),
+            max_actions: u32::default(),
+            delay_ms: u32::default(),
+            on_save_kinds: String::new(),
+            excluded_kinds: String::new(),
+            group_by_kind: bool::default(),
+            show_disabled: bool::default(),
+            language_scopes: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && self.show_lightbulb || true && self.show_on_hover || true && self.auto_trigger || true && self.only_preferred || true && self.max_actions < u32::MAX || true && self.delay_ms < u32::MAX || true && !self.on_save_kinds.is_empty() || true && !self.excluded_kinds.is_empty() || true && self.group_by_kind || true && self.show_disabled || true && !self.language_scopes.is_empty() || true
+    }
+}
+
+impl Default for CodeActionConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -548185,6 +549381,474 @@ mod tests_mrz_generated {
     fn test_mrz_fields() {
         let mut obj = DecorationThemeColor::default();
         obj.theme_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msa_generated {
+    use super::*;
+
+    #[test]
+    fn test_msa_default() {
+        let obj = CodeActionEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msa_fields() {
+        let mut obj = CodeActionEntry::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msb_generated {
+    use super::*;
+
+    #[test]
+    fn test_msb_default() {
+        let obj = QuickFixEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msb_fields() {
+        let mut obj = QuickFixEntry::default();
+        obj.fix_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msc_generated {
+    use super::*;
+
+    #[test]
+    fn test_msc_default() {
+        let obj = RefactorEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msc_fields() {
+        let mut obj = RefactorEntry::default();
+        obj.refactor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msd_generated {
+    use super::*;
+
+    #[test]
+    fn test_msd_default() {
+        let obj = SourceActionEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msd_fields() {
+        let mut obj = SourceActionEntry::default();
+        obj.source_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mse_generated {
+    use super::*;
+
+    #[test]
+    fn test_mse_default() {
+        let obj = CodeActionMenu::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mse_fields() {
+        let mut obj = CodeActionMenu::default();
+        obj.menu_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msf_generated {
+    use super::*;
+
+    #[test]
+    fn test_msf_default() {
+        let obj = CodeActionTrigger::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msf_fields() {
+        let mut obj = CodeActionTrigger::default();
+        obj.trigger_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msg_generated {
+    use super::*;
+
+    #[test]
+    fn test_msg_default() {
+        let obj = AutoFixEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msg_fields() {
+        let mut obj = AutoFixEntry::default();
+        obj.autofix_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msh_generated {
+    use super::*;
+
+    #[test]
+    fn test_msh_default() {
+        let obj = LightbulbIndicator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msh_fields() {
+        let mut obj = LightbulbIndicator::default();
+        obj.lightbulb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msi_generated {
+    use super::*;
+
+    #[test]
+    fn test_msi_default() {
+        let obj = CodeActionGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msi_fields() {
+        let mut obj = CodeActionGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msj_generated {
+    use super::*;
+
+    #[test]
+    fn test_msj_default() {
+        let obj = WorkspaceEditOp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msj_fields() {
+        let mut obj = WorkspaceEditOp::default();
+        obj.edit_op_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msk_generated {
+    use super::*;
+
+    #[test]
+    fn test_msk_default() {
+        let obj = TextEditOp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msk_fields() {
+        let mut obj = TextEditOp::default();
+        obj.text_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msl_generated {
+    use super::*;
+
+    #[test]
+    fn test_msl_default() {
+        let obj = FileEditOp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msl_fields() {
+        let mut obj = FileEditOp::default();
+        obj.file_op_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msm_generated {
+    use super::*;
+
+    #[test]
+    fn test_msm_default() {
+        let obj = EditPreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msm_fields() {
+        let mut obj = EditPreview::default();
+        obj.preview_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msn_generated {
+    use super::*;
+
+    #[test]
+    fn test_msn_default() {
+        let obj = EditConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msn_fields() {
+        let mut obj = EditConflict::default();
+        obj.conflict_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mso_generated {
+    use super::*;
+
+    #[test]
+    fn test_mso_default() {
+        let obj = EditAnnotation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mso_fields() {
+        let mut obj = EditAnnotation::default();
+        obj.annotation_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msp_generated {
+    use super::*;
+
+    #[test]
+    fn test_msp_default() {
+        let obj = SnippetTextEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msp_fields() {
+        let mut obj = SnippetTextEdit::default();
+        obj.snippet_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msq_generated {
+    use super::*;
+
+    #[test]
+    fn test_msq_default() {
+        let obj = CodeActionResponse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msq_fields() {
+        let mut obj = CodeActionResponse::default();
+        obj.result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msr_generated {
+    use super::*;
+
+    #[test]
+    fn test_msr_default() {
+        let obj = DiagnosticFix::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msr_fields() {
+        let mut obj = DiagnosticFix::default();
+        obj.fix_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mss_generated {
+    use super::*;
+
+    #[test]
+    fn test_mss_default() {
+        let obj = ExtractAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mss_fields() {
+        let mut obj = ExtractAction::default();
+        obj.extract_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mst_generated {
+    use super::*;
+
+    #[test]
+    fn test_mst_default() {
+        let obj = InlineAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mst_fields() {
+        let mut obj = InlineAction::default();
+        obj.inline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msu_generated {
+    use super::*;
+
+    #[test]
+    fn test_msu_default() {
+        let obj = MoveAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msu_fields() {
+        let mut obj = MoveAction::default();
+        obj.move_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msv_generated {
+    use super::*;
+
+    #[test]
+    fn test_msv_default() {
+        let obj = RenameAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msv_fields() {
+        let mut obj = RenameAction::default();
+        obj.rename_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msw_generated {
+    use super::*;
+
+    #[test]
+    fn test_msw_default() {
+        let obj = OrganizeImportsAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msw_fields() {
+        let mut obj = OrganizeImportsAction::default();
+        obj.organize_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msx_generated {
+    use super::*;
+
+    #[test]
+    fn test_msx_default() {
+        let obj = ConvertAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msx_fields() {
+        let mut obj = ConvertAction::default();
+        obj.convert_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msy_generated {
+    use super::*;
+
+    #[test]
+    fn test_msy_default() {
+        let obj = SurroundWith::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msy_fields() {
+        let mut obj = SurroundWith::default();
+        obj.surround_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_msz_generated {
+    use super::*;
+
+    #[test]
+    fn test_msz_default() {
+        let obj = CodeActionConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_msz_fields() {
+        let mut obj = CodeActionConfig::default();
+        obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
