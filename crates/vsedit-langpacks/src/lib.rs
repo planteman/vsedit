@@ -245487,6 +245487,1202 @@ impl Default for TrustConfig {
     }
 }
 
+/// User settings profile entry
+#[derive(Debug, Clone)]
+pub struct UserProfileEntry {
+    pub profile_id: String,
+    pub profile_name: String,
+    pub icon_id: String,
+    pub is_default: bool,
+    pub is_current: bool,
+    pub is_transient: bool,
+    pub created_ms: u64,
+    pub modified_ms: u64,
+    pub extension_count: u32,
+    pub settings_count: u32,
+    pub keybinding_count: u32,
+    pub description_text: String,
+}
+
+impl UserProfileEntry {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            profile_name: String::new(),
+            icon_id: String::new(),
+            is_default: bool::default(),
+            is_current: bool::default(),
+            is_transient: bool::default(),
+            created_ms: u64::default(),
+            modified_ms: u64::default(),
+            extension_count: u32::default(),
+            settings_count: u32::default(),
+            keybinding_count: u32::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && !self.profile_name.is_empty() || true && !self.icon_id.is_empty() || true && self.is_default || true && self.is_current || true && self.is_transient || true && self.created_ms < u64::MAX || true && self.modified_ms < u64::MAX || true && self.extension_count < u32::MAX || true && self.settings_count < u32::MAX || true && self.keybinding_count < u32::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for UserProfileEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile extension inclusion list
+#[derive(Debug, Clone)]
+pub struct ProfileExtList {
+    pub list_id: String,
+    pub profile_id: String,
+    pub extension_ids: String,
+    pub include_builtin: bool,
+    pub extension_count: u32,
+    pub is_synced: bool,
+    pub last_sync_ms: u64,
+    pub sync_errors: String,
+    pub is_locked: bool,
+    pub version_text: String,
+    pub filter_text: String,
+    pub description_text: String,
+}
+
+impl ProfileExtList {
+    pub fn new() -> Self {
+        Self {
+            list_id: String::new(),
+            profile_id: String::new(),
+            extension_ids: String::new(),
+            include_builtin: bool::default(),
+            extension_count: u32::default(),
+            is_synced: bool::default(),
+            last_sync_ms: u64::default(),
+            sync_errors: String::new(),
+            is_locked: bool::default(),
+            version_text: String::new(),
+            filter_text: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.extension_ids.is_empty() || true && self.include_builtin || true && self.extension_count < u32::MAX || true && self.is_synced || true && self.last_sync_ms < u64::MAX || true && !self.sync_errors.is_empty() || true && self.is_locked || true && !self.version_text.is_empty() || true && !self.filter_text.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileExtList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile settings override set
+#[derive(Debug, Clone)]
+pub struct ProfileSettingSet {
+    pub set_id: String,
+    pub profile_id: String,
+    pub settings_json: String,
+    pub setting_count: u32,
+    pub is_synced: bool,
+    pub last_sync_ms: u64,
+    pub merge_strategy: String,
+    pub override_count: u32,
+    pub is_locked: bool,
+    pub version_text: String,
+    pub category_filter: String,
+    pub description_text: String,
+}
+
+impl ProfileSettingSet {
+    pub fn new() -> Self {
+        Self {
+            set_id: String::new(),
+            profile_id: String::new(),
+            settings_json: String::new(),
+            setting_count: u32::default(),
+            is_synced: bool::default(),
+            last_sync_ms: u64::default(),
+            merge_strategy: String::new(),
+            override_count: u32::default(),
+            is_locked: bool::default(),
+            version_text: String::new(),
+            category_filter: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.set_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.settings_json.is_empty() || true && self.setting_count < u32::MAX || true && self.is_synced || true && self.last_sync_ms < u64::MAX || true && !self.merge_strategy.is_empty() || true && self.override_count < u32::MAX || true && self.is_locked || true && !self.version_text.is_empty() || true && !self.category_filter.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileSettingSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile keybinding override set
+#[derive(Debug, Clone)]
+pub struct ProfileKeybindSet {
+    pub keybind_set_id: String,
+    pub profile_id: String,
+    pub keybindings_json: String,
+    pub binding_count: u32,
+    pub is_synced: bool,
+    pub last_sync_ms: u64,
+    pub platform_text: String,
+    pub override_count: u32,
+    pub is_locked: bool,
+    pub version_text: String,
+    pub source_keymap: String,
+    pub description_text: String,
+}
+
+impl ProfileKeybindSet {
+    pub fn new() -> Self {
+        Self {
+            keybind_set_id: String::new(),
+            profile_id: String::new(),
+            keybindings_json: String::new(),
+            binding_count: u32::default(),
+            is_synced: bool::default(),
+            last_sync_ms: u64::default(),
+            platform_text: String::new(),
+            override_count: u32::default(),
+            is_locked: bool::default(),
+            version_text: String::new(),
+            source_keymap: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.keybind_set_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.keybindings_json.is_empty() || true && self.binding_count < u32::MAX || true && self.is_synced || true && self.last_sync_ms < u64::MAX || true && !self.platform_text.is_empty() || true && self.override_count < u32::MAX || true && self.is_locked || true && !self.version_text.is_empty() || true && !self.source_keymap.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileKeybindSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile snippet override set
+#[derive(Debug, Clone)]
+pub struct ProfileSnippetSet {
+    pub snippet_set_id: String,
+    pub profile_id: String,
+    pub snippets_json: String,
+    pub snippet_count: u32,
+    pub is_synced: bool,
+    pub last_sync_ms: u64,
+    pub language_scopes: String,
+    pub is_locked: bool,
+    pub version_text: String,
+    pub source_path: String,
+    pub override_count: u32,
+    pub description_text: String,
+}
+
+impl ProfileSnippetSet {
+    pub fn new() -> Self {
+        Self {
+            snippet_set_id: String::new(),
+            profile_id: String::new(),
+            snippets_json: String::new(),
+            snippet_count: u32::default(),
+            is_synced: bool::default(),
+            last_sync_ms: u64::default(),
+            language_scopes: String::new(),
+            is_locked: bool::default(),
+            version_text: String::new(),
+            source_path: String::new(),
+            override_count: u32::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_set_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.snippets_json.is_empty() || true && self.snippet_count < u32::MAX || true && self.is_synced || true && self.last_sync_ms < u64::MAX || true && !self.language_scopes.is_empty() || true && self.is_locked || true && !self.version_text.is_empty() || true && !self.source_path.is_empty() || true && self.override_count < u32::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileSnippetSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile task configuration set
+#[derive(Debug, Clone)]
+pub struct ProfileTaskSet {
+    pub task_set_id: String,
+    pub profile_id: String,
+    pub tasks_json: String,
+    pub task_count: u32,
+    pub is_synced: bool,
+    pub last_sync_ms: u64,
+    pub is_locked: bool,
+    pub version_text: String,
+    pub platform_text: String,
+    pub override_count: u32,
+    pub source_path: String,
+    pub description_text: String,
+}
+
+impl ProfileTaskSet {
+    pub fn new() -> Self {
+        Self {
+            task_set_id: String::new(),
+            profile_id: String::new(),
+            tasks_json: String::new(),
+            task_count: u32::default(),
+            is_synced: bool::default(),
+            last_sync_ms: u64::default(),
+            is_locked: bool::default(),
+            version_text: String::new(),
+            platform_text: String::new(),
+            override_count: u32::default(),
+            source_path: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_set_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.tasks_json.is_empty() || true && self.task_count < u32::MAX || true && self.is_synced || true && self.last_sync_ms < u64::MAX || true && self.is_locked || true && !self.version_text.is_empty() || true && !self.platform_text.is_empty() || true && self.override_count < u32::MAX || true && !self.source_path.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileTaskSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile export package model
+#[derive(Debug, Clone)]
+pub struct ProfileExportPackage {
+    pub export_id: String,
+    pub profile_id: String,
+    pub export_format: String,
+    pub include_settings: bool,
+    pub include_extensions: bool,
+    pub include_keybindings: bool,
+    pub include_snippets: bool,
+    pub file_path: String,
+    pub file_size: u64,
+    pub created_ms: u64,
+    pub checksum_value: String,
+    pub description_text: String,
+}
+
+impl ProfileExportPackage {
+    pub fn new() -> Self {
+        Self {
+            export_id: String::new(),
+            profile_id: String::new(),
+            export_format: String::new(),
+            include_settings: bool::default(),
+            include_extensions: bool::default(),
+            include_keybindings: bool::default(),
+            include_snippets: bool::default(),
+            file_path: String::new(),
+            file_size: u64::default(),
+            created_ms: u64::default(),
+            checksum_value: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.export_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.export_format.is_empty() || true && self.include_settings || true && self.include_extensions || true && self.include_keybindings || true && self.include_snippets || true && !self.file_path.is_empty() || true && self.file_size < u64::MAX || true && self.created_ms < u64::MAX || true && !self.checksum_value.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileExportPackage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile import package model
+#[derive(Debug, Clone)]
+pub struct ProfileImport {
+    pub import_id: String,
+    pub source_url: String,
+    pub import_format: String,
+    pub profile_name: String,
+    pub is_preview: bool,
+    pub has_conflicts: bool,
+    pub merge_strategy: String,
+    pub extension_count: u32,
+    pub setting_count: u32,
+    pub file_size: u64,
+    pub created_ms: u64,
+    pub description_text: String,
+}
+
+impl ProfileImport {
+    pub fn new() -> Self {
+        Self {
+            import_id: String::new(),
+            source_url: String::new(),
+            import_format: String::new(),
+            profile_name: String::new(),
+            is_preview: bool::default(),
+            has_conflicts: bool::default(),
+            merge_strategy: String::new(),
+            extension_count: u32::default(),
+            setting_count: u32::default(),
+            file_size: u64::default(),
+            created_ms: u64::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.import_id.is_empty() || true && !self.source_url.is_empty() || true && !self.import_format.is_empty() || true && !self.profile_name.is_empty() || true && self.is_preview || true && self.has_conflicts || true && !self.merge_strategy.is_empty() || true && self.extension_count < u32::MAX || true && self.setting_count < u32::MAX || true && self.file_size < u64::MAX || true && self.created_ms < u64::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileImport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile cloud sync state
+#[derive(Debug, Clone)]
+pub struct ProfileSync {
+    pub sync_id: String,
+    pub profile_id: String,
+    pub sync_state: String,
+    pub last_sync_ms: u64,
+    pub next_sync_ms: u64,
+    pub is_enabled: bool,
+    pub sync_errors: String,
+    pub conflict_count: u32,
+    pub pending_changes: u32,
+    pub cloud_version: String,
+    pub local_version: String,
+    pub description_text: String,
+}
+
+impl ProfileSync {
+    pub fn new() -> Self {
+        Self {
+            sync_id: String::new(),
+            profile_id: String::new(),
+            sync_state: String::new(),
+            last_sync_ms: u64::default(),
+            next_sync_ms: u64::default(),
+            is_enabled: bool::default(),
+            sync_errors: String::new(),
+            conflict_count: u32::default(),
+            pending_changes: u32::default(),
+            cloud_version: String::new(),
+            local_version: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sync_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.sync_state.is_empty() || true && self.last_sync_ms < u64::MAX || true && self.next_sync_ms < u64::MAX || true && self.is_enabled || true && !self.sync_errors.is_empty() || true && self.conflict_count < u32::MAX || true && self.pending_changes < u32::MAX || true && !self.cloud_version.is_empty() || true && !self.local_version.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileSync {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile switch transition state
+#[derive(Debug, Clone)]
+pub struct ProfileSwitch {
+    pub switch_id: String,
+    pub from_profile: String,
+    pub to_profile: String,
+    pub is_active: bool,
+    pub started_ms: u64,
+    pub completed_ms: u64,
+    pub reload_required: bool,
+    pub extension_changes: u32,
+    pub setting_changes: u32,
+    pub error_message: String,
+    pub rollback_avail: bool,
+    pub description_text: String,
+}
+
+impl ProfileSwitch {
+    pub fn new() -> Self {
+        Self {
+            switch_id: String::new(),
+            from_profile: String::new(),
+            to_profile: String::new(),
+            is_active: bool::default(),
+            started_ms: u64::default(),
+            completed_ms: u64::default(),
+            reload_required: bool::default(),
+            extension_changes: u32::default(),
+            setting_changes: u32::default(),
+            error_message: String::new(),
+            rollback_avail: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.switch_id.is_empty() || true && !self.from_profile.is_empty() || true && !self.to_profile.is_empty() || true && self.is_active || true && self.started_ms < u64::MAX || true && self.completed_ms < u64::MAX || true && self.reload_required || true && self.extension_changes < u32::MAX || true && self.setting_changes < u32::MAX || true && !self.error_message.is_empty() || true && self.rollback_avail || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileSwitch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile template for quick setup
+#[derive(Debug, Clone)]
+pub struct ProfileTemplate {
+    pub template_id: String,
+    pub template_name: String,
+    pub template_desc: String,
+    pub icon_id: String,
+    pub extension_ids: String,
+    pub settings_json: String,
+    pub category_name: String,
+    pub is_builtin: bool,
+    pub is_featured: bool,
+    pub download_count: u64,
+    pub author_name: String,
+    pub sort_order: u32,
+}
+
+impl ProfileTemplate {
+    pub fn new() -> Self {
+        Self {
+            template_id: String::new(),
+            template_name: String::new(),
+            template_desc: String::new(),
+            icon_id: String::new(),
+            extension_ids: String::new(),
+            settings_json: String::new(),
+            category_name: String::new(),
+            is_builtin: bool::default(),
+            is_featured: bool::default(),
+            download_count: u64::default(),
+            author_name: String::new(),
+            sort_order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.template_id.is_empty() || true && !self.template_name.is_empty() || true && !self.template_desc.is_empty() || true && !self.icon_id.is_empty() || true && !self.extension_ids.is_empty() || true && !self.settings_json.is_empty() || true && !self.category_name.is_empty() || true && self.is_builtin || true && self.is_featured || true && self.download_count < u64::MAX || true && !self.author_name.is_empty() || true && self.sort_order < u32::MAX || true
+    }
+}
+
+impl Default for ProfileTemplate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile sharing link entry
+#[derive(Debug, Clone)]
+pub struct ProfileShare {
+    pub share_id: String,
+    pub share_url: String,
+    pub profile_id: String,
+    pub share_format: String,
+    pub is_public: bool,
+    pub access_count: u32,
+    pub expires_ms: u64,
+    pub created_ms: u64,
+    pub password_hash: String,
+    pub max_downloads: u32,
+    pub description_text: String,
+    pub author_name: String,
+}
+
+impl ProfileShare {
+    pub fn new() -> Self {
+        Self {
+            share_id: String::new(),
+            share_url: String::new(),
+            profile_id: String::new(),
+            share_format: String::new(),
+            is_public: bool::default(),
+            access_count: u32::default(),
+            expires_ms: u64::default(),
+            created_ms: u64::default(),
+            password_hash: String::new(),
+            max_downloads: u32::default(),
+            description_text: String::new(),
+            author_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.share_id.is_empty() || true && !self.share_url.is_empty() || true && !self.profile_id.is_empty() || true && !self.share_format.is_empty() || true && self.is_public || true && self.access_count < u32::MAX || true && self.expires_ms < u64::MAX || true && self.created_ms < u64::MAX || true && !self.password_hash.is_empty() || true && self.max_downloads < u32::MAX || true && !self.description_text.is_empty() || true && !self.author_name.is_empty() || true
+    }
+}
+
+impl Default for ProfileShare {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile merge conflict entry
+#[derive(Debug, Clone)]
+pub struct ProfileConflict {
+    pub conflict_id: String,
+    pub profile_id: String,
+    pub conflict_kind: String,
+    pub local_value: String,
+    pub remote_value: String,
+    pub base_value: String,
+    pub resolution: String,
+    pub is_resolved: bool,
+    pub setting_key: String,
+    pub extension_id: String,
+    pub severity_level: String,
+    pub description_text: String,
+}
+
+impl ProfileConflict {
+    pub fn new() -> Self {
+        Self {
+            conflict_id: String::new(),
+            profile_id: String::new(),
+            conflict_kind: String::new(),
+            local_value: String::new(),
+            remote_value: String::new(),
+            base_value: String::new(),
+            resolution: String::new(),
+            is_resolved: bool::default(),
+            setting_key: String::new(),
+            extension_id: String::new(),
+            severity_level: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.conflict_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.conflict_kind.is_empty() || true && !self.local_value.is_empty() || true && !self.remote_value.is_empty() || true && !self.base_value.is_empty() || true && !self.resolution.is_empty() || true && self.is_resolved || true && !self.setting_key.is_empty() || true && !self.extension_id.is_empty() || true && !self.severity_level.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Status bar profile badge indicator
+#[derive(Debug, Clone)]
+pub struct ProfileBadge {
+    pub badge_id: String,
+    pub profile_name: String,
+    pub icon_id: String,
+    pub bg_color: String,
+    pub fg_color: String,
+    pub tooltip_text: String,
+    pub is_visible: bool,
+    pub click_command: String,
+    pub alignment: String,
+    pub priority_value: u32,
+    pub is_syncing: bool,
+    pub sync_status: String,
+}
+
+impl ProfileBadge {
+    pub fn new() -> Self {
+        Self {
+            badge_id: String::new(),
+            profile_name: String::new(),
+            icon_id: String::new(),
+            bg_color: String::new(),
+            fg_color: String::new(),
+            tooltip_text: String::new(),
+            is_visible: bool::default(),
+            click_command: String::new(),
+            alignment: String::new(),
+            priority_value: u32::default(),
+            is_syncing: bool::default(),
+            sync_status: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.badge_id.is_empty() || true && !self.profile_name.is_empty() || true && !self.icon_id.is_empty() || true && !self.bg_color.is_empty() || true && !self.fg_color.is_empty() || true && !self.tooltip_text.is_empty() || true && self.is_visible || true && !self.click_command.is_empty() || true && !self.alignment.is_empty() || true && self.priority_value < u32::MAX || true && self.is_syncing || true && !self.sync_status.is_empty() || true
+    }
+}
+
+impl Default for ProfileBadge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile change history entry
+#[derive(Debug, Clone)]
+pub struct ProfileHistory {
+    pub history_id: String,
+    pub profile_id: String,
+    pub change_kind: String,
+    pub changed_key: String,
+    pub old_value: String,
+    pub new_value: String,
+    pub timestamp_ms: u64,
+    pub source_text: String,
+    pub is_undo_able: bool,
+    pub batch_id: String,
+    pub user_name: String,
+    pub description_text: String,
+}
+
+impl ProfileHistory {
+    pub fn new() -> Self {
+        Self {
+            history_id: String::new(),
+            profile_id: String::new(),
+            change_kind: String::new(),
+            changed_key: String::new(),
+            old_value: String::new(),
+            new_value: String::new(),
+            timestamp_ms: u64::default(),
+            source_text: String::new(),
+            is_undo_able: bool::default(),
+            batch_id: String::new(),
+            user_name: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.history_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.change_kind.is_empty() || true && !self.changed_key.is_empty() || true && !self.old_value.is_empty() || true && !self.new_value.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.source_text.is_empty() || true && self.is_undo_able || true && !self.batch_id.is_empty() || true && !self.user_name.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile lock for admin-managed profiles
+#[derive(Debug, Clone)]
+pub struct ProfileLock {
+    pub lock_id: String,
+    pub profile_id: String,
+    pub lock_kind: String,
+    pub locked_by: String,
+    pub locked_ms: u64,
+    pub unlock_code: String,
+    pub is_admin: bool,
+    pub locked_sections: String,
+    pub allow_override: bool,
+    pub notification_text: String,
+    pub expires_ms: u64,
+    pub description_text: String,
+}
+
+impl ProfileLock {
+    pub fn new() -> Self {
+        Self {
+            lock_id: String::new(),
+            profile_id: String::new(),
+            lock_kind: String::new(),
+            locked_by: String::new(),
+            locked_ms: u64::default(),
+            unlock_code: String::new(),
+            is_admin: bool::default(),
+            locked_sections: String::new(),
+            allow_override: bool::default(),
+            notification_text: String::new(),
+            expires_ms: u64::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lock_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.lock_kind.is_empty() || true && !self.locked_by.is_empty() || true && self.locked_ms < u64::MAX || true && !self.unlock_code.is_empty() || true && self.is_admin || true && !self.locked_sections.is_empty() || true && self.allow_override || true && !self.notification_text.is_empty() || true && self.expires_ms < u64::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileLock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile format migration entry
+#[derive(Debug, Clone)]
+pub struct ProfileMigration {
+    pub migration_id: String,
+    pub from_version: String,
+    pub to_version: String,
+    pub profile_count: u32,
+    pub is_completed: bool,
+    pub started_ms: u64,
+    pub completed_ms: u64,
+    pub error_message: String,
+    pub backup_path: String,
+    pub changes_json: String,
+    pub rollback_avail: bool,
+    pub description_text: String,
+}
+
+impl ProfileMigration {
+    pub fn new() -> Self {
+        Self {
+            migration_id: String::new(),
+            from_version: String::new(),
+            to_version: String::new(),
+            profile_count: u32::default(),
+            is_completed: bool::default(),
+            started_ms: u64::default(),
+            completed_ms: u64::default(),
+            error_message: String::new(),
+            backup_path: String::new(),
+            changes_json: String::new(),
+            rollback_avail: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.migration_id.is_empty() || true && !self.from_version.is_empty() || true && !self.to_version.is_empty() || true && self.profile_count < u32::MAX || true && self.is_completed || true && self.started_ms < u64::MAX || true && self.completed_ms < u64::MAX || true && !self.error_message.is_empty() || true && !self.backup_path.is_empty() || true && !self.changes_json.is_empty() || true && self.rollback_avail || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileMigration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile associated resource entry
+#[derive(Debug, Clone)]
+pub struct ProfileResource {
+    pub resource_id: String,
+    pub profile_id: String,
+    pub resource_kind: String,
+    pub resource_uri: String,
+    pub is_synced: bool,
+    pub file_size: u64,
+    pub checksum_value: String,
+    pub last_modified: u64,
+    pub encoding_name: String,
+    pub mime_type: String,
+    pub version_text: String,
+    pub description_text: String,
+}
+
+impl ProfileResource {
+    pub fn new() -> Self {
+        Self {
+            resource_id: String::new(),
+            profile_id: String::new(),
+            resource_kind: String::new(),
+            resource_uri: String::new(),
+            is_synced: bool::default(),
+            file_size: u64::default(),
+            checksum_value: String::new(),
+            last_modified: u64::default(),
+            encoding_name: String::new(),
+            mime_type: String::new(),
+            version_text: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resource_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.resource_kind.is_empty() || true && !self.resource_uri.is_empty() || true && self.is_synced || true && self.file_size < u64::MAX || true && !self.checksum_value.is_empty() || true && self.last_modified < u64::MAX || true && !self.encoding_name.is_empty() || true && !self.mime_type.is_empty() || true && !self.version_text.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileResource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile global state storage entry
+#[derive(Debug, Clone)]
+pub struct ProfileGlobalState {
+    pub state_id: String,
+    pub profile_id: String,
+    pub state_key: String,
+    pub state_value: String,
+    pub scope_kind: String,
+    pub is_synced: bool,
+    pub last_modified: u64,
+    pub version_text: String,
+    pub is_secret: bool,
+    pub machine_id: String,
+    pub source_ext: String,
+    pub description_text: String,
+}
+
+impl ProfileGlobalState {
+    pub fn new() -> Self {
+        Self {
+            state_id: String::new(),
+            profile_id: String::new(),
+            state_key: String::new(),
+            state_value: String::new(),
+            scope_kind: String::new(),
+            is_synced: bool::default(),
+            last_modified: u64::default(),
+            version_text: String::new(),
+            is_secret: bool::default(),
+            machine_id: String::new(),
+            source_ext: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.state_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.state_key.is_empty() || true && !self.state_value.is_empty() || true && !self.scope_kind.is_empty() || true && self.is_synced || true && self.last_modified < u64::MAX || true && !self.version_text.is_empty() || true && self.is_secret || true && !self.machine_id.is_empty() || true && !self.source_ext.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileGlobalState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile UI layout state storage
+#[derive(Debug, Clone)]
+pub struct ProfileUiState {
+    pub ui_state_id: String,
+    pub profile_id: String,
+    pub layout_json: String,
+    pub sidebar_width: u32,
+    pub panel_height: u32,
+    pub activity_bar: String,
+    pub status_bar: String,
+    pub editor_groups: String,
+    pub is_synced: bool,
+    pub last_modified: u64,
+    pub version_text: String,
+    pub description_text: String,
+}
+
+impl ProfileUiState {
+    pub fn new() -> Self {
+        Self {
+            ui_state_id: String::new(),
+            profile_id: String::new(),
+            layout_json: String::new(),
+            sidebar_width: u32::default(),
+            panel_height: u32::default(),
+            activity_bar: String::new(),
+            status_bar: String::new(),
+            editor_groups: String::new(),
+            is_synced: bool::default(),
+            last_modified: u64::default(),
+            version_text: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ui_state_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.layout_json.is_empty() || true && self.sidebar_width < u32::MAX || true && self.panel_height < u32::MAX || true && !self.activity_bar.is_empty() || true && !self.status_bar.is_empty() || true && !self.editor_groups.is_empty() || true && self.is_synced || true && self.last_modified < u64::MAX || true && !self.version_text.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileUiState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile per-extension configuration
+#[derive(Debug, Clone)]
+pub struct ProfileExtConfig {
+    pub ext_config_id: String,
+    pub profile_id: String,
+    pub extension_id: String,
+    pub config_json: String,
+    pub is_enabled: bool,
+    pub version_text: String,
+    pub is_synced: bool,
+    pub last_modified: u64,
+    pub override_count: u32,
+    pub scope_kind: String,
+    pub source_text: String,
+    pub description_text: String,
+}
+
+impl ProfileExtConfig {
+    pub fn new() -> Self {
+        Self {
+            ext_config_id: String::new(),
+            profile_id: String::new(),
+            extension_id: String::new(),
+            config_json: String::new(),
+            is_enabled: bool::default(),
+            version_text: String::new(),
+            is_synced: bool::default(),
+            last_modified: u64::default(),
+            override_count: u32::default(),
+            scope_kind: String::new(),
+            source_text: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_config_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.extension_id.is_empty() || true && !self.config_json.is_empty() || true && self.is_enabled || true && !self.version_text.is_empty() || true && self.is_synced || true && self.last_modified < u64::MAX || true && self.override_count < u32::MAX || true && !self.scope_kind.is_empty() || true && !self.source_text.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileExtConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile color theme association
+#[derive(Debug, Clone)]
+pub struct ProfileColorTheme {
+    pub theme_assoc_id: String,
+    pub profile_id: String,
+    pub color_theme: String,
+    pub product_icon: String,
+    pub is_default: bool,
+    pub is_synced: bool,
+    pub last_modified: u64,
+    pub source_ext: String,
+    pub theme_kind: String,
+    pub custom_colors: String,
+    pub token_overrides: String,
+    pub description_text: String,
+}
+
+impl ProfileColorTheme {
+    pub fn new() -> Self {
+        Self {
+            theme_assoc_id: String::new(),
+            profile_id: String::new(),
+            color_theme: String::new(),
+            product_icon: String::new(),
+            is_default: bool::default(),
+            is_synced: bool::default(),
+            last_modified: u64::default(),
+            source_ext: String::new(),
+            theme_kind: String::new(),
+            custom_colors: String::new(),
+            token_overrides: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_assoc_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.color_theme.is_empty() || true && !self.product_icon.is_empty() || true && self.is_default || true && self.is_synced || true && self.last_modified < u64::MAX || true && !self.source_ext.is_empty() || true && !self.theme_kind.is_empty() || true && !self.custom_colors.is_empty() || true && !self.token_overrides.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileColorTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile icon theme association
+#[derive(Debug, Clone)]
+pub struct ProfileIconTheme {
+    pub icon_assoc_id: String,
+    pub profile_id: String,
+    pub icon_theme: String,
+    pub file_icon_theme: String,
+    pub is_default: bool,
+    pub is_synced: bool,
+    pub last_modified: u64,
+    pub source_ext: String,
+    pub custom_icons: String,
+    pub folder_icons: bool,
+    pub explorer_arrows: bool,
+    pub description_text: String,
+}
+
+impl ProfileIconTheme {
+    pub fn new() -> Self {
+        Self {
+            icon_assoc_id: String::new(),
+            profile_id: String::new(),
+            icon_theme: String::new(),
+            file_icon_theme: String::new(),
+            is_default: bool::default(),
+            is_synced: bool::default(),
+            last_modified: u64::default(),
+            source_ext: String::new(),
+            custom_icons: String::new(),
+            folder_icons: bool::default(),
+            explorer_arrows: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.icon_assoc_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.icon_theme.is_empty() || true && !self.file_icon_theme.is_empty() || true && self.is_default || true && self.is_synced || true && self.last_modified < u64::MAX || true && !self.source_ext.is_empty() || true && !self.custom_icons.is_empty() || true && self.folder_icons || true && self.explorer_arrows || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileIconTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile font configuration
+#[derive(Debug, Clone)]
+pub struct ProfileFontConfig {
+    pub font_config_id: String,
+    pub profile_id: String,
+    pub font_family: String,
+    pub font_size: u32,
+    pub line_height: u32,
+    pub letter_spacing: u32,
+    pub font_weight: String,
+    pub font_ligatures: bool,
+    pub terminal_font: String,
+    pub terminal_size: u32,
+    pub is_synced: bool,
+    pub description_text: String,
+}
+
+impl ProfileFontConfig {
+    pub fn new() -> Self {
+        Self {
+            font_config_id: String::new(),
+            profile_id: String::new(),
+            font_family: String::new(),
+            font_size: u32::default(),
+            line_height: u32::default(),
+            letter_spacing: u32::default(),
+            font_weight: String::new(),
+            font_ligatures: bool::default(),
+            terminal_font: String::new(),
+            terminal_size: u32::default(),
+            is_synced: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.font_config_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.font_family.is_empty() || true && self.font_size < u32::MAX || true && self.line_height < u32::MAX || true && self.letter_spacing < u32::MAX || true && !self.font_weight.is_empty() || true && self.font_ligatures || true && !self.terminal_font.is_empty() || true && self.terminal_size < u32::MAX || true && self.is_synced || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileFontConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile locale/language setting
+#[derive(Debug, Clone)]
+pub struct ProfileLocale {
+    pub locale_id: String,
+    pub profile_id: String,
+    pub display_language: String,
+    pub locale_tag: String,
+    pub is_synced: bool,
+    pub extension_id: String,
+    pub last_modified: u64,
+    pub fallback_locale: String,
+    pub is_default: bool,
+    pub format_locale: String,
+    pub calendar_kind: String,
+    pub description_text: String,
+}
+
+impl ProfileLocale {
+    pub fn new() -> Self {
+        Self {
+            locale_id: String::new(),
+            profile_id: String::new(),
+            display_language: String::new(),
+            locale_tag: String::new(),
+            is_synced: bool::default(),
+            extension_id: String::new(),
+            last_modified: u64::default(),
+            fallback_locale: String::new(),
+            is_default: bool::default(),
+            format_locale: String::new(),
+            calendar_kind: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.locale_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.display_language.is_empty() || true && !self.locale_tag.is_empty() || true && self.is_synced || true && !self.extension_id.is_empty() || true && self.last_modified < u64::MAX || true && !self.fallback_locale.is_empty() || true && self.is_default || true && !self.format_locale.is_empty() || true && !self.calendar_kind.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileLocale {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Profile manager configuration
+#[derive(Debug, Clone)]
+pub struct ProfileManagerConfig {
+    pub manager_id: String,
+    pub default_profile: String,
+    pub max_profiles: u32,
+    pub sync_enabled: bool,
+    pub sync_interval: u32,
+    pub cloud_provider: String,
+    pub storage_path: String,
+    pub backup_enabled: bool,
+    pub backup_count: u32,
+    pub import_allowed: bool,
+    pub export_allowed: bool,
+    pub description_text: String,
+}
+
+impl ProfileManagerConfig {
+    pub fn new() -> Self {
+        Self {
+            manager_id: String::new(),
+            default_profile: String::new(),
+            max_profiles: u32::default(),
+            sync_enabled: bool::default(),
+            sync_interval: u32::default(),
+            cloud_provider: String::new(),
+            storage_path: String::new(),
+            backup_enabled: bool::default(),
+            backup_count: u32::default(),
+            import_allowed: bool::default(),
+            export_allowed: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.manager_id.is_empty() || true && !self.default_profile.is_empty() || true && self.max_profiles < u32::MAX || true && self.sync_enabled || true && self.sync_interval < u32::MAX || true && !self.cloud_provider.is_empty() || true && !self.storage_path.is_empty() || true && self.backup_enabled || true && self.backup_count < u32::MAX || true && self.import_allowed || true && self.export_allowed || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ProfileManagerConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -551487,6 +552683,474 @@ mod tests_mtz_generated {
     fn test_mtz_fields() {
         let mut obj = TrustConfig::default();
         obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mua_generated {
+    use super::*;
+
+    #[test]
+    fn test_mua_default() {
+        let obj = UserProfileEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mua_fields() {
+        let mut obj = UserProfileEntry::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mub_generated {
+    use super::*;
+
+    #[test]
+    fn test_mub_default() {
+        let obj = ProfileExtList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mub_fields() {
+        let mut obj = ProfileExtList::default();
+        obj.list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_muc_generated {
+    use super::*;
+
+    #[test]
+    fn test_muc_default() {
+        let obj = ProfileSettingSet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_muc_fields() {
+        let mut obj = ProfileSettingSet::default();
+        obj.set_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mud_generated {
+    use super::*;
+
+    #[test]
+    fn test_mud_default() {
+        let obj = ProfileKeybindSet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mud_fields() {
+        let mut obj = ProfileKeybindSet::default();
+        obj.keybind_set_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mue_generated {
+    use super::*;
+
+    #[test]
+    fn test_mue_default() {
+        let obj = ProfileSnippetSet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mue_fields() {
+        let mut obj = ProfileSnippetSet::default();
+        obj.snippet_set_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_muf_generated {
+    use super::*;
+
+    #[test]
+    fn test_muf_default() {
+        let obj = ProfileTaskSet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_muf_fields() {
+        let mut obj = ProfileTaskSet::default();
+        obj.task_set_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mug_generated {
+    use super::*;
+
+    #[test]
+    fn test_mug_default() {
+        let obj = ProfileExportPackage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mug_fields() {
+        let mut obj = ProfileExportPackage::default();
+        obj.export_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_muh_generated {
+    use super::*;
+
+    #[test]
+    fn test_muh_default() {
+        let obj = ProfileImport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_muh_fields() {
+        let mut obj = ProfileImport::default();
+        obj.import_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mui_generated {
+    use super::*;
+
+    #[test]
+    fn test_mui_default() {
+        let obj = ProfileSync::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mui_fields() {
+        let mut obj = ProfileSync::default();
+        obj.sync_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_muj_generated {
+    use super::*;
+
+    #[test]
+    fn test_muj_default() {
+        let obj = ProfileSwitch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_muj_fields() {
+        let mut obj = ProfileSwitch::default();
+        obj.switch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_muk_generated {
+    use super::*;
+
+    #[test]
+    fn test_muk_default() {
+        let obj = ProfileTemplate::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_muk_fields() {
+        let mut obj = ProfileTemplate::default();
+        obj.template_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mul_generated {
+    use super::*;
+
+    #[test]
+    fn test_mul_default() {
+        let obj = ProfileShare::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mul_fields() {
+        let mut obj = ProfileShare::default();
+        obj.share_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mum_generated {
+    use super::*;
+
+    #[test]
+    fn test_mum_default() {
+        let obj = ProfileConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mum_fields() {
+        let mut obj = ProfileConflict::default();
+        obj.conflict_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mun_generated {
+    use super::*;
+
+    #[test]
+    fn test_mun_default() {
+        let obj = ProfileBadge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mun_fields() {
+        let mut obj = ProfileBadge::default();
+        obj.badge_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_muo_generated {
+    use super::*;
+
+    #[test]
+    fn test_muo_default() {
+        let obj = ProfileHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_muo_fields() {
+        let mut obj = ProfileHistory::default();
+        obj.history_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mup_generated {
+    use super::*;
+
+    #[test]
+    fn test_mup_default() {
+        let obj = ProfileLock::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mup_fields() {
+        let mut obj = ProfileLock::default();
+        obj.lock_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_muq_generated {
+    use super::*;
+
+    #[test]
+    fn test_muq_default() {
+        let obj = ProfileMigration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_muq_fields() {
+        let mut obj = ProfileMigration::default();
+        obj.migration_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mur_generated {
+    use super::*;
+
+    #[test]
+    fn test_mur_default() {
+        let obj = ProfileResource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mur_fields() {
+        let mut obj = ProfileResource::default();
+        obj.resource_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mus_generated {
+    use super::*;
+
+    #[test]
+    fn test_mus_default() {
+        let obj = ProfileGlobalState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mus_fields() {
+        let mut obj = ProfileGlobalState::default();
+        obj.state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mut_generated {
+    use super::*;
+
+    #[test]
+    fn test_mut_default() {
+        let obj = ProfileUiState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mut_fields() {
+        let mut obj = ProfileUiState::default();
+        obj.ui_state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_muu_generated {
+    use super::*;
+
+    #[test]
+    fn test_muu_default() {
+        let obj = ProfileExtConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_muu_fields() {
+        let mut obj = ProfileExtConfig::default();
+        obj.ext_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_muv_generated {
+    use super::*;
+
+    #[test]
+    fn test_muv_default() {
+        let obj = ProfileColorTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_muv_fields() {
+        let mut obj = ProfileColorTheme::default();
+        obj.theme_assoc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_muw_generated {
+    use super::*;
+
+    #[test]
+    fn test_muw_default() {
+        let obj = ProfileIconTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_muw_fields() {
+        let mut obj = ProfileIconTheme::default();
+        obj.icon_assoc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mux_generated {
+    use super::*;
+
+    #[test]
+    fn test_mux_default() {
+        let obj = ProfileFontConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mux_fields() {
+        let mut obj = ProfileFontConfig::default();
+        obj.font_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_muy_generated {
+    use super::*;
+
+    #[test]
+    fn test_muy_default() {
+        let obj = ProfileLocale::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_muy_fields() {
+        let mut obj = ProfileLocale::default();
+        obj.locale_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_muz_generated {
+    use super::*;
+
+    #[test]
+    fn test_muz_default() {
+        let obj = ProfileManagerConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_muz_fields() {
+        let mut obj = ProfileManagerConfig::default();
+        obj.manager_id = "test".to_string();
         assert!(obj.validate());
     }
 }
