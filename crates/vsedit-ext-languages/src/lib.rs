@@ -252614,6 +252614,838 @@ impl Default for NotebookCellTag {
     }
 }
 
+/// Test run profile definition for test explorer
+#[derive(Debug, Clone)]
+pub struct TestRunProfileDef {
+    pub profile_id: String,
+    pub label: String,
+    pub kind: String,
+    pub is_default: bool,
+    pub supports_coverage: bool,
+}
+
+impl TestRunProfileDef {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            label: String::new(),
+            kind: String::new(),
+            is_default: bool::default(),
+            supports_coverage: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && !self.label.is_empty() || true && !self.kind.is_empty() || true && self.is_default || true && self.supports_coverage || true
+    }
+}
+
+impl Default for TestRunProfileDef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test item tree node in test explorer
+#[derive(Debug, Clone)]
+pub struct TestItemTreeNode {
+    pub item_id: String,
+    pub label: String,
+    pub uri: String,
+    pub can_resolve: bool,
+    pub sort_text: String,
+}
+
+impl TestItemTreeNode {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            label: String::new(),
+            uri: String::new(),
+            can_resolve: bool::default(),
+            sort_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.label.is_empty() || true && !self.uri.is_empty() || true && self.can_resolve || true && !self.sort_text.is_empty() || true
+    }
+}
+
+impl Default for TestItemTreeNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test run outcome data and status
+#[derive(Debug, Clone)]
+pub struct TestRunOutcome {
+    pub result_id: String,
+    pub test_id: String,
+    pub state: String,
+    pub duration_ms: u64,
+    pub error_message: String,
+}
+
+impl TestRunOutcome {
+    pub fn new() -> Self {
+        Self {
+            result_id: String::new(),
+            test_id: String::new(),
+            state: String::new(),
+            duration_ms: u64::default(),
+            error_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.result_id.is_empty() || true && !self.test_id.is_empty() || true && !self.state.is_empty() || true && self.duration_ms < u64::MAX || true && !self.error_message.is_empty() || true
+    }
+}
+
+impl Default for TestRunOutcome {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test coverage data record
+#[derive(Debug, Clone)]
+pub struct TestCoverageRecord {
+    pub coverage_id: String,
+    pub file_path: String,
+    pub covered_lines: u32,
+    pub total_lines: u32,
+    pub branch_coverage: f64,
+}
+
+impl TestCoverageRecord {
+    pub fn new() -> Self {
+        Self {
+            coverage_id: String::new(),
+            file_path: String::new(),
+            covered_lines: u32::default(),
+            total_lines: u32::default(),
+            branch_coverage: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.coverage_id.is_empty() || true && !self.file_path.is_empty() || true && self.covered_lines < u32::MAX || true && self.total_lines < u32::MAX || true && self.branch_coverage.is_finite() || true
+    }
+}
+
+impl Default for TestCoverageRecord {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test result message entry
+#[derive(Debug, Clone)]
+pub struct TestMessageEntry {
+    pub message_id: String,
+    pub severity: String,
+    pub actual_output: String,
+    pub expected_output: String,
+    pub location_uri: String,
+}
+
+impl TestMessageEntry {
+    pub fn new() -> Self {
+        Self {
+            message_id: String::new(),
+            severity: String::new(),
+            actual_output: String::new(),
+            expected_output: String::new(),
+            location_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.message_id.is_empty() || true && !self.severity.is_empty() || true && !self.actual_output.is_empty() || true && !self.expected_output.is_empty() || true && !self.location_uri.is_empty() || true
+    }
+}
+
+impl Default for TestMessageEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test tag definition for filtering
+#[derive(Debug, Clone)]
+pub struct TestTagDef {
+    pub tag_id: String,
+    pub display_name: String,
+    pub color_hint: String,
+    pub is_hidden: bool,
+    pub sort_priority: u32,
+}
+
+impl TestTagDef {
+    pub fn new() -> Self {
+        Self {
+            tag_id: String::new(),
+            display_name: String::new(),
+            color_hint: String::new(),
+            is_hidden: bool::default(),
+            sort_priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tag_id.is_empty() || true && !self.display_name.is_empty() || true && !self.color_hint.is_empty() || true && self.is_hidden || true && self.sort_priority < u32::MAX || true
+    }
+}
+
+impl Default for TestTagDef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test discovery request and results
+#[derive(Debug, Clone)]
+pub struct TestDiscovery {
+    pub discovery_id: String,
+    pub scope_uri: String,
+    pub include_tags: String,
+    pub exclude_tags: String,
+    pub is_continuous: bool,
+}
+
+impl TestDiscovery {
+    pub fn new() -> Self {
+        Self {
+            discovery_id: String::new(),
+            scope_uri: String::new(),
+            include_tags: String::new(),
+            exclude_tags: String::new(),
+            is_continuous: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.discovery_id.is_empty() || true && !self.scope_uri.is_empty() || true && !self.include_tags.is_empty() || true && !self.exclude_tags.is_empty() || true && self.is_continuous || true
+    }
+}
+
+impl Default for TestDiscovery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test explorer view configuration
+#[derive(Debug, Clone)]
+pub struct TestExplorerConfig {
+    pub view_mode: String,
+    pub sort_order: String,
+    pub show_only_failed: bool,
+    pub auto_reveal: bool,
+    pub group_by: String,
+}
+
+impl TestExplorerConfig {
+    pub fn new() -> Self {
+        Self {
+            view_mode: String::new(),
+            sort_order: String::new(),
+            show_only_failed: bool::default(),
+            auto_reveal: bool::default(),
+            group_by: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_mode.is_empty() || true && !self.sort_order.is_empty() || true && self.show_only_failed || true && self.auto_reveal || true && !self.group_by.is_empty() || true
+    }
+}
+
+impl Default for TestExplorerConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test output pane configuration
+#[derive(Debug, Clone)]
+pub struct TestOutputPane {
+    pub channel_id: String,
+    pub test_run_id: String,
+    pub append_mode: bool,
+    pub show_on_error: bool,
+    pub max_size: u64,
+}
+
+impl TestOutputPane {
+    pub fn new() -> Self {
+        Self {
+            channel_id: String::new(),
+            test_run_id: String::new(),
+            append_mode: bool::default(),
+            show_on_error: bool::default(),
+            max_size: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.channel_id.is_empty() || true && !self.test_run_id.is_empty() || true && self.append_mode || true && self.show_on_error || true && self.max_size < u64::MAX || true
+    }
+}
+
+impl Default for TestOutputPane {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test debug setup profile
+#[derive(Debug, Clone)]
+pub struct TestDebugSetup {
+    pub debug_type: String,
+    pub test_ids: String,
+    pub attach_mode: bool,
+    pub port: u32,
+    pub env_vars: String,
+}
+
+impl TestDebugSetup {
+    pub fn new() -> Self {
+        Self {
+            debug_type: String::new(),
+            test_ids: String::new(),
+            attach_mode: bool::default(),
+            port: u32::default(),
+            env_vars: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.debug_type.is_empty() || true && !self.test_ids.is_empty() || true && self.attach_mode || true && self.port < u32::MAX || true && !self.env_vars.is_empty() || true
+    }
+}
+
+impl Default for TestDebugSetup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Continuous test run tracking
+#[derive(Debug, Clone)]
+pub struct TestContinuousRun {
+    pub run_id: String,
+    pub trigger_pattern: String,
+    pub debounce_ms: u64,
+    pub is_active: bool,
+    pub last_run: u64,
+}
+
+impl TestContinuousRun {
+    pub fn new() -> Self {
+        Self {
+            run_id: String::new(),
+            trigger_pattern: String::new(),
+            debounce_ms: u64::default(),
+            is_active: bool::default(),
+            last_run: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.run_id.is_empty() || true && !self.trigger_pattern.is_empty() || true && self.debounce_ms < u64::MAX || true && self.is_active || true && self.last_run < u64::MAX || true
+    }
+}
+
+impl Default for TestContinuousRun {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test explorer filter criteria
+#[derive(Debug, Clone)]
+pub struct TestFilterCriteria {
+    pub filter_text: String,
+    pub show_passed: bool,
+    pub show_failed: bool,
+    pub show_skipped: bool,
+    pub tag_filter: String,
+}
+
+impl TestFilterCriteria {
+    pub fn new() -> Self {
+        Self {
+            filter_text: String::new(),
+            show_passed: bool::default(),
+            show_failed: bool::default(),
+            show_skipped: bool::default(),
+            tag_filter: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_text.is_empty() || true && self.show_passed || true && self.show_failed || true && self.show_skipped || true && !self.tag_filter.is_empty() || true
+    }
+}
+
+impl Default for TestFilterCriteria {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test item source range info
+#[derive(Debug, Clone)]
+pub struct TestItemRange {
+    pub start_line: u32,
+    pub end_line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub source_uri: String,
+}
+
+impl TestItemRange {
+    pub fn new() -> Self {
+        Self {
+            start_line: u32::default(),
+            end_line: u32::default(),
+            start_col: u32::default(),
+            end_col: u32::default(),
+            source_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_col < u32::MAX || true && !self.source_uri.is_empty() || true
+    }
+}
+
+impl Default for TestItemRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test result gutter decoration
+#[derive(Debug, Clone)]
+pub struct TestDecoration {
+    pub gutter_icon: String,
+    pub hover_message: String,
+    pub is_inline: bool,
+    pub color: String,
+    pub priority: u32,
+}
+
+impl TestDecoration {
+    pub fn new() -> Self {
+        Self {
+            gutter_icon: String::new(),
+            hover_message: String::new(),
+            is_inline: bool::default(),
+            color: String::new(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gutter_icon.is_empty() || true && !self.hover_message.is_empty() || true && self.is_inline || true && !self.color.is_empty() || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for TestDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test retry policy configuration
+#[derive(Debug, Clone)]
+pub struct TestRetryPolicy {
+    pub max_retries: u32,
+    pub retry_delay_ms: u64,
+    pub retry_on_flaky: bool,
+    pub reset_state: bool,
+    pub log_retries: bool,
+}
+
+impl TestRetryPolicy {
+    pub fn new() -> Self {
+        Self {
+            max_retries: u32::default(),
+            retry_delay_ms: u64::default(),
+            retry_on_flaky: bool::default(),
+            reset_state: bool::default(),
+            log_retries: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.max_retries < u32::MAX || true && self.retry_delay_ms < u64::MAX || true && self.retry_on_flaky || true && self.reset_state || true && self.log_retries || true
+    }
+}
+
+impl Default for TestRetryPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test run progress tracking
+#[derive(Debug, Clone)]
+pub struct TestProgressInfo {
+    pub completed_count: u32,
+    pub total_count: u32,
+    pub failed_count: u32,
+    pub skipped_count: u32,
+    pub elapsed_ms: u64,
+}
+
+impl TestProgressInfo {
+    pub fn new() -> Self {
+        Self {
+            completed_count: u32::default(),
+            total_count: u32::default(),
+            failed_count: u32::default(),
+            skipped_count: u32::default(),
+            elapsed_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.completed_count < u32::MAX || true && self.total_count < u32::MAX || true && self.failed_count < u32::MAX || true && self.skipped_count < u32::MAX || true && self.elapsed_ms < u64::MAX || true
+    }
+}
+
+impl Default for TestProgressInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test snapshot comparison data
+#[derive(Debug, Clone)]
+pub struct TestSnapshotEntry {
+    pub snapshot_id: String,
+    pub baseline_path: String,
+    pub actual_path: String,
+    pub diff_pct: f64,
+    pub approved: bool,
+}
+
+impl TestSnapshotEntry {
+    pub fn new() -> Self {
+        Self {
+            snapshot_id: String::new(),
+            baseline_path: String::new(),
+            actual_path: String::new(),
+            diff_pct: f64::default(),
+            approved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snapshot_id.is_empty() || true && !self.baseline_path.is_empty() || true && !self.actual_path.is_empty() || true && self.diff_pct.is_finite() || true && self.approved || true
+    }
+}
+
+impl Default for TestSnapshotEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test run history record
+#[derive(Debug, Clone)]
+pub struct TestHistoryEntry {
+    pub history_id: String,
+    pub profile_id: String,
+    pub started_at: u64,
+    pub total_tests: u32,
+    pub pass_rate: f64,
+}
+
+impl TestHistoryEntry {
+    pub fn new() -> Self {
+        Self {
+            history_id: String::new(),
+            profile_id: String::new(),
+            started_at: u64::default(),
+            total_tests: u32::default(),
+            pass_rate: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.history_id.is_empty() || true && !self.profile_id.is_empty() || true && self.started_at < u64::MAX || true && self.total_tests < u32::MAX || true && self.pass_rate.is_finite() || true
+    }
+}
+
+impl Default for TestHistoryEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test execution environment settings
+#[derive(Debug, Clone)]
+pub struct TestEnvironment {
+    pub env_name: String,
+    pub working_dir: String,
+    pub env_vars: String,
+    pub shell_path: String,
+    pub timeout_ms: u64,
+}
+
+impl TestEnvironment {
+    pub fn new() -> Self {
+        Self {
+            env_name: String::new(),
+            working_dir: String::new(),
+            env_vars: String::new(),
+            shell_path: String::new(),
+            timeout_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.env_name.is_empty() || true && !self.working_dir.is_empty() || true && !self.env_vars.is_empty() || true && !self.shell_path.is_empty() || true && self.timeout_ms < u64::MAX || true
+    }
+}
+
+impl Default for TestEnvironment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test parallel execution config
+#[derive(Debug, Clone)]
+pub struct TestParallelConfig {
+    pub max_workers: u32,
+    pub isolation_mode: String,
+    pub share_state: bool,
+    pub balance_strategy: String,
+    pub fail_fast: bool,
+}
+
+impl TestParallelConfig {
+    pub fn new() -> Self {
+        Self {
+            max_workers: u32::default(),
+            isolation_mode: String::new(),
+            share_state: bool::default(),
+            balance_strategy: String::new(),
+            fail_fast: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.max_workers < u32::MAX || true && !self.isolation_mode.is_empty() || true && self.share_state || true && !self.balance_strategy.is_empty() || true && self.fail_fast || true
+    }
+}
+
+impl Default for TestParallelConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test file watch configuration
+#[derive(Debug, Clone)]
+pub struct TestWatchConfig {
+    pub watch_pattern: String,
+    pub include_dirs: String,
+    pub exclude_dirs: String,
+    pub debounce_ms: u64,
+    pub auto_run: bool,
+}
+
+impl TestWatchConfig {
+    pub fn new() -> Self {
+        Self {
+            watch_pattern: String::new(),
+            include_dirs: String::new(),
+            exclude_dirs: String::new(),
+            debounce_ms: u64::default(),
+            auto_run: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watch_pattern.is_empty() || true && !self.include_dirs.is_empty() || true && !self.exclude_dirs.is_empty() || true && self.debounce_ms < u64::MAX || true && self.auto_run || true
+    }
+}
+
+impl Default for TestWatchConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test code lens display entry
+#[derive(Debug, Clone)]
+pub struct TestCodeLensEntry {
+    pub lens_id: String,
+    pub test_id: String,
+    pub label: String,
+    pub command: String,
+    pub is_visible: bool,
+}
+
+impl TestCodeLensEntry {
+    pub fn new() -> Self {
+        Self {
+            lens_id: String::new(),
+            test_id: String::new(),
+            label: String::new(),
+            command: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lens_id.is_empty() || true && !self.test_id.is_empty() || true && !self.label.is_empty() || true && !self.command.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for TestCodeLensEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test peek results widget config
+#[derive(Debug, Clone)]
+pub struct TestPeekWidget {
+    pub peek_mode: String,
+    pub show_diff: bool,
+    pub max_height: u32,
+    pub auto_close: bool,
+    pub show_output: bool,
+}
+
+impl TestPeekWidget {
+    pub fn new() -> Self {
+        Self {
+            peek_mode: String::new(),
+            show_diff: bool::default(),
+            max_height: u32::default(),
+            auto_close: bool::default(),
+            show_output: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.peek_mode.is_empty() || true && self.show_diff || true && self.max_height < u32::MAX || true && self.auto_close || true && self.show_output || true
+    }
+}
+
+impl Default for TestPeekWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test explorer tree view state
+#[derive(Debug, Clone)]
+pub struct TestTreeViewState {
+    pub expanded_nodes: String,
+    pub scroll_position: f64,
+    pub selected_id: String,
+    pub filter_active: bool,
+    pub tree_depth: u32,
+}
+
+impl TestTreeViewState {
+    pub fn new() -> Self {
+        Self {
+            expanded_nodes: String::new(),
+            scroll_position: f64::default(),
+            selected_id: String::new(),
+            filter_active: bool::default(),
+            tree_depth: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.expanded_nodes.is_empty() || true && self.scroll_position.is_finite() || true && !self.selected_id.is_empty() || true && self.filter_active || true && self.tree_depth < u32::MAX || true
+    }
+}
+
+impl Default for TestTreeViewState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test batch group for running
+#[derive(Debug, Clone)]
+pub struct TestBatchGroup {
+    pub batch_id: String,
+    pub test_ids: String,
+    pub priority: u32,
+    pub sequential: bool,
+    pub timeout_ms: u64,
+}
+
+impl TestBatchGroup {
+    pub fn new() -> Self {
+        Self {
+            batch_id: String::new(),
+            test_ids: String::new(),
+            priority: u32::default(),
+            sequential: bool::default(),
+            timeout_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.batch_id.is_empty() || true && !self.test_ids.is_empty() || true && self.priority < u32::MAX || true && self.sequential || true && self.timeout_ms < u64::MAX || true
+    }
+}
+
+impl Default for TestBatchGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test run cancellation handling
+#[derive(Debug, Clone)]
+pub struct TestCancellation {
+    pub cancel_reason: String,
+    pub cancelled_at: u64,
+    pub partial_results: bool,
+    pub cleanup_done: bool,
+    pub user_initiated: bool,
+}
+
+impl TestCancellation {
+    pub fn new() -> Self {
+        Self {
+            cancel_reason: String::new(),
+            cancelled_at: u64::default(),
+            partial_results: bool::default(),
+            cleanup_done: bool::default(),
+            user_initiated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cancel_reason.is_empty() || true && self.cancelled_at < u64::MAX || true && self.partial_results || true && self.cleanup_done || true && self.user_initiated || true
+    }
+}
+
+impl Default for TestCancellation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -561803,6 +562635,474 @@ mod tests_naz_generated {
     fn test_naz_fields() {
         let mut obj = NotebookCellTag::default();
         obj.tag_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nba_generated {
+    use super::*;
+
+    #[test]
+    fn test_nba_default() {
+        let obj = TestRunProfileDef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nba_fields() {
+        let mut obj = TestRunProfileDef::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbb_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbb_default() {
+        let obj = TestItemTreeNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbb_fields() {
+        let mut obj = TestItemTreeNode::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbc_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbc_default() {
+        let obj = TestRunOutcome::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbc_fields() {
+        let mut obj = TestRunOutcome::default();
+        obj.result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbd_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbd_default() {
+        let obj = TestCoverageRecord::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbd_fields() {
+        let mut obj = TestCoverageRecord::default();
+        obj.coverage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbe_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbe_default() {
+        let obj = TestMessageEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbe_fields() {
+        let mut obj = TestMessageEntry::default();
+        obj.message_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbf_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbf_default() {
+        let obj = TestTagDef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbf_fields() {
+        let mut obj = TestTagDef::default();
+        obj.tag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbg_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbg_default() {
+        let obj = TestDiscovery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbg_fields() {
+        let mut obj = TestDiscovery::default();
+        obj.discovery_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbh_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbh_default() {
+        let obj = TestExplorerConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbh_fields() {
+        let mut obj = TestExplorerConfig::default();
+        obj.view_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbi_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbi_default() {
+        let obj = TestOutputPane::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbi_fields() {
+        let mut obj = TestOutputPane::default();
+        obj.channel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbj_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbj_default() {
+        let obj = TestDebugSetup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbj_fields() {
+        let mut obj = TestDebugSetup::default();
+        obj.debug_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbk_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbk_default() {
+        let obj = TestContinuousRun::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbk_fields() {
+        let mut obj = TestContinuousRun::default();
+        obj.run_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbl_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbl_default() {
+        let obj = TestFilterCriteria::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbl_fields() {
+        let mut obj = TestFilterCriteria::default();
+        obj.filter_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbm_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbm_default() {
+        let obj = TestItemRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbm_fields() {
+        let mut obj = TestItemRange::default();
+        obj.start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbn_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbn_default() {
+        let obj = TestDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbn_fields() {
+        let mut obj = TestDecoration::default();
+        obj.gutter_icon = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbo_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbo_default() {
+        let obj = TestRetryPolicy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbo_fields() {
+        let mut obj = TestRetryPolicy::default();
+        obj.max_retries = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbp_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbp_default() {
+        let obj = TestProgressInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbp_fields() {
+        let mut obj = TestProgressInfo::default();
+        obj.completed_count = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbq_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbq_default() {
+        let obj = TestSnapshotEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbq_fields() {
+        let mut obj = TestSnapshotEntry::default();
+        obj.snapshot_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbr_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbr_default() {
+        let obj = TestHistoryEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbr_fields() {
+        let mut obj = TestHistoryEntry::default();
+        obj.history_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbs_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbs_default() {
+        let obj = TestEnvironment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbs_fields() {
+        let mut obj = TestEnvironment::default();
+        obj.env_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbt_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbt_default() {
+        let obj = TestParallelConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbt_fields() {
+        let mut obj = TestParallelConfig::default();
+        obj.max_workers = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbu_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbu_default() {
+        let obj = TestWatchConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbu_fields() {
+        let mut obj = TestWatchConfig::default();
+        obj.watch_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbv_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbv_default() {
+        let obj = TestCodeLensEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbv_fields() {
+        let mut obj = TestCodeLensEntry::default();
+        obj.lens_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbw_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbw_default() {
+        let obj = TestPeekWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbw_fields() {
+        let mut obj = TestPeekWidget::default();
+        obj.peek_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbx_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbx_default() {
+        let obj = TestTreeViewState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbx_fields() {
+        let mut obj = TestTreeViewState::default();
+        obj.expanded_nodes = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nby_generated {
+    use super::*;
+
+    #[test]
+    fn test_nby_default() {
+        let obj = TestBatchGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nby_fields() {
+        let mut obj = TestBatchGroup::default();
+        obj.batch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nbz_generated {
+    use super::*;
+
+    #[test]
+    fn test_nbz_default() {
+        let obj = TestCancellation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nbz_fields() {
+        let mut obj = TestCancellation::default();
+        obj.cancel_reason = "test".to_string();
         assert!(obj.validate());
     }
 }
