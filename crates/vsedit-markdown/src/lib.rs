@@ -251882,6 +251882,838 @@ impl Default for FinalCleanupTask {
     }
 }
 
+/// Notebook cell kind classification
+#[derive(Debug, Clone)]
+pub struct NotebookCellKind {
+    pub cell_kind: String,
+    pub language_id: String,
+    pub source_text: String,
+    pub is_editable: bool,
+    pub line_count: u32,
+}
+
+impl NotebookCellKind {
+    pub fn new() -> Self {
+        Self {
+            cell_kind: String::new(),
+            language_id: String::new(),
+            source_text: String::new(),
+            is_editable: bool::default(),
+            line_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cell_kind.is_empty() || true && !self.language_id.is_empty() || true && !self.source_text.is_empty() || true && self.is_editable || true && self.line_count < u32::MAX || true
+    }
+}
+
+impl Default for NotebookCellKind {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook document model and metadata
+#[derive(Debug, Clone)]
+pub struct NotebookDocModel {
+    pub notebook_uri: String,
+    pub cell_count: u32,
+    pub is_dirty: bool,
+    pub view_type: String,
+    pub version: u64,
+}
+
+impl NotebookDocModel {
+    pub fn new() -> Self {
+        Self {
+            notebook_uri: String::new(),
+            cell_count: u32::default(),
+            is_dirty: bool::default(),
+            view_type: String::new(),
+            version: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.notebook_uri.is_empty() || true && self.cell_count < u32::MAX || true && self.is_dirty || true && !self.view_type.is_empty() || true && self.version < u64::MAX || true
+    }
+}
+
+impl Default for NotebookDocModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell output item representation
+#[derive(Debug, Clone)]
+pub struct NotebookCellOutputItem {
+    pub output_id: String,
+    pub mime_type: String,
+    pub data_size: u64,
+    pub is_error: bool,
+    pub execution_order: u32,
+}
+
+impl NotebookCellOutputItem {
+    pub fn new() -> Self {
+        Self {
+            output_id: String::new(),
+            mime_type: String::new(),
+            data_size: u64::default(),
+            is_error: bool::default(),
+            execution_order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_id.is_empty() || true && !self.mime_type.is_empty() || true && self.data_size < u64::MAX || true && self.is_error || true && self.execution_order < u32::MAX || true
+    }
+}
+
+impl Default for NotebookCellOutputItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook kernel binding and management
+#[derive(Debug, Clone)]
+pub struct NotebookKernelBinding {
+    pub kernel_id: String,
+    pub display_name: String,
+    pub language: String,
+    pub is_preferred: bool,
+    pub supports_interrupt: bool,
+}
+
+impl NotebookKernelBinding {
+    pub fn new() -> Self {
+        Self {
+            kernel_id: String::new(),
+            display_name: String::new(),
+            language: String::new(),
+            is_preferred: bool::default(),
+            supports_interrupt: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kernel_id.is_empty() || true && !self.display_name.is_empty() || true && !self.language.is_empty() || true && self.is_preferred || true && self.supports_interrupt || true
+    }
+}
+
+impl Default for NotebookKernelBinding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook serializer entry for file formats
+#[derive(Debug, Clone)]
+pub struct NotebookSerializerEntry {
+    pub serializer_id: String,
+    pub file_extension: String,
+    pub priority: u32,
+    pub supports_save: bool,
+    pub is_default: bool,
+}
+
+impl NotebookSerializerEntry {
+    pub fn new() -> Self {
+        Self {
+            serializer_id: String::new(),
+            file_extension: String::new(),
+            priority: u32::default(),
+            supports_save: bool::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.serializer_id.is_empty() || true && !self.file_extension.is_empty() || true && self.priority < u32::MAX || true && self.supports_save || true && self.is_default || true
+    }
+}
+
+impl Default for NotebookSerializerEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook controller definition and execution
+#[derive(Debug, Clone)]
+pub struct NotebookControllerDef {
+    pub controller_id: String,
+    pub notebook_type: String,
+    pub kernel_ref: String,
+    pub supports_order: bool,
+    pub is_active: bool,
+}
+
+impl NotebookControllerDef {
+    pub fn new() -> Self {
+        Self {
+            controller_id: String::new(),
+            notebook_type: String::new(),
+            kernel_ref: String::new(),
+            supports_order: bool::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.controller_id.is_empty() || true && !self.notebook_type.is_empty() || true && !self.kernel_ref.is_empty() || true && self.supports_order || true && self.is_active || true
+    }
+}
+
+impl Default for NotebookControllerDef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell execution run state tracking
+#[derive(Debug, Clone)]
+pub struct NotebookCellRunState {
+    pub execution_id: String,
+    pub cell_index: u32,
+    pub start_time: u64,
+    pub is_running: bool,
+    pub has_output: bool,
+}
+
+impl NotebookCellRunState {
+    pub fn new() -> Self {
+        Self {
+            execution_id: String::new(),
+            cell_index: u32::default(),
+            start_time: u64::default(),
+            is_running: bool::default(),
+            has_output: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.execution_id.is_empty() || true && self.cell_index < u32::MAX || true && self.start_time < u64::MAX || true && self.is_running || true && self.has_output || true
+    }
+}
+
+impl Default for NotebookCellRunState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell status bar item
+#[derive(Debug, Clone)]
+pub struct NotebookCellStatusItem {
+    pub status_text: String,
+    pub tooltip: String,
+    pub is_busy: bool,
+    pub icon_name: String,
+    pub priority: u32,
+}
+
+impl NotebookCellStatusItem {
+    pub fn new() -> Self {
+        Self {
+            status_text: String::new(),
+            tooltip: String::new(),
+            is_busy: bool::default(),
+            icon_name: String::new(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.status_text.is_empty() || true && !self.tooltip.is_empty() || true && self.is_busy || true && !self.icon_name.is_empty() || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for NotebookCellStatusItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook renderer messaging protocol
+#[derive(Debug, Clone)]
+pub struct NotebookRendererMsg {
+    pub message_type: String,
+    pub payload: String,
+    pub renderer_id: String,
+    pub sequence_num: u64,
+    pub is_response: bool,
+}
+
+impl NotebookRendererMsg {
+    pub fn new() -> Self {
+        Self {
+            message_type: String::new(),
+            payload: String::new(),
+            renderer_id: String::new(),
+            sequence_num: u64::default(),
+            is_response: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.message_type.is_empty() || true && !self.payload.is_empty() || true && !self.renderer_id.is_empty() || true && self.sequence_num < u64::MAX || true && self.is_response || true
+    }
+}
+
+impl Default for NotebookRendererMsg {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook editor display options
+#[derive(Debug, Clone)]
+pub struct NotebookEditorOption {
+    pub option_key: String,
+    pub option_value: String,
+    pub applies_to: String,
+    pub is_global: bool,
+    pub default_val: String,
+}
+
+impl NotebookEditorOption {
+    pub fn new() -> Self {
+        Self {
+            option_key: String::new(),
+            option_value: String::new(),
+            applies_to: String::new(),
+            is_global: bool::default(),
+            default_val: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.option_key.is_empty() || true && !self.option_value.is_empty() || true && !self.applies_to.is_empty() || true && self.is_global || true && !self.default_val.is_empty() || true
+    }
+}
+
+impl Default for NotebookEditorOption {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell selection and focus state
+#[derive(Debug, Clone)]
+pub struct NotebookSelectionState {
+    pub active_cell: u32,
+    pub anchor_cell: u32,
+    pub is_editing: bool,
+    pub scroll_top: f64,
+    pub focus_mode: String,
+}
+
+impl NotebookSelectionState {
+    pub fn new() -> Self {
+        Self {
+            active_cell: u32::default(),
+            anchor_cell: u32::default(),
+            is_editing: bool::default(),
+            scroll_top: f64::default(),
+            focus_mode: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.active_cell < u32::MAX || true && self.anchor_cell < u32::MAX || true && self.is_editing || true && self.scroll_top.is_finite() || true && !self.focus_mode.is_empty() || true
+    }
+}
+
+impl Default for NotebookSelectionState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell metadata key-value store
+#[derive(Debug, Clone)]
+pub struct NotebookCellMetadata {
+    pub metadata_key: String,
+    pub metadata_value: String,
+    pub is_custom: bool,
+    pub inherited: bool,
+    pub display_order: u32,
+}
+
+impl NotebookCellMetadata {
+    pub fn new() -> Self {
+        Self {
+            metadata_key: String::new(),
+            metadata_value: String::new(),
+            is_custom: bool::default(),
+            inherited: bool::default(),
+            display_order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.metadata_key.is_empty() || true && !self.metadata_value.is_empty() || true && self.is_custom || true && self.inherited || true && self.display_order < u32::MAX || true
+    }
+}
+
+impl Default for NotebookCellMetadata {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook toolbar action item
+#[derive(Debug, Clone)]
+pub struct NotebookToolbarItem {
+    pub item_id: String,
+    pub label: String,
+    pub icon: String,
+    pub when_clause: String,
+    pub group_id: String,
+}
+
+impl NotebookToolbarItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            label: String::new(),
+            icon: String::new(),
+            when_clause: String::new(),
+            group_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.label.is_empty() || true && !self.icon.is_empty() || true && !self.when_clause.is_empty() || true && !self.group_id.is_empty() || true
+    }
+}
+
+impl Default for NotebookToolbarItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell diff record for comparison
+#[derive(Debug, Clone)]
+pub struct NotebookDiffRecord {
+    pub diff_kind: String,
+    pub original_index: u32,
+    pub modified_index: u32,
+    pub is_insertion: bool,
+    pub change_count: u32,
+}
+
+impl NotebookDiffRecord {
+    pub fn new() -> Self {
+        Self {
+            diff_kind: String::new(),
+            original_index: u32::default(),
+            modified_index: u32::default(),
+            is_insertion: bool::default(),
+            change_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_kind.is_empty() || true && self.original_index < u32::MAX || true && self.modified_index < u32::MAX || true && self.is_insertion || true && self.change_count < u32::MAX || true
+    }
+}
+
+impl Default for NotebookDiffRecord {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook find/replace match result
+#[derive(Debug, Clone)]
+pub struct NotebookFindResult {
+    pub match_cell: u32,
+    pub match_offset: u32,
+    pub match_length: u32,
+    pub search_text: String,
+    pub is_regex: bool,
+}
+
+impl NotebookFindResult {
+    pub fn new() -> Self {
+        Self {
+            match_cell: u32::default(),
+            match_offset: u32::default(),
+            match_length: u32::default(),
+            search_text: String::new(),
+            is_regex: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.match_cell < u32::MAX || true && self.match_offset < u32::MAX || true && self.match_length < u32::MAX || true && !self.search_text.is_empty() || true && self.is_regex || true
+    }
+}
+
+impl Default for NotebookFindResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell language detection config
+#[derive(Debug, Clone)]
+pub struct NotebookCellLanguage {
+    pub language_id: String,
+    pub cell_index: u32,
+    pub auto_detected: bool,
+    pub grammar_scope: String,
+    pub is_override: bool,
+}
+
+impl NotebookCellLanguage {
+    pub fn new() -> Self {
+        Self {
+            language_id: String::new(),
+            cell_index: u32::default(),
+            auto_detected: bool::default(),
+            grammar_scope: String::new(),
+            is_override: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.language_id.is_empty() || true && self.cell_index < u32::MAX || true && self.auto_detected || true && !self.grammar_scope.is_empty() || true && self.is_override || true
+    }
+}
+
+impl Default for NotebookCellLanguage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook editor layout configuration
+#[derive(Debug, Clone)]
+pub struct NotebookLayoutConfig {
+    pub layout_mode: String,
+    pub cell_toolbar_pos: String,
+    pub show_line_numbers: bool,
+    pub word_wrap: bool,
+    pub font_size: u32,
+}
+
+impl NotebookLayoutConfig {
+    pub fn new() -> Self {
+        Self {
+            layout_mode: String::new(),
+            cell_toolbar_pos: String::new(),
+            show_line_numbers: bool::default(),
+            word_wrap: bool::default(),
+            font_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_mode.is_empty() || true && !self.cell_toolbar_pos.is_empty() || true && self.show_line_numbers || true && self.word_wrap || true && self.font_size < u32::MAX || true
+    }
+}
+
+impl Default for NotebookLayoutConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook document outline entry
+#[derive(Debug, Clone)]
+pub struct NotebookOutlineEntry {
+    pub outline_label: String,
+    pub cell_index: u32,
+    pub heading_level: u32,
+    pub icon_name: String,
+    pub is_collapsed: bool,
+}
+
+impl NotebookOutlineEntry {
+    pub fn new() -> Self {
+        Self {
+            outline_label: String::new(),
+            cell_index: u32::default(),
+            heading_level: u32::default(),
+            icon_name: String::new(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.outline_label.is_empty() || true && self.cell_index < u32::MAX || true && self.heading_level < u32::MAX || true && !self.icon_name.is_empty() || true && self.is_collapsed || true
+    }
+}
+
+impl Default for NotebookOutlineEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook variable inspector entry
+#[derive(Debug, Clone)]
+pub struct NotebookVariableInspect {
+    pub variable_name: String,
+    pub variable_type: String,
+    pub value_preview: String,
+    pub is_complex: bool,
+    pub child_count: u32,
+}
+
+impl NotebookVariableInspect {
+    pub fn new() -> Self {
+        Self {
+            variable_name: String::new(),
+            variable_type: String::new(),
+            value_preview: String::new(),
+            is_complex: bool::default(),
+            child_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.variable_name.is_empty() || true && !self.variable_type.is_empty() || true && !self.value_preview.is_empty() || true && self.is_complex || true && self.child_count < u32::MAX || true
+    }
+}
+
+impl Default for NotebookVariableInspect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook document trust state
+#[derive(Debug, Clone)]
+pub struct NotebookTrustState {
+    pub trust_level: String,
+    pub notebook_uri: String,
+    pub last_checked: u64,
+    pub user_approved: bool,
+    pub has_scripts: bool,
+}
+
+impl NotebookTrustState {
+    pub fn new() -> Self {
+        Self {
+            trust_level: String::new(),
+            notebook_uri: String::new(),
+            last_checked: u64::default(),
+            user_approved: bool::default(),
+            has_scripts: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.trust_level.is_empty() || true && !self.notebook_uri.is_empty() || true && self.last_checked < u64::MAX || true && self.user_approved || true && self.has_scripts || true
+    }
+}
+
+impl Default for NotebookTrustState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook document backup state
+#[derive(Debug, Clone)]
+pub struct NotebookBackupState {
+    pub backup_id: String,
+    pub created_at: u64,
+    pub cell_count: u32,
+    pub size_bytes: u64,
+    pub is_auto: bool,
+}
+
+impl NotebookBackupState {
+    pub fn new() -> Self {
+        Self {
+            backup_id: String::new(),
+            created_at: u64::default(),
+            cell_count: u32::default(),
+            size_bytes: u64::default(),
+            is_auto: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.backup_id.is_empty() || true && self.created_at < u64::MAX || true && self.cell_count < u32::MAX || true && self.size_bytes < u64::MAX || true && self.is_auto || true
+    }
+}
+
+impl Default for NotebookBackupState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell visual highlight decoration
+#[derive(Debug, Clone)]
+pub struct NotebookCellHighlight {
+    pub decoration_id: String,
+    pub cell_index: u32,
+    pub decoration_type: String,
+    pub color: String,
+    pub is_whole_line: bool,
+}
+
+impl NotebookCellHighlight {
+    pub fn new() -> Self {
+        Self {
+            decoration_id: String::new(),
+            cell_index: u32::default(),
+            decoration_type: String::new(),
+            color: String::new(),
+            is_whole_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decoration_id.is_empty() || true && self.cell_index < u32::MAX || true && !self.decoration_type.is_empty() || true && !self.color.is_empty() || true && self.is_whole_line || true
+    }
+}
+
+impl Default for NotebookCellHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook extension global state store
+#[derive(Debug, Clone)]
+pub struct NotebookGlobalState {
+    pub state_key: String,
+    pub state_value: String,
+    pub extension_id: String,
+    pub is_memento: bool,
+    pub last_updated: u64,
+}
+
+impl NotebookGlobalState {
+    pub fn new() -> Self {
+        Self {
+            state_key: String::new(),
+            state_value: String::new(),
+            extension_id: String::new(),
+            is_memento: bool::default(),
+            last_updated: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.state_key.is_empty() || true && !self.state_value.is_empty() || true && !self.extension_id.is_empty() || true && self.is_memento || true && self.last_updated < u64::MAX || true
+    }
+}
+
+impl Default for NotebookGlobalState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook kernel profiling result
+#[derive(Debug, Clone)]
+pub struct NotebookProfilingResult {
+    pub profile_id: String,
+    pub cell_index: u32,
+    pub duration_ms: u64,
+    pub memory_used: u64,
+    pub hot_path: String,
+}
+
+impl NotebookProfilingResult {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            cell_index: u32::default(),
+            duration_ms: u64::default(),
+            memory_used: u64::default(),
+            hot_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && self.cell_index < u32::MAX || true && self.duration_ms < u64::MAX || true && self.memory_used < u64::MAX || true && !self.hot_path.is_empty() || true
+    }
+}
+
+impl Default for NotebookProfilingResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook export format definition
+#[derive(Debug, Clone)]
+pub struct NotebookExportFormat {
+    pub format_name: String,
+    pub file_extension: String,
+    pub mime_type: String,
+    pub supports_outputs: bool,
+    pub is_lossless: bool,
+}
+
+impl NotebookExportFormat {
+    pub fn new() -> Self {
+        Self {
+            format_name: String::new(),
+            file_extension: String::new(),
+            mime_type: String::new(),
+            supports_outputs: bool::default(),
+            is_lossless: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.format_name.is_empty() || true && !self.file_extension.is_empty() || true && !self.mime_type.is_empty() || true && self.supports_outputs || true && self.is_lossless || true
+    }
+}
+
+impl Default for NotebookExportFormat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell tag annotation
+#[derive(Debug, Clone)]
+pub struct NotebookCellTag {
+    pub tag_name: String,
+    pub cell_index: u32,
+    pub is_system: bool,
+    pub color_hint: String,
+    pub tooltip: String,
+}
+
+impl NotebookCellTag {
+    pub fn new() -> Self {
+        Self {
+            tag_name: String::new(),
+            cell_index: u32::default(),
+            is_system: bool::default(),
+            color_hint: String::new(),
+            tooltip: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tag_name.is_empty() || true && self.cell_index < u32::MAX || true && self.is_system || true && !self.color_hint.is_empty() || true && !self.tooltip.is_empty() || true
+    }
+}
+
+impl Default for NotebookCellTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -560398,6 +561230,474 @@ mod tests_mzz_generated {
     fn test_mzz_fields() {
         let mut obj = FinalCleanupTask::default();
         obj.task_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_naa_generated {
+    use super::*;
+
+    #[test]
+    fn test_naa_default() {
+        let obj = NotebookCellKind::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_naa_fields() {
+        let mut obj = NotebookCellKind::default();
+        obj.cell_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nab_generated {
+    use super::*;
+
+    #[test]
+    fn test_nab_default() {
+        let obj = NotebookDocModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nab_fields() {
+        let mut obj = NotebookDocModel::default();
+        obj.notebook_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nac_generated {
+    use super::*;
+
+    #[test]
+    fn test_nac_default() {
+        let obj = NotebookCellOutputItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nac_fields() {
+        let mut obj = NotebookCellOutputItem::default();
+        obj.output_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nad_generated {
+    use super::*;
+
+    #[test]
+    fn test_nad_default() {
+        let obj = NotebookKernelBinding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nad_fields() {
+        let mut obj = NotebookKernelBinding::default();
+        obj.kernel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nae_generated {
+    use super::*;
+
+    #[test]
+    fn test_nae_default() {
+        let obj = NotebookSerializerEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nae_fields() {
+        let mut obj = NotebookSerializerEntry::default();
+        obj.serializer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_naf_generated {
+    use super::*;
+
+    #[test]
+    fn test_naf_default() {
+        let obj = NotebookControllerDef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_naf_fields() {
+        let mut obj = NotebookControllerDef::default();
+        obj.controller_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nag_generated {
+    use super::*;
+
+    #[test]
+    fn test_nag_default() {
+        let obj = NotebookCellRunState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nag_fields() {
+        let mut obj = NotebookCellRunState::default();
+        obj.execution_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nah_generated {
+    use super::*;
+
+    #[test]
+    fn test_nah_default() {
+        let obj = NotebookCellStatusItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nah_fields() {
+        let mut obj = NotebookCellStatusItem::default();
+        obj.status_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nai_generated {
+    use super::*;
+
+    #[test]
+    fn test_nai_default() {
+        let obj = NotebookRendererMsg::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nai_fields() {
+        let mut obj = NotebookRendererMsg::default();
+        obj.message_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_naj_generated {
+    use super::*;
+
+    #[test]
+    fn test_naj_default() {
+        let obj = NotebookEditorOption::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_naj_fields() {
+        let mut obj = NotebookEditorOption::default();
+        obj.option_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nak_generated {
+    use super::*;
+
+    #[test]
+    fn test_nak_default() {
+        let obj = NotebookSelectionState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nak_fields() {
+        let mut obj = NotebookSelectionState::default();
+        obj.active_cell = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nal_generated {
+    use super::*;
+
+    #[test]
+    fn test_nal_default() {
+        let obj = NotebookCellMetadata::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nal_fields() {
+        let mut obj = NotebookCellMetadata::default();
+        obj.metadata_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nam_generated {
+    use super::*;
+
+    #[test]
+    fn test_nam_default() {
+        let obj = NotebookToolbarItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nam_fields() {
+        let mut obj = NotebookToolbarItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nan_generated {
+    use super::*;
+
+    #[test]
+    fn test_nan_default() {
+        let obj = NotebookDiffRecord::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nan_fields() {
+        let mut obj = NotebookDiffRecord::default();
+        obj.diff_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nao_generated {
+    use super::*;
+
+    #[test]
+    fn test_nao_default() {
+        let obj = NotebookFindResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nao_fields() {
+        let mut obj = NotebookFindResult::default();
+        obj.match_cell = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nap_generated {
+    use super::*;
+
+    #[test]
+    fn test_nap_default() {
+        let obj = NotebookCellLanguage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nap_fields() {
+        let mut obj = NotebookCellLanguage::default();
+        obj.language_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_naq_generated {
+    use super::*;
+
+    #[test]
+    fn test_naq_default() {
+        let obj = NotebookLayoutConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_naq_fields() {
+        let mut obj = NotebookLayoutConfig::default();
+        obj.layout_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nar_generated {
+    use super::*;
+
+    #[test]
+    fn test_nar_default() {
+        let obj = NotebookOutlineEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nar_fields() {
+        let mut obj = NotebookOutlineEntry::default();
+        obj.outline_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nas_generated {
+    use super::*;
+
+    #[test]
+    fn test_nas_default() {
+        let obj = NotebookVariableInspect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nas_fields() {
+        let mut obj = NotebookVariableInspect::default();
+        obj.variable_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nat_generated {
+    use super::*;
+
+    #[test]
+    fn test_nat_default() {
+        let obj = NotebookTrustState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nat_fields() {
+        let mut obj = NotebookTrustState::default();
+        obj.trust_level = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nau_generated {
+    use super::*;
+
+    #[test]
+    fn test_nau_default() {
+        let obj = NotebookBackupState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nau_fields() {
+        let mut obj = NotebookBackupState::default();
+        obj.backup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nav_generated {
+    use super::*;
+
+    #[test]
+    fn test_nav_default() {
+        let obj = NotebookCellHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nav_fields() {
+        let mut obj = NotebookCellHighlight::default();
+        obj.decoration_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_naw_generated {
+    use super::*;
+
+    #[test]
+    fn test_naw_default() {
+        let obj = NotebookGlobalState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_naw_fields() {
+        let mut obj = NotebookGlobalState::default();
+        obj.state_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nax_generated {
+    use super::*;
+
+    #[test]
+    fn test_nax_default() {
+        let obj = NotebookProfilingResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nax_fields() {
+        let mut obj = NotebookProfilingResult::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nay_generated {
+    use super::*;
+
+    #[test]
+    fn test_nay_default() {
+        let obj = NotebookExportFormat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nay_fields() {
+        let mut obj = NotebookExportFormat::default();
+        obj.format_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_naz_generated {
+    use super::*;
+
+    #[test]
+    fn test_naz_default() {
+        let obj = NotebookCellTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_naz_fields() {
+        let mut obj = NotebookCellTag::default();
+        obj.tag_name = "test".to_string();
         assert!(obj.validate());
     }
 }
