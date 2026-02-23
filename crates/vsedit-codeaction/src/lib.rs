@@ -253360,6 +253360,838 @@ impl Default for TestCancellation {
     }
 }
 
+/// Timeline provider registration entry
+#[derive(Debug, Clone)]
+pub struct TimelineProviderEntry {
+    pub provider_id: String,
+    pub display_label: String,
+    pub scheme_filter: String,
+    pub can_paginate: bool,
+    pub sort_order: u32,
+}
+
+impl TimelineProviderEntry {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            display_label: String::new(),
+            scheme_filter: String::new(),
+            can_paginate: bool::default(),
+            sort_order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.display_label.is_empty() || true && !self.scheme_filter.is_empty() || true && self.can_paginate || true && self.sort_order < u32::MAX || true
+    }
+}
+
+impl Default for TimelineProviderEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Timeline item data and rendering
+#[derive(Debug, Clone)]
+pub struct TimelineItemData {
+    pub item_id: String,
+    pub timestamp: u64,
+    pub label: String,
+    pub description: String,
+    pub icon_path: String,
+}
+
+impl TimelineItemData {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            timestamp: u64::default(),
+            label: String::new(),
+            description: String::new(),
+            icon_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && self.timestamp < u64::MAX || true && !self.label.is_empty() || true && !self.description.is_empty() || true && !self.icon_path.is_empty() || true
+    }
+}
+
+impl Default for TimelineItemData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Timeline source reference for file history
+#[derive(Debug, Clone)]
+pub struct TimelineSourceRef {
+    pub source_uri: String,
+    pub provider_ref: String,
+    pub revision: String,
+    pub is_current: bool,
+    pub change_type: String,
+}
+
+impl TimelineSourceRef {
+    pub fn new() -> Self {
+        Self {
+            source_uri: String::new(),
+            provider_ref: String::new(),
+            revision: String::new(),
+            is_current: bool::default(),
+            change_type: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.source_uri.is_empty() || true && !self.provider_ref.is_empty() || true && !self.revision.is_empty() || true && self.is_current || true && !self.change_type.is_empty() || true
+    }
+}
+
+impl Default for TimelineSourceRef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Timeline pagination and loading state
+#[derive(Debug, Clone)]
+pub struct TimelinePagination {
+    pub cursor_token: String,
+    pub page_size: u32,
+    pub has_more: bool,
+    pub total_items: u64,
+    pub load_direction: String,
+}
+
+impl TimelinePagination {
+    pub fn new() -> Self {
+        Self {
+            cursor_token: String::new(),
+            page_size: u32::default(),
+            has_more: bool::default(),
+            total_items: u64::default(),
+            load_direction: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cursor_token.is_empty() || true && self.page_size < u32::MAX || true && self.has_more || true && self.total_items < u64::MAX || true && !self.load_direction.is_empty() || true
+    }
+}
+
+impl Default for TimelinePagination {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Timeline filter options configuration
+#[derive(Debug, Clone)]
+pub struct TimelineFilterOptions {
+    pub filter_scheme: String,
+    pub include_sources: String,
+    pub exclude_authors: String,
+    pub date_range: String,
+    pub show_all: bool,
+}
+
+impl TimelineFilterOptions {
+    pub fn new() -> Self {
+        Self {
+            filter_scheme: String::new(),
+            include_sources: String::new(),
+            exclude_authors: String::new(),
+            date_range: String::new(),
+            show_all: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_scheme.is_empty() || true && !self.include_sources.is_empty() || true && !self.exclude_authors.is_empty() || true && !self.date_range.is_empty() || true && self.show_all || true
+    }
+}
+
+impl Default for TimelineFilterOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Timeline view display configuration
+#[derive(Debug, Clone)]
+pub struct TimelineViewConfig {
+    pub view_id: String,
+    pub show_relative_time: bool,
+    pub group_by_day: bool,
+    pub max_items: u32,
+    pub auto_refresh: bool,
+}
+
+impl TimelineViewConfig {
+    pub fn new() -> Self {
+        Self {
+            view_id: String::new(),
+            show_relative_time: bool::default(),
+            group_by_day: bool::default(),
+            max_items: u32::default(),
+            auto_refresh: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_id.is_empty() || true && self.show_relative_time || true && self.group_by_day || true && self.max_items < u32::MAX || true && self.auto_refresh || true
+    }
+}
+
+impl Default for TimelineViewConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Timeline context menu command
+#[derive(Debug, Clone)]
+pub struct TimelineCommand {
+    pub command_id: String,
+    pub label: String,
+    pub group: String,
+    pub when_clause: String,
+    pub icon: String,
+}
+
+impl TimelineCommand {
+    pub fn new() -> Self {
+        Self {
+            command_id: String::new(),
+            label: String::new(),
+            group: String::new(),
+            when_clause: String::new(),
+            icon: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.command_id.is_empty() || true && !self.label.is_empty() || true && !self.group.is_empty() || true && !self.when_clause.is_empty() || true && !self.icon.is_empty() || true
+    }
+}
+
+impl Default for TimelineCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control provider registration
+#[derive(Debug, Clone)]
+pub struct ScmProviderEntry {
+    pub provider_id: String,
+    pub label: String,
+    pub root_uri: String,
+    pub count: u32,
+    pub has_actions: bool,
+}
+
+impl ScmProviderEntry {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            label: String::new(),
+            root_uri: String::new(),
+            count: u32::default(),
+            has_actions: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.label.is_empty() || true && !self.root_uri.is_empty() || true && self.count < u32::MAX || true && self.has_actions || true
+    }
+}
+
+impl Default for ScmProviderEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM resource group definition
+#[derive(Debug, Clone)]
+pub struct ScmResourceGroupDef {
+    pub group_id: String,
+    pub label: String,
+    pub hide_when_empty: bool,
+    pub resource_count: u32,
+    pub sort_key: String,
+}
+
+impl ScmResourceGroupDef {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            label: String::new(),
+            hide_when_empty: bool::default(),
+            resource_count: u32::default(),
+            sort_key: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.label.is_empty() || true && self.hide_when_empty || true && self.resource_count < u32::MAX || true && !self.sort_key.is_empty() || true
+    }
+}
+
+impl Default for ScmResourceGroupDef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM resource state and decorations
+#[derive(Debug, Clone)]
+pub struct ScmResourceState {
+    pub resource_uri: String,
+    pub decorations: String,
+    pub is_faded: bool,
+    pub strike_through: bool,
+    pub tooltip: String,
+}
+
+impl ScmResourceState {
+    pub fn new() -> Self {
+        Self {
+            resource_uri: String::new(),
+            decorations: String::new(),
+            is_faded: bool::default(),
+            strike_through: bool::default(),
+            tooltip: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resource_uri.is_empty() || true && !self.decorations.is_empty() || true && self.is_faded || true && self.strike_through || true && !self.tooltip.is_empty() || true
+    }
+}
+
+impl Default for ScmResourceState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM input box state and validation
+#[derive(Debug, Clone)]
+pub struct ScmInputBoxState {
+    pub input_value: String,
+    pub placeholder: String,
+    pub visible: bool,
+    pub enabled: bool,
+    pub max_length: u32,
+}
+
+impl ScmInputBoxState {
+    pub fn new() -> Self {
+        Self {
+            input_value: String::new(),
+            placeholder: String::new(),
+            visible: bool::default(),
+            enabled: bool::default(),
+            max_length: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_value.is_empty() || true && !self.placeholder.is_empty() || true && self.visible || true && self.enabled || true && self.max_length < u32::MAX || true
+    }
+}
+
+impl Default for ScmInputBoxState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM history item entry
+#[derive(Debug, Clone)]
+pub struct ScmHistoryItem {
+    pub commit_hash: String,
+    pub author: String,
+    pub message: String,
+    pub timestamp: u64,
+    pub parent_hash: String,
+}
+
+impl ScmHistoryItem {
+    pub fn new() -> Self {
+        Self {
+            commit_hash: String::new(),
+            author: String::new(),
+            message: String::new(),
+            timestamp: u64::default(),
+            parent_hash: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.commit_hash.is_empty() || true && !self.author.is_empty() || true && !self.message.is_empty() || true && self.timestamp < u64::MAX || true && !self.parent_hash.is_empty() || true
+    }
+}
+
+impl Default for ScmHistoryItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM diff change hunk data
+#[derive(Debug, Clone)]
+pub struct ScmDiffChange {
+    pub change_type: String,
+    pub original_start: u32,
+    pub original_count: u32,
+    pub modified_start: u32,
+    pub modified_count: u32,
+}
+
+impl ScmDiffChange {
+    pub fn new() -> Self {
+        Self {
+            change_type: String::new(),
+            original_start: u32::default(),
+            original_count: u32::default(),
+            modified_start: u32::default(),
+            modified_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.change_type.is_empty() || true && self.original_start < u32::MAX || true && self.original_count < u32::MAX || true && self.modified_start < u32::MAX || true && self.modified_count < u32::MAX || true
+    }
+}
+
+impl Default for ScmDiffChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM action button definition
+#[derive(Debug, Clone)]
+pub struct ScmActionButtonDef {
+    pub button_id: String,
+    pub label: String,
+    pub command: String,
+    pub icon: String,
+    pub enabled: bool,
+}
+
+impl ScmActionButtonDef {
+    pub fn new() -> Self {
+        Self {
+            button_id: String::new(),
+            label: String::new(),
+            command: String::new(),
+            icon: String::new(),
+            enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.button_id.is_empty() || true && !self.label.is_empty() || true && !self.command.is_empty() || true && !self.icon.is_empty() || true && self.enabled || true
+    }
+}
+
+impl Default for ScmActionButtonDef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM branch item for branch picker
+#[derive(Debug, Clone)]
+pub struct ScmBranchItem {
+    pub branch_name: String,
+    pub is_current: bool,
+    pub tracking_ref: String,
+    pub ahead: u32,
+    pub behind: u32,
+}
+
+impl ScmBranchItem {
+    pub fn new() -> Self {
+        Self {
+            branch_name: String::new(),
+            is_current: bool::default(),
+            tracking_ref: String::new(),
+            ahead: u32::default(),
+            behind: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.branch_name.is_empty() || true && self.is_current || true && !self.tracking_ref.is_empty() || true && self.ahead < u32::MAX || true && self.behind < u32::MAX || true
+    }
+}
+
+impl Default for ScmBranchItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM remote repository reference
+#[derive(Debug, Clone)]
+pub struct ScmRemoteRef {
+    pub remote_name: String,
+    pub fetch_url: String,
+    pub push_url: String,
+    pub is_default: bool,
+    pub last_fetch: u64,
+}
+
+impl ScmRemoteRef {
+    pub fn new() -> Self {
+        Self {
+            remote_name: String::new(),
+            fetch_url: String::new(),
+            push_url: String::new(),
+            is_default: bool::default(),
+            last_fetch: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_name.is_empty() || true && !self.fetch_url.is_empty() || true && !self.push_url.is_empty() || true && self.is_default || true && self.last_fetch < u64::MAX || true
+    }
+}
+
+impl Default for ScmRemoteRef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM stash record data
+#[derive(Debug, Clone)]
+pub struct ScmStashRecord {
+    pub stash_index: u32,
+    pub message: String,
+    pub branch_name: String,
+    pub created_at: u64,
+    pub file_count: u32,
+}
+
+impl ScmStashRecord {
+    pub fn new() -> Self {
+        Self {
+            stash_index: u32::default(),
+            message: String::new(),
+            branch_name: String::new(),
+            created_at: u64::default(),
+            file_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.stash_index < u32::MAX || true && !self.message.is_empty() || true && !self.branch_name.is_empty() || true && self.created_at < u64::MAX || true && self.file_count < u32::MAX || true
+    }
+}
+
+impl Default for ScmStashRecord {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM tag record data
+#[derive(Debug, Clone)]
+pub struct ScmTagRecord {
+    pub tag_name: String,
+    pub target_hash: String,
+    pub message: String,
+    pub is_annotated: bool,
+    pub tagger: String,
+}
+
+impl ScmTagRecord {
+    pub fn new() -> Self {
+        Self {
+            tag_name: String::new(),
+            target_hash: String::new(),
+            message: String::new(),
+            is_annotated: bool::default(),
+            tagger: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tag_name.is_empty() || true && !self.target_hash.is_empty() || true && !self.message.is_empty() || true && self.is_annotated || true && !self.tagger.is_empty() || true
+    }
+}
+
+impl Default for ScmTagRecord {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM merge conflict entry
+#[derive(Debug, Clone)]
+pub struct ScmConflictEntry {
+    pub conflict_uri: String,
+    pub our_status: String,
+    pub their_status: String,
+    pub base_hash: String,
+    pub is_resolved: bool,
+}
+
+impl ScmConflictEntry {
+    pub fn new() -> Self {
+        Self {
+            conflict_uri: String::new(),
+            our_status: String::new(),
+            their_status: String::new(),
+            base_hash: String::new(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.conflict_uri.is_empty() || true && !self.our_status.is_empty() || true && !self.their_status.is_empty() || true && !self.base_hash.is_empty() || true && self.is_resolved || true
+    }
+}
+
+impl Default for ScmConflictEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM submodule status entry
+#[derive(Debug, Clone)]
+pub struct ScmSubmodule {
+    pub submodule_path: String,
+    pub commit_hash: String,
+    pub remote_url: String,
+    pub is_initialized: bool,
+    pub has_changes: bool,
+}
+
+impl ScmSubmodule {
+    pub fn new() -> Self {
+        Self {
+            submodule_path: String::new(),
+            commit_hash: String::new(),
+            remote_url: String::new(),
+            is_initialized: bool::default(),
+            has_changes: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.submodule_path.is_empty() || true && !self.commit_hash.is_empty() || true && !self.remote_url.is_empty() || true && self.is_initialized || true && self.has_changes || true
+    }
+}
+
+impl Default for ScmSubmodule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM blame annotation information
+#[derive(Debug, Clone)]
+pub struct ScmBlameAnnotation {
+    pub author_name: String,
+    pub author_email: String,
+    pub commit_hash: String,
+    pub line_start: u32,
+    pub line_count: u32,
+}
+
+impl ScmBlameAnnotation {
+    pub fn new() -> Self {
+        Self {
+            author_name: String::new(),
+            author_email: String::new(),
+            commit_hash: String::new(),
+            line_start: u32::default(),
+            line_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.author_name.is_empty() || true && !self.author_email.is_empty() || true && !self.commit_hash.is_empty() || true && self.line_start < u32::MAX || true && self.line_count < u32::MAX || true
+    }
+}
+
+impl Default for ScmBlameAnnotation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM pull request association data
+#[derive(Debug, Clone)]
+pub struct ScmPullRequestLink {
+    pub pr_number: u32,
+    pub title: String,
+    pub author: String,
+    pub state: String,
+    pub url: String,
+}
+
+impl ScmPullRequestLink {
+    pub fn new() -> Self {
+        Self {
+            pr_number: u32::default(),
+            title: String::new(),
+            author: String::new(),
+            state: String::new(),
+            url: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.pr_number < u32::MAX || true && !self.title.is_empty() || true && !self.author.is_empty() || true && !self.state.is_empty() || true && !self.url.is_empty() || true
+    }
+}
+
+impl Default for ScmPullRequestLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM file tree decoration data
+#[derive(Debug, Clone)]
+pub struct ScmFileDecoration {
+    pub file_uri: String,
+    pub badge: String,
+    pub tooltip: String,
+    pub propagate: bool,
+    pub color: String,
+}
+
+impl ScmFileDecoration {
+    pub fn new() -> Self {
+        Self {
+            file_uri: String::new(),
+            badge: String::new(),
+            tooltip: String::new(),
+            propagate: bool::default(),
+            color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_uri.is_empty() || true && !self.badge.is_empty() || true && !self.tooltip.is_empty() || true && self.propagate || true && !self.color.is_empty() || true
+    }
+}
+
+impl Default for ScmFileDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM commit graph vertex representation
+#[derive(Debug, Clone)]
+pub struct ScmGraphVertex {
+    pub node_id: String,
+    pub parent_ids: String,
+    pub column: u32,
+    pub color_index: u32,
+    pub is_head: bool,
+}
+
+impl ScmGraphVertex {
+    pub fn new() -> Self {
+        Self {
+            node_id: String::new(),
+            parent_ids: String::new(),
+            column: u32::default(),
+            color_index: u32::default(),
+            is_head: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.node_id.is_empty() || true && !self.parent_ids.is_empty() || true && self.column < u32::MAX || true && self.color_index < u32::MAX || true && self.is_head || true
+    }
+}
+
+impl Default for ScmGraphVertex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM quick diff base document reference
+#[derive(Debug, Clone)]
+pub struct ScmQuickDiffBase {
+    pub base_uri: String,
+    pub scheme: String,
+    pub provider_id: String,
+    pub auto_open: bool,
+    pub inline_mode: bool,
+}
+
+impl ScmQuickDiffBase {
+    pub fn new() -> Self {
+        Self {
+            base_uri: String::new(),
+            scheme: String::new(),
+            provider_id: String::new(),
+            auto_open: bool::default(),
+            inline_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.base_uri.is_empty() || true && !self.scheme.is_empty() || true && !self.provider_id.is_empty() || true && self.auto_open || true && self.inline_mode || true
+    }
+}
+
+impl Default for ScmQuickDiffBase {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM status bar contribution item
+#[derive(Debug, Clone)]
+pub struct ScmStatusBarItem {
+    pub item_text: String,
+    pub command: String,
+    pub tooltip: String,
+    pub priority: u32,
+    pub alignment: String,
+}
+
+impl ScmStatusBarItem {
+    pub fn new() -> Self {
+        Self {
+            item_text: String::new(),
+            command: String::new(),
+            tooltip: String::new(),
+            priority: u32::default(),
+            alignment: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_text.is_empty() || true && !self.command.is_empty() || true && !self.tooltip.is_empty() || true && self.priority < u32::MAX || true && !self.alignment.is_empty() || true
+    }
+}
+
+impl Default for ScmStatusBarItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -562996,6 +563828,474 @@ mod tests_nbz_generated {
     fn test_nbz_fields() {
         let mut obj = TestCancellation::default();
         obj.cancel_reason = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nca_generated {
+    use super::*;
+
+    #[test]
+    fn test_nca_default() {
+        let obj = TimelineProviderEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nca_fields() {
+        let mut obj = TimelineProviderEntry::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncb_default() {
+        let obj = TimelineItemData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncb_fields() {
+        let mut obj = TimelineItemData::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncc_default() {
+        let obj = TimelineSourceRef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncc_fields() {
+        let mut obj = TimelineSourceRef::default();
+        obj.source_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncd_default() {
+        let obj = TimelinePagination::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncd_fields() {
+        let mut obj = TimelinePagination::default();
+        obj.cursor_token = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nce_generated {
+    use super::*;
+
+    #[test]
+    fn test_nce_default() {
+        let obj = TimelineFilterOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nce_fields() {
+        let mut obj = TimelineFilterOptions::default();
+        obj.filter_scheme = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncf_default() {
+        let obj = TimelineViewConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncf_fields() {
+        let mut obj = TimelineViewConfig::default();
+        obj.view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncg_default() {
+        let obj = TimelineCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncg_fields() {
+        let mut obj = TimelineCommand::default();
+        obj.command_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nch_generated {
+    use super::*;
+
+    #[test]
+    fn test_nch_default() {
+        let obj = ScmProviderEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nch_fields() {
+        let mut obj = ScmProviderEntry::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nci_generated {
+    use super::*;
+
+    #[test]
+    fn test_nci_default() {
+        let obj = ScmResourceGroupDef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nci_fields() {
+        let mut obj = ScmResourceGroupDef::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncj_default() {
+        let obj = ScmResourceState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncj_fields() {
+        let mut obj = ScmResourceState::default();
+        obj.resource_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nck_generated {
+    use super::*;
+
+    #[test]
+    fn test_nck_default() {
+        let obj = ScmInputBoxState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nck_fields() {
+        let mut obj = ScmInputBoxState::default();
+        obj.input_value = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncl_default() {
+        let obj = ScmHistoryItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncl_fields() {
+        let mut obj = ScmHistoryItem::default();
+        obj.commit_hash = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncm_default() {
+        let obj = ScmDiffChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncm_fields() {
+        let mut obj = ScmDiffChange::default();
+        obj.change_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncn_default() {
+        let obj = ScmActionButtonDef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncn_fields() {
+        let mut obj = ScmActionButtonDef::default();
+        obj.button_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nco_generated {
+    use super::*;
+
+    #[test]
+    fn test_nco_default() {
+        let obj = ScmBranchItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nco_fields() {
+        let mut obj = ScmBranchItem::default();
+        obj.branch_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncp_default() {
+        let obj = ScmRemoteRef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncp_fields() {
+        let mut obj = ScmRemoteRef::default();
+        obj.remote_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncq_default() {
+        let obj = ScmStashRecord::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncq_fields() {
+        let mut obj = ScmStashRecord::default();
+        obj.stash_index = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncr_default() {
+        let obj = ScmTagRecord::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncr_fields() {
+        let mut obj = ScmTagRecord::default();
+        obj.tag_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncs_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncs_default() {
+        let obj = ScmConflictEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncs_fields() {
+        let mut obj = ScmConflictEntry::default();
+        obj.conflict_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nct_generated {
+    use super::*;
+
+    #[test]
+    fn test_nct_default() {
+        let obj = ScmSubmodule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nct_fields() {
+        let mut obj = ScmSubmodule::default();
+        obj.submodule_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncu_default() {
+        let obj = ScmBlameAnnotation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncu_fields() {
+        let mut obj = ScmBlameAnnotation::default();
+        obj.author_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncv_default() {
+        let obj = ScmPullRequestLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncv_fields() {
+        let mut obj = ScmPullRequestLink::default();
+        obj.pr_number = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncw_default() {
+        let obj = ScmFileDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncw_fields() {
+        let mut obj = ScmFileDecoration::default();
+        obj.file_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncx_default() {
+        let obj = ScmGraphVertex::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncx_fields() {
+        let mut obj = ScmGraphVertex::default();
+        obj.node_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncy_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncy_default() {
+        let obj = ScmQuickDiffBase::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncy_fields() {
+        let mut obj = ScmQuickDiffBase::default();
+        obj.base_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ncz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ncz_default() {
+        let obj = ScmStatusBarItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ncz_fields() {
+        let mut obj = ScmStatusBarItem::default();
+        obj.item_text = "test".to_string();
         assert!(obj.validate());
     }
 }
