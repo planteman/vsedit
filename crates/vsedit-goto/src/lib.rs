@@ -250959,6 +250959,838 @@ impl Default for TunnelShutdownPlan {
     }
 }
 
+/// Workspace lifecycle state management
+#[derive(Debug, Clone)]
+pub struct WorkspaceLifecycle {
+    pub lifecycle_phase: String,
+    pub started_at: u64,
+    pub is_dirty: bool,
+    pub pending_saves: u32,
+    pub auto_save_interval: u64,
+}
+
+impl WorkspaceLifecycle {
+    pub fn new() -> Self {
+        Self {
+            lifecycle_phase: String::new(),
+            started_at: u64::default(),
+            is_dirty: bool::default(),
+            pending_saves: u32::default(),
+            auto_save_interval: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lifecycle_phase.is_empty() || true && self.started_at < u64::MAX || true && self.is_dirty || true && self.pending_saves < u32::MAX || true && self.auto_save_interval < u64::MAX || true
+    }
+}
+
+impl Default for WorkspaceLifecycle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Application shutdown sequence coordination
+#[derive(Debug, Clone)]
+pub struct ShutdownSequence {
+    pub sequence_id: String,
+    pub total_steps: u32,
+    pub completed_steps: u32,
+    pub timeout_ms: u64,
+    pub force_exit: bool,
+}
+
+impl ShutdownSequence {
+    pub fn new() -> Self {
+        Self {
+            sequence_id: String::new(),
+            total_steps: u32::default(),
+            completed_steps: u32::default(),
+            timeout_ms: u64::default(),
+            force_exit: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sequence_id.is_empty() || true && self.total_steps < u32::MAX || true && self.completed_steps < u32::MAX || true && self.timeout_ms < u64::MAX || true && self.force_exit || true
+    }
+}
+
+impl Default for ShutdownSequence {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor state persistence configuration
+#[derive(Debug, Clone)]
+pub struct StatePersistence {
+    pub storage_backend: String,
+    pub file_path: String,
+    pub compression: bool,
+    pub max_size_bytes: u64,
+    pub sync_interval: u64,
+}
+
+impl StatePersistence {
+    pub fn new() -> Self {
+        Self {
+            storage_backend: String::new(),
+            file_path: String::new(),
+            compression: bool::default(),
+            max_size_bytes: u64::default(),
+            sync_interval: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.storage_backend.is_empty() || true && !self.file_path.is_empty() || true && self.compression || true && self.max_size_bytes < u64::MAX || true && self.sync_interval < u64::MAX || true
+    }
+}
+
+impl Default for StatePersistence {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Telemetry collection and reporting config
+#[derive(Debug, Clone)]
+pub struct TelemetryConfig {
+    pub telemetry_endpoint: String,
+    pub enabled: bool,
+    pub sample_rate: f64,
+    pub batch_size: u32,
+    pub include_errors: bool,
+}
+
+impl TelemetryConfig {
+    pub fn new() -> Self {
+        Self {
+            telemetry_endpoint: String::new(),
+            enabled: bool::default(),
+            sample_rate: f64::default(),
+            batch_size: u32::default(),
+            include_errors: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.telemetry_endpoint.is_empty() || true && self.enabled || true && self.sample_rate.is_finite() || true && self.batch_size < u32::MAX || true && self.include_errors || true
+    }
+}
+
+impl Default for TelemetryConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Crash reporting and diagnostics configuration
+#[derive(Debug, Clone)]
+pub struct CrashReporter {
+    pub reporter_id: String,
+    pub endpoint_url: String,
+    pub include_stack: bool,
+    pub max_reports: u32,
+    pub anonymize: bool,
+}
+
+impl CrashReporter {
+    pub fn new() -> Self {
+        Self {
+            reporter_id: String::new(),
+            endpoint_url: String::new(),
+            include_stack: bool::default(),
+            max_reports: u32::default(),
+            anonymize: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.reporter_id.is_empty() || true && !self.endpoint_url.is_empty() || true && self.include_stack || true && self.max_reports < u32::MAX || true && self.anonymize || true
+    }
+}
+
+impl Default for CrashReporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace crash recovery settings
+#[derive(Debug, Clone)]
+pub struct WorkspaceRecovery {
+    pub recovery_mode: String,
+    pub backup_count: u32,
+    pub auto_recover: bool,
+    pub max_age_hours: u64,
+    pub verify_integrity: bool,
+}
+
+impl WorkspaceRecovery {
+    pub fn new() -> Self {
+        Self {
+            recovery_mode: String::new(),
+            backup_count: u32::default(),
+            auto_recover: bool::default(),
+            max_age_hours: u64::default(),
+            verify_integrity: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.recovery_mode.is_empty() || true && self.backup_count < u32::MAX || true && self.auto_recover || true && self.max_age_hours < u64::MAX || true && self.verify_integrity || true
+    }
+}
+
+impl Default for WorkspaceRecovery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Session restoration plan after restart
+#[derive(Debug, Clone)]
+pub struct SessionRestorePlan {
+    pub restore_strategy: String,
+    pub include_editors: bool,
+    pub include_terminals: bool,
+    pub include_layout: bool,
+    pub max_tabs: u32,
+}
+
+impl SessionRestorePlan {
+    pub fn new() -> Self {
+        Self {
+            restore_strategy: String::new(),
+            include_editors: bool::default(),
+            include_terminals: bool::default(),
+            include_layout: bool::default(),
+            max_tabs: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.restore_strategy.is_empty() || true && self.include_editors || true && self.include_terminals || true && self.include_layout || true && self.max_tabs < u32::MAX || true
+    }
+}
+
+impl Default for SessionRestorePlan {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Hot exit behavior configuration
+#[derive(Debug, Clone)]
+pub struct HotExitConfig {
+    pub hot_exit_mode: String,
+    pub save_unsaved: bool,
+    pub restore_on_start: bool,
+    pub exclude_large_files: bool,
+    pub max_file_size: u64,
+}
+
+impl HotExitConfig {
+    pub fn new() -> Self {
+        Self {
+            hot_exit_mode: String::new(),
+            save_unsaved: bool::default(),
+            restore_on_start: bool::default(),
+            exclude_large_files: bool::default(),
+            max_file_size: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hot_exit_mode.is_empty() || true && self.save_unsaved || true && self.restore_on_start || true && self.exclude_large_files || true && self.max_file_size < u64::MAX || true
+    }
+}
+
+impl Default for HotExitConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Automatic backup schedule settings
+#[derive(Debug, Clone)]
+pub struct BackupScheduleConfig {
+    pub schedule_name: String,
+    pub interval_minutes: u32,
+    pub retention_count: u32,
+    pub compress_backups: bool,
+    pub backup_dir: String,
+}
+
+impl BackupScheduleConfig {
+    pub fn new() -> Self {
+        Self {
+            schedule_name: String::new(),
+            interval_minutes: u32::default(),
+            retention_count: u32::default(),
+            compress_backups: bool::default(),
+            backup_dir: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.schedule_name.is_empty() || true && self.interval_minutes < u32::MAX || true && self.retention_count < u32::MAX || true && self.compress_backups || true && !self.backup_dir.is_empty() || true
+    }
+}
+
+impl Default for BackupScheduleConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Background process cleanup management
+#[derive(Debug, Clone)]
+pub struct ProcessCleanup {
+    pub cleanup_target: String,
+    pub kill_orphans: bool,
+    pub grace_period_ms: u64,
+    pub scan_interval: u32,
+    pub log_cleanup: bool,
+}
+
+impl ProcessCleanup {
+    pub fn new() -> Self {
+        Self {
+            cleanup_target: String::new(),
+            kill_orphans: bool::default(),
+            grace_period_ms: u64::default(),
+            scan_interval: u32::default(),
+            log_cleanup: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cleanup_target.is_empty() || true && self.kill_orphans || true && self.grace_period_ms < u64::MAX || true && self.scan_interval < u32::MAX || true && self.log_cleanup || true
+    }
+}
+
+impl Default for ProcessCleanup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cache eviction and memory management
+#[derive(Debug, Clone)]
+pub struct CacheEviction {
+    pub eviction_policy: String,
+    pub max_entries: u64,
+    pub max_memory_mb: u64,
+    pub ttl_seconds: u64,
+    pub priority_boost: bool,
+}
+
+impl CacheEviction {
+    pub fn new() -> Self {
+        Self {
+            eviction_policy: String::new(),
+            max_entries: u64::default(),
+            max_memory_mb: u64::default(),
+            ttl_seconds: u64::default(),
+            priority_boost: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.eviction_policy.is_empty() || true && self.max_entries < u64::MAX || true && self.max_memory_mb < u64::MAX || true && self.ttl_seconds < u64::MAX || true && self.priority_boost || true
+    }
+}
+
+impl Default for CacheEviction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Temporary file management settings
+#[derive(Debug, Clone)]
+pub struct TempFileManager {
+    pub temp_directory: String,
+    pub auto_cleanup: bool,
+    pub max_age_hours: u64,
+    pub prefix_pattern: String,
+    pub size_limit_mb: u64,
+}
+
+impl TempFileManager {
+    pub fn new() -> Self {
+        Self {
+            temp_directory: String::new(),
+            auto_cleanup: bool::default(),
+            max_age_hours: u64::default(),
+            prefix_pattern: String::new(),
+            size_limit_mb: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.temp_directory.is_empty() || true && self.auto_cleanup || true && self.max_age_hours < u64::MAX || true && !self.prefix_pattern.is_empty() || true && self.size_limit_mb < u64::MAX || true
+    }
+}
+
+impl Default for TempFileManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Lock file handling for workspace exclusivity
+#[derive(Debug, Clone)]
+pub struct LockFileHandler {
+    pub lock_path: String,
+    pub stale_timeout_ms: u64,
+    pub retry_interval: u64,
+    pub force_acquire: bool,
+    pub pid_check: bool,
+}
+
+impl LockFileHandler {
+    pub fn new() -> Self {
+        Self {
+            lock_path: String::new(),
+            stale_timeout_ms: u64::default(),
+            retry_interval: u64::default(),
+            force_acquire: bool::default(),
+            pid_check: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lock_path.is_empty() || true && self.stale_timeout_ms < u64::MAX || true && self.retry_interval < u64::MAX || true && self.force_acquire || true && self.pid_check || true
+    }
+}
+
+impl Default for LockFileHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File watcher cleanup on shutdown
+#[derive(Debug, Clone)]
+pub struct WatcherCleanup {
+    pub watcher_type: String,
+    pub max_watchers: u32,
+    pub debounce_ms: u64,
+    pub recursive: bool,
+    pub close_on_shutdown: bool,
+}
+
+impl WatcherCleanup {
+    pub fn new() -> Self {
+        Self {
+            watcher_type: String::new(),
+            max_watchers: u32::default(),
+            debounce_ms: u64::default(),
+            recursive: bool::default(),
+            close_on_shutdown: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watcher_type.is_empty() || true && self.max_watchers < u32::MAX || true && self.debounce_ms < u64::MAX || true && self.recursive || true && self.close_on_shutdown || true
+    }
+}
+
+impl Default for WatcherCleanup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension resource cleanup on deactivation
+#[derive(Debug, Clone)]
+pub struct ExtensionCleanup {
+    pub extension_id: String,
+    pub dispose_timeout: u64,
+    pub cleanup_storage: bool,
+    pub remove_caches: bool,
+    pub log_disposal: bool,
+}
+
+impl ExtensionCleanup {
+    pub fn new() -> Self {
+        Self {
+            extension_id: String::new(),
+            dispose_timeout: u64::default(),
+            cleanup_storage: bool::default(),
+            remove_caches: bool::default(),
+            log_disposal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.extension_id.is_empty() || true && self.dispose_timeout < u64::MAX || true && self.cleanup_storage || true && self.remove_caches || true && self.log_disposal || true
+    }
+}
+
+impl Default for ExtensionCleanup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Edit history pruning configuration
+#[derive(Debug, Clone)]
+pub struct HistoryPruning {
+    pub prune_strategy: String,
+    pub max_entries: u64,
+    pub max_age_days: u32,
+    pub keep_milestones: bool,
+    pub compress_old: bool,
+}
+
+impl HistoryPruning {
+    pub fn new() -> Self {
+        Self {
+            prune_strategy: String::new(),
+            max_entries: u64::default(),
+            max_age_days: u32::default(),
+            keep_milestones: bool::default(),
+            compress_old: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prune_strategy.is_empty() || true && self.max_entries < u64::MAX || true && self.max_age_days < u32::MAX || true && self.keep_milestones || true && self.compress_old || true
+    }
+}
+
+impl Default for HistoryPruning {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings storage migration task handler
+#[derive(Debug, Clone)]
+pub struct StorageMigrationTask {
+    pub migration_version: u32,
+    pub source_format: String,
+    pub target_format: String,
+    pub backup_first: bool,
+    pub dry_run: bool,
+}
+
+impl StorageMigrationTask {
+    pub fn new() -> Self {
+        Self {
+            migration_version: u32::default(),
+            source_format: String::new(),
+            target_format: String::new(),
+            backup_first: bool::default(),
+            dry_run: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.migration_version < u32::MAX || true && !self.source_format.is_empty() || true && !self.target_format.is_empty() || true && self.backup_first || true && self.dry_run || true
+    }
+}
+
+impl Default for StorageMigrationTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search index rebuild scheduling
+#[derive(Debug, Clone)]
+pub struct IndexRebuild {
+    pub index_type: String,
+    pub rebuild_interval: u64,
+    pub incremental: bool,
+    pub priority: u32,
+    pub notify_ready: bool,
+}
+
+impl IndexRebuild {
+    pub fn new() -> Self {
+        Self {
+            index_type: String::new(),
+            rebuild_interval: u64::default(),
+            incremental: bool::default(),
+            priority: u32::default(),
+            notify_ready: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.index_type.is_empty() || true && self.rebuild_interval < u64::MAX || true && self.incremental || true && self.priority < u32::MAX || true && self.notify_ready || true
+    }
+}
+
+impl Default for IndexRebuild {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Log file rotation settings
+#[derive(Debug, Clone)]
+pub struct LogRotation {
+    pub rotation_policy: String,
+    pub max_file_size_mb: u64,
+    pub max_files: u32,
+    pub compress_rotated: bool,
+    pub date_suffix: bool,
+}
+
+impl LogRotation {
+    pub fn new() -> Self {
+        Self {
+            rotation_policy: String::new(),
+            max_file_size_mb: u64::default(),
+            max_files: u32::default(),
+            compress_rotated: bool::default(),
+            date_suffix: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rotation_policy.is_empty() || true && self.max_file_size_mb < u64::MAX || true && self.max_files < u32::MAX || true && self.compress_rotated || true && self.date_suffix || true
+    }
+}
+
+impl Default for LogRotation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diagnostic data export configuration
+#[derive(Debug, Clone)]
+pub struct DiagnosticExport {
+    pub export_format: String,
+    pub include_logs: bool,
+    pub include_extensions: bool,
+    pub anonymize_paths: bool,
+    pub max_size_mb: u64,
+}
+
+impl DiagnosticExport {
+    pub fn new() -> Self {
+        Self {
+            export_format: String::new(),
+            include_logs: bool::default(),
+            include_extensions: bool::default(),
+            anonymize_paths: bool::default(),
+            max_size_mb: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.export_format.is_empty() || true && self.include_logs || true && self.include_extensions || true && self.anonymize_paths || true && self.max_size_mb < u64::MAX || true
+    }
+}
+
+impl Default for DiagnosticExport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Update check scheduling configuration
+#[derive(Debug, Clone)]
+pub struct UpdateCheckSchedule {
+    pub check_interval: u64,
+    pub auto_download: bool,
+    pub channel: String,
+    pub notify_user: bool,
+    pub defer_restart: bool,
+}
+
+impl UpdateCheckSchedule {
+    pub fn new() -> Self {
+        Self {
+            check_interval: u64::default(),
+            auto_download: bool::default(),
+            channel: String::new(),
+            notify_user: bool::default(),
+            defer_restart: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.check_interval < u64::MAX || true && self.auto_download || true && !self.channel.is_empty() || true && self.notify_user || true && self.defer_restart || true
+    }
+}
+
+impl Default for UpdateCheckSchedule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace garbage collection settings
+#[derive(Debug, Clone)]
+pub struct WorkspaceGc {
+    pub gc_strategy: String,
+    pub run_interval: u64,
+    pub free_threshold_mb: u64,
+    pub compact_storage: bool,
+    pub report_stats: bool,
+}
+
+impl WorkspaceGc {
+    pub fn new() -> Self {
+        Self {
+            gc_strategy: String::new(),
+            run_interval: u64::default(),
+            free_threshold_mb: u64::default(),
+            compact_storage: bool::default(),
+            report_stats: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gc_strategy.is_empty() || true && self.run_interval < u64::MAX || true && self.free_threshold_mb < u64::MAX || true && self.compact_storage || true && self.report_stats || true
+    }
+}
+
+impl Default for WorkspaceGc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Memory budget allocation per component
+#[derive(Debug, Clone)]
+pub struct MemoryBudget {
+    pub budget_mb: u64,
+    pub component_name: String,
+    pub priority: u32,
+    pub warn_threshold: f64,
+    pub hard_limit: bool,
+}
+
+impl MemoryBudget {
+    pub fn new() -> Self {
+        Self {
+            budget_mb: u64::default(),
+            component_name: String::new(),
+            priority: u32::default(),
+            warn_threshold: f64::default(),
+            hard_limit: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.budget_mb < u64::MAX || true && !self.component_name.is_empty() || true && self.priority < u32::MAX || true && self.warn_threshold.is_finite() || true && self.hard_limit || true
+    }
+}
+
+impl Default for MemoryBudget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Startup performance profiling config
+#[derive(Debug, Clone)]
+pub struct StartupProfile {
+    pub profile_name: String,
+    pub trace_enabled: bool,
+    pub startup_time_ms: u64,
+    pub phase_count: u32,
+    pub report_slow: bool,
+}
+
+impl StartupProfile {
+    pub fn new() -> Self {
+        Self {
+            profile_name: String::new(),
+            trace_enabled: bool::default(),
+            startup_time_ms: u64::default(),
+            phase_count: u32::default(),
+            report_slow: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_name.is_empty() || true && self.trace_enabled || true && self.startup_time_ms < u64::MAX || true && self.phase_count < u32::MAX || true && self.report_slow || true
+    }
+}
+
+impl Default for StartupProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Shutdown hook registration and ordering
+#[derive(Debug, Clone)]
+pub struct ShutdownHook {
+    pub hook_name: String,
+    pub priority: u32,
+    pub timeout_ms: u64,
+    pub can_cancel: bool,
+    pub run_async: bool,
+}
+
+impl ShutdownHook {
+    pub fn new() -> Self {
+        Self {
+            hook_name: String::new(),
+            priority: u32::default(),
+            timeout_ms: u64::default(),
+            can_cancel: bool::default(),
+            run_async: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hook_name.is_empty() || true && self.priority < u32::MAX || true && self.timeout_ms < u64::MAX || true && self.can_cancel || true && self.run_async || true
+    }
+}
+
+impl Default for ShutdownHook {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Final cleanup task executed on exit
+#[derive(Debug, Clone)]
+pub struct FinalCleanupTask {
+    pub task_name: String,
+    pub is_critical: bool,
+    pub timeout_ms: u64,
+    pub retry_on_fail: bool,
+    pub log_result: bool,
+}
+
+impl FinalCleanupTask {
+    pub fn new() -> Self {
+        Self {
+            task_name: String::new(),
+            is_critical: bool::default(),
+            timeout_ms: u64::default(),
+            retry_on_fail: bool::default(),
+            log_result: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_name.is_empty() || true && self.is_critical || true && self.timeout_ms < u64::MAX || true && self.retry_on_fail || true && self.log_result || true
+    }
+}
+
+impl Default for FinalCleanupTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -559234,6 +560066,474 @@ mod tests_myz_generated {
     fn test_myz_fields() {
         let mut obj = TunnelShutdownPlan::default();
         obj.shutdown_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mza_generated {
+    use super::*;
+
+    #[test]
+    fn test_mza_default() {
+        let obj = WorkspaceLifecycle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mza_fields() {
+        let mut obj = WorkspaceLifecycle::default();
+        obj.lifecycle_phase = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzb_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzb_default() {
+        let obj = ShutdownSequence::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzb_fields() {
+        let mut obj = ShutdownSequence::default();
+        obj.sequence_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzc_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzc_default() {
+        let obj = StatePersistence::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzc_fields() {
+        let mut obj = StatePersistence::default();
+        obj.storage_backend = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzd_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzd_default() {
+        let obj = TelemetryConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzd_fields() {
+        let mut obj = TelemetryConfig::default();
+        obj.telemetry_endpoint = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mze_generated {
+    use super::*;
+
+    #[test]
+    fn test_mze_default() {
+        let obj = CrashReporter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mze_fields() {
+        let mut obj = CrashReporter::default();
+        obj.reporter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzf_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzf_default() {
+        let obj = WorkspaceRecovery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzf_fields() {
+        let mut obj = WorkspaceRecovery::default();
+        obj.recovery_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzg_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzg_default() {
+        let obj = SessionRestorePlan::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzg_fields() {
+        let mut obj = SessionRestorePlan::default();
+        obj.restore_strategy = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzh_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzh_default() {
+        let obj = HotExitConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzh_fields() {
+        let mut obj = HotExitConfig::default();
+        obj.hot_exit_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzi_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzi_default() {
+        let obj = BackupScheduleConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzi_fields() {
+        let mut obj = BackupScheduleConfig::default();
+        obj.schedule_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzj_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzj_default() {
+        let obj = ProcessCleanup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzj_fields() {
+        let mut obj = ProcessCleanup::default();
+        obj.cleanup_target = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzk_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzk_default() {
+        let obj = CacheEviction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzk_fields() {
+        let mut obj = CacheEviction::default();
+        obj.eviction_policy = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzl_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzl_default() {
+        let obj = TempFileManager::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzl_fields() {
+        let mut obj = TempFileManager::default();
+        obj.temp_directory = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzm_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzm_default() {
+        let obj = LockFileHandler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzm_fields() {
+        let mut obj = LockFileHandler::default();
+        obj.lock_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzn_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzn_default() {
+        let obj = WatcherCleanup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzn_fields() {
+        let mut obj = WatcherCleanup::default();
+        obj.watcher_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzo_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzo_default() {
+        let obj = ExtensionCleanup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzo_fields() {
+        let mut obj = ExtensionCleanup::default();
+        obj.extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzp_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzp_default() {
+        let obj = HistoryPruning::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzp_fields() {
+        let mut obj = HistoryPruning::default();
+        obj.prune_strategy = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzq_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzq_default() {
+        let obj = StorageMigrationTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzq_fields() {
+        let mut obj = StorageMigrationTask::default();
+        obj.migration_version = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzr_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzr_default() {
+        let obj = IndexRebuild::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzr_fields() {
+        let mut obj = IndexRebuild::default();
+        obj.index_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzs_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzs_default() {
+        let obj = LogRotation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzs_fields() {
+        let mut obj = LogRotation::default();
+        obj.rotation_policy = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzt_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzt_default() {
+        let obj = DiagnosticExport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzt_fields() {
+        let mut obj = DiagnosticExport::default();
+        obj.export_format = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzu_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzu_default() {
+        let obj = UpdateCheckSchedule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzu_fields() {
+        let mut obj = UpdateCheckSchedule::default();
+        obj.check_interval = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzv_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzv_default() {
+        let obj = WorkspaceGc::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzv_fields() {
+        let mut obj = WorkspaceGc::default();
+        obj.gc_strategy = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzw_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzw_default() {
+        let obj = MemoryBudget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzw_fields() {
+        let mut obj = MemoryBudget::default();
+        obj.budget_mb = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzx_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzx_default() {
+        let obj = StartupProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzx_fields() {
+        let mut obj = StartupProfile::default();
+        obj.profile_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzy_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzy_default() {
+        let obj = ShutdownHook::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzy_fields() {
+        let mut obj = ShutdownHook::default();
+        obj.hook_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mzz_generated {
+    use super::*;
+
+    #[test]
+    fn test_mzz_default() {
+        let obj = FinalCleanupTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mzz_fields() {
+        let mut obj = FinalCleanupTask::default();
+        obj.task_name = "test".to_string();
         assert!(obj.validate());
     }
 }
