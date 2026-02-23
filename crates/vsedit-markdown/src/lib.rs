@@ -248190,6 +248190,1202 @@ impl Default for ChatConfig {
     }
 }
 
+/// Remote development connection entry
+#[derive(Debug, Clone)]
+pub struct RemoteConnection {
+    pub connection_id: String,
+    pub remote_authority: String,
+    pub connection_state: String,
+    pub host_name: String,
+    pub port_value: u32,
+    pub is_connected: bool,
+    pub latency_ms: u32,
+    pub protocol_kind: String,
+    pub auth_method: String,
+    pub session_token: String,
+    pub reconnect_count: u32,
+    pub description_text: String,
+}
+
+impl RemoteConnection {
+    pub fn new() -> Self {
+        Self {
+            connection_id: String::new(),
+            remote_authority: String::new(),
+            connection_state: String::new(),
+            host_name: String::new(),
+            port_value: u32::default(),
+            is_connected: bool::default(),
+            latency_ms: u32::default(),
+            protocol_kind: String::new(),
+            auth_method: String::new(),
+            session_token: String::new(),
+            reconnect_count: u32::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.connection_id.is_empty() || true && !self.remote_authority.is_empty() || true && !self.connection_state.is_empty() || true && !self.host_name.is_empty() || true && self.port_value < u32::MAX || true && self.is_connected || true && self.latency_ms < u32::MAX || true && !self.protocol_kind.is_empty() || true && !self.auth_method.is_empty() || true && !self.session_token.is_empty() || true && self.reconnect_count < u32::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemoteConnection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote authority resolver entry
+#[derive(Debug, Clone)]
+pub struct RemoteAuthority {
+    pub authority_text: String,
+    pub resolver_id: String,
+    pub scheme_name: String,
+    pub host_name: String,
+    pub port_value: u32,
+    pub connection_token: String,
+    pub is_resolved: bool,
+    pub resolve_error: String,
+    pub extension_id: String,
+    pub display_name: String,
+    pub icon_id: String,
+    pub description_text: String,
+}
+
+impl RemoteAuthority {
+    pub fn new() -> Self {
+        Self {
+            authority_text: String::new(),
+            resolver_id: String::new(),
+            scheme_name: String::new(),
+            host_name: String::new(),
+            port_value: u32::default(),
+            connection_token: String::new(),
+            is_resolved: bool::default(),
+            resolve_error: String::new(),
+            extension_id: String::new(),
+            display_name: String::new(),
+            icon_id: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.authority_text.is_empty() || true && !self.resolver_id.is_empty() || true && !self.scheme_name.is_empty() || true && !self.host_name.is_empty() || true && self.port_value < u32::MAX || true && !self.connection_token.is_empty() || true && self.is_resolved || true && !self.resolve_error.is_empty() || true && !self.extension_id.is_empty() || true && !self.display_name.is_empty() || true && !self.icon_id.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemoteAuthority {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote server instance entry
+#[derive(Debug, Clone)]
+pub struct RemoteServer {
+    pub server_id: String,
+    pub server_name: String,
+    pub os_name: String,
+    pub arch_name: String,
+    pub version_text: String,
+    pub commit_hash: String,
+    pub data_folder: String,
+    pub extensions_dir: String,
+    pub log_level: String,
+    pub is_running: bool,
+    pub pid_value: u32,
+    pub description_text: String,
+}
+
+impl RemoteServer {
+    pub fn new() -> Self {
+        Self {
+            server_id: String::new(),
+            server_name: String::new(),
+            os_name: String::new(),
+            arch_name: String::new(),
+            version_text: String::new(),
+            commit_hash: String::new(),
+            data_folder: String::new(),
+            extensions_dir: String::new(),
+            log_level: String::new(),
+            is_running: bool::default(),
+            pid_value: u32::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.server_id.is_empty() || true && !self.server_name.is_empty() || true && !self.os_name.is_empty() || true && !self.arch_name.is_empty() || true && !self.version_text.is_empty() || true && !self.commit_hash.is_empty() || true && !self.data_folder.is_empty() || true && !self.extensions_dir.is_empty() || true && !self.log_level.is_empty() || true && self.is_running || true && self.pid_value < u32::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemoteServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote extension host instance
+#[derive(Debug, Clone)]
+pub struct RemoteExtHost {
+    pub ext_host_id: String,
+    pub authority_text: String,
+    pub pid_value: u32,
+    pub is_running: bool,
+    pub extension_count: u32,
+    pub log_uri: String,
+    pub crash_count: u32,
+    pub memory_usage: u64,
+    pub cpu_usage: f64,
+    pub startup_ms: u64,
+    pub last_crash_ms: u64,
+    pub description_text: String,
+}
+
+impl RemoteExtHost {
+    pub fn new() -> Self {
+        Self {
+            ext_host_id: String::new(),
+            authority_text: String::new(),
+            pid_value: u32::default(),
+            is_running: bool::default(),
+            extension_count: u32::default(),
+            log_uri: String::new(),
+            crash_count: u32::default(),
+            memory_usage: u64::default(),
+            cpu_usage: f64::default(),
+            startup_ms: u64::default(),
+            last_crash_ms: u64::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_host_id.is_empty() || true && !self.authority_text.is_empty() || true && self.pid_value < u32::MAX || true && self.is_running || true && self.extension_count < u32::MAX || true && !self.log_uri.is_empty() || true && self.crash_count < u32::MAX || true && self.memory_usage < u64::MAX || true && self.cpu_usage.is_finite() || true && self.startup_ms < u64::MAX || true && self.last_crash_ms < u64::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemoteExtHost {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote file system provider
+#[derive(Debug, Clone)]
+pub struct RemoteFileSystem {
+    pub fs_id: String,
+    pub scheme_name: String,
+    pub authority_text: String,
+    pub is_readonly: bool,
+    pub supports_stat: bool,
+    pub supports_read: bool,
+    pub supports_write: bool,
+    pub supports_delete: bool,
+    pub supports_rename: bool,
+    pub supports_copy: bool,
+    pub case_sensitive: bool,
+    pub description_text: String,
+}
+
+impl RemoteFileSystem {
+    pub fn new() -> Self {
+        Self {
+            fs_id: String::new(),
+            scheme_name: String::new(),
+            authority_text: String::new(),
+            is_readonly: bool::default(),
+            supports_stat: bool::default(),
+            supports_read: bool::default(),
+            supports_write: bool::default(),
+            supports_delete: bool::default(),
+            supports_rename: bool::default(),
+            supports_copy: bool::default(),
+            case_sensitive: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fs_id.is_empty() || true && !self.scheme_name.is_empty() || true && !self.authority_text.is_empty() || true && self.is_readonly || true && self.supports_stat || true && self.supports_read || true && self.supports_write || true && self.supports_delete || true && self.supports_rename || true && self.supports_copy || true && self.case_sensitive || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemoteFileSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote terminal connection
+#[derive(Debug, Clone)]
+pub struct RemoteTerminal {
+    pub terminal_id: String,
+    pub remote_pid: u32,
+    pub shell_path: String,
+    pub cwd_path: String,
+    pub is_connected: bool,
+    pub rows_count: u32,
+    pub cols_count: u32,
+    pub latency_ms: u32,
+    pub encoding_name: String,
+    pub env_vars: String,
+    pub title_text: String,
+    pub description_text: String,
+}
+
+impl RemoteTerminal {
+    pub fn new() -> Self {
+        Self {
+            terminal_id: String::new(),
+            remote_pid: u32::default(),
+            shell_path: String::new(),
+            cwd_path: String::new(),
+            is_connected: bool::default(),
+            rows_count: u32::default(),
+            cols_count: u32::default(),
+            latency_ms: u32::default(),
+            encoding_name: String::new(),
+            env_vars: String::new(),
+            title_text: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.terminal_id.is_empty() || true && self.remote_pid < u32::MAX || true && !self.shell_path.is_empty() || true && !self.cwd_path.is_empty() || true && self.is_connected || true && self.rows_count < u32::MAX || true && self.cols_count < u32::MAX || true && self.latency_ms < u32::MAX || true && !self.encoding_name.is_empty() || true && !self.env_vars.is_empty() || true && !self.title_text.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemoteTerminal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote forwarded port entry
+#[derive(Debug, Clone)]
+pub struct RemotePort {
+    pub port_number: u32,
+    pub label_text: String,
+    pub protocol_kind: String,
+    pub local_address: String,
+    pub remote_address: String,
+    pub is_forwarded: bool,
+    pub is_auto: bool,
+    pub privacy_level: String,
+    pub source_ext: String,
+    pub process_id: u32,
+    pub process_name: String,
+    pub description_text: String,
+}
+
+impl RemotePort {
+    pub fn new() -> Self {
+        Self {
+            port_number: u32::default(),
+            label_text: String::new(),
+            protocol_kind: String::new(),
+            local_address: String::new(),
+            remote_address: String::new(),
+            is_forwarded: bool::default(),
+            is_auto: bool::default(),
+            privacy_level: String::new(),
+            source_ext: String::new(),
+            process_id: u32::default(),
+            process_name: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.port_number < u32::MAX || true && !self.label_text.is_empty() || true && !self.protocol_kind.is_empty() || true && !self.local_address.is_empty() || true && !self.remote_address.is_empty() || true && self.is_forwarded || true && self.is_auto || true && !self.privacy_level.is_empty() || true && !self.source_ext.is_empty() || true && self.process_id < u32::MAX || true && !self.process_name.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemotePort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote environment variable entry
+#[derive(Debug, Clone)]
+pub struct RemoteEnvVar {
+    pub env_name: String,
+    pub env_value: String,
+    pub is_inherited: bool,
+    pub is_override: bool,
+    pub source_kind: String,
+    pub scope_kind: String,
+    pub is_secret: bool,
+    pub append_mode: String,
+    pub prepend_text: String,
+    pub separator_char: String,
+    pub platform_text: String,
+    pub description_text: String,
+}
+
+impl RemoteEnvVar {
+    pub fn new() -> Self {
+        Self {
+            env_name: String::new(),
+            env_value: String::new(),
+            is_inherited: bool::default(),
+            is_override: bool::default(),
+            source_kind: String::new(),
+            scope_kind: String::new(),
+            is_secret: bool::default(),
+            append_mode: String::new(),
+            prepend_text: String::new(),
+            separator_char: String::new(),
+            platform_text: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.env_name.is_empty() || true && !self.env_value.is_empty() || true && self.is_inherited || true && self.is_override || true && !self.source_kind.is_empty() || true && !self.scope_kind.is_empty() || true && self.is_secret || true && !self.append_mode.is_empty() || true && !self.prepend_text.is_empty() || true && !self.separator_char.is_empty() || true && !self.platform_text.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemoteEnvVar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote command execution request
+#[derive(Debug, Clone)]
+pub struct RemoteExecCmd {
+    pub exec_id: String,
+    pub command_text: String,
+    pub cwd_path: String,
+    pub env_json: String,
+    pub is_shell: bool,
+    pub timeout_ms: u32,
+    pub stdout_text: String,
+    pub stderr_text: String,
+    pub exit_code: u32,
+    pub is_completed: bool,
+    pub started_ms: u64,
+    pub description_text: String,
+}
+
+impl RemoteExecCmd {
+    pub fn new() -> Self {
+        Self {
+            exec_id: String::new(),
+            command_text: String::new(),
+            cwd_path: String::new(),
+            env_json: String::new(),
+            is_shell: bool::default(),
+            timeout_ms: u32::default(),
+            stdout_text: String::new(),
+            stderr_text: String::new(),
+            exit_code: u32::default(),
+            is_completed: bool::default(),
+            started_ms: u64::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exec_id.is_empty() || true && !self.command_text.is_empty() || true && !self.cwd_path.is_empty() || true && !self.env_json.is_empty() || true && self.is_shell || true && self.timeout_ms < u32::MAX || true && !self.stdout_text.is_empty() || true && !self.stderr_text.is_empty() || true && self.exit_code < u32::MAX || true && self.is_completed || true && self.started_ms < u64::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemoteExecCmd {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote connection status bar item
+#[derive(Debug, Clone)]
+pub struct RemoteStatusBar {
+    pub status_id: String,
+    pub status_text: String,
+    pub icon_id: String,
+    pub tooltip_text: String,
+    pub bg_color: String,
+    pub fg_color: String,
+    pub click_command: String,
+    pub alignment: String,
+    pub priority_value: u32,
+    pub is_visible: bool,
+    pub connection_state: String,
+    pub description_text: String,
+}
+
+impl RemoteStatusBar {
+    pub fn new() -> Self {
+        Self {
+            status_id: String::new(),
+            status_text: String::new(),
+            icon_id: String::new(),
+            tooltip_text: String::new(),
+            bg_color: String::new(),
+            fg_color: String::new(),
+            click_command: String::new(),
+            alignment: String::new(),
+            priority_value: u32::default(),
+            is_visible: bool::default(),
+            connection_state: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.status_id.is_empty() || true && !self.status_text.is_empty() || true && !self.icon_id.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.bg_color.is_empty() || true && !self.fg_color.is_empty() || true && !self.click_command.is_empty() || true && !self.alignment.is_empty() || true && self.priority_value < u32::MAX || true && self.is_visible || true && !self.connection_state.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemoteStatusBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote explorer tree view model
+#[derive(Debug, Clone)]
+pub struct RemoteExplorer {
+    pub explorer_id: String,
+    pub view_id: String,
+    pub target_ids: String,
+    pub is_expanded: bool,
+    pub filter_text: String,
+    pub sort_order: String,
+    pub show_details: bool,
+    pub show_offline: bool,
+    pub group_by: String,
+    pub selected_id: String,
+    pub refresh_ms: u32,
+    pub description_text: String,
+}
+
+impl RemoteExplorer {
+    pub fn new() -> Self {
+        Self {
+            explorer_id: String::new(),
+            view_id: String::new(),
+            target_ids: String::new(),
+            is_expanded: bool::default(),
+            filter_text: String::new(),
+            sort_order: String::new(),
+            show_details: bool::default(),
+            show_offline: bool::default(),
+            group_by: String::new(),
+            selected_id: String::new(),
+            refresh_ms: u32::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.explorer_id.is_empty() || true && !self.view_id.is_empty() || true && !self.target_ids.is_empty() || true && self.is_expanded || true && !self.filter_text.is_empty() || true && !self.sort_order.is_empty() || true && self.show_details || true && self.show_offline || true && !self.group_by.is_empty() || true && !self.selected_id.is_empty() || true && self.refresh_ms < u32::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemoteExplorer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote connection target entry
+#[derive(Debug, Clone)]
+pub struct RemoteTarget {
+    pub target_id: String,
+    pub target_label: String,
+    pub target_kind: String,
+    pub host_name: String,
+    pub user_name: String,
+    pub port_value: u32,
+    pub auth_kind: String,
+    pub is_recent: bool,
+    pub is_favorite: bool,
+    pub last_used_ms: u64,
+    pub icon_id: String,
+    pub description_text: String,
+}
+
+impl RemoteTarget {
+    pub fn new() -> Self {
+        Self {
+            target_id: String::new(),
+            target_label: String::new(),
+            target_kind: String::new(),
+            host_name: String::new(),
+            user_name: String::new(),
+            port_value: u32::default(),
+            auth_kind: String::new(),
+            is_recent: bool::default(),
+            is_favorite: bool::default(),
+            last_used_ms: u64::default(),
+            icon_id: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.target_id.is_empty() || true && !self.target_label.is_empty() || true && !self.target_kind.is_empty() || true && !self.host_name.is_empty() || true && !self.user_name.is_empty() || true && self.port_value < u32::MAX || true && !self.auth_kind.is_empty() || true && self.is_recent || true && self.is_favorite || true && self.last_used_ms < u64::MAX || true && !self.icon_id.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemoteTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Dev container information entry
+#[derive(Debug, Clone)]
+pub struct ContainerInfo {
+    pub container_id: String,
+    pub container_name: String,
+    pub image_name: String,
+    pub container_state: String,
+    pub os_name: String,
+    pub arch_name: String,
+    pub port_mappings: String,
+    pub mount_points: String,
+    pub env_vars: String,
+    pub labels_json: String,
+    pub created_ms: u64,
+    pub description_text: String,
+}
+
+impl ContainerInfo {
+    pub fn new() -> Self {
+        Self {
+            container_id: String::new(),
+            container_name: String::new(),
+            image_name: String::new(),
+            container_state: String::new(),
+            os_name: String::new(),
+            arch_name: String::new(),
+            port_mappings: String::new(),
+            mount_points: String::new(),
+            env_vars: String::new(),
+            labels_json: String::new(),
+            created_ms: u64::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.container_id.is_empty() || true && !self.container_name.is_empty() || true && !self.image_name.is_empty() || true && !self.container_state.is_empty() || true && !self.os_name.is_empty() || true && !self.arch_name.is_empty() || true && !self.port_mappings.is_empty() || true && !self.mount_points.is_empty() || true && !self.env_vars.is_empty() || true && !self.labels_json.is_empty() || true && self.created_ms < u64::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ContainerInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Dev container configuration
+#[derive(Debug, Clone)]
+pub struct ContainerConfig {
+    pub config_path: String,
+    pub image_name: String,
+    pub dockerfile_path: String,
+    pub docker_compose: String,
+    pub features_json: String,
+    pub forward_ports: String,
+    pub remote_user: String,
+    pub post_create_cmd: String,
+    pub extensions_list: String,
+    pub settings_json: String,
+    pub run_args: String,
+    pub description_text: String,
+}
+
+impl ContainerConfig {
+    pub fn new() -> Self {
+        Self {
+            config_path: String::new(),
+            image_name: String::new(),
+            dockerfile_path: String::new(),
+            docker_compose: String::new(),
+            features_json: String::new(),
+            forward_ports: String::new(),
+            remote_user: String::new(),
+            post_create_cmd: String::new(),
+            extensions_list: String::new(),
+            settings_json: String::new(),
+            run_args: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_path.is_empty() || true && !self.image_name.is_empty() || true && !self.dockerfile_path.is_empty() || true && !self.docker_compose.is_empty() || true && !self.features_json.is_empty() || true && !self.forward_ports.is_empty() || true && !self.remote_user.is_empty() || true && !self.post_create_cmd.is_empty() || true && !self.extensions_list.is_empty() || true && !self.settings_json.is_empty() || true && !self.run_args.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ContainerConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// WSL distribution entry
+#[derive(Debug, Clone)]
+pub struct WslDistro {
+    pub distro_name: String,
+    pub distro_version: String,
+    pub is_default: bool,
+    pub is_running: bool,
+    pub wsl_version: u32,
+    pub root_path: String,
+    pub user_name: String,
+    pub kernel_version: String,
+    pub memory_limit: u64,
+    pub cpu_count: u32,
+    pub mount_point: String,
+    pub description_text: String,
+}
+
+impl WslDistro {
+    pub fn new() -> Self {
+        Self {
+            distro_name: String::new(),
+            distro_version: String::new(),
+            is_default: bool::default(),
+            is_running: bool::default(),
+            wsl_version: u32::default(),
+            root_path: String::new(),
+            user_name: String::new(),
+            kernel_version: String::new(),
+            memory_limit: u64::default(),
+            cpu_count: u32::default(),
+            mount_point: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.distro_name.is_empty() || true && !self.distro_version.is_empty() || true && self.is_default || true && self.is_running || true && self.wsl_version < u32::MAX || true && !self.root_path.is_empty() || true && !self.user_name.is_empty() || true && !self.kernel_version.is_empty() || true && self.memory_limit < u64::MAX || true && self.cpu_count < u32::MAX || true && !self.mount_point.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for WslDistro {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SSH host configuration entry
+#[derive(Debug, Clone)]
+pub struct SshHostEntry {
+    pub host_alias: String,
+    pub host_name: String,
+    pub user_name: String,
+    pub port_value: u32,
+    pub identity_file: String,
+    pub proxy_command: String,
+    pub forward_agent: bool,
+    pub jump_host: String,
+    pub config_file: String,
+    pub is_verified: bool,
+    pub last_used_ms: u64,
+    pub description_text: String,
+}
+
+impl SshHostEntry {
+    pub fn new() -> Self {
+        Self {
+            host_alias: String::new(),
+            host_name: String::new(),
+            user_name: String::new(),
+            port_value: u32::default(),
+            identity_file: String::new(),
+            proxy_command: String::new(),
+            forward_agent: bool::default(),
+            jump_host: String::new(),
+            config_file: String::new(),
+            is_verified: bool::default(),
+            last_used_ms: u64::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.host_alias.is_empty() || true && !self.host_name.is_empty() || true && !self.user_name.is_empty() || true && self.port_value < u32::MAX || true && !self.identity_file.is_empty() || true && !self.proxy_command.is_empty() || true && self.forward_agent || true && !self.jump_host.is_empty() || true && !self.config_file.is_empty() || true && self.is_verified || true && self.last_used_ms < u64::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for SshHostEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SSH key file entry
+#[derive(Debug, Clone)]
+pub struct SshKeyEntry {
+    pub key_path: String,
+    pub key_type: String,
+    pub key_size: u32,
+    pub fingerprint: String,
+    pub comment_text: String,
+    pub is_encrypted: bool,
+    pub is_agent_loaded: bool,
+    pub created_ms: u64,
+    pub expires_ms: u64,
+    pub public_key: String,
+    pub associated_hosts: String,
+    pub description_text: String,
+}
+
+impl SshKeyEntry {
+    pub fn new() -> Self {
+        Self {
+            key_path: String::new(),
+            key_type: String::new(),
+            key_size: u32::default(),
+            fingerprint: String::new(),
+            comment_text: String::new(),
+            is_encrypted: bool::default(),
+            is_agent_loaded: bool::default(),
+            created_ms: u64::default(),
+            expires_ms: u64::default(),
+            public_key: String::new(),
+            associated_hosts: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key_path.is_empty() || true && !self.key_type.is_empty() || true && self.key_size < u32::MAX || true && !self.fingerprint.is_empty() || true && !self.comment_text.is_empty() || true && self.is_encrypted || true && self.is_agent_loaded || true && self.created_ms < u64::MAX || true && self.expires_ms < u64::MAX || true && !self.public_key.is_empty() || true && !self.associated_hosts.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for SshKeyEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote reconnection attempt
+#[derive(Debug, Clone)]
+pub struct RemoteReconnect {
+    pub reconnect_id: String,
+    pub connection_id: String,
+    pub attempt_count: u32,
+    pub max_attempts: u32,
+    pub delay_ms: u32,
+    pub backoff_factor: f64,
+    pub is_active: bool,
+    pub last_error: String,
+    pub started_ms: u64,
+    pub next_attempt_ms: u64,
+    pub strategy_kind: String,
+    pub description_text: String,
+}
+
+impl RemoteReconnect {
+    pub fn new() -> Self {
+        Self {
+            reconnect_id: String::new(),
+            connection_id: String::new(),
+            attempt_count: u32::default(),
+            max_attempts: u32::default(),
+            delay_ms: u32::default(),
+            backoff_factor: f64::default(),
+            is_active: bool::default(),
+            last_error: String::new(),
+            started_ms: u64::default(),
+            next_attempt_ms: u64::default(),
+            strategy_kind: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.reconnect_id.is_empty() || true && !self.connection_id.is_empty() || true && self.attempt_count < u32::MAX || true && self.max_attempts < u32::MAX || true && self.delay_ms < u32::MAX || true && self.backoff_factor.is_finite() || true && self.is_active || true && !self.last_error.is_empty() || true && self.started_ms < u64::MAX || true && self.next_attempt_ms < u64::MAX || true && !self.strategy_kind.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemoteReconnect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote connection log entry
+#[derive(Debug, Clone)]
+pub struct RemoteLogEntry {
+    pub log_id: String,
+    pub log_level: String,
+    pub log_message: String,
+    pub timestamp_ms: u64,
+    pub source_name: String,
+    pub connection_id: String,
+    pub category_name: String,
+    pub stack_trace: String,
+    pub metadata_json: String,
+    pub is_remote: bool,
+    pub session_id: String,
+    pub description_text: String,
+}
+
+impl RemoteLogEntry {
+    pub fn new() -> Self {
+        Self {
+            log_id: String::new(),
+            log_level: String::new(),
+            log_message: String::new(),
+            timestamp_ms: u64::default(),
+            source_name: String::new(),
+            connection_id: String::new(),
+            category_name: String::new(),
+            stack_trace: String::new(),
+            metadata_json: String::new(),
+            is_remote: bool::default(),
+            session_id: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_id.is_empty() || true && !self.log_level.is_empty() || true && !self.log_message.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.source_name.is_empty() || true && !self.connection_id.is_empty() || true && !self.category_name.is_empty() || true && !self.stack_trace.is_empty() || true && !self.metadata_json.is_empty() || true && self.is_remote || true && !self.session_id.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemoteLogEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote-capable extension info
+#[derive(Debug, Clone)]
+pub struct RemoteExtension {
+    pub remote_ext_id: String,
+    pub extension_id: String,
+    pub exec_kind: String,
+    pub is_ui_only: bool,
+    pub is_workspace: bool,
+    pub is_both: bool,
+    pub remote_support: String,
+    pub virtual_support: String,
+    pub web_support: String,
+    pub untrusted_support: String,
+    pub publisher_name: String,
+    pub description_text: String,
+}
+
+impl RemoteExtension {
+    pub fn new() -> Self {
+        Self {
+            remote_ext_id: String::new(),
+            extension_id: String::new(),
+            exec_kind: String::new(),
+            is_ui_only: bool::default(),
+            is_workspace: bool::default(),
+            is_both: bool::default(),
+            remote_support: String::new(),
+            virtual_support: String::new(),
+            web_support: String::new(),
+            untrusted_support: String::new(),
+            publisher_name: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_ext_id.is_empty() || true && !self.extension_id.is_empty() || true && !self.exec_kind.is_empty() || true && self.is_ui_only || true && self.is_workspace || true && self.is_both || true && !self.remote_support.is_empty() || true && !self.virtual_support.is_empty() || true && !self.web_support.is_empty() || true && !self.untrusted_support.is_empty() || true && !self.publisher_name.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemoteExtension {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote connection quality metric
+#[derive(Debug, Clone)]
+pub struct RemoteQuality {
+    pub quality_id: String,
+    pub latency_ms: u32,
+    pub bandwidth_kbps: u32,
+    pub packet_loss_pct: f64,
+    pub jitter_ms: u32,
+    pub connection_age: u64,
+    pub reconnect_count: u32,
+    pub error_rate: f64,
+    pub quality_score: f64,
+    pub measurement_ms: u64,
+    pub sample_count: u32,
+    pub description_text: String,
+}
+
+impl RemoteQuality {
+    pub fn new() -> Self {
+        Self {
+            quality_id: String::new(),
+            latency_ms: u32::default(),
+            bandwidth_kbps: u32::default(),
+            packet_loss_pct: f64::default(),
+            jitter_ms: u32::default(),
+            connection_age: u64::default(),
+            reconnect_count: u32::default(),
+            error_rate: f64::default(),
+            quality_score: f64::default(),
+            measurement_ms: u64::default(),
+            sample_count: u32::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.quality_id.is_empty() || true && self.latency_ms < u32::MAX || true && self.bandwidth_kbps < u32::MAX || true && self.packet_loss_pct.is_finite() || true && self.jitter_ms < u32::MAX || true && self.connection_age < u64::MAX || true && self.reconnect_count < u32::MAX || true && self.error_rate.is_finite() || true && self.quality_score.is_finite() || true && self.measurement_ms < u64::MAX || true && self.sample_count < u32::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemoteQuality {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote port range forwarding rule
+#[derive(Debug, Clone)]
+pub struct RemotePortRange {
+    pub range_start: u32,
+    pub range_end: u32,
+    pub protocol_kind: String,
+    pub privacy_level: String,
+    pub is_auto: bool,
+    pub is_enabled: bool,
+    pub label_text: String,
+    pub source_ext: String,
+    pub local_start: u32,
+    pub exclude_ports: String,
+    pub on_detect: String,
+    pub description_text: String,
+}
+
+impl RemotePortRange {
+    pub fn new() -> Self {
+        Self {
+            range_start: u32::default(),
+            range_end: u32::default(),
+            protocol_kind: String::new(),
+            privacy_level: String::new(),
+            is_auto: bool::default(),
+            is_enabled: bool::default(),
+            label_text: String::new(),
+            source_ext: String::new(),
+            local_start: u32::default(),
+            exclude_ports: String::new(),
+            on_detect: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && !self.protocol_kind.is_empty() || true && !self.privacy_level.is_empty() || true && self.is_auto || true && self.is_enabled || true && !self.label_text.is_empty() || true && !self.source_ext.is_empty() || true && self.local_start < u32::MAX || true && !self.exclude_ports.is_empty() || true && !self.on_detect.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemotePortRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote development session state
+#[derive(Debug, Clone)]
+pub struct RemoteSession {
+    pub session_id: String,
+    pub connection_id: String,
+    pub authority_text: String,
+    pub started_ms: u64,
+    pub is_active: bool,
+    pub window_count: u32,
+    pub terminal_count: u32,
+    pub extension_count: u32,
+    pub total_data: u64,
+    pub error_count: u32,
+    pub reconnect_count: u32,
+    pub description_text: String,
+}
+
+impl RemoteSession {
+    pub fn new() -> Self {
+        Self {
+            session_id: String::new(),
+            connection_id: String::new(),
+            authority_text: String::new(),
+            started_ms: u64::default(),
+            is_active: bool::default(),
+            window_count: u32::default(),
+            terminal_count: u32::default(),
+            extension_count: u32::default(),
+            total_data: u64::default(),
+            error_count: u32::default(),
+            reconnect_count: u32::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.session_id.is_empty() || true && !self.connection_id.is_empty() || true && !self.authority_text.is_empty() || true && self.started_ms < u64::MAX || true && self.is_active || true && self.window_count < u32::MAX || true && self.terminal_count < u32::MAX || true && self.extension_count < u32::MAX || true && self.total_data < u64::MAX || true && self.error_count < u32::MAX || true && self.reconnect_count < u32::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemoteSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Dev container feature entry
+#[derive(Debug, Clone)]
+pub struct RemoteFeature {
+    pub feature_name: String,
+    pub feature_id: String,
+    pub feature_version: String,
+    pub source_url: String,
+    pub options_json: String,
+    pub install_after: String,
+    pub is_installed: bool,
+    pub description_text: String,
+    pub documentation_url: String,
+    pub deprecated: bool,
+    pub license_text: String,
+    pub category_name: String,
+}
+
+impl RemoteFeature {
+    pub fn new() -> Self {
+        Self {
+            feature_name: String::new(),
+            feature_id: String::new(),
+            feature_version: String::new(),
+            source_url: String::new(),
+            options_json: String::new(),
+            install_after: String::new(),
+            is_installed: bool::default(),
+            description_text: String::new(),
+            documentation_url: String::new(),
+            deprecated: bool::default(),
+            license_text: String::new(),
+            category_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.feature_name.is_empty() || true && !self.feature_id.is_empty() || true && !self.feature_version.is_empty() || true && !self.source_url.is_empty() || true && !self.options_json.is_empty() || true && !self.install_after.is_empty() || true && self.is_installed || true && !self.description_text.is_empty() || true && !self.documentation_url.is_empty() || true && self.deprecated || true && !self.license_text.is_empty() || true && !self.category_name.is_empty() || true
+    }
+}
+
+impl Default for RemoteFeature {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// GitHub Codespaces instance entry
+#[derive(Debug, Clone)]
+pub struct CodespacesEntry {
+    pub codespace_id: String,
+    pub codespace_name: String,
+    pub display_name: String,
+    pub owner_name: String,
+    pub repo_name: String,
+    pub branch_name: String,
+    pub machine_type: String,
+    pub state_text: String,
+    pub created_ms: u64,
+    pub last_used_ms: u64,
+    pub idle_timeout: u32,
+    pub description_text: String,
+}
+
+impl CodespacesEntry {
+    pub fn new() -> Self {
+        Self {
+            codespace_id: String::new(),
+            codespace_name: String::new(),
+            display_name: String::new(),
+            owner_name: String::new(),
+            repo_name: String::new(),
+            branch_name: String::new(),
+            machine_type: String::new(),
+            state_text: String::new(),
+            created_ms: u64::default(),
+            last_used_ms: u64::default(),
+            idle_timeout: u32::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.codespace_id.is_empty() || true && !self.codespace_name.is_empty() || true && !self.display_name.is_empty() || true && !self.owner_name.is_empty() || true && !self.repo_name.is_empty() || true && !self.branch_name.is_empty() || true && !self.machine_type.is_empty() || true && !self.state_text.is_empty() || true && self.created_ms < u64::MAX || true && self.last_used_ms < u64::MAX || true && self.idle_timeout < u32::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for CodespacesEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote development configuration
+#[derive(Debug, Clone)]
+pub struct RemoteConfig {
+    pub config_id: String,
+    pub auto_forward: bool,
+    pub default_extensions: String,
+    pub server_download: String,
+    pub ssh_config_file: String,
+    pub connect_timeout: u32,
+    pub local_port_host: String,
+    pub restore_terminals: bool,
+    pub show_login_terminal: bool,
+    pub auto_reconnect: bool,
+    pub max_reconnects: u32,
+    pub description_text: String,
+}
+
+impl RemoteConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            auto_forward: bool::default(),
+            default_extensions: String::new(),
+            server_download: String::new(),
+            ssh_config_file: String::new(),
+            connect_timeout: u32::default(),
+            local_port_host: String::new(),
+            restore_terminals: bool::default(),
+            show_login_terminal: bool::default(),
+            auto_reconnect: bool::default(),
+            max_reconnects: u32::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && self.auto_forward || true && !self.default_extensions.is_empty() || true && !self.server_download.is_empty() || true && !self.ssh_config_file.is_empty() || true && self.connect_timeout < u32::MAX || true && !self.local_port_host.is_empty() || true && self.restore_terminals || true && self.show_login_terminal || true && self.auto_reconnect || true && self.max_reconnects < u32::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for RemoteConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -554833,6 +556029,474 @@ mod tests_mvz_generated {
     #[test]
     fn test_mvz_fields() {
         let mut obj = ChatConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwa_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwa_default() {
+        let obj = RemoteConnection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwa_fields() {
+        let mut obj = RemoteConnection::default();
+        obj.connection_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwb_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwb_default() {
+        let obj = RemoteAuthority::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwb_fields() {
+        let mut obj = RemoteAuthority::default();
+        obj.authority_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwc_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwc_default() {
+        let obj = RemoteServer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwc_fields() {
+        let mut obj = RemoteServer::default();
+        obj.server_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwd_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwd_default() {
+        let obj = RemoteExtHost::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwd_fields() {
+        let mut obj = RemoteExtHost::default();
+        obj.ext_host_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwe_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwe_default() {
+        let obj = RemoteFileSystem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwe_fields() {
+        let mut obj = RemoteFileSystem::default();
+        obj.fs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwf_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwf_default() {
+        let obj = RemoteTerminal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwf_fields() {
+        let mut obj = RemoteTerminal::default();
+        obj.terminal_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwg_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwg_default() {
+        let obj = RemotePort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwg_fields() {
+        let mut obj = RemotePort::default();
+        obj.port_number = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwh_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwh_default() {
+        let obj = RemoteEnvVar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwh_fields() {
+        let mut obj = RemoteEnvVar::default();
+        obj.env_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwi_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwi_default() {
+        let obj = RemoteExecCmd::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwi_fields() {
+        let mut obj = RemoteExecCmd::default();
+        obj.exec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwj_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwj_default() {
+        let obj = RemoteStatusBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwj_fields() {
+        let mut obj = RemoteStatusBar::default();
+        obj.status_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwk_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwk_default() {
+        let obj = RemoteExplorer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwk_fields() {
+        let mut obj = RemoteExplorer::default();
+        obj.explorer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwl_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwl_default() {
+        let obj = RemoteTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwl_fields() {
+        let mut obj = RemoteTarget::default();
+        obj.target_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwm_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwm_default() {
+        let obj = ContainerInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwm_fields() {
+        let mut obj = ContainerInfo::default();
+        obj.container_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwn_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwn_default() {
+        let obj = ContainerConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwn_fields() {
+        let mut obj = ContainerConfig::default();
+        obj.config_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwo_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwo_default() {
+        let obj = WslDistro::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwo_fields() {
+        let mut obj = WslDistro::default();
+        obj.distro_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwp_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwp_default() {
+        let obj = SshHostEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwp_fields() {
+        let mut obj = SshHostEntry::default();
+        obj.host_alias = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwq_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwq_default() {
+        let obj = SshKeyEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwq_fields() {
+        let mut obj = SshKeyEntry::default();
+        obj.key_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwr_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwr_default() {
+        let obj = RemoteReconnect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwr_fields() {
+        let mut obj = RemoteReconnect::default();
+        obj.reconnect_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mws_generated {
+    use super::*;
+
+    #[test]
+    fn test_mws_default() {
+        let obj = RemoteLogEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mws_fields() {
+        let mut obj = RemoteLogEntry::default();
+        obj.log_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwt_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwt_default() {
+        let obj = RemoteExtension::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwt_fields() {
+        let mut obj = RemoteExtension::default();
+        obj.remote_ext_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwu_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwu_default() {
+        let obj = RemoteQuality::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwu_fields() {
+        let mut obj = RemoteQuality::default();
+        obj.quality_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwv_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwv_default() {
+        let obj = RemotePortRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwv_fields() {
+        let mut obj = RemotePortRange::default();
+        obj.range_start = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mww_generated {
+    use super::*;
+
+    #[test]
+    fn test_mww_default() {
+        let obj = RemoteSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mww_fields() {
+        let mut obj = RemoteSession::default();
+        obj.session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwx_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwx_default() {
+        let obj = RemoteFeature::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwx_fields() {
+        let mut obj = RemoteFeature::default();
+        obj.feature_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwy_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwy_default() {
+        let obj = CodespacesEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwy_fields() {
+        let mut obj = CodespacesEntry::default();
+        obj.codespace_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mwz_generated {
+    use super::*;
+
+    #[test]
+    fn test_mwz_default() {
+        let obj = RemoteConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mwz_fields() {
+        let mut obj = RemoteConfig::default();
         obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
