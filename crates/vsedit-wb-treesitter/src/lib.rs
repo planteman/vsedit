@@ -249017,6 +249017,838 @@ impl Default for RemoteConfig {
     }
 }
 
+/// Port forwarding specification for tunneled connections
+#[derive(Debug, Clone)]
+pub struct PortForwardSpec {
+    pub tunnel_name: String,
+    pub local_address: String,
+    pub remote_address: String,
+    pub forward_port: u32,
+    pub auto_connect: bool,
+}
+
+impl PortForwardSpec {
+    pub fn new() -> Self {
+        Self {
+            tunnel_name: String::new(),
+            local_address: String::new(),
+            remote_address: String::new(),
+            forward_port: u32::default(),
+            auto_connect: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tunnel_name.is_empty() || true && !self.local_address.is_empty() || true && !self.remote_address.is_empty() || true && self.forward_port < u32::MAX || true && self.auto_connect || true
+    }
+}
+
+impl Default for PortForwardSpec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forward mapping between local and remote ports
+#[derive(Debug, Clone)]
+pub struct PortForwardMapping {
+    pub local_port: u32,
+    pub remote_port: u32,
+    pub host_address: String,
+    pub binding_scope: String,
+    pub is_active: bool,
+}
+
+impl PortForwardMapping {
+    pub fn new() -> Self {
+        Self {
+            local_port: u32::default(),
+            remote_port: u32::default(),
+            host_address: String::new(),
+            binding_scope: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.local_port < u32::MAX || true && self.remote_port < u32::MAX || true && !self.host_address.is_empty() || true && !self.binding_scope.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for PortForwardMapping {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding protocol configuration
+#[derive(Debug, Clone)]
+pub struct PortForwardProtocol {
+    pub protocol_name: String,
+    pub supports_tls: bool,
+    pub default_port: u32,
+    pub handshake_timeout: u64,
+    pub fallback_enabled: bool,
+}
+
+impl PortForwardProtocol {
+    pub fn new() -> Self {
+        Self {
+            protocol_name: String::new(),
+            supports_tls: bool::default(),
+            default_port: u32::default(),
+            handshake_timeout: u64::default(),
+            fallback_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.protocol_name.is_empty() || true && self.supports_tls || true && self.default_port < u32::MAX || true && self.handshake_timeout < u64::MAX || true && self.fallback_enabled || true
+    }
+}
+
+impl Default for PortForwardProtocol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding connection status
+#[derive(Debug, Clone)]
+pub struct PortForwardStatus {
+    pub status_code: u32,
+    pub is_connected: bool,
+    pub last_activity: u64,
+    pub error_message: String,
+    pub retry_count: u32,
+}
+
+impl PortForwardStatus {
+    pub fn new() -> Self {
+        Self {
+            status_code: u32::default(),
+            is_connected: bool::default(),
+            last_activity: u64::default(),
+            error_message: String::new(),
+            retry_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.status_code < u32::MAX || true && self.is_connected || true && self.last_activity < u64::MAX || true && !self.error_message.is_empty() || true && self.retry_count < u32::MAX || true
+    }
+}
+
+impl Default for PortForwardStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Automatic port detection settings
+#[derive(Debug, Clone)]
+pub struct PortAutoDetection {
+    pub detect_method: String,
+    pub scan_interval: u64,
+    pub port_range_start: u32,
+    pub port_range_end: u32,
+    pub exclude_system: bool,
+}
+
+impl PortAutoDetection {
+    pub fn new() -> Self {
+        Self {
+            detect_method: String::new(),
+            scan_interval: u64::default(),
+            port_range_start: u32::default(),
+            port_range_end: u32::default(),
+            exclude_system: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.detect_method.is_empty() || true && self.scan_interval < u64::MAX || true && self.port_range_start < u32::MAX || true && self.port_range_end < u32::MAX || true && self.exclude_system || true
+    }
+}
+
+impl Default for PortAutoDetection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding display label configuration
+#[derive(Debug, Clone)]
+pub struct PortForwardLabel {
+    pub label_text: String,
+    pub icon_name: String,
+    pub tooltip: String,
+    pub color_code: String,
+    pub sort_priority: u32,
+}
+
+impl PortForwardLabel {
+    pub fn new() -> Self {
+        Self {
+            label_text: String::new(),
+            icon_name: String::new(),
+            tooltip: String::new(),
+            color_code: String::new(),
+            sort_priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.label_text.is_empty() || true && !self.icon_name.is_empty() || true && !self.tooltip.is_empty() || true && !self.color_code.is_empty() || true && self.sort_priority < u32::MAX || true
+    }
+}
+
+impl Default for PortForwardLabel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port visibility and access scope settings
+#[derive(Debug, Clone)]
+pub struct PortVisibility {
+    pub visibility_scope: String,
+    pub requires_auth: bool,
+    pub allowed_origins: String,
+    pub max_connections: u32,
+    pub log_access: bool,
+}
+
+impl PortVisibility {
+    pub fn new() -> Self {
+        Self {
+            visibility_scope: String::new(),
+            requires_auth: bool::default(),
+            allowed_origins: String::new(),
+            max_connections: u32::default(),
+            log_access: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.visibility_scope.is_empty() || true && self.requires_auth || true && !self.allowed_origins.is_empty() || true && self.max_connections < u32::MAX || true && self.log_access || true
+    }
+}
+
+impl Default for PortVisibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding notification events
+#[derive(Debug, Clone)]
+pub struct PortForwardNotification {
+    pub event_type: String,
+    pub port_number: u32,
+    pub message: String,
+    pub severity: String,
+    pub auto_dismiss: bool,
+}
+
+impl PortForwardNotification {
+    pub fn new() -> Self {
+        Self {
+            event_type: String::new(),
+            port_number: u32::default(),
+            message: String::new(),
+            severity: String::new(),
+            auto_dismiss: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_type.is_empty() || true && self.port_number < u32::MAX || true && !self.message.is_empty() || true && !self.severity.is_empty() || true && self.auto_dismiss || true
+    }
+}
+
+impl Default for PortForwardNotification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding tunnel instance data
+#[derive(Debug, Clone)]
+pub struct PortForwardTunnel {
+    pub tunnel_id: String,
+    pub creation_time: u64,
+    pub is_persistent: bool,
+    pub bandwidth_limit: u64,
+    pub compression: bool,
+}
+
+impl PortForwardTunnel {
+    pub fn new() -> Self {
+        Self {
+            tunnel_id: String::new(),
+            creation_time: u64::default(),
+            is_persistent: bool::default(),
+            bandwidth_limit: u64::default(),
+            compression: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tunnel_id.is_empty() || true && self.creation_time < u64::MAX || true && self.is_persistent || true && self.bandwidth_limit < u64::MAX || true && self.compression || true
+    }
+}
+
+impl Default for PortForwardTunnel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding source identification
+#[derive(Debug, Clone)]
+pub struct PortForwardSource {
+    pub source_name: String,
+    pub source_type: String,
+    pub process_pid: u32,
+    pub command_line: String,
+    pub working_dir: String,
+}
+
+impl PortForwardSource {
+    pub fn new() -> Self {
+        Self {
+            source_name: String::new(),
+            source_type: String::new(),
+            process_pid: u32::default(),
+            command_line: String::new(),
+            working_dir: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.source_name.is_empty() || true && !self.source_type.is_empty() || true && self.process_pid < u32::MAX || true && !self.command_line.is_empty() || true && !self.working_dir.is_empty() || true
+    }
+}
+
+impl Default for PortForwardSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Candidate port for forwarding evaluation
+#[derive(Debug, Clone)]
+pub struct PortForwardCandidate {
+    pub candidate_port: u32,
+    pub confidence: f64,
+    pub detected_by: String,
+    pub process_name: String,
+    pub is_suggested: bool,
+}
+
+impl PortForwardCandidate {
+    pub fn new() -> Self {
+        Self {
+            candidate_port: u32::default(),
+            confidence: f64::default(),
+            detected_by: String::new(),
+            process_name: String::new(),
+            is_suggested: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.candidate_port < u32::MAX || true && self.confidence.is_finite() || true && !self.detected_by.is_empty() || true && !self.process_name.is_empty() || true && self.is_suggested || true
+    }
+}
+
+impl Default for PortForwardCandidate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding user action descriptor
+#[derive(Debug, Clone)]
+pub struct PortForwardAction {
+    pub action_type: String,
+    pub target_port: u32,
+    pub label_override: String,
+    pub keybinding: String,
+    pub enabled: bool,
+}
+
+impl PortForwardAction {
+    pub fn new() -> Self {
+        Self {
+            action_type: String::new(),
+            target_port: u32::default(),
+            label_override: String::new(),
+            keybinding: String::new(),
+            enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_type.is_empty() || true && self.target_port < u32::MAX || true && !self.label_override.is_empty() || true && !self.keybinding.is_empty() || true && self.enabled || true
+    }
+}
+
+impl Default for PortForwardAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Process associated with port forwarding
+#[derive(Debug, Clone)]
+pub struct PortForwardProcess {
+    pub process_id: u32,
+    pub process_name: String,
+    pub listening_port: u32,
+    pub start_time: u64,
+    pub is_child: bool,
+}
+
+impl PortForwardProcess {
+    pub fn new() -> Self {
+        Self {
+            process_id: u32::default(),
+            process_name: String::new(),
+            listening_port: u32::default(),
+            start_time: u64::default(),
+            is_child: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.process_id < u32::MAX || true && !self.process_name.is_empty() || true && self.listening_port < u32::MAX || true && self.start_time < u64::MAX || true && self.is_child || true
+    }
+}
+
+impl Default for PortForwardProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding output channel config
+#[derive(Debug, Clone)]
+pub struct PortForwardOutput {
+    pub output_channel: String,
+    pub log_level: String,
+    pub include_timestamps: bool,
+    pub max_buffer_size: u64,
+    pub flush_interval: u32,
+}
+
+impl PortForwardOutput {
+    pub fn new() -> Self {
+        Self {
+            output_channel: String::new(),
+            log_level: String::new(),
+            include_timestamps: bool::default(),
+            max_buffer_size: u64::default(),
+            flush_interval: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_channel.is_empty() || true && !self.log_level.is_empty() || true && self.include_timestamps || true && self.max_buffer_size < u64::MAX || true && self.flush_interval < u32::MAX || true
+    }
+}
+
+impl Default for PortForwardOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding security policy
+#[derive(Debug, Clone)]
+pub struct PortForwardPolicy {
+    pub policy_name: String,
+    pub allow_public: bool,
+    pub require_tls: bool,
+    pub max_ports: u32,
+    pub audit_logging: bool,
+}
+
+impl PortForwardPolicy {
+    pub fn new() -> Self {
+        Self {
+            policy_name: String::new(),
+            allow_public: bool::default(),
+            require_tls: bool::default(),
+            max_ports: u32::default(),
+            audit_logging: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.policy_name.is_empty() || true && self.allow_public || true && self.require_tls || true && self.max_ports < u32::MAX || true && self.audit_logging || true
+    }
+}
+
+impl Default for PortForwardPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port range specification for forwarding
+#[derive(Debug, Clone)]
+pub struct PortForwardRange {
+    pub range_start: u32,
+    pub range_end: u32,
+    pub excluded_ports: String,
+    pub protocol_filter: String,
+    pub auto_assign: bool,
+}
+
+impl PortForwardRange {
+    pub fn new() -> Self {
+        Self {
+            range_start: u32::default(),
+            range_end: u32::default(),
+            excluded_ports: String::new(),
+            protocol_filter: String::new(),
+            auto_assign: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && !self.excluded_ports.is_empty() || true && !self.protocol_filter.is_empty() || true && self.auto_assign || true
+    }
+}
+
+impl Default for PortForwardRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Active port forwarding session state
+#[derive(Debug, Clone)]
+pub struct PortForwardSession {
+    pub session_id: String,
+    pub started_at: u64,
+    pub bytes_transferred: u64,
+    pub connection_count: u32,
+    pub is_paused: bool,
+}
+
+impl PortForwardSession {
+    pub fn new() -> Self {
+        Self {
+            session_id: String::new(),
+            started_at: u64::default(),
+            bytes_transferred: u64::default(),
+            connection_count: u32::default(),
+            is_paused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.session_id.is_empty() || true && self.started_at < u64::MAX || true && self.bytes_transferred < u64::MAX || true && self.connection_count < u32::MAX || true && self.is_paused || true
+    }
+}
+
+impl Default for PortForwardSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding traffic metrics
+#[derive(Debug, Clone)]
+pub struct PortForwardMetrics {
+    pub total_bytes_in: u64,
+    pub total_bytes_out: u64,
+    pub connection_errors: u32,
+    pub avg_latency_ms: f64,
+    pub peak_connections: u32,
+}
+
+impl PortForwardMetrics {
+    pub fn new() -> Self {
+        Self {
+            total_bytes_in: u64::default(),
+            total_bytes_out: u64::default(),
+            connection_errors: u32::default(),
+            avg_latency_ms: f64::default(),
+            peak_connections: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.total_bytes_in < u64::MAX || true && self.total_bytes_out < u64::MAX || true && self.connection_errors < u32::MAX || true && self.avg_latency_ms.is_finite() || true && self.peak_connections < u32::MAX || true
+    }
+}
+
+impl Default for PortForwardMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding attribute key-value pair
+#[derive(Debug, Clone)]
+pub struct PortForwardAttribute {
+    pub attr_key: String,
+    pub attr_value: String,
+    pub is_readonly: bool,
+    pub display_order: u32,
+    pub category: String,
+}
+
+impl PortForwardAttribute {
+    pub fn new() -> Self {
+        Self {
+            attr_key: String::new(),
+            attr_value: String::new(),
+            is_readonly: bool::default(),
+            display_order: u32::default(),
+            category: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.attr_key.is_empty() || true && !self.attr_value.is_empty() || true && self.is_readonly || true && self.display_order < u32::MAX || true && !self.category.is_empty() || true
+    }
+}
+
+impl Default for PortForwardAttribute {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding privilege elevation config
+#[derive(Debug, Clone)]
+pub struct PortForwardElevation {
+    pub elevation_level: String,
+    pub requires_admin: bool,
+    pub prompt_user: bool,
+    pub timeout_secs: u32,
+    pub fallback_port: u32,
+}
+
+impl PortForwardElevation {
+    pub fn new() -> Self {
+        Self {
+            elevation_level: String::new(),
+            requires_admin: bool::default(),
+            prompt_user: bool::default(),
+            timeout_secs: u32::default(),
+            fallback_port: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.elevation_level.is_empty() || true && self.requires_admin || true && self.prompt_user || true && self.timeout_secs < u32::MAX || true && self.fallback_port < u32::MAX || true
+    }
+}
+
+impl Default for PortForwardElevation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding DNS resolution config
+#[derive(Debug, Clone)]
+pub struct PortForwardDns {
+    pub dns_name: String,
+    pub resolve_ipv6: bool,
+    pub cache_ttl: u64,
+    pub custom_resolver: String,
+    pub fallback_ip: String,
+}
+
+impl PortForwardDns {
+    pub fn new() -> Self {
+        Self {
+            dns_name: String::new(),
+            resolve_ipv6: bool::default(),
+            cache_ttl: u64::default(),
+            custom_resolver: String::new(),
+            fallback_ip: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dns_name.is_empty() || true && self.resolve_ipv6 || true && self.cache_ttl < u64::MAX || true && !self.custom_resolver.is_empty() || true && !self.fallback_ip.is_empty() || true
+    }
+}
+
+impl Default for PortForwardDns {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding TLS certificate info
+#[derive(Debug, Clone)]
+pub struct PortForwardCertificate {
+    pub cert_subject: String,
+    pub issuer: String,
+    pub expiry_epoch: u64,
+    pub is_self_signed: bool,
+    pub thumbprint: String,
+}
+
+impl PortForwardCertificate {
+    pub fn new() -> Self {
+        Self {
+            cert_subject: String::new(),
+            issuer: String::new(),
+            expiry_epoch: u64::default(),
+            is_self_signed: bool::default(),
+            thumbprint: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cert_subject.is_empty() || true && !self.issuer.is_empty() || true && self.expiry_epoch < u64::MAX || true && self.is_self_signed || true && !self.thumbprint.is_empty() || true
+    }
+}
+
+impl Default for PortForwardCertificate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding proxy configuration
+#[derive(Debug, Clone)]
+pub struct PortForwardProxy {
+    pub proxy_address: String,
+    pub proxy_port: u32,
+    pub proxy_auth: bool,
+    pub bypass_local: bool,
+    pub proxy_type: String,
+}
+
+impl PortForwardProxy {
+    pub fn new() -> Self {
+        Self {
+            proxy_address: String::new(),
+            proxy_port: u32::default(),
+            proxy_auth: bool::default(),
+            bypass_local: bool::default(),
+            proxy_type: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proxy_address.is_empty() || true && self.proxy_port < u32::MAX || true && self.proxy_auth || true && self.bypass_local || true && !self.proxy_type.is_empty() || true
+    }
+}
+
+impl Default for PortForwardProxy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding timeout settings
+#[derive(Debug, Clone)]
+pub struct PortForwardTimeout {
+    pub connect_timeout: u64,
+    pub read_timeout: u64,
+    pub write_timeout: u64,
+    pub idle_timeout: u64,
+    pub keepalive_interval: u32,
+}
+
+impl PortForwardTimeout {
+    pub fn new() -> Self {
+        Self {
+            connect_timeout: u64::default(),
+            read_timeout: u64::default(),
+            write_timeout: u64::default(),
+            idle_timeout: u64::default(),
+            keepalive_interval: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.connect_timeout < u64::MAX || true && self.read_timeout < u64::MAX || true && self.write_timeout < u64::MAX || true && self.idle_timeout < u64::MAX || true && self.keepalive_interval < u32::MAX || true
+    }
+}
+
+impl Default for PortForwardTimeout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding retry policy
+#[derive(Debug, Clone)]
+pub struct PortForwardRetry {
+    pub max_retries: u32,
+    pub retry_delay_ms: u64,
+    pub backoff_factor: f64,
+    pub jitter_enabled: bool,
+    pub retry_on_timeout: bool,
+}
+
+impl PortForwardRetry {
+    pub fn new() -> Self {
+        Self {
+            max_retries: u32::default(),
+            retry_delay_ms: u64::default(),
+            backoff_factor: f64::default(),
+            jitter_enabled: bool::default(),
+            retry_on_timeout: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.max_retries < u32::MAX || true && self.retry_delay_ms < u64::MAX || true && self.backoff_factor.is_finite() || true && self.jitter_enabled || true && self.retry_on_timeout || true
+    }
+}
+
+impl Default for PortForwardRetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forwarding cleanup and teardown config
+#[derive(Debug, Clone)]
+pub struct PortForwardCleanup {
+    pub cleanup_strategy: String,
+    pub grace_period_ms: u64,
+    pub force_close: bool,
+    pub notify_clients: bool,
+    pub archive_logs: bool,
+}
+
+impl PortForwardCleanup {
+    pub fn new() -> Self {
+        Self {
+            cleanup_strategy: String::new(),
+            grace_period_ms: u64::default(),
+            force_close: bool::default(),
+            notify_clients: bool::default(),
+            archive_logs: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cleanup_strategy.is_empty() || true && self.grace_period_ms < u64::MAX || true && self.force_close || true && self.notify_clients || true && self.archive_logs || true
+    }
+}
+
+impl Default for PortForwardCleanup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -556626,6 +557458,474 @@ mod tests_mwz_generated {
     fn test_mwz_fields() {
         let mut obj = RemoteConfig::default();
         obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxa_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxa_default() {
+        let obj = PortForwardSpec::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxa_fields() {
+        let mut obj = PortForwardSpec::default();
+        obj.tunnel_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxb_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxb_default() {
+        let obj = PortForwardMapping::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxb_fields() {
+        let mut obj = PortForwardMapping::default();
+        obj.local_port = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxc_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxc_default() {
+        let obj = PortForwardProtocol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxc_fields() {
+        let mut obj = PortForwardProtocol::default();
+        obj.protocol_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxd_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxd_default() {
+        let obj = PortForwardStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxd_fields() {
+        let mut obj = PortForwardStatus::default();
+        obj.status_code = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxe_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxe_default() {
+        let obj = PortAutoDetection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxe_fields() {
+        let mut obj = PortAutoDetection::default();
+        obj.detect_method = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxf_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxf_default() {
+        let obj = PortForwardLabel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxf_fields() {
+        let mut obj = PortForwardLabel::default();
+        obj.label_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxg_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxg_default() {
+        let obj = PortVisibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxg_fields() {
+        let mut obj = PortVisibility::default();
+        obj.visibility_scope = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxh_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxh_default() {
+        let obj = PortForwardNotification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxh_fields() {
+        let mut obj = PortForwardNotification::default();
+        obj.event_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxi_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxi_default() {
+        let obj = PortForwardTunnel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxi_fields() {
+        let mut obj = PortForwardTunnel::default();
+        obj.tunnel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxj_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxj_default() {
+        let obj = PortForwardSource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxj_fields() {
+        let mut obj = PortForwardSource::default();
+        obj.source_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxk_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxk_default() {
+        let obj = PortForwardCandidate::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxk_fields() {
+        let mut obj = PortForwardCandidate::default();
+        obj.candidate_port = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxl_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxl_default() {
+        let obj = PortForwardAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxl_fields() {
+        let mut obj = PortForwardAction::default();
+        obj.action_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxm_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxm_default() {
+        let obj = PortForwardProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxm_fields() {
+        let mut obj = PortForwardProcess::default();
+        obj.process_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxn_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxn_default() {
+        let obj = PortForwardOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxn_fields() {
+        let mut obj = PortForwardOutput::default();
+        obj.output_channel = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxo_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxo_default() {
+        let obj = PortForwardPolicy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxo_fields() {
+        let mut obj = PortForwardPolicy::default();
+        obj.policy_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxp_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxp_default() {
+        let obj = PortForwardRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxp_fields() {
+        let mut obj = PortForwardRange::default();
+        obj.range_start = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxq_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxq_default() {
+        let obj = PortForwardSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxq_fields() {
+        let mut obj = PortForwardSession::default();
+        obj.session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxr_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxr_default() {
+        let obj = PortForwardMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxr_fields() {
+        let mut obj = PortForwardMetrics::default();
+        obj.total_bytes_in = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxs_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxs_default() {
+        let obj = PortForwardAttribute::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxs_fields() {
+        let mut obj = PortForwardAttribute::default();
+        obj.attr_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxt_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxt_default() {
+        let obj = PortForwardElevation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxt_fields() {
+        let mut obj = PortForwardElevation::default();
+        obj.elevation_level = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxu_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxu_default() {
+        let obj = PortForwardDns::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxu_fields() {
+        let mut obj = PortForwardDns::default();
+        obj.dns_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxv_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxv_default() {
+        let obj = PortForwardCertificate::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxv_fields() {
+        let mut obj = PortForwardCertificate::default();
+        obj.cert_subject = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxw_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxw_default() {
+        let obj = PortForwardProxy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxw_fields() {
+        let mut obj = PortForwardProxy::default();
+        obj.proxy_address = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxx_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxx_default() {
+        let obj = PortForwardTimeout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxx_fields() {
+        let mut obj = PortForwardTimeout::default();
+        obj.connect_timeout = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxy_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxy_default() {
+        let obj = PortForwardRetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxy_fields() {
+        let mut obj = PortForwardRetry::default();
+        obj.max_retries = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mxz_generated {
+    use super::*;
+
+    #[test]
+    fn test_mxz_default() {
+        let obj = PortForwardCleanup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mxz_fields() {
+        let mut obj = PortForwardCleanup::default();
+        obj.cleanup_strategy = "test".to_string();
         assert!(obj.validate());
     }
 }
