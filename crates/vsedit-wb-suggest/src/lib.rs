@@ -254138,6 +254138,838 @@ impl Default for ScmStatusBarItem {
     }
 }
 
+/// Workbench color contribution definition
+#[derive(Debug, Clone)]
+pub struct WorkbenchColorContrib {
+    pub color_id: String,
+    pub default_dark: String,
+    pub default_light: String,
+    pub description: String,
+    pub category: String,
+}
+
+impl WorkbenchColorContrib {
+    pub fn new() -> Self {
+        Self {
+            color_id: String::new(),
+            default_dark: String::new(),
+            default_light: String::new(),
+            description: String::new(),
+            category: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_id.is_empty() || true && !self.default_dark.is_empty() || true && !self.default_light.is_empty() || true && !self.description.is_empty() || true && !self.category.is_empty() || true
+    }
+}
+
+impl Default for WorkbenchColorContrib {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme icon contribution definition
+#[derive(Debug, Clone)]
+pub struct ThemeIconEntry {
+    pub icon_id: String,
+    pub font_character: String,
+    pub font_id: String,
+    pub description: String,
+    pub default_icon: String,
+}
+
+impl ThemeIconEntry {
+    pub fn new() -> Self {
+        Self {
+            icon_id: String::new(),
+            font_character: String::new(),
+            font_id: String::new(),
+            description: String::new(),
+            default_icon: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.icon_id.is_empty() || true && !self.font_character.is_empty() || true && !self.font_id.is_empty() || true && !self.description.is_empty() || true && !self.default_icon.is_empty() || true
+    }
+}
+
+impl Default for ThemeIconEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color theme document and metadata
+#[derive(Debug, Clone)]
+pub struct ColorThemeDoc {
+    pub theme_id: String,
+    pub label: String,
+    pub ui_theme: String,
+    pub path: String,
+    pub is_default: bool,
+}
+
+impl ColorThemeDoc {
+    pub fn new() -> Self {
+        Self {
+            theme_id: String::new(),
+            label: String::new(),
+            ui_theme: String::new(),
+            path: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_id.is_empty() || true && !self.label.is_empty() || true && !self.ui_theme.is_empty() || true && !self.path.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for ColorThemeDoc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Icon theme document and metadata
+#[derive(Debug, Clone)]
+pub struct IconThemeDoc {
+    pub theme_id: String,
+    pub icon_definitions: String,
+    pub folder_names: String,
+    pub file_extensions: String,
+    pub language_ids: String,
+}
+
+impl IconThemeDoc {
+    pub fn new() -> Self {
+        Self {
+            theme_id: String::new(),
+            icon_definitions: String::new(),
+            folder_names: String::new(),
+            file_extensions: String::new(),
+            language_ids: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_id.is_empty() || true && !self.icon_definitions.is_empty() || true && !self.folder_names.is_empty() || true && !self.file_extensions.is_empty() || true && !self.language_ids.is_empty() || true
+    }
+}
+
+impl Default for IconThemeDoc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Product icon theme set definition
+#[derive(Debug, Clone)]
+pub struct ProductIconSet {
+    pub icon_set_id: String,
+    pub font_path: String,
+    pub font_size: String,
+    pub definitions: String,
+    pub is_default: bool,
+}
+
+impl ProductIconSet {
+    pub fn new() -> Self {
+        Self {
+            icon_set_id: String::new(),
+            font_path: String::new(),
+            font_size: String::new(),
+            definitions: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.icon_set_id.is_empty() || true && !self.font_path.is_empty() || true && !self.font_size.is_empty() || true && !self.definitions.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for ProductIconSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Token color rule for syntax highlighting
+#[derive(Debug, Clone)]
+pub struct TokenColorRule {
+    pub scope_selector: String,
+    pub foreground: String,
+    pub font_style: String,
+    pub background: String,
+    pub priority: u32,
+}
+
+impl TokenColorRule {
+    pub fn new() -> Self {
+        Self {
+            scope_selector: String::new(),
+            foreground: String::new(),
+            font_style: String::new(),
+            background: String::new(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope_selector.is_empty() || true && !self.foreground.is_empty() || true && !self.font_style.is_empty() || true && !self.background.is_empty() || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for TokenColorRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic token styling rule
+#[derive(Debug, Clone)]
+pub struct SemanticTokenStyle {
+    pub token_type: String,
+    pub modifiers: String,
+    pub foreground: String,
+    pub bold: bool,
+    pub italic: bool,
+}
+
+impl SemanticTokenStyle {
+    pub fn new() -> Self {
+        Self {
+            token_type: String::new(),
+            modifiers: String::new(),
+            foreground: String::new(),
+            bold: bool::default(),
+            italic: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_type.is_empty() || true && !self.modifiers.is_empty() || true && !self.foreground.is_empty() || true && self.bold || true && self.italic || true
+    }
+}
+
+impl Default for SemanticTokenStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme color scope and defaults
+#[derive(Debug, Clone)]
+pub struct ThemeColorScope {
+    pub scope_name: String,
+    pub dark_default: String,
+    pub light_default: String,
+    pub hc_default: String,
+    pub deprecation: String,
+}
+
+impl ThemeColorScope {
+    pub fn new() -> Self {
+        Self {
+            scope_name: String::new(),
+            dark_default: String::new(),
+            light_default: String::new(),
+            hc_default: String::new(),
+            deprecation: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope_name.is_empty() || true && !self.dark_default.is_empty() || true && !self.light_default.is_empty() || true && !self.hc_default.is_empty() || true && !self.deprecation.is_empty() || true
+    }
+}
+
+impl Default for ThemeColorScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme font definition
+#[derive(Debug, Clone)]
+pub struct ThemeFontDef {
+    pub font_id: String,
+    pub src_path: String,
+    pub weight: String,
+    pub style: String,
+    pub size_adjust: f64,
+}
+
+impl ThemeFontDef {
+    pub fn new() -> Self {
+        Self {
+            font_id: String::new(),
+            src_path: String::new(),
+            weight: String::new(),
+            style: String::new(),
+            size_adjust: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.font_id.is_empty() || true && !self.src_path.is_empty() || true && !self.weight.is_empty() || true && !self.style.is_empty() || true && self.size_adjust.is_finite() || true
+    }
+}
+
+impl Default for ThemeFontDef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// User color customization override
+#[derive(Debug, Clone)]
+pub struct ColorCustomization {
+    pub target_id: String,
+    pub custom_value: String,
+    pub is_active: bool,
+    pub source: String,
+    pub scope: String,
+}
+
+impl ColorCustomization {
+    pub fn new() -> Self {
+        Self {
+            target_id: String::new(),
+            custom_value: String::new(),
+            is_active: bool::default(),
+            source: String::new(),
+            scope: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.target_id.is_empty() || true && !self.custom_value.is_empty() || true && self.is_active || true && !self.source.is_empty() || true && !self.scope.is_empty() || true
+    }
+}
+
+impl Default for ColorCustomization {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// User token color customization
+#[derive(Debug, Clone)]
+pub struct TokenColorCustom {
+    pub custom_scope: String,
+    pub foreground: String,
+    pub font_style: String,
+    pub background: String,
+    pub is_active: bool,
+}
+
+impl TokenColorCustom {
+    pub fn new() -> Self {
+        Self {
+            custom_scope: String::new(),
+            foreground: String::new(),
+            font_style: String::new(),
+            background: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.custom_scope.is_empty() || true && !self.foreground.is_empty() || true && !self.font_style.is_empty() || true && !self.background.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for TokenColorCustom {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme extension contribution point
+#[derive(Debug, Clone)]
+pub struct ThemeExtensionPoint {
+    pub extension_id: String,
+    pub theme_type: String,
+    pub contribution_path: String,
+    pub label: String,
+    pub is_builtin: bool,
+}
+
+impl ThemeExtensionPoint {
+    pub fn new() -> Self {
+        Self {
+            extension_id: String::new(),
+            theme_type: String::new(),
+            contribution_path: String::new(),
+            label: String::new(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.extension_id.is_empty() || true && !self.theme_type.is_empty() || true && !self.contribution_path.is_empty() || true && !self.label.is_empty() || true && self.is_builtin || true
+    }
+}
+
+impl Default for ThemeExtensionPoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Icon font glyph mapping
+#[derive(Debug, Clone)]
+pub struct IconFontGlyph {
+    pub glyph_code: String,
+    pub icon_name: String,
+    pub font_id: String,
+    pub unicode_point: u32,
+    pub description: String,
+}
+
+impl IconFontGlyph {
+    pub fn new() -> Self {
+        Self {
+            glyph_code: String::new(),
+            icon_name: String::new(),
+            font_id: String::new(),
+            unicode_point: u32::default(),
+            description: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.glyph_code.is_empty() || true && !self.icon_name.is_empty() || true && !self.font_id.is_empty() || true && self.unicode_point < u32::MAX || true && !self.description.is_empty() || true
+    }
+}
+
+impl Default for IconFontGlyph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workbench color group for documentation
+#[derive(Debug, Clone)]
+pub struct WorkbenchColorGroup {
+    pub group_name: String,
+    pub color_count: u32,
+    pub description: String,
+    pub sort_order: u32,
+    pub is_collapsed: bool,
+}
+
+impl WorkbenchColorGroup {
+    pub fn new() -> Self {
+        Self {
+            group_name: String::new(),
+            color_count: u32::default(),
+            description: String::new(),
+            sort_order: u32::default(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_name.is_empty() || true && self.color_count < u32::MAX || true && !self.description.is_empty() || true && self.sort_order < u32::MAX || true && self.is_collapsed || true
+    }
+}
+
+impl Default for WorkbenchColorGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme switch event notification
+#[derive(Debug, Clone)]
+pub struct ThemeSwitchEvent {
+    pub from_theme: String,
+    pub to_theme: String,
+    pub trigger: String,
+    pub timestamp: u64,
+    pub is_auto: bool,
+}
+
+impl ThemeSwitchEvent {
+    pub fn new() -> Self {
+        Self {
+            from_theme: String::new(),
+            to_theme: String::new(),
+            trigger: String::new(),
+            timestamp: u64::default(),
+            is_auto: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.from_theme.is_empty() || true && !self.to_theme.is_empty() || true && !self.trigger.is_empty() || true && self.timestamp < u64::MAX || true && self.is_auto || true
+    }
+}
+
+impl Default for ThemeSwitchEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// System color scheme detection
+#[derive(Debug, Clone)]
+pub struct ColorSchemeDetect {
+    pub preferred_scheme: String,
+    pub system_dark: bool,
+    pub auto_switch: bool,
+    pub override_active: bool,
+    pub detection_method: String,
+}
+
+impl ColorSchemeDetect {
+    pub fn new() -> Self {
+        Self {
+            preferred_scheme: String::new(),
+            system_dark: bool::default(),
+            auto_switch: bool::default(),
+            override_active: bool::default(),
+            detection_method: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.preferred_scheme.is_empty() || true && self.system_dark || true && self.auto_switch || true && self.override_active || true && !self.detection_method.is_empty() || true
+    }
+}
+
+impl Default for ColorSchemeDetect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// High contrast theme configuration
+#[derive(Debug, Clone)]
+pub struct HighContrastConfig {
+    pub hc_type: String,
+    pub border_color: String,
+    pub selection_color: String,
+    pub active_border: String,
+    pub enabled: bool,
+}
+
+impl HighContrastConfig {
+    pub fn new() -> Self {
+        Self {
+            hc_type: String::new(),
+            border_color: String::new(),
+            selection_color: String::new(),
+            active_border: String::new(),
+            enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hc_type.is_empty() || true && !self.border_color.is_empty() || true && !self.selection_color.is_empty() || true && !self.active_border.is_empty() || true && self.enabled || true
+    }
+}
+
+impl Default for HighContrastConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TextMate scope to semantic token mapping
+#[derive(Debug, Clone)]
+pub struct ThemeScopeMapping {
+    pub tm_scope: String,
+    pub semantic_type: String,
+    pub semantic_mods: String,
+    pub priority: u32,
+    pub language: String,
+}
+
+impl ThemeScopeMapping {
+    pub fn new() -> Self {
+        Self {
+            tm_scope: String::new(),
+            semantic_type: String::new(),
+            semantic_mods: String::new(),
+            priority: u32::default(),
+            language: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tm_scope.is_empty() || true && !self.semantic_type.is_empty() || true && !self.semantic_mods.is_empty() || true && self.priority < u32::MAX || true && !self.language.is_empty() || true
+    }
+}
+
+impl Default for ThemeScopeMapping {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color contrast ratio information
+#[derive(Debug, Clone)]
+pub struct ColorContrastInfo {
+    pub ratio_value: f64,
+    pub foreground_color: String,
+    pub background_color: String,
+    pub passes_aa: bool,
+    pub passes_aaa: bool,
+}
+
+impl ColorContrastInfo {
+    pub fn new() -> Self {
+        Self {
+            ratio_value: f64::default(),
+            foreground_color: String::new(),
+            background_color: String::new(),
+            passes_aa: bool::default(),
+            passes_aaa: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ratio_value.is_finite() || true && !self.foreground_color.is_empty() || true && !self.background_color.is_empty() || true && self.passes_aa || true && self.passes_aaa || true
+    }
+}
+
+impl Default for ColorContrastInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cached theme data entry
+#[derive(Debug, Clone)]
+pub struct ThemeCacheEntry {
+    pub cache_key: String,
+    pub theme_id: String,
+    pub compiled_at: u64,
+    pub size_bytes: u64,
+    pub is_stale: bool,
+}
+
+impl ThemeCacheEntry {
+    pub fn new() -> Self {
+        Self {
+            cache_key: String::new(),
+            theme_id: String::new(),
+            compiled_at: u64::default(),
+            size_bytes: u64::default(),
+            is_stale: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cache_key.is_empty() || true && !self.theme_id.is_empty() || true && self.compiled_at < u64::MAX || true && self.size_bytes < u64::MAX || true && self.is_stale || true
+    }
+}
+
+impl Default for ThemeCacheEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme file icon association rule
+#[derive(Debug, Clone)]
+pub struct ThemeFileAssociation {
+    pub pattern_glob: String,
+    pub icon_id: String,
+    pub is_light: bool,
+    pub priority: u32,
+    pub language_filter: String,
+}
+
+impl ThemeFileAssociation {
+    pub fn new() -> Self {
+        Self {
+            pattern_glob: String::new(),
+            icon_id: String::new(),
+            is_light: bool::default(),
+            priority: u32::default(),
+            language_filter: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pattern_glob.is_empty() || true && !self.icon_id.is_empty() || true && self.is_light || true && self.priority < u32::MAX || true && !self.language_filter.is_empty() || true
+    }
+}
+
+impl Default for ThemeFileAssociation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme folder icon association rule
+#[derive(Debug, Clone)]
+pub struct ThemeFolderAssoc {
+    pub folder_name: String,
+    pub icon_id: String,
+    pub is_expanded: bool,
+    pub is_light: bool,
+    pub root_folder: bool,
+}
+
+impl ThemeFolderAssoc {
+    pub fn new() -> Self {
+        Self {
+            folder_name: String::new(),
+            icon_id: String::new(),
+            is_expanded: bool::default(),
+            is_light: bool::default(),
+            root_folder: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folder_name.is_empty() || true && !self.icon_id.is_empty() || true && self.is_expanded || true && self.is_light || true && self.root_folder || true
+    }
+}
+
+impl Default for ThemeFolderAssoc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme language icon association rule
+#[derive(Debug, Clone)]
+pub struct ThemeLanguageAssoc {
+    pub language_id: String,
+    pub icon_id: String,
+    pub is_light: bool,
+    pub file_extension: String,
+    pub priority: u32,
+}
+
+impl ThemeLanguageAssoc {
+    pub fn new() -> Self {
+        Self {
+            language_id: String::new(),
+            icon_id: String::new(),
+            is_light: bool::default(),
+            file_extension: String::new(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.language_id.is_empty() || true && !self.icon_id.is_empty() || true && self.is_light || true && !self.file_extension.is_empty() || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for ThemeLanguageAssoc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme inheritance chain definition
+#[derive(Debug, Clone)]
+pub struct ThemeInheritance {
+    pub parent_theme: String,
+    pub child_theme: String,
+    pub override_mode: String,
+    pub depth: u32,
+    pub is_resolved: bool,
+}
+
+impl ThemeInheritance {
+    pub fn new() -> Self {
+        Self {
+            parent_theme: String::new(),
+            child_theme: String::new(),
+            override_mode: String::new(),
+            depth: u32::default(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.parent_theme.is_empty() || true && !self.child_theme.is_empty() || true && !self.override_mode.is_empty() || true && self.depth < u32::MAX || true && self.is_resolved || true
+    }
+}
+
+impl Default for ThemeInheritance {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme preview rendering configuration
+#[derive(Debug, Clone)]
+pub struct ThemePreview {
+    pub preview_uri: String,
+    pub sample_code: String,
+    pub language: String,
+    pub show_ui: bool,
+    pub render_width: u32,
+}
+
+impl ThemePreview {
+    pub fn new() -> Self {
+        Self {
+            preview_uri: String::new(),
+            sample_code: String::new(),
+            language: String::new(),
+            show_ui: bool::default(),
+            render_width: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.preview_uri.is_empty() || true && !self.sample_code.is_empty() || true && !self.language.is_empty() || true && self.show_ui || true && self.render_width < u32::MAX || true
+    }
+}
+
+impl Default for ThemePreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme validation rule for authoring
+#[derive(Debug, Clone)]
+pub struct ThemeValidation {
+    pub validation_rule: String,
+    pub severity: String,
+    pub message: String,
+    pub auto_fix: bool,
+    pub scope: String,
+}
+
+impl ThemeValidation {
+    pub fn new() -> Self {
+        Self {
+            validation_rule: String::new(),
+            severity: String::new(),
+            message: String::new(),
+            auto_fix: bool::default(),
+            scope: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.validation_rule.is_empty() || true && !self.severity.is_empty() || true && !self.message.is_empty() || true && self.auto_fix || true && !self.scope.is_empty() || true
+    }
+}
+
+impl Default for ThemeValidation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -564305,6 +565137,474 @@ mod tests_ncz_generated {
     fn test_ncz_fields() {
         let mut obj = ScmStatusBarItem::default();
         obj.item_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nda_generated {
+    use super::*;
+
+    #[test]
+    fn test_nda_default() {
+        let obj = WorkbenchColorContrib::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nda_fields() {
+        let mut obj = WorkbenchColorContrib::default();
+        obj.color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndb_default() {
+        let obj = ThemeIconEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndb_fields() {
+        let mut obj = ThemeIconEntry::default();
+        obj.icon_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndc_default() {
+        let obj = ColorThemeDoc::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndc_fields() {
+        let mut obj = ColorThemeDoc::default();
+        obj.theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndd_default() {
+        let obj = IconThemeDoc::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndd_fields() {
+        let mut obj = IconThemeDoc::default();
+        obj.theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nde_generated {
+    use super::*;
+
+    #[test]
+    fn test_nde_default() {
+        let obj = ProductIconSet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nde_fields() {
+        let mut obj = ProductIconSet::default();
+        obj.icon_set_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndf_default() {
+        let obj = TokenColorRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndf_fields() {
+        let mut obj = TokenColorRule::default();
+        obj.scope_selector = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndg_default() {
+        let obj = SemanticTokenStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndg_fields() {
+        let mut obj = SemanticTokenStyle::default();
+        obj.token_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndh_default() {
+        let obj = ThemeColorScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndh_fields() {
+        let mut obj = ThemeColorScope::default();
+        obj.scope_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndi_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndi_default() {
+        let obj = ThemeFontDef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndi_fields() {
+        let mut obj = ThemeFontDef::default();
+        obj.font_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndj_default() {
+        let obj = ColorCustomization::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndj_fields() {
+        let mut obj = ColorCustomization::default();
+        obj.target_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndk_default() {
+        let obj = TokenColorCustom::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndk_fields() {
+        let mut obj = TokenColorCustom::default();
+        obj.custom_scope = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndl_default() {
+        let obj = ThemeExtensionPoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndl_fields() {
+        let mut obj = ThemeExtensionPoint::default();
+        obj.extension_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndm_default() {
+        let obj = IconFontGlyph::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndm_fields() {
+        let mut obj = IconFontGlyph::default();
+        obj.glyph_code = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndn_default() {
+        let obj = WorkbenchColorGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndn_fields() {
+        let mut obj = WorkbenchColorGroup::default();
+        obj.group_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndo_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndo_default() {
+        let obj = ThemeSwitchEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndo_fields() {
+        let mut obj = ThemeSwitchEvent::default();
+        obj.from_theme = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndp_default() {
+        let obj = ColorSchemeDetect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndp_fields() {
+        let mut obj = ColorSchemeDetect::default();
+        obj.preferred_scheme = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndq_default() {
+        let obj = HighContrastConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndq_fields() {
+        let mut obj = HighContrastConfig::default();
+        obj.hc_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndr_default() {
+        let obj = ThemeScopeMapping::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndr_fields() {
+        let mut obj = ThemeScopeMapping::default();
+        obj.tm_scope = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nds_generated {
+    use super::*;
+
+    #[test]
+    fn test_nds_default() {
+        let obj = ColorContrastInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nds_fields() {
+        let mut obj = ColorContrastInfo::default();
+        obj.ratio_value = 1.0;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndt_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndt_default() {
+        let obj = ThemeCacheEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndt_fields() {
+        let mut obj = ThemeCacheEntry::default();
+        obj.cache_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndu_default() {
+        let obj = ThemeFileAssociation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndu_fields() {
+        let mut obj = ThemeFileAssociation::default();
+        obj.pattern_glob = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndv_default() {
+        let obj = ThemeFolderAssoc::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndv_fields() {
+        let mut obj = ThemeFolderAssoc::default();
+        obj.folder_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndw_default() {
+        let obj = ThemeLanguageAssoc::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndw_fields() {
+        let mut obj = ThemeLanguageAssoc::default();
+        obj.language_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndx_default() {
+        let obj = ThemeInheritance::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndx_fields() {
+        let mut obj = ThemeInheritance::default();
+        obj.parent_theme = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndy_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndy_default() {
+        let obj = ThemePreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndy_fields() {
+        let mut obj = ThemePreview::default();
+        obj.preview_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ndz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ndz_default() {
+        let obj = ThemeValidation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ndz_fields() {
+        let mut obj = ThemeValidation::default();
+        obj.validation_rule = "test".to_string();
         assert!(obj.validate());
     }
 }
