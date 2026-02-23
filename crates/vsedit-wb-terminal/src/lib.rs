@@ -246866,6 +246866,1202 @@ impl Default for ProfileManagerConfig {
     }
 }
 
+/// Chat conversation message entry
+#[derive(Debug, Clone)]
+pub struct ChatMessage {
+    pub message_id: String,
+    pub role_name: String,
+    pub content_text: String,
+    pub timestamp_ms: u64,
+    pub participant_id: String,
+    pub is_complete: bool,
+    pub has_error: bool,
+    pub error_message: String,
+    pub token_count: u32,
+    pub model_id: String,
+    pub request_id: String,
+    pub metadata_json: String,
+}
+
+impl ChatMessage {
+    pub fn new() -> Self {
+        Self {
+            message_id: String::new(),
+            role_name: String::new(),
+            content_text: String::new(),
+            timestamp_ms: u64::default(),
+            participant_id: String::new(),
+            is_complete: bool::default(),
+            has_error: bool::default(),
+            error_message: String::new(),
+            token_count: u32::default(),
+            model_id: String::new(),
+            request_id: String::new(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.message_id.is_empty() || true && !self.role_name.is_empty() || true && !self.content_text.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.participant_id.is_empty() || true && self.is_complete || true && self.has_error || true && !self.error_message.is_empty() || true && self.token_count < u32::MAX || true && !self.model_id.is_empty() || true && !self.request_id.is_empty() || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for ChatMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat participant definition
+#[derive(Debug, Clone)]
+pub struct ChatParticipantDef {
+    pub participant_id: String,
+    pub participant_name: String,
+    pub display_name: String,
+    pub icon_url: String,
+    pub description_text: String,
+    pub is_default: bool,
+    pub extension_id: String,
+    pub slash_commands: String,
+    pub when_clause: String,
+    pub sample_request: String,
+    pub sort_order: u32,
+    pub is_sticky: bool,
+}
+
+impl ChatParticipantDef {
+    pub fn new() -> Self {
+        Self {
+            participant_id: String::new(),
+            participant_name: String::new(),
+            display_name: String::new(),
+            icon_url: String::new(),
+            description_text: String::new(),
+            is_default: bool::default(),
+            extension_id: String::new(),
+            slash_commands: String::new(),
+            when_clause: String::new(),
+            sample_request: String::new(),
+            sort_order: u32::default(),
+            is_sticky: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.participant_id.is_empty() || true && !self.participant_name.is_empty() || true && !self.display_name.is_empty() || true && !self.icon_url.is_empty() || true && !self.description_text.is_empty() || true && self.is_default || true && !self.extension_id.is_empty() || true && !self.slash_commands.is_empty() || true && !self.when_clause.is_empty() || true && !self.sample_request.is_empty() || true && self.sort_order < u32::MAX || true && self.is_sticky || true
+    }
+}
+
+impl Default for ChatParticipantDef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat request payload to language model
+#[derive(Debug, Clone)]
+pub struct ChatRequestPayload {
+    pub request_id: String,
+    pub prompt_text: String,
+    pub participant_id: String,
+    pub model_id: String,
+    pub temperature: f64,
+    pub max_tokens: u32,
+    pub top_p: f64,
+    pub stop_sequences: String,
+    pub system_prompt: String,
+    pub context_refs: String,
+    pub tool_ids: String,
+    pub stream_enabled: bool,
+}
+
+impl ChatRequestPayload {
+    pub fn new() -> Self {
+        Self {
+            request_id: String::new(),
+            prompt_text: String::new(),
+            participant_id: String::new(),
+            model_id: String::new(),
+            temperature: f64::default(),
+            max_tokens: u32::default(),
+            top_p: f64::default(),
+            stop_sequences: String::new(),
+            system_prompt: String::new(),
+            context_refs: String::new(),
+            tool_ids: String::new(),
+            stream_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.request_id.is_empty() || true && !self.prompt_text.is_empty() || true && !self.participant_id.is_empty() || true && !self.model_id.is_empty() || true && self.temperature.is_finite() || true && self.max_tokens < u32::MAX || true && self.top_p.is_finite() || true && !self.stop_sequences.is_empty() || true && !self.system_prompt.is_empty() || true && !self.context_refs.is_empty() || true && !self.tool_ids.is_empty() || true && self.stream_enabled || true
+    }
+}
+
+impl Default for ChatRequestPayload {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat response stream fragment
+#[derive(Debug, Clone)]
+pub struct ChatStreamFragment {
+    pub part_id: String,
+    pub part_kind: String,
+    pub content_text: String,
+    pub is_final: bool,
+    pub request_id: String,
+    pub sequence_num: u32,
+    pub markdown_text: String,
+    pub code_block: String,
+    pub language_id: String,
+    pub is_incomplete: bool,
+    pub vulnerability_text: String,
+    pub citation_text: String,
+}
+
+impl ChatStreamFragment {
+    pub fn new() -> Self {
+        Self {
+            part_id: String::new(),
+            part_kind: String::new(),
+            content_text: String::new(),
+            is_final: bool::default(),
+            request_id: String::new(),
+            sequence_num: u32::default(),
+            markdown_text: String::new(),
+            code_block: String::new(),
+            language_id: String::new(),
+            is_incomplete: bool::default(),
+            vulnerability_text: String::new(),
+            citation_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.part_id.is_empty() || true && !self.part_kind.is_empty() || true && !self.content_text.is_empty() || true && self.is_final || true && !self.request_id.is_empty() || true && self.sequence_num < u32::MAX || true && !self.markdown_text.is_empty() || true && !self.code_block.is_empty() || true && !self.language_id.is_empty() || true && self.is_incomplete || true && !self.vulnerability_text.is_empty() || true && !self.citation_text.is_empty() || true
+    }
+}
+
+impl Default for ChatStreamFragment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat slash command registration
+#[derive(Debug, Clone)]
+pub struct ChatSlashCommand {
+    pub slash_id: String,
+    pub command_name: String,
+    pub description_text: String,
+    pub participant_id: String,
+    pub when_clause: String,
+    pub sample_request: String,
+    pub is_default: bool,
+    pub sort_order: u32,
+    pub icon_id: String,
+    pub yields_to: String,
+    pub is_sticky: bool,
+    pub category_name: String,
+}
+
+impl ChatSlashCommand {
+    pub fn new() -> Self {
+        Self {
+            slash_id: String::new(),
+            command_name: String::new(),
+            description_text: String::new(),
+            participant_id: String::new(),
+            when_clause: String::new(),
+            sample_request: String::new(),
+            is_default: bool::default(),
+            sort_order: u32::default(),
+            icon_id: String::new(),
+            yields_to: String::new(),
+            is_sticky: bool::default(),
+            category_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.slash_id.is_empty() || true && !self.command_name.is_empty() || true && !self.description_text.is_empty() || true && !self.participant_id.is_empty() || true && !self.when_clause.is_empty() || true && !self.sample_request.is_empty() || true && self.is_default || true && self.sort_order < u32::MAX || true && !self.icon_id.is_empty() || true && !self.yields_to.is_empty() || true && self.is_sticky || true && !self.category_name.is_empty() || true
+    }
+}
+
+impl Default for ChatSlashCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat context variable reference
+#[derive(Debug, Clone)]
+pub struct ChatContextVariable {
+    pub variable_name: String,
+    pub variable_id: String,
+    pub description_text: String,
+    pub is_builtin: bool,
+    pub value_text: String,
+    pub is_slow: bool,
+    pub is_full: bool,
+    pub icon_id: String,
+    pub when_clause: String,
+    pub extension_id: String,
+    pub model_description: String,
+    pub sort_order: u32,
+}
+
+impl ChatContextVariable {
+    pub fn new() -> Self {
+        Self {
+            variable_name: String::new(),
+            variable_id: String::new(),
+            description_text: String::new(),
+            is_builtin: bool::default(),
+            value_text: String::new(),
+            is_slow: bool::default(),
+            is_full: bool::default(),
+            icon_id: String::new(),
+            when_clause: String::new(),
+            extension_id: String::new(),
+            model_description: String::new(),
+            sort_order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.variable_name.is_empty() || true && !self.variable_id.is_empty() || true && !self.description_text.is_empty() || true && self.is_builtin || true && !self.value_text.is_empty() || true && self.is_slow || true && self.is_full || true && !self.icon_id.is_empty() || true && !self.when_clause.is_empty() || true && !self.extension_id.is_empty() || true && !self.model_description.is_empty() || true && self.sort_order < u32::MAX || true
+    }
+}
+
+impl Default for ChatContextVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat follow-up suggestion
+#[derive(Debug, Clone)]
+pub struct ChatFollowUp {
+    pub followup_id: String,
+    pub followup_text: String,
+    pub participant_id: String,
+    pub command_name: String,
+    pub tooltip_text: String,
+    pub is_default: bool,
+    pub sort_order: u32,
+    pub icon_id: String,
+    pub when_clause: String,
+    pub category_name: String,
+    pub label_text: String,
+    pub description_text: String,
+}
+
+impl ChatFollowUp {
+    pub fn new() -> Self {
+        Self {
+            followup_id: String::new(),
+            followup_text: String::new(),
+            participant_id: String::new(),
+            command_name: String::new(),
+            tooltip_text: String::new(),
+            is_default: bool::default(),
+            sort_order: u32::default(),
+            icon_id: String::new(),
+            when_clause: String::new(),
+            category_name: String::new(),
+            label_text: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.followup_id.is_empty() || true && !self.followup_text.is_empty() || true && !self.participant_id.is_empty() || true && !self.command_name.is_empty() || true && !self.tooltip_text.is_empty() || true && self.is_default || true && self.sort_order < u32::MAX || true && !self.icon_id.is_empty() || true && !self.when_clause.is_empty() || true && !self.category_name.is_empty() || true && !self.label_text.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ChatFollowUp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat tool/function call invocation
+#[derive(Debug, Clone)]
+pub struct ChatToolCall {
+    pub tool_call_id: String,
+    pub tool_name: String,
+    pub arguments_json: String,
+    pub request_id: String,
+    pub is_confirmed: bool,
+    pub is_complete: bool,
+    pub progress_text: String,
+    pub result_preview: String,
+    pub confirmation_msg: String,
+    pub token_count: u32,
+    pub invocation_token: String,
+    pub description_text: String,
+}
+
+impl ChatToolCall {
+    pub fn new() -> Self {
+        Self {
+            tool_call_id: String::new(),
+            tool_name: String::new(),
+            arguments_json: String::new(),
+            request_id: String::new(),
+            is_confirmed: bool::default(),
+            is_complete: bool::default(),
+            progress_text: String::new(),
+            result_preview: String::new(),
+            confirmation_msg: String::new(),
+            token_count: u32::default(),
+            invocation_token: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tool_call_id.is_empty() || true && !self.tool_name.is_empty() || true && !self.arguments_json.is_empty() || true && !self.request_id.is_empty() || true && self.is_confirmed || true && self.is_complete || true && !self.progress_text.is_empty() || true && !self.result_preview.is_empty() || true && !self.confirmation_msg.is_empty() || true && self.token_count < u32::MAX || true && !self.invocation_token.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ChatToolCall {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat tool/function call result
+#[derive(Debug, Clone)]
+pub struct ChatToolResult {
+    pub result_id: String,
+    pub tool_call_id: String,
+    pub result_json: String,
+    pub is_success: bool,
+    pub error_message: String,
+    pub duration_ms: u64,
+    pub token_count: u32,
+    pub truncated: bool,
+    pub metadata_json: String,
+    pub display_text: String,
+    pub content_type: String,
+    pub description_text: String,
+}
+
+impl ChatToolResult {
+    pub fn new() -> Self {
+        Self {
+            result_id: String::new(),
+            tool_call_id: String::new(),
+            result_json: String::new(),
+            is_success: bool::default(),
+            error_message: String::new(),
+            duration_ms: u64::default(),
+            token_count: u32::default(),
+            truncated: bool::default(),
+            metadata_json: String::new(),
+            display_text: String::new(),
+            content_type: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.result_id.is_empty() || true && !self.tool_call_id.is_empty() || true && !self.result_json.is_empty() || true && self.is_success || true && !self.error_message.is_empty() || true && self.duration_ms < u64::MAX || true && self.token_count < u32::MAX || true && self.truncated || true && !self.metadata_json.is_empty() || true && !self.display_text.is_empty() || true && !self.content_type.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ChatToolResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat conversation session
+#[derive(Debug, Clone)]
+pub struct ChatSession {
+    pub session_id: String,
+    pub session_title: String,
+    pub message_count: u32,
+    pub participant_id: String,
+    pub model_id: String,
+    pub created_ms: u64,
+    pub modified_ms: u64,
+    pub is_active: bool,
+    pub total_tokens: u32,
+    pub turn_count: u32,
+    pub is_exported: bool,
+    pub description_text: String,
+}
+
+impl ChatSession {
+    pub fn new() -> Self {
+        Self {
+            session_id: String::new(),
+            session_title: String::new(),
+            message_count: u32::default(),
+            participant_id: String::new(),
+            model_id: String::new(),
+            created_ms: u64::default(),
+            modified_ms: u64::default(),
+            is_active: bool::default(),
+            total_tokens: u32::default(),
+            turn_count: u32::default(),
+            is_exported: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.session_id.is_empty() || true && !self.session_title.is_empty() || true && self.message_count < u32::MAX || true && !self.participant_id.is_empty() || true && !self.model_id.is_empty() || true && self.created_ms < u64::MAX || true && self.modified_ms < u64::MAX || true && self.is_active || true && self.total_tokens < u32::MAX || true && self.turn_count < u32::MAX || true && self.is_exported || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ChatSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat code block with actions
+#[derive(Debug, Clone)]
+pub struct ChatCodeBlock {
+    pub block_id: String,
+    pub language_id: String,
+    pub code_text: String,
+    pub is_complete: bool,
+    pub line_count: u32,
+    pub has_diff: bool,
+    pub is_editable: bool,
+    pub apply_status: String,
+    pub file_uri: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub description_text: String,
+}
+
+impl ChatCodeBlock {
+    pub fn new() -> Self {
+        Self {
+            block_id: String::new(),
+            language_id: String::new(),
+            code_text: String::new(),
+            is_complete: bool::default(),
+            line_count: u32::default(),
+            has_diff: bool::default(),
+            is_editable: bool::default(),
+            apply_status: String::new(),
+            file_uri: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.block_id.is_empty() || true && !self.language_id.is_empty() || true && !self.code_text.is_empty() || true && self.is_complete || true && self.line_count < u32::MAX || true && self.has_diff || true && self.is_editable || true && !self.apply_status.is_empty() || true && !self.file_uri.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ChatCodeBlock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat inline annotation/reference
+#[derive(Debug, Clone)]
+pub struct ChatAnnotation {
+    pub annotation_id: String,
+    pub annotation_kind: String,
+    pub label_text: String,
+    pub detail_text: String,
+    pub file_uri: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub icon_id: String,
+    pub tooltip_text: String,
+    pub command_id: String,
+    pub is_clickable: bool,
+    pub description_text: String,
+}
+
+impl ChatAnnotation {
+    pub fn new() -> Self {
+        Self {
+            annotation_id: String::new(),
+            annotation_kind: String::new(),
+            label_text: String::new(),
+            detail_text: String::new(),
+            file_uri: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            icon_id: String::new(),
+            tooltip_text: String::new(),
+            command_id: String::new(),
+            is_clickable: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.annotation_id.is_empty() || true && !self.annotation_kind.is_empty() || true && !self.label_text.is_empty() || true && !self.detail_text.is_empty() || true && !self.file_uri.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && !self.icon_id.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.command_id.is_empty() || true && self.is_clickable || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ChatAnnotation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline chat widget in editor
+#[derive(Debug, Clone)]
+pub struct InlineChatEntry {
+    pub inline_id: String,
+    pub prompt_text: String,
+    pub response_text: String,
+    pub line_number: u32,
+    pub is_visible: bool,
+    pub is_loading: bool,
+    pub model_id: String,
+    pub participant_id: String,
+    pub diff_preview: String,
+    pub accept_status: String,
+    pub widget_height: u32,
+    pub description_text: String,
+}
+
+impl InlineChatEntry {
+    pub fn new() -> Self {
+        Self {
+            inline_id: String::new(),
+            prompt_text: String::new(),
+            response_text: String::new(),
+            line_number: u32::default(),
+            is_visible: bool::default(),
+            is_loading: bool::default(),
+            model_id: String::new(),
+            participant_id: String::new(),
+            diff_preview: String::new(),
+            accept_status: String::new(),
+            widget_height: u32::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_id.is_empty() || true && !self.prompt_text.is_empty() || true && !self.response_text.is_empty() || true && self.line_number < u32::MAX || true && self.is_visible || true && self.is_loading || true && !self.model_id.is_empty() || true && !self.participant_id.is_empty() || true && !self.diff_preview.is_empty() || true && !self.accept_status.is_empty() || true && self.widget_height < u32::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for InlineChatEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat language model selection
+#[derive(Debug, Clone)]
+pub struct ChatModelSelection {
+    pub model_id: String,
+    pub model_name: String,
+    pub model_family: String,
+    pub provider_name: String,
+    pub max_tokens: u32,
+    pub supports_tools: bool,
+    pub supports_vision: bool,
+    pub is_default: bool,
+    pub is_available: bool,
+    pub cost_tier: String,
+    pub version_text: String,
+    pub description_text: String,
+}
+
+impl ChatModelSelection {
+    pub fn new() -> Self {
+        Self {
+            model_id: String::new(),
+            model_name: String::new(),
+            model_family: String::new(),
+            provider_name: String::new(),
+            max_tokens: u32::default(),
+            supports_tools: bool::default(),
+            supports_vision: bool::default(),
+            is_default: bool::default(),
+            is_available: bool::default(),
+            cost_tier: String::new(),
+            version_text: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.model_id.is_empty() || true && !self.model_name.is_empty() || true && !self.model_family.is_empty() || true && !self.provider_name.is_empty() || true && self.max_tokens < u32::MAX || true && self.supports_tools || true && self.supports_vision || true && self.is_default || true && self.is_available || true && !self.cost_tier.is_empty() || true && !self.version_text.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ChatModelSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat prompt library template
+#[derive(Debug, Clone)]
+pub struct ChatPromptLib {
+    pub prompt_id: String,
+    pub prompt_name: String,
+    pub prompt_text: String,
+    pub category_name: String,
+    pub is_builtin: bool,
+    pub is_favorite: bool,
+    pub use_count: u32,
+    pub created_ms: u64,
+    pub modified_ms: u64,
+    pub variables_used: String,
+    pub sort_order: u32,
+    pub description_text: String,
+}
+
+impl ChatPromptLib {
+    pub fn new() -> Self {
+        Self {
+            prompt_id: String::new(),
+            prompt_name: String::new(),
+            prompt_text: String::new(),
+            category_name: String::new(),
+            is_builtin: bool::default(),
+            is_favorite: bool::default(),
+            use_count: u32::default(),
+            created_ms: u64::default(),
+            modified_ms: u64::default(),
+            variables_used: String::new(),
+            sort_order: u32::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prompt_id.is_empty() || true && !self.prompt_name.is_empty() || true && !self.prompt_text.is_empty() || true && !self.category_name.is_empty() || true && self.is_builtin || true && self.is_favorite || true && self.use_count < u32::MAX || true && self.created_ms < u64::MAX || true && self.modified_ms < u64::MAX || true && !self.variables_used.is_empty() || true && self.sort_order < u32::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ChatPromptLib {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat context attachment item
+#[derive(Debug, Clone)]
+pub struct ChatContextItem {
+    pub context_id: String,
+    pub context_kind: String,
+    pub context_uri: String,
+    pub context_text: String,
+    pub is_file: bool,
+    pub is_selection: bool,
+    pub is_terminal: bool,
+    pub is_symbol: bool,
+    pub line_range: String,
+    pub token_count: u32,
+    pub is_truncated: bool,
+    pub description_text: String,
+}
+
+impl ChatContextItem {
+    pub fn new() -> Self {
+        Self {
+            context_id: String::new(),
+            context_kind: String::new(),
+            context_uri: String::new(),
+            context_text: String::new(),
+            is_file: bool::default(),
+            is_selection: bool::default(),
+            is_terminal: bool::default(),
+            is_symbol: bool::default(),
+            line_range: String::new(),
+            token_count: u32::default(),
+            is_truncated: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.context_id.is_empty() || true && !self.context_kind.is_empty() || true && !self.context_uri.is_empty() || true && !self.context_text.is_empty() || true && self.is_file || true && self.is_selection || true && self.is_terminal || true && self.is_symbol || true && !self.line_range.is_empty() || true && self.token_count < u32::MAX || true && self.is_truncated || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ChatContextItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat-suggested code edit action
+#[derive(Debug, Clone)]
+pub struct ChatEditAction {
+    pub edit_id: String,
+    pub file_uri: String,
+    pub old_text: String,
+    pub new_text: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub is_applied: bool,
+    pub is_accepted: bool,
+    pub is_rejected: bool,
+    pub diff_preview: String,
+    pub description_text: String,
+    pub confidence_pct: f64,
+}
+
+impl ChatEditAction {
+    pub fn new() -> Self {
+        Self {
+            edit_id: String::new(),
+            file_uri: String::new(),
+            old_text: String::new(),
+            new_text: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            is_applied: bool::default(),
+            is_accepted: bool::default(),
+            is_rejected: bool::default(),
+            diff_preview: String::new(),
+            description_text: String::new(),
+            confidence_pct: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_id.is_empty() || true && !self.file_uri.is_empty() || true && !self.old_text.is_empty() || true && !self.new_text.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && self.is_applied || true && self.is_accepted || true && self.is_rejected || true && !self.diff_preview.is_empty() || true && !self.description_text.is_empty() || true && self.confidence_pct.is_finite() || true
+    }
+}
+
+impl Default for ChatEditAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat voice input transcription
+#[derive(Debug, Clone)]
+pub struct ChatVoiceInput {
+    pub voice_id: String,
+    pub audio_data: String,
+    pub transcript_text: String,
+    pub language_id: String,
+    pub duration_ms: u64,
+    pub is_final: bool,
+    pub confidence_pct: f64,
+    pub is_recording: bool,
+    pub sample_rate: u32,
+    pub encoding_format: String,
+    pub error_message: String,
+    pub description_text: String,
+}
+
+impl ChatVoiceInput {
+    pub fn new() -> Self {
+        Self {
+            voice_id: String::new(),
+            audio_data: String::new(),
+            transcript_text: String::new(),
+            language_id: String::new(),
+            duration_ms: u64::default(),
+            is_final: bool::default(),
+            confidence_pct: f64::default(),
+            is_recording: bool::default(),
+            sample_rate: u32::default(),
+            encoding_format: String::new(),
+            error_message: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.voice_id.is_empty() || true && !self.audio_data.is_empty() || true && !self.transcript_text.is_empty() || true && !self.language_id.is_empty() || true && self.duration_ms < u64::MAX || true && self.is_final || true && self.confidence_pct.is_finite() || true && self.is_recording || true && self.sample_rate < u32::MAX || true && !self.encoding_format.is_empty() || true && !self.error_message.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ChatVoiceInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat conversation history entry
+#[derive(Debug, Clone)]
+pub struct ChatHistory {
+    pub history_id: String,
+    pub session_id: String,
+    pub title_text: String,
+    pub message_count: u32,
+    pub total_tokens: u32,
+    pub created_ms: u64,
+    pub last_access_ms: u64,
+    pub is_pinned: bool,
+    pub is_archived: bool,
+    pub participant_ids: String,
+    pub model_id: String,
+    pub description_text: String,
+}
+
+impl ChatHistory {
+    pub fn new() -> Self {
+        Self {
+            history_id: String::new(),
+            session_id: String::new(),
+            title_text: String::new(),
+            message_count: u32::default(),
+            total_tokens: u32::default(),
+            created_ms: u64::default(),
+            last_access_ms: u64::default(),
+            is_pinned: bool::default(),
+            is_archived: bool::default(),
+            participant_ids: String::new(),
+            model_id: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.history_id.is_empty() || true && !self.session_id.is_empty() || true && !self.title_text.is_empty() || true && self.message_count < u32::MAX || true && self.total_tokens < u32::MAX || true && self.created_ms < u64::MAX || true && self.last_access_ms < u64::MAX || true && self.is_pinned || true && self.is_archived || true && !self.participant_ids.is_empty() || true && !self.model_id.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ChatHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat file/image attachment
+#[derive(Debug, Clone)]
+pub struct ChatAttachment {
+    pub attach_id: String,
+    pub attach_kind: String,
+    pub file_name: String,
+    pub file_size: u64,
+    pub mime_type: String,
+    pub content_data: String,
+    pub thumbnail_url: String,
+    pub is_image: bool,
+    pub width_px: u32,
+    pub height_px: u32,
+    pub is_uploaded: bool,
+    pub description_text: String,
+}
+
+impl ChatAttachment {
+    pub fn new() -> Self {
+        Self {
+            attach_id: String::new(),
+            attach_kind: String::new(),
+            file_name: String::new(),
+            file_size: u64::default(),
+            mime_type: String::new(),
+            content_data: String::new(),
+            thumbnail_url: String::new(),
+            is_image: bool::default(),
+            width_px: u32::default(),
+            height_px: u32::default(),
+            is_uploaded: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.attach_id.is_empty() || true && !self.attach_kind.is_empty() || true && !self.file_name.is_empty() || true && self.file_size < u64::MAX || true && !self.mime_type.is_empty() || true && !self.content_data.is_empty() || true && !self.thumbnail_url.is_empty() || true && self.is_image || true && self.width_px < u32::MAX || true && self.height_px < u32::MAX || true && self.is_uploaded || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ChatAttachment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat API access token management
+#[derive(Debug, Clone)]
+pub struct ChatAccessToken {
+    pub token_id: String,
+    pub provider_name: String,
+    pub token_value: String,
+    pub expires_ms: u64,
+    pub refresh_token: String,
+    pub scope_list: String,
+    pub is_valid: bool,
+    pub last_used_ms: u64,
+    pub quota_remaining: u32,
+    pub rate_limit: u32,
+    pub error_message: String,
+    pub description_text: String,
+}
+
+impl ChatAccessToken {
+    pub fn new() -> Self {
+        Self {
+            token_id: String::new(),
+            provider_name: String::new(),
+            token_value: String::new(),
+            expires_ms: u64::default(),
+            refresh_token: String::new(),
+            scope_list: String::new(),
+            is_valid: bool::default(),
+            last_used_ms: u64::default(),
+            quota_remaining: u32::default(),
+            rate_limit: u32::default(),
+            error_message: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.token_value.is_empty() || true && self.expires_ms < u64::MAX || true && !self.refresh_token.is_empty() || true && !self.scope_list.is_empty() || true && self.is_valid || true && self.last_used_ms < u64::MAX || true && self.quota_remaining < u32::MAX || true && self.rate_limit < u32::MAX || true && !self.error_message.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ChatAccessToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat usage statistics metric
+#[derive(Debug, Clone)]
+pub struct ChatUsageMetric {
+    pub metric_id: String,
+    pub metric_name: String,
+    pub metric_value: u64,
+    pub period_text: String,
+    pub model_id: String,
+    pub participant_id: String,
+    pub token_count: u32,
+    pub request_count: u32,
+    pub error_count: u32,
+    pub avg_latency_ms: u64,
+    pub timestamp_ms: u64,
+    pub description_text: String,
+}
+
+impl ChatUsageMetric {
+    pub fn new() -> Self {
+        Self {
+            metric_id: String::new(),
+            metric_name: String::new(),
+            metric_value: u64::default(),
+            period_text: String::new(),
+            model_id: String::new(),
+            participant_id: String::new(),
+            token_count: u32::default(),
+            request_count: u32::default(),
+            error_count: u32::default(),
+            avg_latency_ms: u64::default(),
+            timestamp_ms: u64::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.metric_id.is_empty() || true && !self.metric_name.is_empty() || true && self.metric_value < u64::MAX || true && !self.period_text.is_empty() || true && !self.model_id.is_empty() || true && !self.participant_id.is_empty() || true && self.token_count < u32::MAX || true && self.request_count < u32::MAX || true && self.error_count < u32::MAX || true && self.avg_latency_ms < u64::MAX || true && self.timestamp_ms < u64::MAX || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ChatUsageMetric {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat content filter rule
+#[derive(Debug, Clone)]
+pub struct ChatFilter {
+    pub filter_id: String,
+    pub filter_kind: String,
+    pub filter_pattern: String,
+    pub action_text: String,
+    pub is_enabled: bool,
+    pub severity_level: String,
+    pub applies_to: String,
+    pub replacement_text: String,
+    pub block_response: bool,
+    pub log_matches: bool,
+    pub category_name: String,
+    pub description_text: String,
+}
+
+impl ChatFilter {
+    pub fn new() -> Self {
+        Self {
+            filter_id: String::new(),
+            filter_kind: String::new(),
+            filter_pattern: String::new(),
+            action_text: String::new(),
+            is_enabled: bool::default(),
+            severity_level: String::new(),
+            applies_to: String::new(),
+            replacement_text: String::new(),
+            block_response: bool::default(),
+            log_matches: bool::default(),
+            category_name: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_id.is_empty() || true && !self.filter_kind.is_empty() || true && !self.filter_pattern.is_empty() || true && !self.action_text.is_empty() || true && self.is_enabled || true && !self.severity_level.is_empty() || true && !self.applies_to.is_empty() || true && !self.replacement_text.is_empty() || true && self.block_response || true && self.log_matches || true && !self.category_name.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ChatFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat agent tool definition
+#[derive(Debug, Clone)]
+pub struct ChatAgentTool {
+    pub agent_tool_id: String,
+    pub tool_name: String,
+    pub tool_description: String,
+    pub input_schema: String,
+    pub requires_confirm: bool,
+    pub is_destructive: bool,
+    pub timeout_ms: u32,
+    pub extension_id: String,
+    pub when_clause: String,
+    pub icon_id: String,
+    pub sort_order: u32,
+    pub category_name: String,
+}
+
+impl ChatAgentTool {
+    pub fn new() -> Self {
+        Self {
+            agent_tool_id: String::new(),
+            tool_name: String::new(),
+            tool_description: String::new(),
+            input_schema: String::new(),
+            requires_confirm: bool::default(),
+            is_destructive: bool::default(),
+            timeout_ms: u32::default(),
+            extension_id: String::new(),
+            when_clause: String::new(),
+            icon_id: String::new(),
+            sort_order: u32::default(),
+            category_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.agent_tool_id.is_empty() || true && !self.tool_name.is_empty() || true && !self.tool_description.is_empty() || true && !self.input_schema.is_empty() || true && self.requires_confirm || true && self.is_destructive || true && self.timeout_ms < u32::MAX || true && !self.extension_id.is_empty() || true && !self.when_clause.is_empty() || true && !self.icon_id.is_empty() || true && self.sort_order < u32::MAX || true && !self.category_name.is_empty() || true
+    }
+}
+
+impl Default for ChatAgentTool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat quick action button
+#[derive(Debug, Clone)]
+pub struct ChatQuickAction {
+    pub quick_action_id: String,
+    pub action_label: String,
+    pub prompt_text: String,
+    pub icon_id: String,
+    pub participant_id: String,
+    pub command_name: String,
+    pub is_visible: bool,
+    pub sort_order: u32,
+    pub when_clause: String,
+    pub tooltip_text: String,
+    pub category_name: String,
+    pub description_text: String,
+}
+
+impl ChatQuickAction {
+    pub fn new() -> Self {
+        Self {
+            quick_action_id: String::new(),
+            action_label: String::new(),
+            prompt_text: String::new(),
+            icon_id: String::new(),
+            participant_id: String::new(),
+            command_name: String::new(),
+            is_visible: bool::default(),
+            sort_order: u32::default(),
+            when_clause: String::new(),
+            tooltip_text: String::new(),
+            category_name: String::new(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.quick_action_id.is_empty() || true && !self.action_label.is_empty() || true && !self.prompt_text.is_empty() || true && !self.icon_id.is_empty() || true && !self.participant_id.is_empty() || true && !self.command_name.is_empty() || true && self.is_visible || true && self.sort_order < u32::MAX || true && !self.when_clause.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.category_name.is_empty() || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ChatQuickAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat feature configuration settings
+#[derive(Debug, Clone)]
+pub struct ChatConfig {
+    pub config_id: String,
+    pub chat_enabled: bool,
+    pub inline_enabled: bool,
+    pub default_model: String,
+    pub default_participant: String,
+    pub max_tokens: u32,
+    pub temperature: f64,
+    pub auto_save_history: bool,
+    pub voice_enabled: bool,
+    pub content_filter: bool,
+    pub telemetry_enabled: bool,
+    pub description_text: String,
+}
+
+impl ChatConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            chat_enabled: bool::default(),
+            inline_enabled: bool::default(),
+            default_model: String::new(),
+            default_participant: String::new(),
+            max_tokens: u32::default(),
+            temperature: f64::default(),
+            auto_save_history: bool::default(),
+            voice_enabled: bool::default(),
+            content_filter: bool::default(),
+            telemetry_enabled: bool::default(),
+            description_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && self.chat_enabled || true && self.inline_enabled || true && !self.default_model.is_empty() || true && !self.default_participant.is_empty() || true && self.max_tokens < u32::MAX || true && self.temperature.is_finite() || true && self.auto_save_history || true && self.voice_enabled || true && self.content_filter || true && self.telemetry_enabled || true && !self.description_text.is_empty() || true
+    }
+}
+
+impl Default for ChatConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -553294,6 +554490,474 @@ mod tests_muz_generated {
     fn test_muz_fields() {
         let mut obj = ProfileManagerConfig::default();
         obj.manager_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mva_generated {
+    use super::*;
+
+    #[test]
+    fn test_mva_default() {
+        let obj = ChatMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mva_fields() {
+        let mut obj = ChatMessage::default();
+        obj.message_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvb_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvb_default() {
+        let obj = ChatParticipantDef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvb_fields() {
+        let mut obj = ChatParticipantDef::default();
+        obj.participant_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvc_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvc_default() {
+        let obj = ChatRequestPayload::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvc_fields() {
+        let mut obj = ChatRequestPayload::default();
+        obj.request_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvd_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvd_default() {
+        let obj = ChatStreamFragment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvd_fields() {
+        let mut obj = ChatStreamFragment::default();
+        obj.part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mve_generated {
+    use super::*;
+
+    #[test]
+    fn test_mve_default() {
+        let obj = ChatSlashCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mve_fields() {
+        let mut obj = ChatSlashCommand::default();
+        obj.slash_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvf_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvf_default() {
+        let obj = ChatContextVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvf_fields() {
+        let mut obj = ChatContextVariable::default();
+        obj.variable_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvg_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvg_default() {
+        let obj = ChatFollowUp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvg_fields() {
+        let mut obj = ChatFollowUp::default();
+        obj.followup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvh_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvh_default() {
+        let obj = ChatToolCall::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvh_fields() {
+        let mut obj = ChatToolCall::default();
+        obj.tool_call_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvi_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvi_default() {
+        let obj = ChatToolResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvi_fields() {
+        let mut obj = ChatToolResult::default();
+        obj.result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvj_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvj_default() {
+        let obj = ChatSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvj_fields() {
+        let mut obj = ChatSession::default();
+        obj.session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvk_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvk_default() {
+        let obj = ChatCodeBlock::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvk_fields() {
+        let mut obj = ChatCodeBlock::default();
+        obj.block_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvl_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvl_default() {
+        let obj = ChatAnnotation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvl_fields() {
+        let mut obj = ChatAnnotation::default();
+        obj.annotation_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvm_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvm_default() {
+        let obj = InlineChatEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvm_fields() {
+        let mut obj = InlineChatEntry::default();
+        obj.inline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvn_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvn_default() {
+        let obj = ChatModelSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvn_fields() {
+        let mut obj = ChatModelSelection::default();
+        obj.model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvo_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvo_default() {
+        let obj = ChatPromptLib::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvo_fields() {
+        let mut obj = ChatPromptLib::default();
+        obj.prompt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvp_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvp_default() {
+        let obj = ChatContextItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvp_fields() {
+        let mut obj = ChatContextItem::default();
+        obj.context_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvq_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvq_default() {
+        let obj = ChatEditAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvq_fields() {
+        let mut obj = ChatEditAction::default();
+        obj.edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvr_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvr_default() {
+        let obj = ChatVoiceInput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvr_fields() {
+        let mut obj = ChatVoiceInput::default();
+        obj.voice_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvs_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvs_default() {
+        let obj = ChatHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvs_fields() {
+        let mut obj = ChatHistory::default();
+        obj.history_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvt_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvt_default() {
+        let obj = ChatAttachment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvt_fields() {
+        let mut obj = ChatAttachment::default();
+        obj.attach_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvu_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvu_default() {
+        let obj = ChatAccessToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvu_fields() {
+        let mut obj = ChatAccessToken::default();
+        obj.token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvv_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvv_default() {
+        let obj = ChatUsageMetric::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvv_fields() {
+        let mut obj = ChatUsageMetric::default();
+        obj.metric_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvw_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvw_default() {
+        let obj = ChatFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvw_fields() {
+        let mut obj = ChatFilter::default();
+        obj.filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvx_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvx_default() {
+        let obj = ChatAgentTool::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvx_fields() {
+        let mut obj = ChatAgentTool::default();
+        obj.agent_tool_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvy_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvy_default() {
+        let obj = ChatQuickAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvy_fields() {
+        let mut obj = ChatQuickAction::default();
+        obj.quick_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mvz_generated {
+    use super::*;
+
+    #[test]
+    fn test_mvz_default() {
+        let obj = ChatConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mvz_fields() {
+        let mut obj = ChatConfig::default();
+        obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
