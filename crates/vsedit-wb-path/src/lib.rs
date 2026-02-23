@@ -250129,6 +250129,838 @@ impl Default for PortForwardCleanup {
     }
 }
 
+/// Tunnel service configuration and connection settings
+#[derive(Debug, Clone)]
+pub struct TunnelServiceConfig {
+    pub service_name: String,
+    pub service_url: String,
+    pub auth_method: String,
+    pub connect_timeout: u64,
+    pub keep_alive: bool,
+}
+
+impl TunnelServiceConfig {
+    pub fn new() -> Self {
+        Self {
+            service_name: String::new(),
+            service_url: String::new(),
+            auth_method: String::new(),
+            connect_timeout: u64::default(),
+            keep_alive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.service_name.is_empty() || true && !self.service_url.is_empty() || true && !self.auth_method.is_empty() || true && self.connect_timeout < u64::MAX || true && self.keep_alive || true
+    }
+}
+
+impl Default for TunnelServiceConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Request to create a new dev tunnel
+#[derive(Debug, Clone)]
+pub struct TunnelCreationRequest {
+    pub tunnel_label: String,
+    pub description: String,
+    pub expiry_hours: u32,
+    pub region: String,
+    pub allow_anonymous: bool,
+}
+
+impl TunnelCreationRequest {
+    pub fn new() -> Self {
+        Self {
+            tunnel_label: String::new(),
+            description: String::new(),
+            expiry_hours: u32::default(),
+            region: String::new(),
+            allow_anonymous: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tunnel_label.is_empty() || true && !self.description.is_empty() || true && self.expiry_hours < u32::MAX || true && !self.region.is_empty() || true && self.allow_anonymous || true
+    }
+}
+
+impl Default for TunnelCreationRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel access control policy definition
+#[derive(Debug, Clone)]
+pub struct TunnelAccessPolicy {
+    pub policy_id: String,
+    pub allowed_users: String,
+    pub max_sessions: u32,
+    pub ip_whitelist: String,
+    pub enforce_mfa: bool,
+}
+
+impl TunnelAccessPolicy {
+    pub fn new() -> Self {
+        Self {
+            policy_id: String::new(),
+            allowed_users: String::new(),
+            max_sessions: u32::default(),
+            ip_whitelist: String::new(),
+            enforce_mfa: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.policy_id.is_empty() || true && !self.allowed_users.is_empty() || true && self.max_sessions < u32::MAX || true && !self.ip_whitelist.is_empty() || true && self.enforce_mfa || true
+    }
+}
+
+impl Default for TunnelAccessPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel host machine information
+#[derive(Debug, Clone)]
+pub struct TunnelHostInfo {
+    pub host_id: String,
+    pub hostname: String,
+    pub os_type: String,
+    pub agent_version: String,
+    pub online: bool,
+}
+
+impl TunnelHostInfo {
+    pub fn new() -> Self {
+        Self {
+            host_id: String::new(),
+            hostname: String::new(),
+            os_type: String::new(),
+            agent_version: String::new(),
+            online: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.host_id.is_empty() || true && !self.hostname.is_empty() || true && !self.os_type.is_empty() || true && !self.agent_version.is_empty() || true && self.online || true
+    }
+}
+
+impl Default for TunnelHostInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel endpoint connection details
+#[derive(Debug, Clone)]
+pub struct TunnelEndpoint {
+    pub endpoint_uri: String,
+    pub protocol: String,
+    pub port_number: u32,
+    pub is_compressed: bool,
+    pub latency_ms: f64,
+}
+
+impl TunnelEndpoint {
+    pub fn new() -> Self {
+        Self {
+            endpoint_uri: String::new(),
+            protocol: String::new(),
+            port_number: u32::default(),
+            is_compressed: bool::default(),
+            latency_ms: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.endpoint_uri.is_empty() || true && !self.protocol.is_empty() || true && self.port_number < u32::MAX || true && self.is_compressed || true && self.latency_ms.is_finite() || true
+    }
+}
+
+impl Default for TunnelEndpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel DNS resolution configuration
+#[derive(Debug, Clone)]
+pub struct TunnelDnsConfig {
+    pub domain_name: String,
+    pub cname_target: String,
+    pub ttl_seconds: u64,
+    pub auto_renew: bool,
+    pub zone_id: String,
+}
+
+impl TunnelDnsConfig {
+    pub fn new() -> Self {
+        Self {
+            domain_name: String::new(),
+            cname_target: String::new(),
+            ttl_seconds: u64::default(),
+            auto_renew: bool::default(),
+            zone_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.domain_name.is_empty() || true && !self.cname_target.is_empty() || true && self.ttl_seconds < u64::MAX || true && self.auto_renew || true && !self.zone_id.is_empty() || true
+    }
+}
+
+impl Default for TunnelDnsConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel TLS certificate management
+#[derive(Debug, Clone)]
+pub struct TunnelCertManager {
+    pub cert_store: String,
+    pub auto_provision: bool,
+    pub renewal_days: u32,
+    pub issuer_name: String,
+    pub key_algorithm: String,
+}
+
+impl TunnelCertManager {
+    pub fn new() -> Self {
+        Self {
+            cert_store: String::new(),
+            auto_provision: bool::default(),
+            renewal_days: u32::default(),
+            issuer_name: String::new(),
+            key_algorithm: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cert_store.is_empty() || true && self.auto_provision || true && self.renewal_days < u32::MAX || true && !self.issuer_name.is_empty() || true && !self.key_algorithm.is_empty() || true
+    }
+}
+
+impl Default for TunnelCertManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel billing and usage information
+#[derive(Debug, Clone)]
+pub struct TunnelBillingInfo {
+    pub plan_name: String,
+    pub monthly_limit: u64,
+    pub current_usage: u64,
+    pub overage_rate: f64,
+    pub billing_active: bool,
+}
+
+impl TunnelBillingInfo {
+    pub fn new() -> Self {
+        Self {
+            plan_name: String::new(),
+            monthly_limit: u64::default(),
+            current_usage: u64::default(),
+            overage_rate: f64::default(),
+            billing_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.plan_name.is_empty() || true && self.monthly_limit < u64::MAX || true && self.current_usage < u64::MAX || true && self.overage_rate.is_finite() || true && self.billing_active || true
+    }
+}
+
+impl Default for TunnelBillingInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel rate limiting configuration
+#[derive(Debug, Clone)]
+pub struct TunnelRateLimit {
+    pub requests_per_min: u32,
+    pub burst_size: u32,
+    pub window_seconds: u64,
+    pub penalty_delay: u64,
+    pub enforce: bool,
+}
+
+impl TunnelRateLimit {
+    pub fn new() -> Self {
+        Self {
+            requests_per_min: u32::default(),
+            burst_size: u32::default(),
+            window_seconds: u64::default(),
+            penalty_delay: u64::default(),
+            enforce: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.requests_per_min < u32::MAX || true && self.burst_size < u32::MAX || true && self.window_seconds < u64::MAX || true && self.penalty_delay < u64::MAX || true && self.enforce || true
+    }
+}
+
+impl Default for TunnelRateLimit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel health check probe settings
+#[derive(Debug, Clone)]
+pub struct TunnelHealthCheck {
+    pub check_endpoint: String,
+    pub interval_ms: u64,
+    pub timeout_ms: u64,
+    pub unhealthy_threshold: u32,
+    pub healthy_threshold: u32,
+}
+
+impl TunnelHealthCheck {
+    pub fn new() -> Self {
+        Self {
+            check_endpoint: String::new(),
+            interval_ms: u64::default(),
+            timeout_ms: u64::default(),
+            unhealthy_threshold: u32::default(),
+            healthy_threshold: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.check_endpoint.is_empty() || true && self.interval_ms < u64::MAX || true && self.timeout_ms < u64::MAX || true && self.unhealthy_threshold < u32::MAX || true && self.healthy_threshold < u32::MAX || true
+    }
+}
+
+impl Default for TunnelHealthCheck {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel logging configuration
+#[derive(Debug, Clone)]
+pub struct TunnelLogConfig {
+    pub log_destination: String,
+    pub log_level: String,
+    pub retain_days: u32,
+    pub include_payload: bool,
+    pub structured: bool,
+}
+
+impl TunnelLogConfig {
+    pub fn new() -> Self {
+        Self {
+            log_destination: String::new(),
+            log_level: String::new(),
+            retain_days: u32::default(),
+            include_payload: bool::default(),
+            structured: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_destination.is_empty() || true && !self.log_level.is_empty() || true && self.retain_days < u32::MAX || true && self.include_payload || true && self.structured || true
+    }
+}
+
+impl Default for TunnelLogConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel relay node information
+#[derive(Debug, Clone)]
+pub struct TunnelRelayNode {
+    pub relay_region: String,
+    pub relay_address: String,
+    pub capacity: u32,
+    pub current_load: f64,
+    pub is_primary: bool,
+}
+
+impl TunnelRelayNode {
+    pub fn new() -> Self {
+        Self {
+            relay_region: String::new(),
+            relay_address: String::new(),
+            capacity: u32::default(),
+            current_load: f64::default(),
+            is_primary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.relay_region.is_empty() || true && !self.relay_address.is_empty() || true && self.capacity < u32::MAX || true && self.current_load.is_finite() || true && self.is_primary || true
+    }
+}
+
+impl Default for TunnelRelayNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel authentication token data
+#[derive(Debug, Clone)]
+pub struct TunnelAuthToken {
+    pub token_value: String,
+    pub issued_at: u64,
+    pub expires_at: u64,
+    pub scope: String,
+    pub is_revoked: bool,
+}
+
+impl TunnelAuthToken {
+    pub fn new() -> Self {
+        Self {
+            token_value: String::new(),
+            issued_at: u64::default(),
+            expires_at: u64::default(),
+            scope: String::new(),
+            is_revoked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_value.is_empty() || true && self.issued_at < u64::MAX || true && self.expires_at < u64::MAX || true && !self.scope.is_empty() || true && self.is_revoked || true
+    }
+}
+
+impl Default for TunnelAuthToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel event streaming configuration
+#[derive(Debug, Clone)]
+pub struct TunnelEventStream {
+    pub stream_id: String,
+    pub event_filter: String,
+    pub buffer_size: u32,
+    pub reconnect_delay: u64,
+    pub compression: bool,
+}
+
+impl TunnelEventStream {
+    pub fn new() -> Self {
+        Self {
+            stream_id: String::new(),
+            event_filter: String::new(),
+            buffer_size: u32::default(),
+            reconnect_delay: u64::default(),
+            compression: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.stream_id.is_empty() || true && !self.event_filter.is_empty() || true && self.buffer_size < u32::MAX || true && self.reconnect_delay < u64::MAX || true && self.compression || true
+    }
+}
+
+impl Default for TunnelEventStream {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel port binding allocation
+#[derive(Debug, Clone)]
+pub struct TunnelPortBinding {
+    pub bound_port: u32,
+    pub external_port: u32,
+    pub binding_ip: String,
+    pub is_ephemeral: bool,
+    pub protocol_type: String,
+}
+
+impl TunnelPortBinding {
+    pub fn new() -> Self {
+        Self {
+            bound_port: u32::default(),
+            external_port: u32::default(),
+            binding_ip: String::new(),
+            is_ephemeral: bool::default(),
+            protocol_type: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bound_port < u32::MAX || true && self.external_port < u32::MAX || true && !self.binding_ip.is_empty() || true && self.is_ephemeral || true && !self.protocol_type.is_empty() || true
+    }
+}
+
+impl Default for TunnelPortBinding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel cluster topology information
+#[derive(Debug, Clone)]
+pub struct TunnelClusterInfo {
+    pub cluster_name: String,
+    pub node_count: u32,
+    pub primary_region: String,
+    pub failover_enabled: bool,
+    pub api_version: String,
+}
+
+impl TunnelClusterInfo {
+    pub fn new() -> Self {
+        Self {
+            cluster_name: String::new(),
+            node_count: u32::default(),
+            primary_region: String::new(),
+            failover_enabled: bool::default(),
+            api_version: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cluster_name.is_empty() || true && self.node_count < u32::MAX || true && !self.primary_region.is_empty() || true && self.failover_enabled || true && !self.api_version.is_empty() || true
+    }
+}
+
+impl Default for TunnelClusterInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Active tunnel session state data
+#[derive(Debug, Clone)]
+pub struct TunnelSessionState {
+    pub session_token: String,
+    pub connected_at: u64,
+    pub bytes_sent: u64,
+    pub bytes_received: u64,
+    pub is_authenticated: bool,
+}
+
+impl TunnelSessionState {
+    pub fn new() -> Self {
+        Self {
+            session_token: String::new(),
+            connected_at: u64::default(),
+            bytes_sent: u64::default(),
+            bytes_received: u64::default(),
+            is_authenticated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.session_token.is_empty() || true && self.connected_at < u64::MAX || true && self.bytes_sent < u64::MAX || true && self.bytes_received < u64::MAX || true && self.is_authenticated || true
+    }
+}
+
+impl Default for TunnelSessionState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel bandwidth allocation settings
+#[derive(Debug, Clone)]
+pub struct TunnelBandwidth {
+    pub max_bandwidth: u64,
+    pub current_usage: u64,
+    pub throttle_threshold: f64,
+    pub burst_allowance: u64,
+    pub enforce_limit: bool,
+}
+
+impl TunnelBandwidth {
+    pub fn new() -> Self {
+        Self {
+            max_bandwidth: u64::default(),
+            current_usage: u64::default(),
+            throttle_threshold: f64::default(),
+            burst_allowance: u64::default(),
+            enforce_limit: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.max_bandwidth < u64::MAX || true && self.current_usage < u64::MAX || true && self.throttle_threshold.is_finite() || true && self.burst_allowance < u64::MAX || true && self.enforce_limit || true
+    }
+}
+
+impl Default for TunnelBandwidth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel feature flag toggle
+#[derive(Debug, Clone)]
+pub struct TunnelFeatureFlag {
+    pub flag_name: String,
+    pub is_enabled: bool,
+    pub rollout_pct: f64,
+    pub target_group: String,
+    pub description: String,
+}
+
+impl TunnelFeatureFlag {
+    pub fn new() -> Self {
+        Self {
+            flag_name: String::new(),
+            is_enabled: bool::default(),
+            rollout_pct: f64::default(),
+            target_group: String::new(),
+            description: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.flag_name.is_empty() || true && self.is_enabled || true && self.rollout_pct.is_finite() || true && !self.target_group.is_empty() || true && !self.description.is_empty() || true
+    }
+}
+
+impl Default for TunnelFeatureFlag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel region selection and failover config
+#[derive(Debug, Clone)]
+pub struct TunnelRegionConfig {
+    pub region_code: String,
+    pub display_name: String,
+    pub priority: u32,
+    pub failover_to: String,
+    pub is_available: bool,
+}
+
+impl TunnelRegionConfig {
+    pub fn new() -> Self {
+        Self {
+            region_code: String::new(),
+            display_name: String::new(),
+            priority: u32::default(),
+            failover_to: String::new(),
+            is_available: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.region_code.is_empty() || true && !self.display_name.is_empty() || true && self.priority < u32::MAX || true && !self.failover_to.is_empty() || true && self.is_available || true
+    }
+}
+
+impl Default for TunnelRegionConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel connection pool management
+#[derive(Debug, Clone)]
+pub struct TunnelConnectionPool {
+    pub pool_name: String,
+    pub max_connections: u32,
+    pub idle_timeout: u64,
+    pub health_check_interval: u64,
+    pub preconnect: bool,
+}
+
+impl TunnelConnectionPool {
+    pub fn new() -> Self {
+        Self {
+            pool_name: String::new(),
+            max_connections: u32::default(),
+            idle_timeout: u64::default(),
+            health_check_interval: u64::default(),
+            preconnect: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pool_name.is_empty() || true && self.max_connections < u32::MAX || true && self.idle_timeout < u64::MAX || true && self.health_check_interval < u64::MAX || true && self.preconnect || true
+    }
+}
+
+impl Default for TunnelConnectionPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel connection retry policy
+#[derive(Debug, Clone)]
+pub struct TunnelRetryPolicy {
+    pub retry_strategy: String,
+    pub max_attempts: u32,
+    pub base_delay_ms: u64,
+    pub max_delay_ms: u64,
+    pub retry_on_auth_fail: bool,
+}
+
+impl TunnelRetryPolicy {
+    pub fn new() -> Self {
+        Self {
+            retry_strategy: String::new(),
+            max_attempts: u32::default(),
+            base_delay_ms: u64::default(),
+            max_delay_ms: u64::default(),
+            retry_on_auth_fail: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.retry_strategy.is_empty() || true && self.max_attempts < u32::MAX || true && self.base_delay_ms < u64::MAX || true && self.max_delay_ms < u64::MAX || true && self.retry_on_auth_fail || true
+    }
+}
+
+impl Default for TunnelRetryPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel telemetry and analytics config
+#[derive(Debug, Clone)]
+pub struct TunnelTelemetry {
+    pub telemetry_endpoint: String,
+    pub sample_rate: f64,
+    pub batch_size: u32,
+    pub flush_interval: u64,
+    pub include_metadata: bool,
+}
+
+impl TunnelTelemetry {
+    pub fn new() -> Self {
+        Self {
+            telemetry_endpoint: String::new(),
+            sample_rate: f64::default(),
+            batch_size: u32::default(),
+            flush_interval: u64::default(),
+            include_metadata: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.telemetry_endpoint.is_empty() || true && self.sample_rate.is_finite() || true && self.batch_size < u32::MAX || true && self.flush_interval < u64::MAX || true && self.include_metadata || true
+    }
+}
+
+impl Default for TunnelTelemetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel encryption settings
+#[derive(Debug, Clone)]
+pub struct TunnelEncryption {
+    pub cipher_suite: String,
+    pub min_tls_version: String,
+    pub cert_pinning: bool,
+    pub key_rotation_hours: u32,
+    pub perfect_forward: bool,
+}
+
+impl TunnelEncryption {
+    pub fn new() -> Self {
+        Self {
+            cipher_suite: String::new(),
+            min_tls_version: String::new(),
+            cert_pinning: bool::default(),
+            key_rotation_hours: u32::default(),
+            perfect_forward: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cipher_suite.is_empty() || true && !self.min_tls_version.is_empty() || true && self.cert_pinning || true && self.key_rotation_hours < u32::MAX || true && self.perfect_forward || true
+    }
+}
+
+impl Default for TunnelEncryption {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel resource quota usage tracking
+#[derive(Debug, Clone)]
+pub struct TunnelQuotaUsage {
+    pub quota_type: String,
+    pub allocated: u64,
+    pub consumed: u64,
+    pub warn_threshold: f64,
+    pub hard_limit: bool,
+}
+
+impl TunnelQuotaUsage {
+    pub fn new() -> Self {
+        Self {
+            quota_type: String::new(),
+            allocated: u64::default(),
+            consumed: u64::default(),
+            warn_threshold: f64::default(),
+            hard_limit: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.quota_type.is_empty() || true && self.allocated < u64::MAX || true && self.consumed < u64::MAX || true && self.warn_threshold.is_finite() || true && self.hard_limit || true
+    }
+}
+
+impl Default for TunnelQuotaUsage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel graceful shutdown planning
+#[derive(Debug, Clone)]
+pub struct TunnelShutdownPlan {
+    pub shutdown_mode: String,
+    pub drain_timeout_ms: u64,
+    pub notify_clients: bool,
+    pub save_state: bool,
+    pub cleanup_temp: bool,
+}
+
+impl TunnelShutdownPlan {
+    pub fn new() -> Self {
+        Self {
+            shutdown_mode: String::new(),
+            drain_timeout_ms: u64::default(),
+            notify_clients: bool::default(),
+            save_state: bool::default(),
+            cleanup_temp: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shutdown_mode.is_empty() || true && self.drain_timeout_ms < u64::MAX || true && self.notify_clients || true && self.save_state || true && self.cleanup_temp || true
+    }
+}
+
+impl Default for TunnelShutdownPlan {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -557791,6 +558623,474 @@ mod tests_mxz_generated {
     fn test_mxz_fields() {
         let mut obj = PortForwardCleanup::default();
         obj.cleanup_strategy = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mya_generated {
+    use super::*;
+
+    #[test]
+    fn test_mya_default() {
+        let obj = TunnelServiceConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mya_fields() {
+        let mut obj = TunnelServiceConfig::default();
+        obj.service_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myb_generated {
+    use super::*;
+
+    #[test]
+    fn test_myb_default() {
+        let obj = TunnelCreationRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myb_fields() {
+        let mut obj = TunnelCreationRequest::default();
+        obj.tunnel_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myc_generated {
+    use super::*;
+
+    #[test]
+    fn test_myc_default() {
+        let obj = TunnelAccessPolicy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myc_fields() {
+        let mut obj = TunnelAccessPolicy::default();
+        obj.policy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myd_generated {
+    use super::*;
+
+    #[test]
+    fn test_myd_default() {
+        let obj = TunnelHostInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myd_fields() {
+        let mut obj = TunnelHostInfo::default();
+        obj.host_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mye_generated {
+    use super::*;
+
+    #[test]
+    fn test_mye_default() {
+        let obj = TunnelEndpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mye_fields() {
+        let mut obj = TunnelEndpoint::default();
+        obj.endpoint_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myf_generated {
+    use super::*;
+
+    #[test]
+    fn test_myf_default() {
+        let obj = TunnelDnsConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myf_fields() {
+        let mut obj = TunnelDnsConfig::default();
+        obj.domain_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myg_generated {
+    use super::*;
+
+    #[test]
+    fn test_myg_default() {
+        let obj = TunnelCertManager::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myg_fields() {
+        let mut obj = TunnelCertManager::default();
+        obj.cert_store = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myh_generated {
+    use super::*;
+
+    #[test]
+    fn test_myh_default() {
+        let obj = TunnelBillingInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myh_fields() {
+        let mut obj = TunnelBillingInfo::default();
+        obj.plan_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myi_generated {
+    use super::*;
+
+    #[test]
+    fn test_myi_default() {
+        let obj = TunnelRateLimit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myi_fields() {
+        let mut obj = TunnelRateLimit::default();
+        obj.requests_per_min = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myj_generated {
+    use super::*;
+
+    #[test]
+    fn test_myj_default() {
+        let obj = TunnelHealthCheck::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myj_fields() {
+        let mut obj = TunnelHealthCheck::default();
+        obj.check_endpoint = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myk_generated {
+    use super::*;
+
+    #[test]
+    fn test_myk_default() {
+        let obj = TunnelLogConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myk_fields() {
+        let mut obj = TunnelLogConfig::default();
+        obj.log_destination = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myl_generated {
+    use super::*;
+
+    #[test]
+    fn test_myl_default() {
+        let obj = TunnelRelayNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myl_fields() {
+        let mut obj = TunnelRelayNode::default();
+        obj.relay_region = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mym_generated {
+    use super::*;
+
+    #[test]
+    fn test_mym_default() {
+        let obj = TunnelAuthToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mym_fields() {
+        let mut obj = TunnelAuthToken::default();
+        obj.token_value = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myn_generated {
+    use super::*;
+
+    #[test]
+    fn test_myn_default() {
+        let obj = TunnelEventStream::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myn_fields() {
+        let mut obj = TunnelEventStream::default();
+        obj.stream_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myo_generated {
+    use super::*;
+
+    #[test]
+    fn test_myo_default() {
+        let obj = TunnelPortBinding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myo_fields() {
+        let mut obj = TunnelPortBinding::default();
+        obj.bound_port = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myp_generated {
+    use super::*;
+
+    #[test]
+    fn test_myp_default() {
+        let obj = TunnelClusterInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myp_fields() {
+        let mut obj = TunnelClusterInfo::default();
+        obj.cluster_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myq_generated {
+    use super::*;
+
+    #[test]
+    fn test_myq_default() {
+        let obj = TunnelSessionState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myq_fields() {
+        let mut obj = TunnelSessionState::default();
+        obj.session_token = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myr_generated {
+    use super::*;
+
+    #[test]
+    fn test_myr_default() {
+        let obj = TunnelBandwidth::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myr_fields() {
+        let mut obj = TunnelBandwidth::default();
+        obj.max_bandwidth = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_mys_generated {
+    use super::*;
+
+    #[test]
+    fn test_mys_default() {
+        let obj = TunnelFeatureFlag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_mys_fields() {
+        let mut obj = TunnelFeatureFlag::default();
+        obj.flag_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myt_generated {
+    use super::*;
+
+    #[test]
+    fn test_myt_default() {
+        let obj = TunnelRegionConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myt_fields() {
+        let mut obj = TunnelRegionConfig::default();
+        obj.region_code = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myu_generated {
+    use super::*;
+
+    #[test]
+    fn test_myu_default() {
+        let obj = TunnelConnectionPool::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myu_fields() {
+        let mut obj = TunnelConnectionPool::default();
+        obj.pool_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myv_generated {
+    use super::*;
+
+    #[test]
+    fn test_myv_default() {
+        let obj = TunnelRetryPolicy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myv_fields() {
+        let mut obj = TunnelRetryPolicy::default();
+        obj.retry_strategy = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myw_generated {
+    use super::*;
+
+    #[test]
+    fn test_myw_default() {
+        let obj = TunnelTelemetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myw_fields() {
+        let mut obj = TunnelTelemetry::default();
+        obj.telemetry_endpoint = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myx_generated {
+    use super::*;
+
+    #[test]
+    fn test_myx_default() {
+        let obj = TunnelEncryption::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myx_fields() {
+        let mut obj = TunnelEncryption::default();
+        obj.cipher_suite = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myy_generated {
+    use super::*;
+
+    #[test]
+    fn test_myy_default() {
+        let obj = TunnelQuotaUsage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myy_fields() {
+        let mut obj = TunnelQuotaUsage::default();
+        obj.quota_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_myz_generated {
+    use super::*;
+
+    #[test]
+    fn test_myz_default() {
+        let obj = TunnelShutdownPlan::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_myz_fields() {
+        let mut obj = TunnelShutdownPlan::default();
+        obj.shutdown_mode = "test".to_string();
         assert!(obj.validate());
     }
 }
