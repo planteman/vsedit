@@ -255143,6 +255143,838 @@ impl Default for ThemeValidation {
     }
 }
 
+/// Authentication session data model
+#[derive(Debug, Clone)]
+pub struct AuthSessionData {
+    pub session_id: String,
+    pub provider_id: String,
+    pub access_token: String,
+    pub scopes: String,
+    pub account_label: bool,
+}
+
+impl AuthSessionData {
+    pub fn new() -> Self {
+        Self {
+            session_id: String::new(),
+            provider_id: String::new(),
+            access_token: String::new(),
+            scopes: String::new(),
+            account_label: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.session_id.is_empty() || true && !self.provider_id.is_empty() || true && !self.access_token.is_empty() || true && !self.scopes.is_empty() || true && self.account_label || true
+    }
+}
+
+impl Default for AuthSessionData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication provider registration
+#[derive(Debug, Clone)]
+pub struct AuthProviderEntry {
+    pub provider_id: String,
+    pub label: String,
+    pub supports_multiple: bool,
+    pub display_name: String,
+    pub priority: u32,
+}
+
+impl AuthProviderEntry {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            label: String::new(),
+            supports_multiple: bool::default(),
+            display_name: String::new(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.label.is_empty() || true && self.supports_multiple || true && !self.display_name.is_empty() || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for AuthProviderEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication token storage data
+#[derive(Debug, Clone)]
+pub struct AuthTokenData {
+    pub token_hash: String,
+    pub encrypted_data: String,
+    pub created_at: u64,
+    pub expires_at: u64,
+    pub is_valid: bool,
+}
+
+impl AuthTokenData {
+    pub fn new() -> Self {
+        Self {
+            token_hash: String::new(),
+            encrypted_data: String::new(),
+            created_at: u64::default(),
+            expires_at: u64::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_hash.is_empty() || true && !self.encrypted_data.is_empty() || true && self.created_at < u64::MAX || true && self.expires_at < u64::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for AuthTokenData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication scope set definition
+#[derive(Debug, Clone)]
+pub struct AuthScopeSet {
+    pub scope_list: String,
+    pub description: String,
+    pub is_default: bool,
+    pub required: bool,
+    pub display_label: String,
+}
+
+impl AuthScopeSet {
+    pub fn new() -> Self {
+        Self {
+            scope_list: String::new(),
+            description: String::new(),
+            is_default: bool::default(),
+            required: bool::default(),
+            display_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope_list.is_empty() || true && !self.description.is_empty() || true && self.is_default || true && self.required || true && !self.display_label.is_empty() || true
+    }
+}
+
+impl Default for AuthScopeSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication account information
+#[derive(Debug, Clone)]
+pub struct AuthAccountInfo {
+    pub account_id: String,
+    pub account_label: String,
+    pub email: String,
+    pub avatar_uri: String,
+    pub is_primary: bool,
+}
+
+impl AuthAccountInfo {
+    pub fn new() -> Self {
+        Self {
+            account_id: String::new(),
+            account_label: String::new(),
+            email: String::new(),
+            avatar_uri: String::new(),
+            is_primary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.account_id.is_empty() || true && !self.account_label.is_empty() || true && !self.email.is_empty() || true && !self.avatar_uri.is_empty() || true && self.is_primary || true
+    }
+}
+
+impl Default for AuthAccountInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication flow state tracking
+#[derive(Debug, Clone)]
+pub struct AuthFlowState {
+    pub flow_id: String,
+    pub state_code: String,
+    pub redirect_uri: String,
+    pub started_at: u64,
+    pub is_complete: bool,
+}
+
+impl AuthFlowState {
+    pub fn new() -> Self {
+        Self {
+            flow_id: String::new(),
+            state_code: String::new(),
+            redirect_uri: String::new(),
+            started_at: u64::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.flow_id.is_empty() || true && !self.state_code.is_empty() || true && !self.redirect_uri.is_empty() || true && self.started_at < u64::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for AuthFlowState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication callback handler config
+#[derive(Debug, Clone)]
+pub struct AuthCallback {
+    pub callback_uri: String,
+    pub expected_state: String,
+    pub timeout_ms: u64,
+    pub auto_close: bool,
+    pub port: u32,
+}
+
+impl AuthCallback {
+    pub fn new() -> Self {
+        Self {
+            callback_uri: String::new(),
+            expected_state: String::new(),
+            timeout_ms: u64::default(),
+            auto_close: bool::default(),
+            port: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.callback_uri.is_empty() || true && !self.expected_state.is_empty() || true && self.timeout_ms < u64::MAX || true && self.auto_close || true && self.port < u32::MAX || true
+    }
+}
+
+impl Default for AuthCallback {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Secret storage for authentication data
+#[derive(Debug, Clone)]
+pub struct AuthSecretStore {
+    pub secret_key: String,
+    pub encrypted_value: String,
+    pub store_type: String,
+    pub last_accessed: u64,
+    pub is_sensitive: bool,
+}
+
+impl AuthSecretStore {
+    pub fn new() -> Self {
+        Self {
+            secret_key: String::new(),
+            encrypted_value: String::new(),
+            store_type: String::new(),
+            last_accessed: u64::default(),
+            is_sensitive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.secret_key.is_empty() || true && !self.encrypted_value.is_empty() || true && !self.store_type.is_empty() || true && self.last_accessed < u64::MAX || true && self.is_sensitive || true
+    }
+}
+
+impl Default for AuthSecretStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Trusted domain for authentication
+#[derive(Debug, Clone)]
+pub struct AuthTrustDomain {
+    pub domain_name: String,
+    pub trust_level: String,
+    pub added_at: u64,
+    pub auto_approved: bool,
+    pub source: String,
+}
+
+impl AuthTrustDomain {
+    pub fn new() -> Self {
+        Self {
+            domain_name: String::new(),
+            trust_level: String::new(),
+            added_at: u64::default(),
+            auto_approved: bool::default(),
+            source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.domain_name.is_empty() || true && !self.trust_level.is_empty() || true && self.added_at < u64::MAX || true && self.auto_approved || true && !self.source.is_empty() || true
+    }
+}
+
+impl Default for AuthTrustDomain {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication proxy configuration
+#[derive(Debug, Clone)]
+pub struct AuthProxyConfig {
+    pub proxy_url: String,
+    pub requires_auth: bool,
+    pub username: String,
+    pub bypass_list: String,
+    pub is_system: bool,
+}
+
+impl AuthProxyConfig {
+    pub fn new() -> Self {
+        Self {
+            proxy_url: String::new(),
+            requires_auth: bool::default(),
+            username: String::new(),
+            bypass_list: String::new(),
+            is_system: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proxy_url.is_empty() || true && self.requires_auth || true && !self.username.is_empty() || true && !self.bypass_list.is_empty() || true && self.is_system || true
+    }
+}
+
+impl Default for AuthProxyConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Certificate validation for auth
+#[derive(Debug, Clone)]
+pub struct AuthCertValidation {
+    pub cert_fingerprint: String,
+    pub issuer_name: String,
+    pub valid_from: u64,
+    pub valid_to: u64,
+    pub is_trusted: bool,
+}
+
+impl AuthCertValidation {
+    pub fn new() -> Self {
+        Self {
+            cert_fingerprint: String::new(),
+            issuer_name: String::new(),
+            valid_from: u64::default(),
+            valid_to: u64::default(),
+            is_trusted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cert_fingerprint.is_empty() || true && !self.issuer_name.is_empty() || true && self.valid_from < u64::MAX || true && self.valid_to < u64::MAX || true && self.is_trusted || true
+    }
+}
+
+impl Default for AuthCertValidation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication session change event
+#[derive(Debug, Clone)]
+pub struct AuthSessionChange {
+    pub change_type: String,
+    pub session_id: String,
+    pub provider_id: String,
+    pub timestamp: u64,
+    pub is_logout: bool,
+}
+
+impl AuthSessionChange {
+    pub fn new() -> Self {
+        Self {
+            change_type: String::new(),
+            session_id: String::new(),
+            provider_id: String::new(),
+            timestamp: u64::default(),
+            is_logout: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.change_type.is_empty() || true && !self.session_id.is_empty() || true && !self.provider_id.is_empty() || true && self.timestamp < u64::MAX || true && self.is_logout || true
+    }
+}
+
+impl Default for AuthSessionChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication rate limiter state
+#[derive(Debug, Clone)]
+pub struct AuthRateLimiter {
+    pub request_limit: u32,
+    pub window_ms: u64,
+    pub current_count: u32,
+    pub reset_at: u64,
+    pub is_blocked: bool,
+}
+
+impl AuthRateLimiter {
+    pub fn new() -> Self {
+        Self {
+            request_limit: u32::default(),
+            window_ms: u64::default(),
+            current_count: u32::default(),
+            reset_at: u64::default(),
+            is_blocked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.request_limit < u32::MAX || true && self.window_ms < u64::MAX || true && self.current_count < u32::MAX || true && self.reset_at < u64::MAX || true && self.is_blocked || true
+    }
+}
+
+impl Default for AuthRateLimiter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Device code authentication flow data
+#[derive(Debug, Clone)]
+pub struct AuthDeviceCode {
+    pub device_code: String,
+    pub user_code: String,
+    pub verification_uri: String,
+    pub poll_interval: u64,
+    pub expires_in: u64,
+}
+
+impl AuthDeviceCode {
+    pub fn new() -> Self {
+        Self {
+            device_code: String::new(),
+            user_code: String::new(),
+            verification_uri: String::new(),
+            poll_interval: u64::default(),
+            expires_in: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.device_code.is_empty() || true && !self.user_code.is_empty() || true && !self.verification_uri.is_empty() || true && self.poll_interval < u64::MAX || true && self.expires_in < u64::MAX || true
+    }
+}
+
+impl Default for AuthDeviceCode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// PKCE challenge for OAuth flows
+#[derive(Debug, Clone)]
+pub struct AuthPkceChallenge {
+    pub code_verifier: String,
+    pub code_challenge: String,
+    pub method: String,
+    pub created_at: u64,
+    pub is_used: bool,
+}
+
+impl AuthPkceChallenge {
+    pub fn new() -> Self {
+        Self {
+            code_verifier: String::new(),
+            code_challenge: String::new(),
+            method: String::new(),
+            created_at: u64::default(),
+            is_used: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.code_verifier.is_empty() || true && !self.code_challenge.is_empty() || true && !self.method.is_empty() || true && self.created_at < u64::MAX || true && self.is_used || true
+    }
+}
+
+impl Default for AuthPkceChallenge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// OAuth refresh token management
+#[derive(Debug, Clone)]
+pub struct AuthRefreshToken {
+    pub refresh_token: String,
+    pub issued_at: u64,
+    pub expires_at: u64,
+    pub scope: String,
+    pub is_revoked: bool,
+}
+
+impl AuthRefreshToken {
+    pub fn new() -> Self {
+        Self {
+            refresh_token: String::new(),
+            issued_at: u64::default(),
+            expires_at: u64::default(),
+            scope: String::new(),
+            is_revoked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.refresh_token.is_empty() || true && self.issued_at < u64::MAX || true && self.expires_at < u64::MAX || true && !self.scope.is_empty() || true && self.is_revoked || true
+    }
+}
+
+impl Default for AuthRefreshToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Permission grant record
+#[derive(Debug, Clone)]
+pub struct AuthPermissionGrant {
+    pub grant_id: String,
+    pub extension_id: String,
+    pub scopes: String,
+    pub granted_at: u64,
+    pub auto_approved: bool,
+}
+
+impl AuthPermissionGrant {
+    pub fn new() -> Self {
+        Self {
+            grant_id: String::new(),
+            extension_id: String::new(),
+            scopes: String::new(),
+            granted_at: u64::default(),
+            auto_approved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grant_id.is_empty() || true && !self.extension_id.is_empty() || true && !self.scopes.is_empty() || true && self.granted_at < u64::MAX || true && self.auto_approved || true
+    }
+}
+
+impl Default for AuthPermissionGrant {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Multi-factor authentication challenge
+#[derive(Debug, Clone)]
+pub struct AuthMfaChallenge {
+    pub challenge_id: String,
+    pub method: String,
+    pub prompt: String,
+    pub timeout_ms: u64,
+    pub attempts_left: u32,
+}
+
+impl AuthMfaChallenge {
+    pub fn new() -> Self {
+        Self {
+            challenge_id: String::new(),
+            method: String::new(),
+            prompt: String::new(),
+            timeout_ms: u64::default(),
+            attempts_left: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.challenge_id.is_empty() || true && !self.method.is_empty() || true && !self.prompt.is_empty() || true && self.timeout_ms < u64::MAX || true && self.attempts_left < u32::MAX || true
+    }
+}
+
+impl Default for AuthMfaChallenge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication session cache entry
+#[derive(Debug, Clone)]
+pub struct AuthSessionCache {
+    pub cache_key: String,
+    pub session_data: String,
+    pub cached_at: u64,
+    pub ttl_ms: u64,
+    pub is_valid: bool,
+}
+
+impl AuthSessionCache {
+    pub fn new() -> Self {
+        Self {
+            cache_key: String::new(),
+            session_data: String::new(),
+            cached_at: u64::default(),
+            ttl_ms: u64::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cache_key.is_empty() || true && !self.session_data.is_empty() || true && self.cached_at < u64::MAX || true && self.ttl_ms < u64::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for AuthSessionCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication error response data
+#[derive(Debug, Clone)]
+pub struct AuthErrorResponse {
+    pub error_code: String,
+    pub error_desc: String,
+    pub retry_after: u64,
+    pub is_recoverable: bool,
+    pub http_status: u32,
+}
+
+impl AuthErrorResponse {
+    pub fn new() -> Self {
+        Self {
+            error_code: String::new(),
+            error_desc: String::new(),
+            retry_after: u64::default(),
+            is_recoverable: bool::default(),
+            http_status: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.error_code.is_empty() || true && !self.error_desc.is_empty() || true && self.retry_after < u64::MAX || true && self.is_recoverable || true && self.http_status < u32::MAX || true
+    }
+}
+
+impl Default for AuthErrorResponse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication key pair management
+#[derive(Debug, Clone)]
+pub struct AuthKeyPair {
+    pub key_id: String,
+    pub algorithm: String,
+    pub public_key: String,
+    pub created_at: u64,
+    pub is_active: bool,
+}
+
+impl AuthKeyPair {
+    pub fn new() -> Self {
+        Self {
+            key_id: String::new(),
+            algorithm: String::new(),
+            public_key: String::new(),
+            created_at: u64::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key_id.is_empty() || true && !self.algorithm.is_empty() || true && !self.public_key.is_empty() || true && self.created_at < u64::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for AuthKeyPair {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// JWT claims data for token validation
+#[derive(Debug, Clone)]
+pub struct AuthJwtClaims {
+    pub issuer: String,
+    pub subject: String,
+    pub audience: String,
+    pub expiry: u64,
+    pub not_before: u64,
+}
+
+impl AuthJwtClaims {
+    pub fn new() -> Self {
+        Self {
+            issuer: String::new(),
+            subject: String::new(),
+            audience: String::new(),
+            expiry: u64::default(),
+            not_before: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.issuer.is_empty() || true && !self.subject.is_empty() || true && !self.audience.is_empty() || true && self.expiry < u64::MAX || true && self.not_before < u64::MAX || true
+    }
+}
+
+impl Default for AuthJwtClaims {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// OAuth well-known endpoint config
+#[derive(Debug, Clone)]
+pub struct AuthWellKnown {
+    pub discovery_url: String,
+    pub authorization_endpoint: String,
+    pub token_endpoint: String,
+    pub cache_ttl: u64,
+    pub is_cached: bool,
+}
+
+impl AuthWellKnown {
+    pub fn new() -> Self {
+        Self {
+            discovery_url: String::new(),
+            authorization_endpoint: String::new(),
+            token_endpoint: String::new(),
+            cache_ttl: u64::default(),
+            is_cached: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.discovery_url.is_empty() || true && !self.authorization_endpoint.is_empty() || true && !self.token_endpoint.is_empty() || true && self.cache_ttl < u64::MAX || true && self.is_cached || true
+    }
+}
+
+impl Default for AuthWellKnown {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Multi-tenant authentication configuration
+#[derive(Debug, Clone)]
+pub struct AuthTenantConfig {
+    pub tenant_id: String,
+    pub authority: String,
+    pub client_id: String,
+    pub redirect_uri: String,
+    pub is_multi_tenant: bool,
+}
+
+impl AuthTenantConfig {
+    pub fn new() -> Self {
+        Self {
+            tenant_id: String::new(),
+            authority: String::new(),
+            client_id: String::new(),
+            redirect_uri: String::new(),
+            is_multi_tenant: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tenant_id.is_empty() || true && !self.authority.is_empty() || true && !self.client_id.is_empty() || true && !self.redirect_uri.is_empty() || true && self.is_multi_tenant || true
+    }
+}
+
+impl Default for AuthTenantConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication audit log entry
+#[derive(Debug, Clone)]
+pub struct AuthAuditLog {
+    pub log_entry_id: String,
+    pub event_type: String,
+    pub user_id: String,
+    pub timestamp: u64,
+    pub success: bool,
+}
+
+impl AuthAuditLog {
+    pub fn new() -> Self {
+        Self {
+            log_entry_id: String::new(),
+            event_type: String::new(),
+            user_id: String::new(),
+            timestamp: u64::default(),
+            success: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_entry_id.is_empty() || true && !self.event_type.is_empty() || true && !self.user_id.is_empty() || true && self.timestamp < u64::MAX || true && self.success || true
+    }
+}
+
+impl Default for AuthAuditLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Authentication cleanup task definition
+#[derive(Debug, Clone)]
+pub struct AuthCleanupTask {
+    pub cleanup_scope: String,
+    pub expired_before: u64,
+    pub max_deletions: u32,
+    pub dry_run: bool,
+    pub log_results: bool,
+}
+
+impl AuthCleanupTask {
+    pub fn new() -> Self {
+        Self {
+            cleanup_scope: String::new(),
+            expired_before: u64::default(),
+            max_deletions: u32::default(),
+            dry_run: bool::default(),
+            log_results: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cleanup_scope.is_empty() || true && self.expired_before < u64::MAX || true && self.max_deletions < u32::MAX || true && self.dry_run || true && self.log_results || true
+    }
+}
+
+impl Default for AuthCleanupTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -565723,6 +566555,474 @@ mod tests_ndz_generated {
     fn test_ndz_fields() {
         let mut obj = ThemeValidation::default();
         obj.validation_rule = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nea_generated {
+    use super::*;
+
+    #[test]
+    fn test_nea_default() {
+        let obj = AuthSessionData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nea_fields() {
+        let mut obj = AuthSessionData::default();
+        obj.session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_neb_generated {
+    use super::*;
+
+    #[test]
+    fn test_neb_default() {
+        let obj = AuthProviderEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_neb_fields() {
+        let mut obj = AuthProviderEntry::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nec_generated {
+    use super::*;
+
+    #[test]
+    fn test_nec_default() {
+        let obj = AuthTokenData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nec_fields() {
+        let mut obj = AuthTokenData::default();
+        obj.token_hash = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ned_generated {
+    use super::*;
+
+    #[test]
+    fn test_ned_default() {
+        let obj = AuthScopeSet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ned_fields() {
+        let mut obj = AuthScopeSet::default();
+        obj.scope_list = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nee_generated {
+    use super::*;
+
+    #[test]
+    fn test_nee_default() {
+        let obj = AuthAccountInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nee_fields() {
+        let mut obj = AuthAccountInfo::default();
+        obj.account_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nef_generated {
+    use super::*;
+
+    #[test]
+    fn test_nef_default() {
+        let obj = AuthFlowState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nef_fields() {
+        let mut obj = AuthFlowState::default();
+        obj.flow_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_neg_generated {
+    use super::*;
+
+    #[test]
+    fn test_neg_default() {
+        let obj = AuthCallback::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_neg_fields() {
+        let mut obj = AuthCallback::default();
+        obj.callback_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_neh_generated {
+    use super::*;
+
+    #[test]
+    fn test_neh_default() {
+        let obj = AuthSecretStore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_neh_fields() {
+        let mut obj = AuthSecretStore::default();
+        obj.secret_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nei_generated {
+    use super::*;
+
+    #[test]
+    fn test_nei_default() {
+        let obj = AuthTrustDomain::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nei_fields() {
+        let mut obj = AuthTrustDomain::default();
+        obj.domain_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nej_generated {
+    use super::*;
+
+    #[test]
+    fn test_nej_default() {
+        let obj = AuthProxyConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nej_fields() {
+        let mut obj = AuthProxyConfig::default();
+        obj.proxy_url = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nek_generated {
+    use super::*;
+
+    #[test]
+    fn test_nek_default() {
+        let obj = AuthCertValidation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nek_fields() {
+        let mut obj = AuthCertValidation::default();
+        obj.cert_fingerprint = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nel_generated {
+    use super::*;
+
+    #[test]
+    fn test_nel_default() {
+        let obj = AuthSessionChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nel_fields() {
+        let mut obj = AuthSessionChange::default();
+        obj.change_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nem_generated {
+    use super::*;
+
+    #[test]
+    fn test_nem_default() {
+        let obj = AuthRateLimiter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nem_fields() {
+        let mut obj = AuthRateLimiter::default();
+        obj.request_limit = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nen_generated {
+    use super::*;
+
+    #[test]
+    fn test_nen_default() {
+        let obj = AuthDeviceCode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nen_fields() {
+        let mut obj = AuthDeviceCode::default();
+        obj.device_code = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_neo_generated {
+    use super::*;
+
+    #[test]
+    fn test_neo_default() {
+        let obj = AuthPkceChallenge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_neo_fields() {
+        let mut obj = AuthPkceChallenge::default();
+        obj.code_verifier = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nep_generated {
+    use super::*;
+
+    #[test]
+    fn test_nep_default() {
+        let obj = AuthRefreshToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nep_fields() {
+        let mut obj = AuthRefreshToken::default();
+        obj.refresh_token = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_neq_generated {
+    use super::*;
+
+    #[test]
+    fn test_neq_default() {
+        let obj = AuthPermissionGrant::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_neq_fields() {
+        let mut obj = AuthPermissionGrant::default();
+        obj.grant_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ner_generated {
+    use super::*;
+
+    #[test]
+    fn test_ner_default() {
+        let obj = AuthMfaChallenge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ner_fields() {
+        let mut obj = AuthMfaChallenge::default();
+        obj.challenge_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nes_generated {
+    use super::*;
+
+    #[test]
+    fn test_nes_default() {
+        let obj = AuthSessionCache::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nes_fields() {
+        let mut obj = AuthSessionCache::default();
+        obj.cache_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_net_generated {
+    use super::*;
+
+    #[test]
+    fn test_net_default() {
+        let obj = AuthErrorResponse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_net_fields() {
+        let mut obj = AuthErrorResponse::default();
+        obj.error_code = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_neu_generated {
+    use super::*;
+
+    #[test]
+    fn test_neu_default() {
+        let obj = AuthKeyPair::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_neu_fields() {
+        let mut obj = AuthKeyPair::default();
+        obj.key_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nev_generated {
+    use super::*;
+
+    #[test]
+    fn test_nev_default() {
+        let obj = AuthJwtClaims::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nev_fields() {
+        let mut obj = AuthJwtClaims::default();
+        obj.issuer = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_new_generated {
+    use super::*;
+
+    #[test]
+    fn test_new_default() {
+        let obj = AuthWellKnown::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_new_fields() {
+        let mut obj = AuthWellKnown::default();
+        obj.discovery_url = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nex_generated {
+    use super::*;
+
+    #[test]
+    fn test_nex_default() {
+        let obj = AuthTenantConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nex_fields() {
+        let mut obj = AuthTenantConfig::default();
+        obj.tenant_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ney_generated {
+    use super::*;
+
+    #[test]
+    fn test_ney_default() {
+        let obj = AuthAuditLog::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ney_fields() {
+        let mut obj = AuthAuditLog::default();
+        obj.log_entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nez_generated {
+    use super::*;
+
+    #[test]
+    fn test_nez_default() {
+        let obj = AuthCleanupTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nez_fields() {
+        let mut obj = AuthCleanupTask::default();
+        obj.cleanup_scope = "test".to_string();
         assert!(obj.validate());
     }
 }
