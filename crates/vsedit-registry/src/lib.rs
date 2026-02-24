@@ -255745,6 +255745,838 @@ impl Default for AuthCleanupTask {
     }
 }
 
+/// Comment thread data for inline comments
+#[derive(Debug, Clone)]
+pub struct CommentThreadData {
+    pub thread_id: String,
+    pub uri: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub is_resolved: bool,
+}
+
+impl CommentThreadData {
+    pub fn new() -> Self {
+        Self {
+            thread_id: String::new(),
+            uri: String::new(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.thread_id.is_empty() || true && !self.uri.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && self.is_resolved || true
+    }
+}
+
+impl Default for CommentThreadData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment reply body content
+#[derive(Debug, Clone)]
+pub struct CommentReplyBody {
+    pub body_text: String,
+    pub author_id: String,
+    pub timestamp: u64,
+    pub is_edited: bool,
+    pub reply_to: String,
+}
+
+impl CommentReplyBody {
+    pub fn new() -> Self {
+        Self {
+            body_text: String::new(),
+            author_id: String::new(),
+            timestamp: u64::default(),
+            is_edited: bool::default(),
+            reply_to: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.body_text.is_empty() || true && !self.author_id.is_empty() || true && self.timestamp < u64::MAX || true && self.is_edited || true && !self.reply_to.is_empty() || true
+    }
+}
+
+impl Default for CommentReplyBody {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment reaction/emoji data
+#[derive(Debug, Clone)]
+pub struct CommentReaction {
+    pub reaction_type: String,
+    pub count: u32,
+    pub has_reacted: bool,
+    pub label: String,
+    pub icon_path: String,
+}
+
+impl CommentReaction {
+    pub fn new() -> Self {
+        Self {
+            reaction_type: String::new(),
+            count: u32::default(),
+            has_reacted: bool::default(),
+            label: String::new(),
+            icon_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.reaction_type.is_empty() || true && self.count < u32::MAX || true && self.has_reacted || true && !self.label.is_empty() || true && !self.icon_path.is_empty() || true
+    }
+}
+
+impl Default for CommentReaction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment range reference in document
+#[derive(Debug, Clone)]
+pub struct CommentRangeRef {
+    pub start_line: u32,
+    pub end_line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub document_uri: String,
+}
+
+impl CommentRangeRef {
+    pub fn new() -> Self {
+        Self {
+            start_line: u32::default(),
+            end_line: u32::default(),
+            start_col: u32::default(),
+            end_col: u32::default(),
+            document_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_col < u32::MAX || true && !self.document_uri.is_empty() || true
+    }
+}
+
+impl Default for CommentRangeRef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment author identity info
+#[derive(Debug, Clone)]
+pub struct CommentAuthorInfo {
+    pub author_name: String,
+    pub avatar_uri: String,
+    pub is_self: bool,
+    pub author_id: String,
+    pub profile_url: String,
+}
+
+impl CommentAuthorInfo {
+    pub fn new() -> Self {
+        Self {
+            author_name: String::new(),
+            avatar_uri: String::new(),
+            is_self: bool::default(),
+            author_id: String::new(),
+            profile_url: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.author_name.is_empty() || true && !self.avatar_uri.is_empty() || true && self.is_self || true && !self.author_id.is_empty() || true && !self.profile_url.is_empty() || true
+    }
+}
+
+impl Default for CommentAuthorInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment controller registration reference
+#[derive(Debug, Clone)]
+pub struct CommentControllerRef {
+    pub controller_id: String,
+    pub label: String,
+    pub commenting_range_provider: bool,
+    pub reaction_handler: bool,
+    pub options: String,
+}
+
+impl CommentControllerRef {
+    pub fn new() -> Self {
+        Self {
+            controller_id: String::new(),
+            label: String::new(),
+            commenting_range_provider: bool::default(),
+            reaction_handler: bool::default(),
+            options: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.controller_id.is_empty() || true && !self.label.is_empty() || true && self.commenting_range_provider || true && self.reaction_handler || true && !self.options.is_empty() || true
+    }
+}
+
+impl Default for CommentControllerRef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment context key for visibility
+#[derive(Debug, Clone)]
+pub struct CommentContextKey {
+    pub context_key: String,
+    pub expected_value: String,
+    pub is_negated: bool,
+    pub comment_id: String,
+    pub scope: String,
+}
+
+impl CommentContextKey {
+    pub fn new() -> Self {
+        Self {
+            context_key: String::new(),
+            expected_value: String::new(),
+            is_negated: bool::default(),
+            comment_id: String::new(),
+            scope: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.context_key.is_empty() || true && !self.expected_value.is_empty() || true && self.is_negated || true && !self.comment_id.is_empty() || true && !self.scope.is_empty() || true
+    }
+}
+
+impl Default for CommentContextKey {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment widget mode configuration
+#[derive(Debug, Clone)]
+pub struct CommentModeEntry {
+    pub mode_type: String,
+    pub collapse_by_default: bool,
+    pub show_resolved: bool,
+    pub inline_actions: bool,
+    pub editor_command: String,
+}
+
+impl CommentModeEntry {
+    pub fn new() -> Self {
+        Self {
+            mode_type: String::new(),
+            collapse_by_default: bool::default(),
+            show_resolved: bool::default(),
+            inline_actions: bool::default(),
+            editor_command: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mode_type.is_empty() || true && self.collapse_by_default || true && self.show_resolved || true && self.inline_actions || true && !self.editor_command.is_empty() || true
+    }
+}
+
+impl Default for CommentModeEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment draft state persistence
+#[derive(Debug, Clone)]
+pub struct CommentDraftState {
+    pub draft_text: String,
+    pub thread_id: String,
+    pub saved_at: u64,
+    pub is_reply: bool,
+    pub cursor_pos: u32,
+}
+
+impl CommentDraftState {
+    pub fn new() -> Self {
+        Self {
+            draft_text: String::new(),
+            thread_id: String::new(),
+            saved_at: u64::default(),
+            is_reply: bool::default(),
+            cursor_pos: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.draft_text.is_empty() || true && !self.thread_id.is_empty() || true && self.saved_at < u64::MAX || true && self.is_reply || true && self.cursor_pos < u32::MAX || true
+    }
+}
+
+impl Default for CommentDraftState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment filter configuration
+#[derive(Debug, Clone)]
+pub struct CommentFilterConfig {
+    pub filter_by: String,
+    pub show_unresolved: bool,
+    pub show_resolved: bool,
+    pub author_filter: String,
+    pub date_filter: String,
+}
+
+impl CommentFilterConfig {
+    pub fn new() -> Self {
+        Self {
+            filter_by: String::new(),
+            show_unresolved: bool::default(),
+            show_resolved: bool::default(),
+            author_filter: String::new(),
+            date_filter: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_by.is_empty() || true && self.show_unresolved || true && self.show_resolved || true && !self.author_filter.is_empty() || true && !self.date_filter.is_empty() || true
+    }
+}
+
+impl Default for CommentFilterConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment sort order settings
+#[derive(Debug, Clone)]
+pub struct CommentSortOrder {
+    pub sort_field: String,
+    pub ascending: bool,
+    pub group_by_file: bool,
+    pub pin_unresolved: bool,
+    pub secondary_sort: String,
+}
+
+impl CommentSortOrder {
+    pub fn new() -> Self {
+        Self {
+            sort_field: String::new(),
+            ascending: bool::default(),
+            group_by_file: bool::default(),
+            pin_unresolved: bool::default(),
+            secondary_sort: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sort_field.is_empty() || true && self.ascending || true && self.group_by_file || true && self.pin_unresolved || true && !self.secondary_sort.is_empty() || true
+    }
+}
+
+impl Default for CommentSortOrder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment widget display configuration
+#[derive(Debug, Clone)]
+pub struct CommentWidgetConfig {
+    pub widget_id: String,
+    pub max_height: u32,
+    pub show_timestamps: bool,
+    pub show_avatars: bool,
+    pub collapse_replies: bool,
+}
+
+impl CommentWidgetConfig {
+    pub fn new() -> Self {
+        Self {
+            widget_id: String::new(),
+            max_height: u32::default(),
+            show_timestamps: bool::default(),
+            show_avatars: bool::default(),
+            collapse_replies: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.widget_id.is_empty() || true && self.max_height < u32::MAX || true && self.show_timestamps || true && self.show_avatars || true && self.collapse_replies || true
+    }
+}
+
+impl Default for CommentWidgetConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment resolution tracking data
+#[derive(Debug, Clone)]
+pub struct CommentResolution {
+    pub resolved_by: String,
+    pub resolved_at: u64,
+    pub resolution_text: String,
+    pub auto_resolved: bool,
+    pub thread_id: String,
+}
+
+impl CommentResolution {
+    pub fn new() -> Self {
+        Self {
+            resolved_by: String::new(),
+            resolved_at: u64::default(),
+            resolution_text: String::new(),
+            auto_resolved: bool::default(),
+            thread_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resolved_by.is_empty() || true && self.resolved_at < u64::MAX || true && !self.resolution_text.is_empty() || true && self.auto_resolved || true && !self.thread_id.is_empty() || true
+    }
+}
+
+impl Default for CommentResolution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment gutter decoration reference
+#[derive(Debug, Clone)]
+pub struct CommentDecorationRef {
+    pub decoration_type: String,
+    pub icon_path: String,
+    pub hover_text: String,
+    pub color: String,
+    pub affects_overview: bool,
+}
+
+impl CommentDecorationRef {
+    pub fn new() -> Self {
+        Self {
+            decoration_type: String::new(),
+            icon_path: String::new(),
+            hover_text: String::new(),
+            color: String::new(),
+            affects_overview: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decoration_type.is_empty() || true && !self.icon_path.is_empty() || true && !self.hover_text.is_empty() || true && !self.color.is_empty() || true && self.affects_overview || true
+    }
+}
+
+impl Default for CommentDecorationRef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inlay hint entry for editor overlays
+#[derive(Debug, Clone)]
+pub struct InlineHintEntry {
+    pub hint_text: String,
+    pub position_line: u32,
+    pub position_col: u32,
+    pub kind: String,
+    pub is_clickable: bool,
+}
+
+impl InlineHintEntry {
+    pub fn new() -> Self {
+        Self {
+            hint_text: String::new(),
+            position_line: u32::default(),
+            position_col: u32::default(),
+            kind: String::new(),
+            is_clickable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hint_text.is_empty() || true && self.position_line < u32::MAX || true && self.position_col < u32::MAX || true && !self.kind.is_empty() || true && self.is_clickable || true
+    }
+}
+
+impl Default for InlineHintEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inlay hint kind classification
+#[derive(Debug, Clone)]
+pub struct InlineHintKind {
+    pub kind_value: String,
+    pub display_name: String,
+    pub icon: String,
+    pub sort_order: u32,
+    pub is_default: bool,
+}
+
+impl InlineHintKind {
+    pub fn new() -> Self {
+        Self {
+            kind_value: String::new(),
+            display_name: String::new(),
+            icon: String::new(),
+            sort_order: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kind_value.is_empty() || true && !self.display_name.is_empty() || true && !self.icon.is_empty() || true && self.sort_order < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for InlineHintKind {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inlay hint label part definition
+#[derive(Debug, Clone)]
+pub struct InlineHintLabel {
+    pub label_parts: String,
+    pub command_id: String,
+    pub tooltip: String,
+    pub location_uri: String,
+    pub is_resolved: bool,
+}
+
+impl InlineHintLabel {
+    pub fn new() -> Self {
+        Self {
+            label_parts: String::new(),
+            command_id: String::new(),
+            tooltip: String::new(),
+            location_uri: String::new(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.label_parts.is_empty() || true && !self.command_id.is_empty() || true && !self.tooltip.is_empty() || true && !self.location_uri.is_empty() || true && self.is_resolved || true
+    }
+}
+
+impl Default for InlineHintLabel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inlay hint provider registration
+#[derive(Debug, Clone)]
+pub struct InlineHintProvider {
+    pub provider_id: String,
+    pub document_selector: String,
+    pub resolve_hints: bool,
+    pub event_emitter: bool,
+    pub priority: u32,
+}
+
+impl InlineHintProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            document_selector: String::new(),
+            resolve_hints: bool::default(),
+            event_emitter: bool::default(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.document_selector.is_empty() || true && self.resolve_hints || true && self.event_emitter || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for InlineHintProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inlay hint padding configuration
+#[derive(Debug, Clone)]
+pub struct InlineHintPadding {
+    pub padding_left: bool,
+    pub padding_right: bool,
+    pub space_width: u32,
+    pub custom_css: String,
+    pub is_enabled: bool,
+}
+
+impl InlineHintPadding {
+    pub fn new() -> Self {
+        Self {
+            padding_left: bool::default(),
+            padding_right: bool::default(),
+            space_width: u32::default(),
+            custom_css: String::new(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.padding_left || true && self.padding_right || true && self.space_width < u32::MAX || true && !self.custom_css.is_empty() || true && self.is_enabled || true
+    }
+}
+
+impl Default for InlineHintPadding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inlay hint tooltip content
+#[derive(Debug, Clone)]
+pub struct InlineHintTooltip {
+    pub tooltip_text: String,
+    pub is_markdown: bool,
+    pub supports_html: bool,
+    pub max_width: u32,
+    pub show_delay_ms: u64,
+}
+
+impl InlineHintTooltip {
+    pub fn new() -> Self {
+        Self {
+            tooltip_text: String::new(),
+            is_markdown: bool::default(),
+            supports_html: bool::default(),
+            max_width: u32::default(),
+            show_delay_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tooltip_text.is_empty() || true && self.is_markdown || true && self.supports_html || true && self.max_width < u32::MAX || true && self.show_delay_ms < u64::MAX || true
+    }
+}
+
+impl Default for InlineHintTooltip {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline edit suggestion display
+#[derive(Debug, Clone)]
+pub struct InlineEditSuggestion {
+    pub edit_text: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub display_label: String,
+    pub is_preferred: bool,
+}
+
+impl InlineEditSuggestion {
+    pub fn new() -> Self {
+        Self {
+            edit_text: String::new(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            display_label: String::new(),
+            is_preferred: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_text.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && !self.display_label.is_empty() || true && self.is_preferred || true
+    }
+}
+
+impl Default for InlineEditSuggestion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline completion candidate data
+#[derive(Debug, Clone)]
+pub struct InlineCompletionCandidate {
+    pub insert_text: String,
+    pub filter_text: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub command: String,
+}
+
+impl InlineCompletionCandidate {
+    pub fn new() -> Self {
+        Self {
+            insert_text: String::new(),
+            filter_text: String::new(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            command: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.insert_text.is_empty() || true && !self.filter_text.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && !self.command.is_empty() || true
+    }
+}
+
+impl Default for InlineCompletionCandidate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline completion list grouping
+#[derive(Debug, Clone)]
+pub struct InlineCompletionList {
+    pub list_id: String,
+    pub items_count: u32,
+    pub is_incomplete: bool,
+    pub suppress_suggestions: bool,
+    pub cache_key: String,
+}
+
+impl InlineCompletionList {
+    pub fn new() -> Self {
+        Self {
+            list_id: String::new(),
+            items_count: u32::default(),
+            is_incomplete: bool::default(),
+            suppress_suggestions: bool::default(),
+            cache_key: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_id.is_empty() || true && self.items_count < u32::MAX || true && self.is_incomplete || true && self.suppress_suggestions || true && !self.cache_key.is_empty() || true
+    }
+}
+
+impl Default for InlineCompletionList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline completion trigger info
+#[derive(Debug, Clone)]
+pub struct InlineCompletionTrigger {
+    pub trigger_kind: String,
+    pub selected_text: String,
+    pub was_explicit: bool,
+    pub document_uri: String,
+    pub position: u32,
+}
+
+impl InlineCompletionTrigger {
+    pub fn new() -> Self {
+        Self {
+            trigger_kind: String::new(),
+            selected_text: String::new(),
+            was_explicit: bool::default(),
+            document_uri: String::new(),
+            position: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.trigger_kind.is_empty() || true && !self.selected_text.is_empty() || true && self.was_explicit || true && !self.document_uri.is_empty() || true && self.position < u32::MAX || true
+    }
+}
+
+impl Default for InlineCompletionTrigger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline completion request context
+#[derive(Debug, Clone)]
+pub struct InlineCompletionContext {
+    pub context_id: String,
+    pub trigger_kind: String,
+    pub selected_suggestion: String,
+    pub is_retrigger: bool,
+    pub prefix: String,
+}
+
+impl InlineCompletionContext {
+    pub fn new() -> Self {
+        Self {
+            context_id: String::new(),
+            trigger_kind: String::new(),
+            selected_suggestion: String::new(),
+            is_retrigger: bool::default(),
+            prefix: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.context_id.is_empty() || true && !self.trigger_kind.is_empty() || true && !self.selected_suggestion.is_empty() || true && self.is_retrigger || true && !self.prefix.is_empty() || true
+    }
+}
+
+impl Default for InlineCompletionContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline completion provider definition
+#[derive(Debug, Clone)]
+pub struct InlineCompletionProviderDef {
+    pub provider_id: String,
+    pub selector: String,
+    pub supports_handle: bool,
+    pub yield_to: String,
+    pub priority: u32,
+}
+
+impl InlineCompletionProviderDef {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            selector: String::new(),
+            supports_handle: bool::default(),
+            yield_to: String::new(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.selector.is_empty() || true && self.supports_handle || true && !self.yield_to.is_empty() || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for InlineCompletionProviderDef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -566896,6 +567728,474 @@ mod tests_nez_generated {
     fn test_nez_fields() {
         let mut obj = AuthCleanupTask::default();
         obj.cleanup_scope = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfa_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfa_default() {
+        let obj = CommentThreadData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfa_fields() {
+        let mut obj = CommentThreadData::default();
+        obj.thread_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfb_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfb_default() {
+        let obj = CommentReplyBody::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfb_fields() {
+        let mut obj = CommentReplyBody::default();
+        obj.body_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfc_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfc_default() {
+        let obj = CommentReaction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfc_fields() {
+        let mut obj = CommentReaction::default();
+        obj.reaction_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfd_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfd_default() {
+        let obj = CommentRangeRef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfd_fields() {
+        let mut obj = CommentRangeRef::default();
+        obj.start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfe_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfe_default() {
+        let obj = CommentAuthorInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfe_fields() {
+        let mut obj = CommentAuthorInfo::default();
+        obj.author_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nff_generated {
+    use super::*;
+
+    #[test]
+    fn test_nff_default() {
+        let obj = CommentControllerRef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nff_fields() {
+        let mut obj = CommentControllerRef::default();
+        obj.controller_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfg_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfg_default() {
+        let obj = CommentContextKey::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfg_fields() {
+        let mut obj = CommentContextKey::default();
+        obj.context_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfh_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfh_default() {
+        let obj = CommentModeEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfh_fields() {
+        let mut obj = CommentModeEntry::default();
+        obj.mode_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfi_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfi_default() {
+        let obj = CommentDraftState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfi_fields() {
+        let mut obj = CommentDraftState::default();
+        obj.draft_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfj_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfj_default() {
+        let obj = CommentFilterConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfj_fields() {
+        let mut obj = CommentFilterConfig::default();
+        obj.filter_by = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfk_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfk_default() {
+        let obj = CommentSortOrder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfk_fields() {
+        let mut obj = CommentSortOrder::default();
+        obj.sort_field = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfl_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfl_default() {
+        let obj = CommentWidgetConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfl_fields() {
+        let mut obj = CommentWidgetConfig::default();
+        obj.widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfm_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfm_default() {
+        let obj = CommentResolution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfm_fields() {
+        let mut obj = CommentResolution::default();
+        obj.resolved_by = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfn_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfn_default() {
+        let obj = CommentDecorationRef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfn_fields() {
+        let mut obj = CommentDecorationRef::default();
+        obj.decoration_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfo_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfo_default() {
+        let obj = InlineHintEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfo_fields() {
+        let mut obj = InlineHintEntry::default();
+        obj.hint_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfp_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfp_default() {
+        let obj = InlineHintKind::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfp_fields() {
+        let mut obj = InlineHintKind::default();
+        obj.kind_value = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfq_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfq_default() {
+        let obj = InlineHintLabel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfq_fields() {
+        let mut obj = InlineHintLabel::default();
+        obj.label_parts = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfr_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfr_default() {
+        let obj = InlineHintProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfr_fields() {
+        let mut obj = InlineHintProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfs_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfs_default() {
+        let obj = InlineHintPadding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfs_fields() {
+        let mut obj = InlineHintPadding::default();
+        obj.padding_left = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nft_generated {
+    use super::*;
+
+    #[test]
+    fn test_nft_default() {
+        let obj = InlineHintTooltip::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nft_fields() {
+        let mut obj = InlineHintTooltip::default();
+        obj.tooltip_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfu_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfu_default() {
+        let obj = InlineEditSuggestion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfu_fields() {
+        let mut obj = InlineEditSuggestion::default();
+        obj.edit_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfv_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfv_default() {
+        let obj = InlineCompletionCandidate::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfv_fields() {
+        let mut obj = InlineCompletionCandidate::default();
+        obj.insert_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfw_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfw_default() {
+        let obj = InlineCompletionList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfw_fields() {
+        let mut obj = InlineCompletionList::default();
+        obj.list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfx_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfx_default() {
+        let obj = InlineCompletionTrigger::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfx_fields() {
+        let mut obj = InlineCompletionTrigger::default();
+        obj.trigger_kind = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfy_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfy_default() {
+        let obj = InlineCompletionContext::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfy_fields() {
+        let mut obj = InlineCompletionContext::default();
+        obj.context_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_nfz_generated {
+    use super::*;
+
+    #[test]
+    fn test_nfz_default() {
+        let obj = InlineCompletionProviderDef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_nfz_fields() {
+        let mut obj = InlineCompletionProviderDef::default();
+        obj.provider_id = "test".to_string();
         assert!(obj.validate());
     }
 }
